@@ -59,11 +59,6 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version:
-          - stable
-          - oldstable
 
     steps:
       - name: Checkout
@@ -75,7 +70,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ matrix['go-version'] }}
+          go-version-file: 'go.mod'
 
       - name: Setup tools
         run: | 
