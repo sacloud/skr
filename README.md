@@ -14,6 +14,21 @@ $ skr config current
 my-profile
 ```
 
+EventBus API のリソースは `eventbus-api` から操作できます。
+
+```console
+$ skr eventbus-api process-configuration list
+$ skr eventbus-api schedule list
+$ skr eventbus-api trigger list
+```
+
+各リソースは `list`、`read`、`create`、`update`、`delete` を提供します。作成・更新には
+SDK の `CreateCommonServiceItemRequest` または `UpdateCommonServiceItemRequest` JSON を
+`--request` に指定してください。作成時の EventBus provider class はコマンドが設定します。
+JSON ファイルを使う場合は `@` に続けてパスを指定します。
+プロセス設定には `update-secret` もあり、`--secret-file` で JSON ファイルを指定します
+（`-` を指定すると標準入力から読み込みます）。
+
 ## ライセンス
 
 このプロジェクトは [Apache License 2.0](LICENSE) のもとで公開されています。
