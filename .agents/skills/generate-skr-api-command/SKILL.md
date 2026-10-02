@@ -124,3 +124,5 @@ replacement for sakumock coverage of the SDK request and response path.
   this repository's `Makefile` so `make build` compiles the package, not only `main.go`.
 - Review `git diff --check` and verify no unrelated files or generated artifacts were
   introduced.
+- For a user-facing walkthrough after the command is implemented, use
+  [the skr API tutorial generation skill](../generate-skr-api-manual/SKILL.md).
