@@ -1,4 +1,4 @@
-# Copyright 2022-2026 The sacloud/go-template Authors
+# Copyright 2022-2026 The sacloud/skr Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM golang:1.27.0 AS builder
-MAINTAINER Usacloud Authors <sacloud.users@gmail.com>
+LABEL org.opencontainers.image.authors="Usacloud Authors <sacloud.users@gmail.com>"
 
 RUN  apt-get update && apt-get -y install \
         bash \
@@ -24,16 +24,16 @@ RUN  apt-get update && apt-get -y install \
       && apt-get clean \
       && rm -rf /var/cache/apt/archives/* /var/lib/apt/lists/*
 
-ADD . /go/src/github.com/sacloud/go-template
-WORKDIR /go/src/github.com/sacloud/go-template
-ENV CGO_ENABLED 0
+ADD . /go/src/github.com/sacloud/skr
+WORKDIR /go/src/github.com/sacloud/skr
+ENV CGO_ENABLED=0
 RUN make tools build
 # ======
 
 FROM alpine:3.24.2
-MAINTAINER Usacloud Authors <sacloud.users@gmail.com>
+LABEL org.opencontainers.image.authors="Usacloud Authors <sacloud.users@gmail.com>"
 
 RUN apk add --no-cache --update ca-certificates
-COPY --from=builder /go/src/github.com/sacloud/go-template/go-template /usr/bin/
+COPY --from=builder /go/src/github.com/sacloud/skr/skr /usr/bin/
 
-ENTRYPOINT ["/usr/bin/go-template"]
+ENTRYPOINT ["/usr/bin/skr"]

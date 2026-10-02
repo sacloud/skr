@@ -2,7 +2,7 @@
 
 usacloud は、さくらのクラウドを操作するための CLI ツールです。
 
-このリポジトリでは、usacloud の新しいバージョンを開発しています。
+このリポジトリでは、usacloud の新しいバージョンを `skr` として開発しています。
 従来の usacloud との互換性は保証されません。
 
 ## 使い方
@@ -10,7 +10,7 @@ usacloud は、さくらのクラウドを操作するための CLI ツールで
 現在選択されているプロファイル名は、次のコマンドで確認できます。
 
 ```console
-$ usacloud config current
+$ skr config current
 my-profile
 ```
 

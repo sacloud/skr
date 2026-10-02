@@ -1,8 +1,8 @@
 #====================
-AUTHOR         ?= The sacloud/go-template Authors
+AUTHOR         ?= The sacloud/skr Authors
 COPYRIGHT_YEAR ?= 2022-2026
 
-BIN            ?= go-template
+BIN            ?= skr
 GO_FILES       ?= $(shell find . -name '*.go')
 
 include includes/go/common.mk

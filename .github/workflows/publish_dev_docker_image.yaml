@@ -36,5 +36,5 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/sacloud/go-template:dev
+          tags: ghcr.io/sacloud/skr:dev
           push: true

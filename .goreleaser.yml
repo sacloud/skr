@@ -6,7 +6,7 @@ builds:
       - CGO_ENABLED=0
     ldflags:
       - -s -w
-      - -X github.com/sacloud/go-template/version.Revision={{.ShortCommit}}
+      - -X github.com/sacloud/skr/version.Revision={{.ShortCommit}}
     goos:
       - windows
       - linux
@@ -58,7 +58,7 @@ changelog:
 #  draft: true
 
 #nfpms:
-#  - homepage: https://docs.usacloud.jp/go-template
+#  - homepage: https://docs.usacloud.jp/skr
 #    file_name_template: "{{ .ProjectName }}_{{ .Os }}-{{ .Arch }}"
 #    maintainer: Usacloud <sacloud.users@gmail.com>
 #    description: CLI to manage to resources on the SAKURA Cloud
@@ -70,13 +70,13 @@ changelog:
 #brews:
 #  - tap:
 #      owner: sacloud
-#      name: homebrew-go-template
+#      name: homebrew-skr
 #      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-#    url_template: "https://github.com/sacloud/go-template/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+#    url_template: "https://github.com/sacloud/skr/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
 #    commit_author:
 #      name: sacloud-bot
 #      email: sacloud.users@gmail.com
-#    homepage: "https://github.com/sacloud/go-template"
+#    homepage: "https://github.com/sacloud/skr"
 #    license: "Apache 2.0"
 #    test: |
-#      system "#{bin}/go-template --version"
+#      system "#{bin}/skr --version"

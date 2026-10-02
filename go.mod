@@ -1,4 +1,4 @@
-module github.com/sacloud/go-template
+module github.com/sacloud/skr
 
 go 1.27.1
 
