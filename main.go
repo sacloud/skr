@@ -25,7 +25,7 @@ import (
 
 type cli struct {
 	Config      configCommand      `cmd:"" help:"Manage configuration profiles."`
-	EventbusAPI eventbusAPICommand `cmd:"" name:"eventbus-api" help:"Manage EventBus API resources."`
+	EventbusAPI eventbusAPICommand `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。実行先を process-configuration で定義し、schedule または trigger から参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
 }
 
 type configCommand struct {

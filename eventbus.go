@@ -29,9 +29,9 @@ import (
 )
 
 type eventbusAPICommand struct {
-	ProcessConfiguration processConfigurationCommands `cmd:"" name:"process-configuration" help:"Manage EventBus process configurations."`
-	Schedule             resourceCommands             `cmd:"" help:"Manage EventBus schedules."`
-	Trigger              resourceCommands             `cmd:"" help:"Manage EventBus triggers."`
+	ProcessConfiguration processConfigurationCommands `cmd:"" name:"process-configuration" help:"ジョブの実行先とパラメータを定義します。simple-notification、simplemq、autoscale の実行先サービスを先に作成してから、この実行設定を作成してください。作成後、schedule または trigger からこの実行設定 ID を参照します。"`
+	Schedule             scheduleCommands             `cmd:"" help:"指定した時刻から定期的に実行設定を実行します。スケジュール周期は最短 1 分です。先に process-configuration を作成し、その ID を指定してください。StartsAt は Unix epoch のミリ秒を整数で指定します。例: skr eventbus-api schedule create --request='{\"CommonServiceItem\":{\"Name\":\"daily\",\"Settings\":{\"ProcessConfigurationID\":\"PROCESS-CONFIGURATION-ID\",\"StartsAt\":1893456000000,\"RecurringStep\":1,\"RecurringUnit\":\"day\"}}}'"`
+	Trigger              triggerCommands              `cmd:"" help:"イベントソースの変更を検知して実行設定を実行します。先に process-configuration を作成し、その ID を指定してください。Settings には Source、Types、ProcessConfigurationID を指定します。Source と Types の例示値は実際のイベントソースに置き換えてください。例: skr eventbus-api trigger create --request='{\"CommonServiceItem\":{\"Name\":\"on-change\",\"Settings\":{\"Source\":\"EVENT-SOURCE\",\"Types\":[\"EVENT-TYPE\"],\"ProcessConfigurationID\":\"PROCESS-CONFIGURATION-ID\"}}}'"`
 }
 
 type itemAPI interface {
@@ -49,21 +49,29 @@ type processConfigurationAPI interface {
 
 type itemAPIFactory func() (itemAPI, error)
 
-type resourceCommands struct {
-	List   itemListCommand   `cmd:"" help:"List this resource type."`
-	Read   itemReadCommand   `cmd:"" help:"Read a resource by ID."`
-	Create itemCreateCommand `cmd:"" help:"Create a resource from a JSON request."`
-	Update itemUpdateCommand `cmd:"" help:"Update a resource from a JSON request."`
-	Delete itemDeleteCommand `cmd:"" help:"Delete a resource by ID."`
+type processConfigurationCommands struct {
+	List         itemListCommand                   `cmd:"" help:"実行設定を一覧表示し、JSON 配列で出力します。例: skr eventbus-api process-configuration list"`
+	Read         itemReadCommand                   `cmd:"" help:"ID を指定して実行設定を読み取り、JSON で出力します。ID は list の出力で確認できます。"`
+	Create       processConfigurationCreateCommand `cmd:"" help:"実行設定を作成します。実行先サービス（simplenotification、simplemq、autoscale）は先に作成してください。例: skr eventbus-api process-configuration create --request='{\"CommonServiceItem\":{\"Name\":\"notify\",\"Settings\":{\"Destination\":\"simplenotification\",\"Parameters\":\"{\\\"group_id\\\":\\\"GROUP-ID\\\",\\\"message\\\":\\\"hello\\\"}\"}}}'"`
+	Update       processConfigurationUpdateCommand `cmd:"" help:"実行設定を部分更新します。未指定の項目は変更されません。Settings を指定する場合は Destination と Parameters を含む設定全体を指定してください。"`
+	Delete       itemDeleteCommand                 `cmd:"" help:"ID を指定して実行設定を削除します。削除前に対象 ID を確認してください。"`
+	UpdateSecret itemUpdateSecretCommand           `cmd:"" help:"実行設定が実行先サービスを呼び出すためのシークレットを登録します。シークレットは --secret-file でファイルまたは標準入力から読み込み、コマンドラインには記述しないでください。SimpleMQ の例: {\"APIKey\":\"SIMPLEMQ-API-KEY\"}"`
 }
 
-type processConfigurationCommands struct {
-	List         itemListCommand         `cmd:"" help:"List process configurations."`
-	Read         itemReadCommand         `cmd:"" help:"Read a process configuration by ID."`
-	Create       itemCreateCommand       `cmd:"" help:"Create a process configuration from a JSON request."`
-	Update       itemUpdateCommand       `cmd:"" help:"Update a process configuration from a JSON request."`
-	Delete       itemDeleteCommand       `cmd:"" help:"Delete a process configuration by ID."`
-	UpdateSecret itemUpdateSecretCommand `cmd:"" help:"Update a process configuration's secret."`
+type scheduleCommands struct {
+	List   itemListCommand       `cmd:"" help:"スケジュールを一覧表示し、JSON 配列で出力します。"`
+	Read   itemReadCommand       `cmd:"" help:"ID を指定してスケジュールを読み取り、JSON で出力します。"`
+	Create scheduleCreateCommand `cmd:"" help:"実行スケジュールを作成します。StartsAt は Unix epoch ミリ秒の整数です。RecurringStep と RecurringUnit（min、hour、day）、または Crontab を指定します。周期は最短 1 分です。例: skr eventbus-api schedule create --request='{\"CommonServiceItem\":{\"Name\":\"daily\",\"Settings\":{\"ProcessConfigurationID\":\"PROCESS-CONFIGURATION-ID\",\"StartsAt\":1893456000000,\"RecurringStep\":1,\"RecurringUnit\":\"day\"}}}'"`
+	Update scheduleUpdateCommand `cmd:"" help:"スケジュールを部分更新します。未指定項目は変更されません。Settings を更新する場合は ProcessConfigurationID と StartsAt、および周期または Crontab を含めます。"`
+	Delete itemDeleteCommand     `cmd:"" help:"ID を指定してスケジュールを削除します。削除前に対象 ID を確認してください。"`
+}
+
+type triggerCommands struct {
+	List   itemListCommand      `cmd:"" help:"トリガーを一覧表示し、JSON 配列で出力します。"`
+	Read   itemReadCommand      `cmd:"" help:"ID を指定してトリガーを読み取り、JSON で出力します。"`
+	Create triggerCreateCommand `cmd:"" help:"イベントトリガーを作成します。Settings に Source、Types、ProcessConfigurationID を指定します。Source と Types の例示値は実際のイベントソースに置き換えてください。例: skr eventbus-api trigger create --request='{\"CommonServiceItem\":{\"Name\":\"on-change\",\"Settings\":{\"Source\":\"EVENT-SOURCE\",\"Types\":[\"EVENT-TYPE\"],\"ProcessConfigurationID\":\"PROCESS-CONFIGURATION-ID\"}}}'"`
+	Update triggerUpdateCommand `cmd:"" help:"トリガーを部分更新します。未指定項目は変更されません。Settings を更新する場合は Source、Types、ProcessConfigurationID を含めます。"`
+	Delete itemDeleteCommand    `cmd:"" help:"ID を指定してトリガーを削除します。削除前に対象 ID を確認してください。"`
 }
 
 type itemListCommand struct {
@@ -83,7 +91,7 @@ func (c *itemListCommand) Run(ctx *kong.Context) error {
 }
 
 type itemReadCommand struct {
-	ID      string `arg:"" help:"Resource ID."`
+	ID      string `arg:"" help:"list の出力で確認したリソース ID。"`
 	factory itemAPIFactory
 }
 
@@ -99,18 +107,69 @@ func (c *itemReadCommand) Run(ctx *kong.Context) error {
 	return writeJSON(ctx, item)
 }
 
-type itemCreateCommand struct {
-	Request       string `name:"request" required:"" help:"SDK CreateCommonServiceItemRequest JSON or @path-to-file."`
-	factory       itemAPIFactory
-	providerClass v1.ProviderClass
+type processConfigurationCreateCommand struct {
+	Request string `name:"request" required:"" help:"CommonServiceItem に Name と Settings を含む JSON。直接指定するか @path.json でファイルを指定します。Provider は自動設定されます。"`
+	factory itemAPIFactory
 }
 
-func (c *itemCreateCommand) Run(ctx *kong.Context) error {
+func (c *processConfigurationCreateCommand) Run(ctx *kong.Context) error {
+	return runCreateItem(ctx, c.Request, c.factory, v1.ProviderClassEventbusprocessconfiguration)
+}
+
+type scheduleCreateCommand struct {
+	Request string `name:"request" required:"" help:"Settings は ProcessConfigurationID、StartsAt（Unix epoch ミリ秒の整数）、RecurringStep と RecurringUnit（min、hour、day）で指定します。RecurringStep/RecurringUnit の代わりに Crontab も指定できます。直接 JSON または @path.json。"`
+	factory itemAPIFactory
+}
+
+func (c *scheduleCreateCommand) Run(ctx *kong.Context) error {
+	return runCreateItem(ctx, c.Request, c.factory, v1.ProviderClassEventbusschedule)
+}
+
+type triggerCreateCommand struct {
+	Request string `name:"request" required:"" help:"Settings に Source、Types（文字列配列）、ProcessConfigurationID を含む JSON。直接指定するか @path.json でファイルを指定します。"`
+	factory itemAPIFactory
+}
+
+func (c *triggerCreateCommand) Run(ctx *kong.Context) error {
+	return runCreateItem(ctx, c.Request, c.factory, v1.ProviderClassEventbustrigger)
+}
+
+type processConfigurationUpdateCommand struct {
+	ID      string `arg:"" help:"更新する実行設定 ID。"`
+	Request string `name:"request" required:"" help:"変更する項目を含む UpdateCommonServiceItemRequest JSON。Settings は Destination と Parameters を含む実行設定全体を指定します。直接 JSON または @path.json。Description を null にすると説明を消去します。"`
+	factory itemAPIFactory
+}
+
+func (c *processConfigurationUpdateCommand) Run(ctx *kong.Context) error {
+	return runUpdateItem(ctx, c.ID, c.Request, c.factory)
+}
+
+type scheduleUpdateCommand struct {
+	ID      string `arg:"" help:"更新するスケジュール ID。"`
+	Request string `name:"request" required:"" help:"変更する項目を含む UpdateCommonServiceItemRequest JSON。Settings は schedule 用の JSON オブジェクトです。直接 JSON または @path.json。Description を null にすると説明を消去します。"`
+	factory itemAPIFactory
+}
+
+func (c *scheduleUpdateCommand) Run(ctx *kong.Context) error {
+	return runUpdateItem(ctx, c.ID, c.Request, c.factory)
+}
+
+type triggerUpdateCommand struct {
+	ID      string `arg:"" help:"更新するトリガー ID。"`
+	Request string `name:"request" required:"" help:"変更する項目を含む UpdateCommonServiceItemRequest JSON。Settings は Source、Types、ProcessConfigurationID を含む trigger 用 JSON オブジェクトです。直接 JSON または @path.json。Description を null にすると説明を消去します。"`
+	factory itemAPIFactory
+}
+
+func (c *triggerUpdateCommand) Run(ctx *kong.Context) error {
+	return runUpdateItem(ctx, c.ID, c.Request, c.factory)
+}
+
+func runCreateItem(ctx *kong.Context, input string, factory itemAPIFactory, providerClass v1.ProviderClass) error {
 	var request v1.CreateCommonServiceItemRequest
-	if err := decodeCreateRequest(c.Request, c.providerClass, &request); err != nil {
+	if err := decodeCreateRequest(input, providerClass, &request); err != nil {
 		return err
 	}
-	op, err := c.factory()
+	op, err := factory()
 	if err != nil {
 		return err
 	}
@@ -121,22 +180,16 @@ func (c *itemCreateCommand) Run(ctx *kong.Context) error {
 	return writeJSON(ctx, item)
 }
 
-type itemUpdateCommand struct {
-	ID      string `arg:"" help:"Resource ID."`
-	Request string `name:"request" required:"" help:"SDK UpdateCommonServiceItemRequest JSON or @path-to-file."`
-	factory itemAPIFactory
-}
-
-func (c *itemUpdateCommand) Run(ctx *kong.Context) error {
+func runUpdateItem(ctx *kong.Context, id, input string, factory itemAPIFactory) error {
 	var request v1.UpdateCommonServiceItemRequest
-	if err := decodeRequest(c.Request, &request); err != nil {
+	if err := decodeRequest(input, &request); err != nil {
 		return err
 	}
-	op, err := c.factory()
+	op, err := factory()
 	if err != nil {
 		return err
 	}
-	item, err := op.Update(context.Background(), c.ID, request)
+	item, err := op.Update(context.Background(), id, request)
 	if err != nil {
 		return err
 	}
@@ -144,7 +197,7 @@ func (c *itemUpdateCommand) Run(ctx *kong.Context) error {
 }
 
 type itemDeleteCommand struct {
-	ID      string `arg:"" help:"Resource ID."`
+	ID      string `arg:"" help:"削除するリソース ID。list の出力で確認できます。"`
 	factory itemAPIFactory
 }
 
@@ -157,8 +210,8 @@ func (c *itemDeleteCommand) Run(_ *kong.Context) error {
 }
 
 type itemUpdateSecretCommand struct {
-	ID         string `arg:"" help:"Process configuration ID."`
-	SecretFile string `name:"secret-file" required:"" help:"SDK SetSecretRequest JSON file, or - to read from standard input."`
+	ID         string `arg:"" help:"シークレットを更新する実行設定 ID。"`
+	SecretFile string `name:"secret-file" required:"" help:"Secret オブジェクトの JSON ファイル。- の場合は標準入力から読み込みます。SimpleMQ: {\"APIKey\":\"...\"}。API キー認証: {\"AccessToken\":\"...\",\"AccessTokenSecret\":\"...\"}。"`
 }
 
 func (c *itemUpdateSecretCommand) Run(_ *kong.Context) error {
@@ -183,41 +236,44 @@ func newCLI() cli {
 	processConfigurationFactory := func() (itemAPI, error) {
 		return newProcessConfigurationAPI()
 	}
-	result.EventbusAPI.ProcessConfiguration.setFactory(
-		processConfigurationFactory,
-		v1.ProviderClassEventbusprocessconfiguration,
-	)
+	result.EventbusAPI.ProcessConfiguration.setFactory(processConfigurationFactory)
 	result.EventbusAPI.Schedule.setFactory(func() (itemAPI, error) {
 		client, err := newEventbusClient()
 		if err != nil {
 			return nil, err
 		}
 		return eventbus.NewScheduleOp(client), nil
-	}, v1.ProviderClassEventbusschedule)
+	})
 	result.EventbusAPI.Trigger.setFactory(func() (itemAPI, error) {
 		client, err := newEventbusClient()
 		if err != nil {
 			return nil, err
 		}
 		return eventbus.NewTriggerOp(client), nil
-	}, v1.ProviderClassEventbustrigger)
+	})
 	return result
 }
 
-func (c *resourceCommands) setFactory(factory itemAPIFactory, providerClass v1.ProviderClass) {
+func (c *scheduleCommands) setFactory(factory itemAPIFactory) {
 	c.List.factory = factory
 	c.Read.factory = factory
 	c.Create.factory = factory
-	c.Create.providerClass = providerClass
 	c.Update.factory = factory
 	c.Delete.factory = factory
 }
 
-func (c *processConfigurationCommands) setFactory(factory itemAPIFactory, providerClass v1.ProviderClass) {
+func (c *triggerCommands) setFactory(factory itemAPIFactory) {
 	c.List.factory = factory
 	c.Read.factory = factory
 	c.Create.factory = factory
-	c.Create.providerClass = providerClass
+	c.Update.factory = factory
+	c.Delete.factory = factory
+}
+
+func (c *processConfigurationCommands) setFactory(factory itemAPIFactory) {
+	c.List.factory = factory
+	c.Read.factory = factory
+	c.Create.factory = factory
 	c.Update.factory = factory
 	c.Delete.factory = factory
 }

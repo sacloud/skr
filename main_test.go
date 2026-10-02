@@ -77,15 +77,101 @@ func TestRunEventbusAPIHelp(t *testing.T) {
 	if exitCode := run([]string{"eventbus-api", "--help"}, &stdout, &stderr); exitCode != 0 {
 		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
 	}
-	for _, command := range []string{
+	for _, text := range []string{
 		"process-configuration list",
 		"process-configuration update-secret",
 		"schedule list",
 		"trigger list",
+		"ベストエフォート型",
 	} {
-		if !strings.Contains(stdout.String(), command) {
-			t.Errorf("help output does not contain %q", command)
+		if !strings.Contains(stdout.String(), text) {
+			t.Errorf("help output does not contain %q", text)
 		}
+	}
+}
+
+func TestRunEventbusResourceHelpExplainsRequest(t *testing.T) {
+	for _, test := range []struct {
+		args []string
+		want []string
+	}{
+		{
+			args: []string{"eventbus-api", "process-configuration", "create", "--help"},
+			want: []string{"Destination", "simplemq", "Parameters", "Provider"},
+		},
+		{
+			args: []string{"eventbus-api", "schedule", "create", "--help"},
+			want: []string{"ProcessConfigurationID", "StartsAt", "RecurringUnit", "RecurringStep", "1893456000000"},
+		},
+		{
+			args: []string{"eventbus-api", "trigger", "create", "--help"},
+			want: []string{"Source", "Types", "ProcessConfigurationID", "EVENT-SOURCE", "EVENT-TYPE"},
+		},
+		{
+			args: []string{"eventbus-api", "process-configuration", "update-secret", "--help"},
+			want: []string{"--secret-file", "APIKey", "AccessTokenSecret"},
+		},
+		{
+			args: []string{"eventbus-api", "process-configuration", "update", "--help"},
+			want: []string{"Destination", "Parameters", "指定", "null"},
+		},
+		{
+			args: []string{"eventbus-api", "schedule", "update", "--help"},
+			want: []string{"部分更新", "Settings", "Description"},
+		},
+		{
+			args: []string{"eventbus-api", "trigger", "update", "--help"},
+			want: []string{"Source", "Types", "ProcessConfigurationID"},
+		},
+	} {
+		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
+				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, exitCode, stderr.String())
+			}
+			for _, text := range test.want {
+				if !strings.Contains(stdout.String(), text) {
+					t.Errorf("help output does not contain %q", text)
+				}
+			}
+		})
+	}
+}
+
+func TestRunEventbusResourceHelpExplainsWorkflow(t *testing.T) {
+	for _, test := range []struct {
+		args []string
+		want []string
+	}{
+		{
+			args: []string{"eventbus-api", "--help"},
+			want: []string{"process-configuration list", "schedule list", "trigger list", "SAKURA_ACCESS_TOKEN", "JSON"},
+		},
+		{
+			args: []string{"eventbus-api", "process-configuration", "--help"},
+			want: []string{"実行先サービス", "schedule または trigger"},
+		},
+		{
+			args: []string{"eventbus-api", "schedule", "--help"},
+			want: []string{"process-configuration を作成", "StartsAt", "Unix epoch"},
+		},
+		{
+			args: []string{"eventbus-api", "trigger", "--help"},
+			want: []string{"イベントソース", "process-configuration", "EVENT-SOURCE"},
+		},
+	} {
+		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
+				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, exitCode, stderr.String())
+			}
+			help := strings.Join(strings.Fields(stdout.String()), " ")
+			for _, text := range test.want {
+				if !strings.Contains(help, text) {
+					t.Errorf("help output does not contain %q", text)
+				}
+			}
+		})
 	}
 }
 
