@@ -24,7 +24,8 @@ import (
 )
 
 type cli struct {
-	Config configCommand `cmd:"" help:"Manage configuration profiles."`
+	Config      configCommand      `cmd:"" help:"Manage configuration profiles."`
+	EventbusAPI eventbusAPICommand `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。実行先を process-configuration で定義し、schedule または trigger から参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
 }
 
 type configCommand struct {
@@ -49,24 +50,33 @@ func (currentCommand) Run(ctx *kong.Context) error {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	var cli cli
+	commandLine := newCLI()
+	exitCode := -1
 	parser, err := kong.New(
-		&cli,
+		&commandLine,
 		kong.Name("skr"),
 		kong.Description("CLI for Sakura Cloud."),
 		kong.Writers(stdout, stderr),
+		kong.Exit(func(code int) { exitCode = code }),
 	)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		if _, writeErr := fmt.Fprintln(stderr, err); writeErr != nil {
+			return 1
+		}
 		return 1
 	}
 
 	ctx, err := parser.Parse(args)
+	if exitCode >= 0 {
+		return exitCode
+	}
 	if err == nil {
 		err = ctx.Run()
 	}
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		if _, writeErr := fmt.Fprintln(stderr, err); writeErr != nil {
+			return 1
+		}
 		return 1
 	}
 	return 0
