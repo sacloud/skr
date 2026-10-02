@@ -52,7 +52,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	var cli cli
 	parser, err := kong.New(
 		&cli,
-		kong.Name("usacloud"),
+		kong.Name("skr"),
 		kong.Description("CLI for Sakura Cloud."),
 		kong.Writers(stdout, stderr),
 	)
