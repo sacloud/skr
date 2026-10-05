@@ -131,13 +131,15 @@ def check_link(url: str, timeout: float, retries: int) -> LinkResult:
     raise AssertionError("unreachable")
 
 
-def default_paths(root: pathlib.Path = pathlib.Path("docs/tutorials")) -> list[pathlib.Path]:
+def default_paths(
+    root: pathlib.Path = pathlib.Path("docs/manual/tutorials"),
+) -> list[pathlib.Path]:
     return sorted(root.rglob(DEFAULT_TUTORIAL_PATTERN))
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Check links in Markdown tutorials under docs/tutorials.",
+        description="Check links in Markdown tutorials under docs/manual/tutorials.",
     )
     parser.add_argument("paths", nargs="*", type=pathlib.Path, help="Markdown files to check")
     parser.add_argument("--timeout", type=float, default=15.0, help="Timeout per request in seconds")
@@ -162,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: file not found: {path}", file=sys.stderr)
         return 2
     if not paths:
-        print("ERROR: no Markdown tutorials found under docs/tutorials", file=sys.stderr)
+        print("ERROR: no Markdown tutorials found under docs/manual/tutorials", file=sys.stderr)
         return 2
 
     links: dict[str, list[Occurrence]] = {}

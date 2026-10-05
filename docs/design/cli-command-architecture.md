@@ -194,6 +194,6 @@ zone
 - `github.com/sacloud/sacloud-sdk-go/api/` — API グループ
 - `github.com/sacloud/sacloud-sdk-go/service/iaas/` — SDK 内の IaaS 関連パッケージ構成
 - `github.com/sacloud/sacloud-sdk-go/api/eventbus/` — EventBus 操作
-- [EventBus API チュートリアル](../tutorials/eventbus-api.md)
+- [EventBus API チュートリアル](../manual/tutorials/eventbus-api.md)
 - [API コマンド生成スキル](../../.agents/skills/generate-skr-api-command/SKILL.md)
 - [fujiwara/apprun-cli](https://github.com/fujiwara/apprun-cli)
