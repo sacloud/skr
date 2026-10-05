@@ -2,3 +2,13 @@ changelog:
   exclude:
     labels:
       - tagpr
+  categories:
+    - title: 🚀 Changes
+      labels:
+        - "*"
+      exclude:
+        labels:
+          - dependencies
+    - title: 📦 Dependency Updates
+      labels:
+        - dependencies
