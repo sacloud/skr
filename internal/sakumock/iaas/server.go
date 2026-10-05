@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package iaas provides a Switch-focused in-memory mock for IaaS API calls.
+// Package iaas provides a Switch- and Zone-focused in-memory mock for IaaS API calls.
 // Its constructor and lifecycle mirror the sakumock test-server convention.
 package iaas
 
@@ -27,19 +27,23 @@ import (
 )
 
 // Config holds mock options.
-type Config struct{}
+type Config struct {
+	Zones []string
+}
 
 // Server stores mock Switch resources and implements the IaaS SDK caller interface.
 type Server struct {
 	mu       sync.Mutex
 	switches map[string]map[string]json.RawMessage
+	zones    []string
 	nextID   int
 }
 
 // NewTestServer creates an in-memory mock API caller.
-func NewTestServer(_ Config) *Server {
+func NewTestServer(config Config) *Server {
 	return &Server{
 		switches: make(map[string]map[string]json.RawMessage),
+		zones:    append([]string(nil), config.Zones...),
 		nextID:   1000,
 	}
 }
@@ -59,6 +63,19 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 		return nil, fmt.Errorf("parse IaaS request URL: %w", err)
 	}
 	parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+	if method == "GET" && parts[len(parts)-1] == "zone" {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		zones := make([]map[string]string, 0, len(s.zones))
+		for _, name := range s.zones {
+			zones = append(zones, map[string]string{"Name": name})
+		}
+		return marshalJSON(map[string]any{
+			"Total": len(zones),
+			"Count": len(zones),
+			"Zones": zones,
+		})
+	}
 	switchIndex := -1
 	for i, part := range parts {
 		if part == "switch" {
@@ -68,7 +85,7 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 	if switchIndex < 0 || switchIndex+2 < len(parts) {
 		return nil, fmt.Errorf("unsupported IaaS request URL: %s", uri)
 	}
-	zoneIndex := switchIndex - 3
+	zoneIndex := switchIndex - 4
 	if zoneIndex < 0 {
 		return nil, fmt.Errorf("missing zone in IaaS request URL: %s", uri)
 	}
