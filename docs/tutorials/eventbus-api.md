@@ -28,7 +28,7 @@ $ skr eventbus-api process-configuration update-secret --help
 $ skr eventbus-api trigger create --help
 ```
 
-`skr config current` の結果が対象のプロファイルであることを確認します。作成時の `--request` は `CommonServiceItem` を含む JSON で、ファイルは `@ファイル名` で指定できます。作成結果は JSON で出力されるので、後続手順用に `ID` を控えます。
+`skr config current` の結果が対象のプロファイルであることを確認します。作成時の `--request` は `CommonServiceItem` を含む JSON で、ファイルは `@ファイル名` で指定できます。作成結果は既定で JSON 出力されるので、後続手順用に `ID` を控えます。`--output json`、`--output yaml`、`--output table` で API コマンドの出力形式を選択でき、プロファイルの `cli.default_output_type`（v0 は `DefaultOutputType`）でも既定値を設定できます。
 
 ## Step 2: シンプル通知の実行設定を作成する
 

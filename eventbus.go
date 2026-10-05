@@ -50,8 +50,8 @@ type processConfigurationAPI interface {
 type itemAPIFactory func() (itemAPI, error)
 
 type processConfigurationCommands struct {
-	List         itemListCommand                   `cmd:"" help:"実行設定を一覧表示し、JSON 配列で出力します。例: skr eventbus-api process-configuration list"`
-	Read         itemReadCommand                   `cmd:"" help:"ID を指定して実行設定を読み取り、JSON で出力します。ID は list の出力で確認できます。"`
+	List         itemListCommand                   `cmd:"" help:"実行設定を一覧表示します。例: skr eventbus-api process-configuration list"`
+	Read         itemReadCommand                   `cmd:"" help:"ID を指定して実行設定を読み取ります。ID は list の出力で確認できます。"`
 	Create       processConfigurationCreateCommand `cmd:"" help:"実行設定を作成します。実行先サービス（simplenotification、simplemq、autoscale）は先に作成してください。例: skr eventbus-api process-configuration create --request='{\"CommonServiceItem\":{\"Name\":\"notify\",\"Settings\":{\"Destination\":\"simplenotification\",\"Parameters\":\"{\\\"group_id\\\":\\\"GROUP-ID\\\",\\\"message\\\":\\\"hello\\\"}\"}}}'"`
 	Update       processConfigurationUpdateCommand `cmd:"" help:"実行設定を部分更新します。未指定の項目は変更されません。Settings を指定する場合は Destination と Parameters を含む設定全体を指定してください。"`
 	Delete       itemDeleteCommand                 `cmd:"" help:"ID を指定して実行設定を削除します。削除前に対象 ID を確認してください。"`
@@ -59,16 +59,16 @@ type processConfigurationCommands struct {
 }
 
 type scheduleCommands struct {
-	List   itemListCommand       `cmd:"" help:"スケジュールを一覧表示し、JSON 配列で出力します。"`
-	Read   itemReadCommand       `cmd:"" help:"ID を指定してスケジュールを読み取り、JSON で出力します。"`
+	List   itemListCommand       `cmd:"" help:"スケジュールを一覧表示します。"`
+	Read   itemReadCommand       `cmd:"" help:"ID を指定してスケジュールを読み取ります。"`
 	Create scheduleCreateCommand `cmd:"" help:"実行スケジュールを作成します。StartsAt は Unix epoch ミリ秒の整数です。RecurringStep と RecurringUnit（min、hour、day）、または Crontab を指定します。周期は最短 1 分です。例: skr eventbus-api schedule create --request='{\"CommonServiceItem\":{\"Name\":\"daily\",\"Settings\":{\"ProcessConfigurationID\":\"PROCESS-CONFIGURATION-ID\",\"StartsAt\":1893456000000,\"RecurringStep\":1,\"RecurringUnit\":\"day\"}}}'"`
 	Update scheduleUpdateCommand `cmd:"" help:"スケジュールを部分更新します。未指定項目は変更されません。Settings を更新する場合は ProcessConfigurationID と StartsAt、および周期または Crontab を含めます。"`
 	Delete itemDeleteCommand     `cmd:"" help:"ID を指定してスケジュールを削除します。削除前に対象 ID を確認してください。"`
 }
 
 type triggerCommands struct {
-	List   itemListCommand      `cmd:"" help:"トリガーを一覧表示し、JSON 配列で出力します。"`
-	Read   itemReadCommand      `cmd:"" help:"ID を指定してトリガーを読み取り、JSON で出力します。"`
+	List   itemListCommand      `cmd:"" help:"トリガーを一覧表示します。"`
+	Read   itemReadCommand      `cmd:"" help:"ID を指定してトリガーを読み取ります。"`
 	Create triggerCreateCommand `cmd:"" help:"イベントトリガーを作成します。Settings に Source、Types、ProcessConfigurationID を指定します。Source と Types の例示値は実際のイベントソースに置き換えてください。例: skr eventbus-api trigger create --request='{\"CommonServiceItem\":{\"Name\":\"on-change\",\"Settings\":{\"Source\":\"EVENT-SOURCE\",\"Types\":[\"EVENT-TYPE\"],\"ProcessConfigurationID\":\"PROCESS-CONFIGURATION-ID\"}}}'"`
 	Update triggerUpdateCommand `cmd:"" help:"トリガーを部分更新します。未指定項目は変更されません。Settings を更新する場合は Source、Types、ProcessConfigurationID を含めます。"`
 	Delete itemDeleteCommand    `cmd:"" help:"ID を指定してトリガーを削除します。削除前に対象 ID を確認してください。"`
@@ -79,6 +79,10 @@ type itemListCommand struct {
 }
 
 func (c *itemListCommand) Run(ctx *kong.Context) error {
+	format, err := outputType(ctx)
+	if err != nil {
+		return err
+	}
 	op, err := c.factory()
 	if err != nil {
 		return err
@@ -87,7 +91,7 @@ func (c *itemListCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(ctx, items)
+	return writeOutputWithFormat(ctx, format, items)
 }
 
 type itemReadCommand struct {
@@ -96,6 +100,10 @@ type itemReadCommand struct {
 }
 
 func (c *itemReadCommand) Run(ctx *kong.Context) error {
+	format, err := outputType(ctx)
+	if err != nil {
+		return err
+	}
 	op, err := c.factory()
 	if err != nil {
 		return err
@@ -104,7 +112,7 @@ func (c *itemReadCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(ctx, item)
+	return writeOutputWithFormat(ctx, format, item)
 }
 
 type processConfigurationCreateCommand struct {
@@ -165,6 +173,10 @@ func (c *triggerUpdateCommand) Run(ctx *kong.Context) error {
 }
 
 func runCreateItem(ctx *kong.Context, input string, factory itemAPIFactory, providerClass v1.ProviderClass) error {
+	format, err := outputType(ctx)
+	if err != nil {
+		return err
+	}
 	var request v1.CreateCommonServiceItemRequest
 	if err := decodeCreateRequest(input, providerClass, &request); err != nil {
 		return err
@@ -177,10 +189,14 @@ func runCreateItem(ctx *kong.Context, input string, factory itemAPIFactory, prov
 	if err != nil {
 		return err
 	}
-	return writeJSON(ctx, item)
+	return writeOutputWithFormat(ctx, format, item)
 }
 
 func runUpdateItem(ctx *kong.Context, id, input string, factory itemAPIFactory) error {
+	format, err := outputType(ctx)
+	if err != nil {
+		return err
+	}
 	var request v1.UpdateCommonServiceItemRequest
 	if err := decodeRequest(input, &request); err != nil {
 		return err
@@ -193,7 +209,7 @@ func runUpdateItem(ctx *kong.Context, id, input string, factory itemAPIFactory) 
 	if err != nil {
 		return err
 	}
-	return writeJSON(ctx, item)
+	return writeOutputWithFormat(ctx, format, item)
 }
 
 type itemDeleteCommand struct {
@@ -369,10 +385,4 @@ func unmarshalRequest(data []byte, destination any) error {
 		return fmt.Errorf("decode request JSON: %w", err)
 	}
 	return nil
-}
-
-func writeJSON(ctx *kong.Context, value any) error {
-	encoder := json.NewEncoder(ctx.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(value)
 }

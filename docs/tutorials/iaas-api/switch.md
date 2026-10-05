@@ -29,7 +29,7 @@ $ skr iaas-api switch update --help
 $ skr iaas-api switch delete --help
 ```
 
-`config current` で意図したプロファイルが選択されていることを確認してください。環境変数による認証の場合も、対象プロジェクトと権限を別途確認してください。各操作には `--zone` などのフラグか、`--request` で JSON オブジェクトを渡します。両方を指定するとエラーになります。JSON はコマンドに直接指定するか、`@ファイル名` で読み込めます。JSON のキー名と値の種類は各操作の `--help` に記載されています。作成・参照・更新・削除では対象ゾーン名を指定します。`find --zone all` は SDK から取得したゾーン一覧を順に検索して結果をまとめます。全ゾーン検索は個別フラグで指定するため、複雑な検索条件を含む `--request` の JSON とは併用できません。
+`config current` で意図したプロファイルが選択されていることを確認してください。環境変数による認証の場合も、対象プロジェクトと権限を別途確認してください。各操作には `--zone` などのフラグか、`--request` で JSON オブジェクトを渡します。両方を指定するとエラーになります。JSON はコマンドに直接指定するか、`@ファイル名` で読み込めます。JSON のキー名と値の種類は各操作の `--help` に記載されています。作成・参照・更新・削除では対象ゾーン名を指定します。`find --zone all` は SDK から取得したゾーン一覧を順に検索して結果をまとめます。全ゾーン検索は個別フラグで指定するため、複雑な検索条件を含む `--request` の JSON とは併用できません。API の出力形式は `--output json`、`--output yaml`、`--output table` で選択でき、プロファイルの `cli.default_output_type`（v0 は `DefaultOutputType`）でも既定値を設定できます。全ゾーン検索の table ではゾーン名が各行の先頭に表示されます。
 
 ## Step 2: テスト用スイッチを作成する
 
@@ -54,11 +54,11 @@ $ skr iaas-api switch create --zone tk1v --name TEST-SWITCH-NAME --description "
 $ skr iaas-api switch create --request @switch-create.json
 ```
 
-`--request` と個別フラグは併用できません。成功時は Switch の JSON オブジェクトが出力されます。後続の操作と削除に使用する `ID` を控えてください。実際のアカウントの出力や ID を共有・公開しないでください。
+`--request` と個別フラグは併用できません。成功時は既定で Switch の JSON オブジェクトが出力されます。後続の操作と削除に使用する `ID` を控えてください。実際のアカウントの出力や ID を共有・公開しないでください。
 
 ## Step 3: スイッチを検索し、変更を確認する
 
-`TEST-SWITCH-NAME` は、作成時に指定した名前へ置き換えてください。検索条件の `Names` は名前の文字列配列で、フラグでは指定できません。`Zone` とともに JSON で単一ゾーンを検索します。検索結果の `ID` が作成結果のものと一致するか確認します。`find` は JSON 配列を返します。
+`TEST-SWITCH-NAME` は、作成時に指定した名前へ置き換えてください。検索条件の `Names` は名前の文字列配列で、フラグでは指定できません。`Zone` とともに JSON で単一ゾーンを検索します。検索結果の `ID` が作成結果のものと一致するか確認します。`find` は既定で JSON 配列を返します。表形式で確認する場合は `--output table` を指定します。
 
 ```console
 $ skr iaas-api switch find --request='{"Zone":"tk1v","Names":["TEST-SWITCH-NAME"]}'

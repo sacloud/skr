@@ -30,6 +30,11 @@ $ skr eventbus-api schedule list
 $ skr eventbus-api trigger list
 ```
 
+API コマンドの出力形式は `--output json`、`--output yaml`、`--output table` で選択できます。
+省略時はプロファイルの `cli.default_output_type` が使われ、未設定時は JSON で出力します。
+プロファイル v0 では `DefaultOutputType` を指定します。コマンドラインの `--output` は
+プロファイル設定より優先されます。
+
 作成では `--request` に `CommonServiceItem` を含む JSON を指定します。次の例はシンプル MQ
 キューにメッセージを送る実行設定です。`Parameters` は実行先サービス固有の JSON 文字列です。
 
@@ -54,8 +59,8 @@ $ skr eventbus-api trigger create --request='{"CommonServiceItem":{"Name":"on-ch
 
 作成・更新の `--request` は JSON を直接指定するか、`@request.json` の形式でファイルから
 読み込めます。作成時の `Provider` はコマンドが設定します。更新では指定した項目だけが変更
-され、`"Description":null` で説明を消去できます。`list` は JSON 配列、`read` と作成・更新は
-JSON オブジェクトを標準出力に返します。各リソースで `list`、`read`、`create`、`update`、
+され、`"Description":null` で説明を消去できます。`list` は配列、`read` と作成・更新は
+オブジェクトを標準出力に返します。出力形式は `--output` で選択できます。各リソースで `list`、`read`、`create`、`update`、
 `delete` を利用できます。
 
 実行先サービスの認証情報は `process-configuration update-secret` でファイルまたは標準入力
@@ -95,7 +100,11 @@ $ skr iaas-api switch read --zone ZONE --id 123456789012
 更新では `Zone` と `ID` を指定し、変更する項目だけをフラグまたは JSON に含めます。
 フラグの `--description ''` や `--network-mask-len 0` は明示的な更新として扱います。
 更新結果には SDK が読み取ったリソースを反映します。
-`find` は JSON 配列、`read`／`create`／`update` は JSON オブジェクトを標準出力に返します。
+`find` は配列、`read`／`create`／`update` はオブジェクトを標準出力に返します。出力形式は
+`--output json`、`--output yaml`、`--output table` で選択できます。table では `ID`、`Name`、
+`Status`、`Description` などの識別・状態項目を優先して表示します。`--zone all` の table 出力は
+各行の先頭にゾーン名を表示します。table は端末幅に合わせて列幅を調整し、長い値を省略します。
+幅に収まらない場合は優先度の低い列を省略して、その列数を表示します。
 `delete` は成功時に標準出力へ出力しません。
 
 削除時は `WaitForRelease` を有効にすると、他リソースから参照されている間の削除を待ち合わせます。

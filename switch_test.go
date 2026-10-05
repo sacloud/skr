@@ -79,6 +79,7 @@ func TestRunIaaSAPIHelp(t *testing.T) {
 }
 
 func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	server := iaasmock.NewTestServer(iaasmock.Config{})
 	t.Cleanup(server.Close)
 
@@ -154,6 +155,8 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 }
 
 func TestIaaSSwitchFindAllZones(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("COLUMNS", "100")
 	server := iaasmock.NewTestServer(iaasmock.Config{Zones: []string{"test-zone-a", "test-zone-b"}})
 	t.Cleanup(server.Close)
 
@@ -193,6 +196,25 @@ func TestIaaSSwitchFindAllZones(t *testing.T) {
 	if len(found) != 2 || found[0].Name != "switch-a" || found[1].Name != "switch-b" {
 		t.Errorf("find all returned %#v, want one result from each configured zone", found)
 	}
+	table := string(runCommand("iaas-api", "switch", "find", "--zone", "all", "--output", "table"))
+	if headers := tableHeaderCells(table); len(headers) < 3 || strings.Join(headers[:3], " ") != "Zone ID Name" {
+		t.Errorf("table headers start with %v, want Zone ID Name", headers[:min(3, len(headers))])
+	}
+	rows := strings.Split(strings.TrimSpace(table), "\n")
+	if first := tableRowCells(rows[3]); len(first) == 0 || first[0] != "test-zone-a" {
+		t.Errorf("first table row starts with %v, want zone test-zone-a", first)
+	}
+	if second := tableRowCells(rows[4]); len(second) == 0 || second[0] != "test-zone-b" {
+		t.Errorf("second table row starts with %v, want zone test-zone-b", second)
+	}
+}
+
+func tableRowCells(line string) []string {
+	cells := strings.Split(strings.Trim(line, "|"), "|")
+	for i, cell := range cells {
+		cells[i] = strings.TrimSpace(cell)
+	}
+	return cells
 }
 
 func TestFindInAllIaaSZonesReturnsErrorWithoutPartialResults(t *testing.T) {
@@ -222,6 +244,7 @@ func (api testIaaSZoneAPI) FindWithContext(context.Context, *zone.FindRequest) (
 }
 
 func TestSwitchFlagInputs(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	server := iaasmock.NewTestServer(iaasmock.Config{})
 	t.Cleanup(server.Close)
 	call := func(args ...string) ([]byte, string, int) {
