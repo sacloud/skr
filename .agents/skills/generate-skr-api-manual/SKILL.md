@@ -7,7 +7,7 @@ description: 実装済みの skr API コマンドについて、さくらのク�
 
 実装済みの `skr <service>-api` コマンドについて、ユーザー向けチュートリアルを作成するときにこのスキルを使用してください。チュートリアルでは CLI の構文だけでなくサービスの利用手順も説明します。`--help` の内容をそのままコマンドリファレンスとしてコピーするものではありません。
 
-生成するチュートリアルは `docs/tutorials/` に配置します。IaaS API のように複数のリソースを扱う場合は `docs/tutorials/<service>-api/<resource>.md` に分け、それ以外は `docs/tutorials/<service>-api.md` とします。reStructuredText は生成しないでください。
+生成するチュートリアルは `docs/manual/tutorials/` に配置します。IaaS API のように複数のリソースを扱う場合は `docs/manual/tutorials/<service>-api/<resource>.md` に分け、それ以外は `docs/manual/tutorials/<service>-api.md` とします。チュートリアル以外の利用者向け解説も `docs/manual/` に配置します。reStructuredText は生成しないでください。
 
 ## 原則と情報源の方針
 

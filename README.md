@@ -39,11 +39,9 @@ API コマンドの出力形式は `--output json`、`--output yaml`、`--output
 省略時はプロファイルの `cli.default_output_type`（プロファイル v0 では `DefaultOutputType`）を
 使い、未設定の場合は JSON で出力します。
 
-## チュートリアル
+## 利用者向けドキュメント
 
-- [IaaS Switch API: Sandbox でスイッチの管理手順を確認する](docs/tutorials/iaas-api/switch.md)
-- [SimpleMQ API: キューを作成してメッセージを送受信する](docs/tutorials/simplemq-api.md)
-- [EventBus API: スイッチ作成イベントを SimpleMQ で受信する](docs/tutorials/eventbus-api.md)
+[利用者向けドキュメント一覧](docs/manual/README.md)から、チュートリアルや共通機能の解説を確認できます。
 
 ## 開発
 
