@@ -104,4 +104,3 @@ $ skr iaas-api switch find --request='{"Zone":"tk1v","Names":["UPDATED-TEST-SWIT
 - [さくらのクラウドマニュアル: スイッチの作成・削除](https://manual.sakura.ad.jp/cloud/network/switch/router-switch.html)
 - [さくらのクラウドマニュアル: Sandbox（テスト用ゾーン）](https://manual.sakura.ad.jp/cloud/server/sandbox.html)
 - [sacloud-sdk-go v0.3.0: Switch サービス](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/swytch)
-- `skr iaas-api switch --help`、`skr iaas-api switch <operation> --help`

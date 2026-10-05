@@ -139,7 +139,3 @@ $ skr eventbus-api process-configuration list
 - [EventBus のネットワーク関連イベントタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events_network.html)
 - [EventBus コントロールパネルの実行設定](https://manual.sakura.ad.jp/cloud/appliance/eventbus/control_panel.html)
 - [シンプル通知の概要](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/about.html)
-- `skr eventbus-api --help`
-- `skr eventbus-api process-configuration create --help`
-- `skr eventbus-api process-configuration update-secret --help`
-- `skr eventbus-api trigger create --help`
