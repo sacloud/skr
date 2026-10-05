@@ -25,6 +25,7 @@ import (
 
 type cli struct {
 	Config      configCommand      `cmd:"" help:"Manage configuration profiles."`
+	IaaSAPI     iaasAPICommand     `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。"`
 	EventbusAPI eventbusAPICommand `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。実行先を process-configuration で定義し、schedule または trigger から参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
 }
 
@@ -50,7 +51,17 @@ func (currentCommand) Run(ctx *kong.Context) error {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	commandLine := newCLI()
+	return runCLI(args, stdout, stderr, newCLI())
+}
+
+func newCLI() cli {
+	result := cli{}
+	result.initIaaSAPI()
+	result.initEventbusAPI()
+	return result
+}
+
+func runCLI(args []string, stdout, stderr io.Writer, commandLine cli) int {
 	exitCode := -1
 	parser, err := kong.New(
 		&commandLine,

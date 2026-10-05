@@ -95,6 +95,20 @@ class CheckTutorialLinksTest(unittest.TestCase):
             self.assertTrue(check_tutorial_links.local_link_exists(links[0]))
             self.assertFalse(check_tutorial_links.local_link_exists(links[1]))
 
+    def test_default_paths_includes_resource_tutorials(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            nested = root / "iaas-api" / "switch.md"
+            nested.parent.mkdir()
+            nested.write_text("# Switch\n", encoding="utf-8")
+            top_level = root / "eventbus-api.md"
+            top_level.write_text("# EventBus\n", encoding="utf-8")
+
+            self.assertEqual(
+                sorted([nested, top_level]),
+                check_tutorial_links.default_paths(root),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

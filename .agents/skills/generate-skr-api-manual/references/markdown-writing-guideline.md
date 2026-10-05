@@ -1,6 +1,7 @@
 # Markdown チュートリアル作成ガイドライン
 
-生成先は `docs/tutorials/<service>-api.md` です。リポジトリでは Markdown で記述し、
+生成先は `docs/tutorials/<service>-api.md` です。IaaS API のように複数のリソースを扱う場合は
+`docs/tutorials/<service>-api/<resource>.md` に分けます。リポジトリでは Markdown で記述し、
 特定の静的サイトジェネレーター専用の構文には依存しません。
 
 ## 構成と可読性
