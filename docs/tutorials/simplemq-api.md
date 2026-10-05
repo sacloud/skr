@@ -43,7 +43,14 @@ $ skr simplemq-api message delete --help
 $ skr simplemq-api queue create --name QUEUE-NAME --description simplemq-tutorial/UNIQUE-SUFFIX --output json
 ```
 
-キューの可視性タイムアウトと未処理メッセージ保存期間を設定します。`VisibilityTimeoutSeconds` は5〜900秒、`ExpireSeconds` は60〜1209600秒です。どちらも必須なので、JSON ファイルに両方を指定します。
+キューの可視性タイムアウトと未処理メッセージ保存期間を設定します。`VisibilityTimeoutSeconds` は5〜900秒、`ExpireSeconds` は60〜1209600秒です。どちらも必要なので、通常は対応する CLI フラグで指定します。
+
+```console
+$ skr simplemq-api queue config QUEUE-ID --visibility-timeout-seconds 30 --expire-seconds 345600 --output json
+$ skr simplemq-api queue read QUEUE-ID --output json
+```
+
+`Description`、`Tags`、`Icon` も設定する場合は、ConfigQueueRequest の JSON を `--request` で指定します。個別フラグとは併用できません。
 
 `queue-settings.json`:
 
@@ -60,7 +67,6 @@ $ skr simplemq-api queue create --name QUEUE-NAME --description simplemq-tutoria
 
 ```console
 $ skr simplemq-api queue config QUEUE-ID --request @queue-settings.json --output json
-$ skr simplemq-api queue read QUEUE-ID --output json
 ```
 
 ## Step 3: API キーを用意してメッセージを送受信する

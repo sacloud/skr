@@ -106,11 +106,12 @@ $ skr simplemq-api message receive --queue-name sample-queue --api-key-file simp
 メッセージ ID が含まれます。受信後は `message extend-timeout` でタイムアウトを延長し、
 `message delete` でメッセージを削除できます。
 
-キューの設定変更では `--request` に JSON を指定します。`VisibilityTimeoutSeconds` は5〜900秒、
-`ExpireSeconds` は60〜1209600秒で、両方を含めます。
+キューの設定変更では、通常 `--visibility-timeout-seconds` と `--expire-seconds` の両方を指定します。
+前者は5〜900秒、後者は60〜1209600秒です。`Description`、`Tags`、`Icon` も設定する場合は
+`--request` で SDK の JSON を指定してください。個別フラグと `--request` は併用できません。
 
 ```console
-$ skr simplemq-api queue config QUEUE-ID --request='{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}'
+$ skr simplemq-api queue config QUEUE-ID --visibility-timeout-seconds 30 --expire-seconds 345600
 $ skr simplemq-api queue count-messages QUEUE-ID
 $ skr simplemq-api queue clear-messages QUEUE-ID
 ```

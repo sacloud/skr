@@ -344,9 +344,8 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 		return fmt.Errorf("queue list returned %d items named %q; want the created queue once", found, name)
 	}
 
-	settings := `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}`
 	data, err = s.call(ctx, "e2e-config", "queue config", id,
-		"--request", settings, "--output", "json")
+		"--visibility-timeout-seconds", "30", "--expire-seconds", "345600", "--output", "json")
 	if err != nil {
 		return err
 	}

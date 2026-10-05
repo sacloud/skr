@@ -149,6 +149,12 @@ func TestScenarioCleansUpAfterSuccess(t *testing.T) {
 			t.Errorf("scenario did not call %s: %v", want, fake.calls)
 		}
 	}
+	configArgs := strings.Join(fake.callArgs["e2e-config"], " ")
+	for _, want := range []string{"--visibility-timeout-seconds 30", "--expire-seconds 345600"} {
+		if !strings.Contains(configArgs, want) {
+			t.Errorf("E2E config args %q do not contain %q", configArgs, want)
+		}
+	}
 	if got := strings.Join(fake.callArgs["e2e-profile-current"], " "); got != "config current" {
 		t.Errorf("profile check args = %q, want %q", got, "config current")
 	}

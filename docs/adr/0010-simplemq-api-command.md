@@ -16,7 +16,9 @@ CLI から直接利用できるようにする必要があります。
 - `skr simplemq-api message` は SDK の `MessageAPI` が公開する send、receive、extend-timeout、delete
   を個別コマンドとして提供します。
 - SDK のクライアント、操作、リクエスト、レスポンスをそのまま利用します。Queue の create は
-  コマンドが SimpleMQ の Provider を設定します。複雑な作成・設定リクエストは SDK 型の JSON で受け付けます。
+  コマンドが SimpleMQ の Provider を設定します。`queue config` は可視性タイムアウトと保存期間を
+  個別フラグで受け付け、SDK リクエストの `Settings` に組み立てます。その他の複雑な作成・設定項目は
+  SDK 型の JSON で受け付けます。
 - キュー管理 API は sacloud-sdk-go の標準プロファイル／環境変数を使います。メッセージ API の
   API キーはフラグに直接含めず、ファイルまたは標準入力から読み込みます。キー発行操作は SDK が
   返す値を通常のコマンド出力として返します。
@@ -27,8 +29,8 @@ CLI から直接利用できるようにする必要があります。
 
 - キュー ID とメッセージ API が使うキュー名は別のモノです。キュー管理操作は ID、メッセージ操作は
   キュー名と API キーを使います。
-- `config` はネストした `Settings` を受け取るため JSON で入力する必要があります。API 定義に従い、
-  `VisibilityTimeoutSeconds` と `ExpireSeconds` を両方含めます。
+- `config` は `--visibility-timeout-seconds` と `--expire-seconds` の両方を必要とします。
+  `--request` による SDK 型 JSON 入力も利用でき、個別フラグとは併用できません。
 - `rotate-api-key` のレスポンスには秘密情報が含まれます。利用者は出力先を安全に扱う必要があります。
 
 ## Alternatives considered

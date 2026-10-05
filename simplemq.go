@@ -36,7 +36,7 @@ type simpleMQQueueCommands struct {
 	List          simpleMQQueueListCommand          `cmd:"" help:"キューを一覧表示します。"`
 	Read          simpleMQQueueReadCommand          `cmd:"" help:"ID を指定してキューを読み取ります。"`
 	Create        simpleMQQueueCreateCommand        `cmd:"" help:"キューを作成します。作成後、rotate-api-key でメッセージ API 用のキーを発行してください。"`
-	Config        simpleMQQueueConfigCommand        `cmd:"" help:"キューの設定を更新します。Settings には可視性タイムアウトとメッセージ保存期間を両方指定してください。"`
+	Config        simpleMQQueueConfigCommand        `cmd:"" help:"キューの設定を更新します。--visibility-timeout-seconds と --expire-seconds を指定するか、--request JSON を指定してください。"`
 	Delete        simpleMQQueueDeleteCommand        `cmd:"" help:"ID を指定してキューを削除します。"`
 	CountMessages simpleMQQueueCountMessagesCommand `cmd:"" name:"count-messages" help:"キュー内のメッセージ数を取得します。"`
 	RotateAPIKey  simpleMQQueueRotateAPIKeyCommand  `cmd:"" name:"rotate-api-key" help:"メッセージ API キーを発行または再発行し、結果を出力します。APIKey は認証情報として安全に扱ってください。"`
@@ -168,8 +168,10 @@ func decodeSimpleMQCreateRequest(input string, destination *queue.CreateQueueReq
 }
 
 type simpleMQQueueConfigCommand struct {
-	ID      string `arg:"" help:"設定を変更するキュー ID。"`
-	Request string `name:"request" required:"" help:"ConfigQueueRequest JSON を直接または @path.json で指定します。CommonServiceItem.Settings に VisibilityTimeoutSeconds (5〜900秒) と ExpireSeconds (60〜1209600秒) の両方が必要です。例: --request='{\"CommonServiceItem\":{\"Settings\":{\"VisibilityTimeoutSeconds\":30,\"ExpireSeconds\":345600}}}'"`
+	ID                       string  `arg:"" help:"設定を変更するキュー ID。"`
+	Request                  *string `help:"個別フラグと併用不可。ConfigQueueRequest JSON を直接または @path.json で指定します。Description、Tags、Icon など追加項目は JSON で指定します。例: --request='{\"CommonServiceItem\":{\"Settings\":{\"VisibilityTimeoutSeconds\":30,\"ExpireSeconds\":345600}}}'"`
+	VisibilityTimeoutSeconds *int    `name:"visibility-timeout-seconds" help:"必須: 可視性タイムアウト秒数 (5〜900)。SDK の CommonServiceItem.Settings.VisibilityTimeoutSeconds に設定します。--expire-seconds と併せて指定します。"`
+	ExpireSeconds            *int    `name:"expire-seconds" help:"必須: メッセージ保存期間秒数 (60〜1209600)。SDK の CommonServiceItem.Settings.ExpireSeconds に設定します。--visibility-timeout-seconds と併せて指定します。"`
 }
 
 func (c simpleMQQueueConfigCommand) Run(ctx *kong.Context) error {
@@ -177,8 +179,8 @@ func (c simpleMQQueueConfigCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	var request queue.ConfigQueueRequest
-	if err := decodeRequest(c.Request, &request); err != nil {
+	request, err := simpleMQConfigRequest(c.Request, c.VisibilityTimeoutSeconds, c.ExpireSeconds)
+	if err != nil {
 		return err
 	}
 	op, err := newSimpleMQQueueAPI()
@@ -190,6 +192,39 @@ func (c simpleMQQueueConfigCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 	return writeOutputWithFormat(ctx, format, item)
+}
+
+func simpleMQConfigRequest(input *string, visibilityTimeoutSeconds, expireSeconds *int) (queue.ConfigQueueRequest, error) {
+	if input != nil {
+		if visibilityTimeoutSeconds != nil || expireSeconds != nil {
+			return queue.ConfigQueueRequest{}, fmt.Errorf("--request と個別フラグは併用できません")
+		}
+		var request queue.ConfigQueueRequest
+		if err := decodeRequest(*input, &request); err != nil {
+			return queue.ConfigQueueRequest{}, err
+		}
+		return request, nil
+	}
+
+	if visibilityTimeoutSeconds == nil || expireSeconds == nil {
+		var missing []string
+		if visibilityTimeoutSeconds == nil {
+			missing = append(missing, "--visibility-timeout-seconds")
+		}
+		if expireSeconds == nil {
+			missing = append(missing, "--expire-seconds")
+		}
+		return queue.ConfigQueueRequest{}, fmt.Errorf("%s が必要です (--request JSON も指定できます)", strings.Join(missing, " と "))
+	}
+
+	return queue.ConfigQueueRequest{
+		CommonServiceItem: queue.ConfigQueueRequestCommonServiceItem{
+			Settings: queue.Settings{
+				VisibilityTimeoutSeconds: queue.VisibilityTimeoutSeconds(*visibilityTimeoutSeconds),
+				ExpireSeconds:            queue.ExpireSeconds(*expireSeconds),
+			},
+		},
+	}, nil
 }
 
 type simpleMQQueueDeleteCommand struct {

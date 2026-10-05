@@ -10,7 +10,7 @@
 skr simplemq-api queue list
 skr simplemq-api queue read <id>
 skr simplemq-api queue create [--name ... | --request ...]
-skr simplemq-api queue config <id> --request ...
+skr simplemq-api queue config <id> (--visibility-timeout-seconds ... --expire-seconds ... | --request ...)
 skr simplemq-api queue delete <id>
 skr simplemq-api queue count-messages <id>
 skr simplemq-api queue rotate-api-key <id>
@@ -49,8 +49,10 @@ SDK が行います。認証情報を含む値を CLI のフラグとして受�
 - `queue create` は `Name`、任意の `Description` をフラグで受け取れます。タグや Icon などの
   複雑な値には SDK の `CreateQueueRequest` JSON を使います。`Provider.Class` はコマンドが設定します。
   JSON と個別フラグは併用できません。
-- `queue config` はネストした `Settings` を含む SDK の `ConfigQueueRequest` JSON を受け取ります。
-  `VisibilityTimeoutSeconds` は5〜900秒、`ExpireSeconds` は60〜1209600秒です。
+- `queue config` は `--visibility-timeout-seconds` と `--expire-seconds` をフラットな CLI フラグで受け取り、
+  SDK の `ConfigQueueRequest.CommonServiceItem.Settings` に設定します。JSON の `--request` 経路も維持し、
+  `Description`、`Tags`、`Icon` など SDK リクエストのその他の項目を指定できます。個別フラグと JSON は
+  併用できません。`VisibilityTimeoutSeconds` は5〜900秒、`ExpireSeconds` は60〜1209600秒です。
 - `queue rotate-api-key` は SDK が返した API キーを `APIKey` フィールドとして通常の出力形式で返します。
 - `message send` は SDK のスカラー引数として本文を受け取ります。SDK OpenAPI 定義では最大256000文字で、
   英数字、`+`、`/`、`=` の文字に制約されています。

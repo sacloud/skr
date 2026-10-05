@@ -47,7 +47,7 @@ func TestRunSimpleMQAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"simplemq-api", "queue", "config", "--help"},
-			want: []string{"--request", "VisibilityTimeoutSeconds", "ExpireSeconds", "345600"},
+			want: []string{"--visibility-timeout-seconds", "--expire-seconds", "--request", "併用不可", "CommonServiceItem.Settings", "5〜900", "60〜1209600", "345600"},
 		},
 		{
 			args: []string{"simplemq-api", "queue", "rotate-api-key", "--help"},
@@ -128,6 +128,16 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	if configured.Settings.VisibilityTimeoutSeconds != 45 || configured.Settings.ExpireSeconds != 604800 {
 		t.Fatalf("config returned settings %+v, want visibility timeout 45 and expiry 604800", configured.Settings)
 	}
+	var configuredByFlags queue.CommonServiceItem
+	if err := json.Unmarshal(runCommand(
+		"simplemq-api", "queue", "config", queueID,
+		"--visibility-timeout-seconds", "45", "--expire-seconds", "604800",
+	), &configuredByFlags); err != nil {
+		t.Fatal(err)
+	}
+	if configuredByFlags.Settings != configured.Settings {
+		t.Fatalf("flag config returned settings %+v, JSON config returned %+v", configuredByFlags.Settings, configured.Settings)
+	}
 
 	var rotated struct {
 		APIKey string
@@ -204,10 +214,60 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	}
 }
 
+func TestSimpleMQConfigRequestPaths(t *testing.T) {
+	visibilityTimeoutSeconds, expireSeconds := 30, 345600
+	jsonInput := `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}`
+
+	flagRequest, err := simpleMQConfigRequest(nil, &visibilityTimeoutSeconds, &expireSeconds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonRequest, err := simpleMQConfigRequest(&jsonInput, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flagRequest.CommonServiceItem.Settings != jsonRequest.CommonServiceItem.Settings {
+		t.Fatalf("flag settings %+v and JSON settings %+v differ",
+			flagRequest.CommonServiceItem.Settings, jsonRequest.CommonServiceItem.Settings)
+	}
+
+	zero := 0
+	requestWithZero, err := simpleMQConfigRequest(nil, &zero, &expireSeconds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requestWithZero.CommonServiceItem.Settings.VisibilityTimeoutSeconds != 0 {
+		t.Fatalf("explicit zero was not preserved: %+v", requestWithZero.CommonServiceItem.Settings)
+	}
+
+	for _, test := range []struct {
+		name       string
+		input      *string
+		visibility *int
+		expire     *int
+	}{
+		{name: "missing both flags"},
+		{name: "missing expire flag", visibility: &visibilityTimeoutSeconds},
+		{name: "missing visibility flag", expire: &expireSeconds},
+		{name: "request with explicit zero flag", input: &jsonInput, visibility: &zero},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := simpleMQConfigRequest(test.input, test.visibility, test.expire); err == nil {
+				t.Fatal("request succeeded, want input validation error")
+			}
+		})
+	}
+}
+
 func TestSimpleMQCommandInputErrors(t *testing.T) {
 	for _, args := range [][]string{
 		{"simplemq-api", "queue", "create"},
 		{"simplemq-api", "queue", "create", "--request", `{"CommonServiceItem":{"Name":"mock-queue"}}`, "--name", "mock-queue"},
+		{"simplemq-api", "queue", "config", "queue-id"},
+		{"simplemq-api", "queue", "config", "queue-id", "--visibility-timeout-seconds", "30"},
+		{"simplemq-api", "queue", "config", "queue-id", "--expire-seconds", "345600"},
+		{"simplemq-api", "queue", "config", "queue-id", "--request", `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}`, "--expire-seconds", "345600"},
+		{"simplemq-api", "queue", "config", "queue-id", "--request", `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}`, "--visibility-timeout-seconds", "0"},
 		{"simplemq-api", "message", "receive", "--queue-name", "mock-queue", "--api-key-file", "/missing/simplemq.key"},
 	} {
 		var stdout, stderr bytes.Buffer
