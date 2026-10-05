@@ -15,9 +15,10 @@
 package main
 
 type iaasAPICommand struct {
-	Switch switchCommands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
+	Switch switchCommands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。find は --zone all で全ゾーンを検索できます。両経路は併用できません。"`
 }
 
 func (c *cli) initIaaSAPI() {
 	c.IaaSAPI.Switch.setFactory(newSwitchAPI)
+	c.IaaSAPI.Switch.setZoneFactory(newIaaSZoneAPI)
 }

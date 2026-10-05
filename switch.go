@@ -17,17 +17,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 )
 
 type switchCommands struct {
-	Find   switchFindCommand   `cmd:"" help:"スイッチを検索し JSON 配列で出力します。例: skr iaas-api switch find --zone ZONE"`
+	Find   switchFindCommand   `cmd:"" help:"スイッチを検索し JSON 配列で出力します。--zone all で全ゾーンを検索できます。例: skr iaas-api switch find --zone ZONE"`
 	Read   switchReadCommand   `cmd:"" help:"スイッチを読み取り JSON で出力します。例: skr iaas-api switch read --zone ZONE --id 123456789012"`
 	Create switchCreateCommand `cmd:"" help:"スイッチを作成し JSON で出力します。例: skr iaas-api switch create --zone ZONE --name example"`
 	Update switchUpdateCommand `cmd:"" help:"指定項目だけを更新し JSON で出力します。例: skr iaas-api switch update --zone ZONE --id 123456789012 --name updated"`
@@ -63,6 +61,17 @@ func switchZone(zone *string) (string, error) {
 	return *zone, nil
 }
 
+func switchSingleZone(zone *string) (string, error) {
+	name, err := switchZone(zone)
+	if err != nil {
+		return "", err
+	}
+	if err := validateSingleIaaSZone(name); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
 func switchID(id *int64) (types.ID, error) {
 	if id == nil || *id == 0 {
 		return 0, fmt.Errorf("--id が必要です (--request JSON も指定できます)")
@@ -71,11 +80,12 @@ func switchID(id *int64) (types.ID, error) {
 }
 
 type switchFindCommand struct {
-	Request *string `help:"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数の整数)、From (開始位置の整数)。Sort の要素は Key (API のソート対象フィールド名) と Order (0: 昇順、1: 降順) を持つオブジェクトです。有効な Key は対象 API の仕様で確認してください。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'"`
-	Zone    *string `help:"必須: 対象ゾーン名。例: --zone tk1v"`
-	Count   *int    `help:"任意: 取得件数 (整数)。"`
-	From    *int    `help:"任意: 取得開始位置 (整数)。"`
-	factory switchAPIFactory
+	Request     *string `help:"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数の整数)、From (開始位置の整数)。Sort の要素は Key (API のソート対象フィールド名) と Order (0: 昇順、1: 降順) を持つオブジェクトです。有効な Key は対象 API の仕様で確認してください。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'"`
+	Zone        *string `help:"必須: 対象ゾーン名。all を指定すると全ゾーンを検索します。例: --zone tk1v または --zone all"`
+	Count       *int    `help:"任意: 取得件数 (整数)。"`
+	From        *int    `help:"任意: 取得開始位置 (整数)。"`
+	factory     switchAPIFactory
+	zoneFactory iaasZoneAPIFactory
 }
 
 func (c *switchFindCommand) Run(ctx *kong.Context) error {
@@ -100,7 +110,16 @@ func (c *switchFindCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	switches, err := op.FindWithContext(context.Background(), &request)
+	var switches []*iaas.Switch
+	if c.Request == nil && c.Zone != nil && *c.Zone == allIaaSZones {
+		switches, err = findInAllIaaSZones(context.Background(), c.zoneFactory, func(ctx context.Context, zone string) ([]*iaas.Switch, error) {
+			zoneRequest := request
+			zoneRequest.Zone = zone
+			return op.FindWithContext(ctx, &zoneRequest)
+		})
+	} else {
+		switches, err = op.FindWithContext(context.Background(), &request)
+	}
 	if err != nil {
 		return err
 	}
@@ -116,7 +135,7 @@ type switchReadCommand struct {
 
 func (c *switchReadCommand) Run(ctx *kong.Context) error {
 	request, err := switchRequest(c.Request, c.Zone != nil || c.ID != nil, func() (swytch.ReadRequest, error) {
-		zone, err := switchZone(c.Zone)
+		zone, err := switchSingleZone(c.Zone)
 		if err != nil {
 			return swytch.ReadRequest{}, err
 		}
@@ -151,7 +170,7 @@ type switchCreateCommand struct {
 func (c *switchCreateCommand) Run(ctx *kong.Context) error {
 	flags := c.Zone != nil || c.Name != nil || c.Description != nil || c.IconID != nil || c.NetworkMaskLen != nil || c.DefaultRoute != nil
 	request, err := switchRequest(c.Request, flags, func() (swytch.CreateRequest, error) {
-		zone, err := switchZone(c.Zone)
+		zone, err := switchSingleZone(c.Zone)
 		if err != nil {
 			return swytch.CreateRequest{}, err
 		}
@@ -202,7 +221,7 @@ type switchUpdateCommand struct {
 func (c *switchUpdateCommand) Run(ctx *kong.Context) error {
 	flags := c.Zone != nil || c.ID != nil || c.Name != nil || c.Description != nil || c.IconID != nil || c.NetworkMaskLen != nil || c.DefaultRoute != nil
 	request, err := switchRequest(c.Request, flags, func() (swytch.UpdateRequest, error) {
-		zone, err := switchZone(c.Zone)
+		zone, err := switchSingleZone(c.Zone)
 		if err != nil {
 			return swytch.UpdateRequest{}, err
 		}
@@ -245,7 +264,7 @@ type switchDeleteCommand struct {
 func (c *switchDeleteCommand) Run(_ *kong.Context) error {
 	flags := c.Zone != nil || c.ID != nil || c.FailIfNotFound != nil || c.WaitForRelease != nil || c.WaitForReleaseTimeout != nil || c.WaitForReleaseTick != nil
 	request, err := switchRequest(c.Request, flags, func() (swytch.DeleteRequest, error) {
-		zone, err := switchZone(c.Zone)
+		zone, err := switchSingleZone(c.Zone)
 		if err != nil {
 			return swytch.DeleteRequest{}, err
 		}
@@ -286,10 +305,14 @@ func (c *switchCommands) setFactory(factory switchAPIFactory) {
 	c.Delete.factory = factory
 }
 
+func (c *switchCommands) setZoneFactory(factory iaasZoneAPIFactory) {
+	c.Find.zoneFactory = factory
+}
+
 func newSwitchAPI() (switchAPI, error) {
-	var client saclient.Client
-	if err := client.SetEnviron(os.Environ()); err != nil {
+	client, err := newIaaSClient()
+	if err != nil {
 		return nil, err
 	}
-	return swytch.New(iaas.NewClientFromSaclient(&client)), nil
+	return swytch.New(client), nil
 }

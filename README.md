@@ -81,11 +81,12 @@ JSON をファイルに保存して `--request @request.json` と指定すれば
 `SAKURA_ACCESS_TOKEN`、`SAKURA_ACCESS_TOKEN_SECRET` 環境変数を使用してください。
 各操作は `--zone` などの個別フラグか、各操作の `--help` に示すキーと値で構成した JSON を `--request` に指定します。
 両方の経路は併用できません。JSON は直接指定するか `@request.json` でファイルから読み込めます。
-`Zone` はいずれの経路でも必須です。
+`Zone` はいずれの経路でも必須です。`find` は個別フラグの `--zone all` で全ゾーンを検索できます。SDK からゾーン一覧を取得して各ゾーンを検索し、結果をまとめて出力します。`--request` の JSON は従来どおり単一ゾーンのリクエストとして扱います。`read`、`create`、`update`、`delete` では個別フラグに `--zone all` を指定できません。
 
 ```console
 $ skr iaas-api switch create --zone ZONE --name example
 $ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["example"]}'
+$ skr iaas-api switch find --zone all
 $ skr iaas-api switch read --zone ZONE --id 123456789012
 ```
 
