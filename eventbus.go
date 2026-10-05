@@ -231,27 +231,25 @@ func (c *itemUpdateSecretCommand) Run(_ *kong.Context) error {
 	return op.UpdateSecret(context.Background(), c.ID, request)
 }
 
-func newCLI() cli {
-	result := cli{}
+func (c *cli) initEventbusAPI() {
 	processConfigurationFactory := func() (itemAPI, error) {
 		return newProcessConfigurationAPI()
 	}
-	result.EventbusAPI.ProcessConfiguration.setFactory(processConfigurationFactory)
-	result.EventbusAPI.Schedule.setFactory(func() (itemAPI, error) {
+	c.EventbusAPI.ProcessConfiguration.setFactory(processConfigurationFactory)
+	c.EventbusAPI.Schedule.setFactory(func() (itemAPI, error) {
 		client, err := newEventbusClient()
 		if err != nil {
 			return nil, err
 		}
 		return eventbus.NewScheduleOp(client), nil
 	})
-	result.EventbusAPI.Trigger.setFactory(func() (itemAPI, error) {
+	c.EventbusAPI.Trigger.setFactory(func() (itemAPI, error) {
 		client, err := newEventbusClient()
 		if err != nil {
 			return nil, err
 		}
 		return eventbus.NewTriggerOp(client), nil
 	})
-	return result
 }
 
 func (c *scheduleCommands) setFactory(factory itemAPIFactory) {

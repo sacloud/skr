@@ -74,6 +74,53 @@ $ skr eventbus-api schedule create --help
 JSON をファイルに保存して `--request @request.json` と指定すれば、引用符のエスケープを避けて
 作成・更新できます。
 
+## IaaS Switch API
+
+`skr iaas-api switch` は、スイッチの `find`、`read`、
+`create`、`update`、`delete` を実行します。認証には SDK のプロファイルか
+`SAKURA_ACCESS_TOKEN`、`SAKURA_ACCESS_TOKEN_SECRET` 環境変数を使用してください。
+各操作は `--zone` などの個別フラグか、各操作の `--help` に示すキーと値で構成した JSON を `--request` に指定します。
+両方の経路は併用できません。JSON は直接指定するか `@request.json` でファイルから読み込めます。
+`Zone` はいずれの経路でも必須です。
+
+```console
+$ skr iaas-api switch create --zone ZONE --name example
+$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["example"]}'
+$ skr iaas-api switch read --zone ZONE --id 123456789012
+```
+
+作成では `Name` が必須です。`Description`、`Tags`、`IconID`、`NetworkMaskLen`、
+`DefaultRoute` も指定できます。配列である `Tags` は JSON で指定します。
+更新では `Zone` と `ID` を指定し、変更する項目だけをフラグまたは JSON に含めます。
+フラグの `--description ''` や `--network-mask-len 0` は明示的な更新として扱います。
+更新結果には SDK が読み取ったリソースを反映します。
+`find` は JSON 配列、`read`／`create`／`update` は JSON オブジェクトを標準出力に返します。
+`delete` は成功時に標準出力へ出力しません。
+
+削除時は `WaitForRelease` を有効にすると、他リソースから参照されている間の削除を待ち合わせます。
+待ち時間を調整する場合は `WaitForReleaseTimeout` と `WaitForReleaseTick` を秒単位で指定します。
+SDK の既定値はそれぞれ 3600 秒と 5 秒です。
+
+配列を含むリクエストはファイルに保存して指定できます。更新例:
+
+```json
+{
+  "Zone": "ZONE",
+  "ID": 123456789012,
+  "Tags": ["test"]
+}
+```
+
+```console
+$ skr iaas-api switch update --request @update.json
+$ skr iaas-api switch delete --zone ZONE --id 123456789012 --fail-if-not-found
+```
+
+`ZONE` と `123456789012` は実際のゾーンと作成結果の ID に置き換えてください。`--request` と個別フラグを併用しないでください。
+コマンドの入力項目と各操作の詳細は `skr iaas-api switch <operation> --help` を参照してください。
+Sandbox ゾーンで管理操作を試す場合は
+[IaaS Switch API チュートリアル](docs/tutorials/iaas-api/switch.md)を参照してください。
+
 ## ライセンス
 
 このプロジェクトは [Apache License 2.0](LICENSE) のもとで公開されています。

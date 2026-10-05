@@ -131,8 +131,8 @@ def check_link(url: str, timeout: float, retries: int) -> LinkResult:
     raise AssertionError("unreachable")
 
 
-def default_paths() -> list[pathlib.Path]:
-    return sorted(pathlib.Path("docs/tutorials").glob(DEFAULT_TUTORIAL_PATTERN))
+def default_paths(root: pathlib.Path = pathlib.Path("docs/tutorials")) -> list[pathlib.Path]:
+    return sorted(root.rglob(DEFAULT_TUTORIAL_PATTERN))
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
