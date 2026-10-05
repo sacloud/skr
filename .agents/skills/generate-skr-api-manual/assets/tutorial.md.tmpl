@@ -1,0 +1,78 @@
+# <Service> API チュートリアル
+
+> [!WARNING]
+> このチュートリアルでライブ環境にリソースを作成・変更する場合は、実行前に
+> `skr config current` でプロファイルを確認してください。対象環境と変更内容を確認し、
+> 必要な承認を得てから進めます。
+
+## このサービスを使う場面
+
+<公式マニュアルに基づいて、解決する課題と代表的な利用場面を説明します。>
+
+## 前提条件
+
+- `skr` と `skr <service>-api` が利用できること
+- 認証と対象プロファイルが設定済みであること
+- <必要な権限、依存サービス、事前に用意するリソース>
+- <料金や外部への影響があれば、一次資料に沿って記載>
+
+## 作成するリソースと順序
+
+1. `<resource-a>` — <役割>
+2. `<resource-b>` — <resource-a> を参照する理由>
+
+## Step 1: 対象環境とコマンドを確認する
+
+```console
+$ skr config current
+$ skr <service>-api --help
+$ skr <service>-api <resource-a> create --help
+```
+
+<どの出力を確認するか説明します。>
+
+## Step 2: <resource-a> を作成する
+
+<必要な値、JSON file の形式、placeholder の置換方法を説明します。JSON は複雑ならファイル化します。>
+
+```json
+{
+  "<request-field>": "<replace-with-your-value>"
+}
+```
+
+```console
+$ skr <service>-api <resource-a> create --request @resource-a.json
+```
+
+<作成結果から後続手順で使う ID を取得する方法を、実際の出力形式に沿って説明します。>
+
+## Step 3: <resource-b> を作成して動作を確認する
+
+<依存 ID や設定値を説明します。CRUD 完了だけでなく、サービスが期待した働きをしたことを
+観測する具体的な方法を説明します。未実施のライブ検証を成功済みとして書きません。>
+
+```console
+$ skr <service>-api <resource-b> create --request @resource-b.json
+$ <documented-command-or-observation>
+```
+
+## Step 4: 作成したリソースを削除する
+
+<作成と逆の依存順で、チュートリアル中に作ったものだけを削除します。削除対象 ID の確認と、
+残存確認を含めます。>
+
+```console
+$ skr <service>-api <resource-b> delete <resource-b-id>
+$ skr <service>-api <resource-a> delete <resource-a-id>
+$ skr <service>-api <resource-a> list
+```
+
+## まとめ
+
+<このチュートリアルでできるようになったことと、未検証の点があれば明記します。>
+
+## 参考資料
+
+- [公式マニュアル](https://manual.sakura.ad.jp/cloud/<service-path>.html)
+- `skr <service>-api --help`
