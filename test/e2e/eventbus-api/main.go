@@ -30,6 +30,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 const (
@@ -91,17 +93,13 @@ type cli interface {
 
 type cliRunner struct {
 	binary   string
-	evidence string
-	sequence int
+	evidence *evidence.Recorder
 }
 
 func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]byte, error) {
-	if filepath.Base(step) != step || step == "" {
-		return nil, fmt.Errorf("invalid evidence step %q", step)
+	if err := evidence.ValidateStep(step); err != nil {
+		return nil, err
 	}
-	r.sequence++
-	sequence := r.sequence
-	filename := fmt.Sprintf("%03d-%s.json", sequence, step)
 	timeout, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
 
@@ -111,59 +109,16 @@ func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]by
 	command.Stderr = &stderr
 	runErr := command.Run()
 
-	record := struct {
-		Sequence int      `json:"sequence"`
-		Step     string   `json:"step"`
-		Args     []string `json:"args"`
-		Stdout   string   `json:"stdout"`
-		Stderr   string   `json:"stderr"`
-		Error    string   `json:"error,omitempty"`
-	}{
-		Sequence: sequence, Step: step, Args: args, Stdout: stdout.String(), Stderr: stderr.String(),
-	}
-	if step == "rotate-api-key" {
-		record.Stdout = "[REDACTED: APIKey]"
-	}
-	if runErr != nil {
-		record.Error = runErr.Error()
-	}
-	data, err := json.MarshalIndent(record, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("%s: encode evidence: %w", step, err)
-	}
-	if err := os.WriteFile(filepath.Join(r.evidence, filename), append(data, '\n'), 0o600); err != nil {
-		return nil, fmt.Errorf("%s: write evidence: %w", step, err)
-	}
-	result := "ok"
-	if runErr != nil {
-		result = "failed"
-	}
-	if err := appendEvidenceOrder(r.evidence, sequence, step, result, filename); err != nil {
-		orderErr := fmt.Errorf("%s: write evidence order: %w", step, err)
+	if err := r.evidence.Record(step, args, nil, stdout.String(), stderr.String(), runErr, step == "rotate-api-key"); err != nil {
 		if runErr != nil {
-			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr), orderErr)
+			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr), err)
 		}
-		return nil, orderErr
+		return nil, err
 	}
 	if runErr != nil {
 		return nil, fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr)
 	}
 	return stdout.Bytes(), nil
-}
-
-func appendEvidenceOrder(evidence string, sequence int, step, result, filename string) error {
-	path := filepath.Join(evidence, "ORDER.txt")
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o600) //nolint:gosec // The filename is fixed inside the private evidence directory.
-	if err != nil {
-		return fmt.Errorf("open %s: %w", path, err)
-	}
-	if _, err := fmt.Fprintf(file, "%03d\t%s\t%s\t%s\n", sequence, step, result, filename); err != nil {
-		return errors.Join(fmt.Errorf("append %s: %w", path, err), file.Close())
-	}
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("close %s: %w", path, err)
-	}
-	return nil
 }
 
 type resource struct {
@@ -635,52 +590,6 @@ func (s *scenario) run(ctx context.Context) (result error) {
 	return s.waitForMessage(ctx)
 }
 
-func evidenceDir() (string, error) {
-	command := exec.Command("git", "rev-parse", "--show-toplevel")
-	output, err := command.Output()
-	if err != nil {
-		return "", fmt.Errorf("find repository root for E2E evidence: %w", err)
-	}
-	root := strings.TrimSpace(string(output))
-	if root == "" {
-		return "", errors.New("find repository root for E2E evidence: empty path")
-	}
-	return createEvidenceDir(filepath.Join(root, "tmp", "eventbus-api"), time.Now())
-}
-
-func createEvidenceDir(baseDir string, now time.Time) (string, error) {
-	if err := os.MkdirAll(baseDir, 0o700); err != nil {
-		return "", fmt.Errorf("create E2E evidence root: %w", err)
-	}
-	prefix := now.Local().Format("200601021504")
-	for suffix := 1; ; suffix++ {
-		name := prefix
-		if suffix > 1 {
-			name = fmt.Sprintf("%s-%02d", prefix, suffix)
-		}
-		dir := filepath.Join(baseDir, name)
-		if err := os.Mkdir(dir, 0o700); err != nil {
-			if errors.Is(err, os.ErrExist) {
-				continue
-			}
-			return "", fmt.Errorf("create E2E evidence directory %s: %w", dir, err)
-		}
-		order := "Sequence\tStep\tResult\tFile\n"
-		if err := os.WriteFile(filepath.Join(dir, "ORDER.txt"), []byte(order), 0o600); err != nil {
-			return "", fmt.Errorf("initialize E2E evidence order in %s: %w", dir, err)
-		}
-		return dir, nil
-	}
-}
-
-func writeEvidenceResult(evidence, result string) error {
-	content := fmt.Sprintf("Result: %s\nCompleted: %s\n", result, time.Now().Format(time.RFC3339))
-	if err := os.WriteFile(filepath.Join(evidence, "RESULT.txt"), []byte(content), 0o600); err != nil {
-		return fmt.Errorf("write E2E result in %s: %w", evidence, err)
-	}
-	return nil
-}
-
 func randomSuffix() (string, error) {
 	var value [8]byte
 	if _, err := rand.Read(value[:]); err != nil {
@@ -711,15 +620,18 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	evidence, err := evidenceDir()
+	recorder, err := evidence.New("eventbus-api")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	fmt.Println("Evidence (private, ignored by Git):", evidence)
-	evidenceResult := "failed"
+	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
 	defer func() {
-		if err := writeEvidenceResult(evidence, evidenceResult); err != nil {
+		result := "failed"
+		if exitCode == 0 {
+			result = "passed"
+		}
+		if err := recorder.SetResult(result, time.Now()); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			exitCode = 1
 		}
@@ -759,7 +671,7 @@ func runMain() (exitCode int) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	runner := &cliRunner{binary: path, evidence: evidence}
+	runner := &cliRunner{binary: path, evidence: recorder}
 	s := &scenario{
 		client:      runner,
 		keyFile:     keyFile,
@@ -773,12 +685,11 @@ func runMain() (exitCode int) {
 	}
 	if err := s.run(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "EventBus E2E failed:", err)
-		fmt.Fprintln(os.Stderr, "Evidence retained at:", evidence)
+		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
 	}
-	evidenceResult = "passed"
 	fmt.Println("EventBus E2E passed; the test Switch, EventBus resources, and SimpleMQ queue were deleted.")
-	fmt.Println("Evidence retained at:", evidence)
+	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
 }
 

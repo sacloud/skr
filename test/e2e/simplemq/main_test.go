@@ -22,6 +22,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 type fakeCLI struct {
@@ -62,6 +65,8 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		return data, err
 	case "e2e-list-created", "e2e-cleanup-list", "e2e-cleanup-list-after":
 		return f.queueList()
+	case "e2e-list-created-table":
+		return []byte("ID Name\nqueue-123 skr-e2e-sqm-test\n"), nil
 	case "e2e-config":
 		f.item.Settings.VisibilityTimeoutSeconds = 30
 		f.item.Settings.ExpireSeconds = 345600
@@ -135,6 +140,7 @@ func TestScenarioCleansUpAfterSuccess(t *testing.T) {
 		t.Fatal("test queue was not deleted")
 	}
 	for _, want := range []string{
+		"e2e-list-created-table",
 		"e2e-config",
 		"e2e-rotate-api-key",
 		"e2e-send",
@@ -216,7 +222,11 @@ func TestCLIRunnerRedactsAPIKeyFromEvidence(t *testing.T) {
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil { //nolint:gosec // The test helper must be executable.
 		t.Fatal(err)
 	}
-	runner := cliRunner{binary: binary, evidence: dir}
+	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "simplemq-api"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := cliRunner{binary: binary, evidence: recorder}
 	output, err := runner.call(context.Background(), "e2e-rotate-api-key", "simplemq-api", "queue", "rotate-api-key")
 	if err != nil {
 		t.Fatal(err)
@@ -224,7 +234,7 @@ func TestCLIRunnerRedactsAPIKeyFromEvidence(t *testing.T) {
 	if !strings.Contains(string(output), "test-only-api-key") {
 		t.Fatalf("CLI output = %q, want raw API key for the caller", output)
 	}
-	evidencePath := filepath.Join(dir, "e2e-rotate-api-key.json")
+	evidencePath := filepath.Join(recorder.Dir(), "001-e2e-rotate-api-key.json")
 	info, err := os.Stat(evidencePath)
 	if err != nil {
 		t.Fatal(err)
@@ -238,6 +248,13 @@ func TestCLIRunnerRedactsAPIKeyFromEvidence(t *testing.T) {
 	}
 	if strings.Contains(string(evidence), "test-only-api-key") || !strings.Contains(string(evidence), "[REDACTED: APIKey]") {
 		t.Fatalf("evidence did not redact API key: %s", evidence)
+	}
+	order, err := os.ReadFile(filepath.Join(recorder.Dir(), "ORDER.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(order), "001\te2e-rotate-api-key\tok\t001-e2e-rotate-api-key.json") {
+		t.Fatalf("evidence order missing API key step: %s", order)
 	}
 }
 

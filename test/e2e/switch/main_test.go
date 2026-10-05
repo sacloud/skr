@@ -23,8 +23,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 type fakeCLI struct {
@@ -222,11 +224,15 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	runner := cliRunner{binary: binary, evidence: dir}
+	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "switch-api"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := cliRunner{binary: binary, evidence: recorder}
 	if _, err := runner.call(context.Background(), "test-find", map[string]any{"Zone": zone}); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "test-find.json")
+	path := filepath.Join(recorder.Dir(), "001-test-find.json")
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
@@ -241,6 +247,13 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	if !strings.Contains(string(data), "test-find") || !strings.Contains(string(data), `"tk1v"`) {
 		t.Fatalf("evidence missing step or request: %s", data)
 	}
+	order, err := os.ReadFile(filepath.Join(recorder.Dir(), "ORDER.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(order), "001\ttest-find\tok\t001-test-find.json") {
+		t.Fatalf("evidence order missing find step: %s", order)
+	}
 }
 
 func TestSwitchArgsUsesFlagsAndJSONForNames(t *testing.T) {
@@ -249,10 +262,11 @@ func TestSwitchArgsUsesFlagsAndJSONForNames(t *testing.T) {
 		request map[string]any
 		want    string
 	}{
-		{"test-create", map[string]any{"Zone": zone, "Name": name, "Description": description}, "--zone tk1v --name skr-e2e-switch --description Temporary switch for skr API tutorial"},
+		{"test-create", map[string]any{"Zone": zone, "Name": name, "Description": description}, "--zone tk1v --output json --name skr-e2e-switch --description Temporary switch for skr API tutorial"},
 		{"test-find", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
-		{"preflight-find-page-000", map[string]any{"Zone": zone, "Count": pageSize, "From": 0}, "--zone tk1v --count 100 --from 0"},
-		{"cleanup-delete", map[string]any{"Zone": zone, "ID": types.ID(123), "FailIfNotFound": true}, "--zone tk1v --id 123 --fail-if-not-found=true"},
+		{"test-find-table", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
+		{"preflight-find-page-000", map[string]any{"Zone": zone, "Count": pageSize, "From": 0}, "--zone tk1v --output json --count 100 --from 0"},
+		{"cleanup-delete", map[string]any{"Zone": zone, "ID": types.ID(123), "FailIfNotFound": true}, "--zone tk1v --output json --id 123 --fail-if-not-found=true"},
 	} {
 		args, err := switchArgs(tc.step, tc.request)
 		if err != nil {
@@ -260,6 +274,13 @@ func TestSwitchArgsUsesFlagsAndJSONForNames(t *testing.T) {
 		}
 		if !strings.Contains(strings.Join(args, " "), tc.want) {
 			t.Fatalf("%s: args = %v, want %q", tc.step, args, tc.want)
+		}
+		output := "json"
+		if strings.HasSuffix(tc.step, "-table") {
+			output = "table"
+		}
+		if !strings.Contains(strings.Join(args, " "), "--output "+output) {
+			t.Errorf("%s: args = %v, want output format %q", tc.step, args, output)
 		}
 	}
 }

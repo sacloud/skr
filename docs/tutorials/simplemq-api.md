@@ -41,6 +41,17 @@ $ skr simplemq-api message delete --help
 
 ```console
 $ skr simplemq-api queue create --name QUEUE-NAME --description simplemq-tutorial/UNIQUE-SUFFIX --output json
+$ COLUMNS=200 skr simplemq-api queue list --output table
+```
+
+次は SimpleMQ の live E2E で取得した出力を編集した例です。ID、キュー名、説明、設定ハッシュ、時刻は置き換えています。列や値は端末幅とキューの内容によって省略される場合があります。
+
+```text
++--------------+------------------------------+--------------------------+----------------+--------+--------------+--------------+-----------+------------+----------+----------+--------------+-------+
+| ID           | Name                         | Status                   | Description    | Tags   | Availability | ServiceClass | CreatedAt | ModifiedAt | Provider | Settings | SettingsHash | Icon  |
++--------------+------------------------------+--------------------------+----------------+--------+--------------+--------------+-----------+------------+----------+----------+--------------+-------+
+| 123456789012 | QUEUE-NAME                   | {"QueueName":"QUEUE-...  | DESCRIPTION    |        | available    | cloud/sim... | 2026-1... | 2026-10... | {"Cla... | {"Exp... | ...          |       |
++--------------+------------------------------+--------------------------+----------------+--------+--------------+--------------+-----------+------------+----------+----------+--------------+-------+
 ```
 
 キューの可視性タイムアウトと未処理メッセージ保存期間を設定します。`VisibilityTimeoutSeconds` は5〜900秒、`ExpireSeconds` は60〜1209600秒です。どちらも必要なので、通常は対応する CLI フラグで指定します。
@@ -108,11 +119,19 @@ $ skr simplemq-api queue count-messages QUEUE-ID --output json
 $ skr simplemq-api queue read QUEUE-ID --output json
 $ skr simplemq-api queue clear-messages QUEUE-ID
 $ skr simplemq-api queue delete QUEUE-ID
-$ skr simplemq-api queue list --output json
+$ skr simplemq-api queue list --output table
 $ rm simplemq.key
 ```
 
-`queue list` に対象キューが残っていないことを確認します。API キーを別の場所に保存した場合は、そのファイルもこの手順で作成したものだけを削除してください。
+`queue list` に対象キューが残っていないことを確認します。削除後に結果が空の場合の出力は次のとおりです。
+
+```text
++------------+
+| No results |
++------------+
+```
+
+API キーを別の場所に保存した場合は、そのファイルもこの手順で作成したものだけを削除してください。
 
 ## 参考資料
 

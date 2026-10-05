@@ -30,6 +30,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 const (
@@ -89,48 +91,44 @@ type cli interface {
 
 type cliRunner struct {
 	binary   string
-	evidence string
+	evidence *evidence.Recorder
 }
 
 func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byte, error) {
-	if filepath.Base(step) != step || step == "" {
-		return nil, fmt.Errorf("invalid evidence step %q", step)
+	if err := evidence.ValidateStep(step); err != nil {
+		return nil, err
 	}
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The caller provides a selected skr executable and structured arguments; no shell is used.
+	if hasTableOutput(args) {
+		command.Env = append(os.Environ(), "COLUMNS=200")
+	}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	runErr := command.Run()
 
-	record := struct {
-		Step   string   `json:"step"`
-		Args   []string `json:"args"`
-		Stdout string   `json:"stdout"`
-		Stderr string   `json:"stderr"`
-		Error  string   `json:"error,omitempty"`
-	}{
-		Step: step, Args: args, Stdout: stdout.String(), Stderr: stderr.String(),
-	}
-	if step == "e2e-rotate-api-key" {
-		record.Stdout = "[REDACTED: APIKey]"
-	}
-	if runErr != nil {
-		record.Error = runErr.Error()
-	}
-	data, err := json.MarshalIndent(record, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("%s: encode evidence: %w", step, err)
-	}
-	if err := os.WriteFile(filepath.Join(r.evidence, step+".json"), append(data, '\n'), 0o600); err != nil {
-		return nil, fmt.Errorf("%s: write evidence: %w", step, err)
+	if err := r.evidence.Record(step, args, nil, stdout.String(), stderr.String(), runErr, step == "e2e-rotate-api-key"); err != nil {
+		if runErr != nil {
+			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr), err)
+		}
+		return nil, err
 	}
 	if runErr != nil {
 		return nil, fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr)
 	}
 	return stdout.Bytes(), nil
+}
+
+func hasTableOutput(args []string) bool {
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--output" && args[i+1] == "table" {
+			return true
+		}
+	}
+	return false
 }
 
 type scenario struct {
@@ -343,6 +341,13 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 	if found != 1 {
 		return fmt.Errorf("queue list returned %d items named %q; want the created queue once", found, name)
 	}
+	table, err := s.call(ctx, "e2e-list-created-table", "queue list", "--output", "table")
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(string(table), name) {
+		return fmt.Errorf("queue table output does not contain created queue %q", name)
+	}
 
 	data, err = s.call(ctx, "e2e-config", "queue config", id,
 		"--visibility-timeout-seconds", "30", "--expire-seconds", "345600", "--output", "json")
@@ -438,31 +443,6 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 	return nil
 }
 
-func evidenceDir() (string, error) {
-	dir, err := os.MkdirTemp("", "skr-e2e-simplemq-")
-	if err != nil {
-		return "", fmt.Errorf("create evidence directory: %w", err)
-	}
-	command := exec.Command("git", "-C", dir, "rev-parse", "--is-inside-work-tree") //nolint:gosec // The directory was just created by MkdirTemp.
-	output, err := command.Output()
-	if err == nil && strings.TrimSpace(string(output)) == "true" {
-		if removeErr := os.Remove(dir); removeErr != nil {
-			return "", errors.Join(fmt.Errorf("refusing evidence inside a Git worktree: %s", dir),
-				fmt.Errorf("remove evidence directory: %w", removeErr))
-		}
-		return "", fmt.Errorf("refusing to save evidence inside a Git worktree: %s", dir)
-	}
-	var exitErr *exec.ExitError
-	if err != nil && !errors.As(err, &exitErr) {
-		if removeErr := os.Remove(dir); removeErr != nil {
-			return "", errors.Join(fmt.Errorf("verify evidence directory: %w", err),
-				fmt.Errorf("remove evidence directory: %w", removeErr))
-		}
-		return "", fmt.Errorf("verify evidence directory: %w", err)
-	}
-	return dir, nil
-}
-
 func randomSuffix() (string, error) {
 	var value [8]byte
 	if _, err := rand.Read(value[:]); err != nil {
@@ -493,11 +473,22 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	evidence, err := evidenceDir()
+	recorder, err := evidence.New("simplemq-api")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+	defer func() {
+		result := "failed"
+		if exitCode == 0 {
+			result = "passed"
+		}
+		if err := recorder.SetResult(result, time.Now()); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			exitCode = 1
+		}
+	}()
 	secretDir, err := os.MkdirTemp("", "skr-e2e-simplemq-secret-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "create private key directory:", err)
@@ -526,20 +517,19 @@ func runMain() (exitCode int) {
 	}
 	name := queuePrefix + suffix
 	description := descriptionPrefix + suffix
-	fmt.Println("Evidence (private, outside Git):", evidence)
 	fmt.Println("Unique queue to create:", name)
 	fmt.Println("Check `skr config current` before running; this command uses the selected SDK profile.")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	runner := cliRunner{binary: path, evidence: evidence}
+	runner := cliRunner{binary: path, evidence: recorder}
 	if err := (scenario{client: runner, keyFile: keyFile}).run(ctx, name, description); err != nil {
 		fmt.Fprintln(os.Stderr, "SimpleMQ E2E failed:", err)
-		fmt.Fprintln(os.Stderr, "Evidence retained at:", evidence)
+		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
 	}
 	fmt.Println("SimpleMQ E2E passed; the test message and uniquely created queue were deleted.")
-	fmt.Println("Evidence retained at:", evidence)
+	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
 }
 

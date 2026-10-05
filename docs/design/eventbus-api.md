@@ -21,7 +21,7 @@ $ go run ./test/e2e/eventbus-api --skr ./skr --confirm-is1b-live
 
 コマンドの実行証跡は `./tmp/eventbus-api/<YYYYMMDDHHmm>/` に保存され、開始時に実際の保存先が表示されます。同じ分に複数回実行した場合は `-02` 以降を付けて既存の証跡を上書きしません。
 
-各 JSON ファイル名の先頭にある3桁の連番が実行順です。`ORDER.txt` にも連番、操作名、成否、対応する JSON ファイルを記録します。`receive-event-message` のように同じ操作を繰り返す場合も、連番で順序を確認できます。`RESULT.txt` には最終結果を記録します。
+各 JSON ファイル名の先頭にある3桁の連番が実行順です。`test/e2e/internal/evidence` が共通の記録処理を提供し、`ORDER.txt` にも連番、操作名、成否、対応する JSON ファイルを記録します。`receive-event-message` のように同じ操作を繰り返す場合も、連番で順序を確認できます。`RESULT.txt` には最終結果を記録します。
 
 スクリプトは一意な試験名を使い、SimpleMQ キュー、実行設定、トリガー、`is1b` の通常スイッチを作成します。トリガーは `//eventbus.sakura.ad.jp/eventlog` の `jp.ad.sakura.eventbus.eventlog.IaaS.request.Switch.normal.created` を対象とし、イベントの `zone` が `is1b` のときだけ実行設定を起動します。SimpleMQ から一意な試験メッセージを受信したことを確認します。
 

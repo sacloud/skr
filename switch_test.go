@@ -100,11 +100,11 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 	}
 
 	var created iaas.Switch
-	create := `{"Zone":"test-zone","Name":"local-sakumock-switch","Description":"created"}`
+	create := `{"Zone":"test-zone","Name":"TEST-SWITCH-NAME","Description":"Temporary switch for skr API tutorial"}`
 	if err := json.Unmarshal(runCommand("iaas-api", "switch", "create", "--request", create), &created); err != nil {
 		t.Fatal(err)
 	}
-	if created.ID == 0 || created.Name != "local-sakumock-switch" || created.Description != "created" {
+	if created.ID == 0 || created.Name != "TEST-SWITCH-NAME" || created.Description != "Temporary switch for skr API tutorial" {
 		t.Fatalf("create returned %#v, want created switch fields", created)
 	}
 
@@ -114,6 +114,11 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 	}
 	if len(found) != 1 || found[0].ID != created.ID {
 		t.Fatalf("find returned %#v, want switch %d", found, created.ID)
+	}
+	t.Setenv("COLUMNS", "200")
+	table := string(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--output", "table"))
+	if !strings.Contains(table, created.ID.String()) || !strings.Contains(table, "TEST-SWITCH-NAME") {
+		t.Fatalf("table output = %q, want created switch ID and name", table)
 	}
 
 	var read iaas.Switch
@@ -138,7 +143,7 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 	if err := json.Unmarshal(runCommand("iaas-api", "switch", "update", "--request", updateRequest), &updated); err != nil {
 		t.Fatal(err)
 	}
-	if updated.Name != "updated-switch" || updated.Description != "created" {
+	if updated.Name != "updated-switch" || updated.Description != "Temporary switch for skr API tutorial" {
 		t.Errorf("update returned %#v, want updated name and unchanged description", updated)
 	}
 
@@ -151,6 +156,10 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 	}
 	if len(found) != 0 {
 		t.Errorf("find after delete returned %#v, want no switches", found)
+	}
+	emptyTable := string(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--output", "table"))
+	if want := "+------------+\n| No results |\n+------------+\n"; emptyTable != want {
+		t.Errorf("empty table output = %q, want %q", emptyTable, want)
 	}
 }
 
@@ -196,6 +205,7 @@ func TestIaaSSwitchFindAllZones(t *testing.T) {
 	if len(found) != 2 || found[0].Name != "switch-a" || found[1].Name != "switch-b" {
 		t.Errorf("find all returned %#v, want one result from each configured zone", found)
 	}
+	t.Setenv("COLUMNS", "200")
 	table := string(runCommand("iaas-api", "switch", "find", "--zone", "all", "--output", "table"))
 	if headers := tableHeaderCells(table); len(headers) < 3 || strings.Join(headers[:3], " ") != "Zone ID Name" {
 		t.Errorf("table headers start with %v, want Zone ID Name", headers[:min(3, len(headers))])
