@@ -29,7 +29,7 @@ import (
 	"unicode"
 
 	"github.com/alecthomas/kong"
-	"github.com/ghodss/yaml"
+	"github.com/goccy/go-yaml"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"golang.org/x/term"
 	"golang.org/x/text/width"
@@ -44,11 +44,7 @@ func writeOutputWithFormat(ctx *kong.Context, format string, value any, zones ..
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(value)
 	case "yaml":
-		data, err := json.Marshal(value)
-		if err != nil {
-			return fmt.Errorf("encode output JSON for YAML: %w", err)
-		}
-		data, err = yaml.JSONToYAML(data)
+		data, err := marshalYAML(value)
 		if err != nil {
 			return fmt.Errorf("encode output YAML: %w", err)
 		}
@@ -64,6 +60,45 @@ func writeOutputWithFormat(ctx *kong.Context, format string, value any, zones ..
 		return writeTable(ctx.Stdout, value, zoneNames)
 	default:
 		return fmt.Errorf("unsupported output format %q", format)
+	}
+}
+
+func marshalYAML(value any) ([]byte, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("encode output JSON for YAML: %w", err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var decoded any
+	if err := decoder.Decode(&decoded); err != nil {
+		return nil, fmt.Errorf("decode output JSON for YAML: %w", err)
+	}
+	data, err = yaml.Marshal(yamlCompatibleValue(decoded))
+	if err != nil {
+		return nil, fmt.Errorf("marshal output YAML: %w", err)
+	}
+	return data, nil
+}
+
+func yamlCompatibleValue(value any) any {
+	switch value := value.(type) {
+	case json.Number:
+		return yaml.RawMessage(value.String())
+	case []any:
+		converted := make([]any, len(value))
+		for i, item := range value {
+			converted[i] = yamlCompatibleValue(item)
+		}
+		return converted
+	case map[string]any:
+		converted := make(map[string]any, len(value))
+		for key, item := range value {
+			converted[key] = yamlCompatibleValue(item)
+		}
+		return converted
+	default:
+		return value
 	}
 }
 

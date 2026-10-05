@@ -191,6 +191,19 @@ func TestWriteTableOmitsZeroTimestamps(t *testing.T) {
 	}
 }
 
+func TestMarshalYAMLPreservesLargeNumbersAndJSONFieldNames(t *testing.T) {
+	output, err := marshalYAML(map[string]any{
+		"ID":   json.Number("9007199254740993"),
+		"Name": "example",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(output); !strings.Contains(got, "ID: 9007199254740993") || !strings.Contains(got, "Name: example") {
+		t.Fatalf("YAML output = %q, want original field names and exact numeric ID", got)
+	}
+}
+
 func tableHeaderCells(output string) []string {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	if len(lines) < 2 {
