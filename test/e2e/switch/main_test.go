@@ -262,10 +262,11 @@ func TestSwitchArgsUsesFlagsAndJSONForNames(t *testing.T) {
 		request map[string]any
 		want    string
 	}{
-		{"test-create", map[string]any{"Zone": zone, "Name": name, "Description": description}, "--zone tk1v --name skr-e2e-switch --description Temporary switch for skr API tutorial"},
+		{"test-create", map[string]any{"Zone": zone, "Name": name, "Description": description}, "--zone tk1v --output json --name skr-e2e-switch --description Temporary switch for skr API tutorial"},
 		{"test-find", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
-		{"preflight-find-page-000", map[string]any{"Zone": zone, "Count": pageSize, "From": 0}, "--zone tk1v --count 100 --from 0"},
-		{"cleanup-delete", map[string]any{"Zone": zone, "ID": types.ID(123), "FailIfNotFound": true}, "--zone tk1v --id 123 --fail-if-not-found=true"},
+		{"test-find-table", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
+		{"preflight-find-page-000", map[string]any{"Zone": zone, "Count": pageSize, "From": 0}, "--zone tk1v --output json --count 100 --from 0"},
+		{"cleanup-delete", map[string]any{"Zone": zone, "ID": types.ID(123), "FailIfNotFound": true}, "--zone tk1v --output json --id 123 --fail-if-not-found=true"},
 	} {
 		args, err := switchArgs(tc.step, tc.request)
 		if err != nil {
@@ -273,6 +274,13 @@ func TestSwitchArgsUsesFlagsAndJSONForNames(t *testing.T) {
 		}
 		if !strings.Contains(strings.Join(args, " "), tc.want) {
 			t.Fatalf("%s: args = %v, want %q", tc.step, args, tc.want)
+		}
+		output := "json"
+		if strings.HasSuffix(tc.step, "-table") {
+			output = "table"
+		}
+		if !strings.Contains(strings.Join(args, " "), "--output "+output) {
+			t.Errorf("%s: args = %v, want output format %q", tc.step, args, output)
 		}
 	}
 }

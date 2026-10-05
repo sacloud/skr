@@ -65,6 +65,8 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		return data, err
 	case "e2e-list-created", "e2e-cleanup-list", "e2e-cleanup-list-after":
 		return f.queueList()
+	case "e2e-list-created-table":
+		return []byte("ID Name\nqueue-123 skr-e2e-sqm-test\n"), nil
 	case "e2e-config":
 		f.item.Settings.VisibilityTimeoutSeconds = 30
 		f.item.Settings.ExpireSeconds = 345600
@@ -138,6 +140,7 @@ func TestScenarioCleansUpAfterSuccess(t *testing.T) {
 		t.Fatal("test queue was not deleted")
 	}
 	for _, want := range []string{
+		"e2e-list-created-table",
 		"e2e-config",
 		"e2e-rotate-api-key",
 		"e2e-send",

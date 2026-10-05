@@ -102,6 +102,9 @@ func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byt
 	defer cancel()
 
 	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The caller provides a selected skr executable and structured arguments; no shell is used.
+	if hasTableOutput(args) {
+		command.Env = append(os.Environ(), "COLUMNS=200")
+	}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -117,6 +120,15 @@ func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byt
 		return nil, fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr)
 	}
 	return stdout.Bytes(), nil
+}
+
+func hasTableOutput(args []string) bool {
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--output" && args[i+1] == "table" {
+			return true
+		}
+	}
+	return false
 }
 
 type scenario struct {
@@ -328,6 +340,13 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 	}
 	if found != 1 {
 		return fmt.Errorf("queue list returned %d items named %q; want the created queue once", found, name)
+	}
+	table, err := s.call(ctx, "e2e-list-created-table", "queue list", "--output", "table")
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(string(table), name) {
+		return fmt.Errorf("queue table output does not contain created queue %q", name)
 	}
 
 	data, err = s.call(ctx, "e2e-config", "queue config", id,

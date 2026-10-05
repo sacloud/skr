@@ -80,6 +80,9 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // Binary is an explicitly selected local skr executable; arguments are structured JSON, not a shell.
+	if hasTableOutput(args) {
+		command.Env = append(os.Environ(), "COLUMNS=200")
+	}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -96,6 +99,15 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	return stdout.Bytes(), nil
 }
 
+func hasTableOutput(args []string) bool {
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--output" && args[i+1] == "table" {
+			return true
+		}
+	}
+	return false
+}
+
 func switchArgs(step string, value any) ([]string, error) {
 	op, err := operation(step)
 	if err != nil {
@@ -109,7 +121,11 @@ func switchArgs(step string, value any) ([]string, error) {
 	if !ok || zone == "" {
 		return nil, fmt.Errorf("%s: missing Zone", step)
 	}
-	args := []string{"iaas-api", "switch", op, "--zone", zone}
+	output := "json"
+	if strings.HasSuffix(step, "-table") {
+		output = "table"
+	}
+	args := []string{"iaas-api", "switch", op, "--zone", zone, "--output", output}
 	fields := map[string]string{"ID": "--id", "Name": "--name", "Description": "--description", "Count": "--count", "From": "--from", "FailIfNotFound": "--fail-if-not-found"}
 	for field := range request {
 		if field != "Zone" && field != "Names" && fields[field] == "" {
@@ -136,7 +152,7 @@ func switchArgs(step string, value any) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: encode request: %w", step, err)
 		}
-		return []string{"iaas-api", "switch", op, "--request", string(data)}, nil
+		return []string{"iaas-api", "switch", op, "--request", string(data), "--output", output}, nil
 	}
 	return args, nil
 }
@@ -350,6 +366,13 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	}
 	if len(found) != 1 || checkItem(found[0], id, name) != nil {
 		return fmt.Errorf("find did not return exactly the created Switch %s", id)
+	}
+	table, err := s.call(ctx, "test-find-table", map[string]any{"Zone": zone, "Names": []string{name}})
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(string(table), id.String()) || !strings.Contains(string(table), name) {
+		return fmt.Errorf("Switch table output does not contain created Switch %s", id)
 	}
 	request := map[string]any{"Zone": zone, "ID": id}
 	read, err := s.item(ctx, "test-read", request)
