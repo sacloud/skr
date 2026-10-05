@@ -9,7 +9,7 @@
 
 - `skr iaas-api switch` を含むバイナリが利用できること。リポジトリで `make build` を実行すると `./skr` が生成されます。以下の `skr` は、そのバイナリを実行するコマンドとして記載します。
 - 対象プロジェクトに対する認証情報を、プロファイルまたは `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で設定済みであること。スイッチを作成・更新・削除できる権限も必要です。認証情報はコマンド例や JSON ファイルに書かないでください。
-- 対象が `tk1v` の Sandbox ゾーンであることを確認できること。[Sandbox のマニュアル](https://manual.sakura.ad.jp/cloud/server/sandbox.html)によると、Sandbox で作成したリソースは課金されません。ただし、スイッチを含む機器はインターネットに接続できません。この手順で検証するのは API での管理操作であり、実際のネットワーク通信ではありません。
+- 対象が `tk1v` の Sandbox ゾーンであることを確認できること。Sandbox で作成したリソースは課金されませんが、スイッチを含む機器はインターネットに接続できません（[Sandbox の制限](https://manual.sakura.ad.jp/cloud/server/sandbox.html)）。この手順で検証するのは API での管理操作であり、実際のネットワーク通信ではありません。
 - `TEST-SWITCH-NAME` と `UPDATED-TEST-SWITCH-NAME` を、他のリソースと重複しない、自分のテスト専用の名前に置き換えること。後述の数値 `123456789012` は **仮の ID** です。必ず作成結果の `ID` に置き換えてください。
 
 ## 作成するリソースと順序
