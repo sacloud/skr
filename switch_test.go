@@ -43,7 +43,7 @@ func TestRunIaaSAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"iaas-api", "switch", "find", "--help"},
-			want: []string{`"Zone":"all"`, `"Names":["example"]`, "Tags", "Sort", "有効な Key", "取得件数", "--zone all", "併用不可"},
+			want: []string{`"Zone":"tk1v"`, `"Names":["example"]`, "Tags", "Sort", "有効な Key", "取得件数", "--zone all", "併用不可"},
 		},
 		{
 			args: []string{"iaas-api", "switch", "read", "--help"},
@@ -186,17 +186,12 @@ func TestIaaSSwitchFindAllZones(t *testing.T) {
 		runCommand("iaas-api", "switch", "create", "--zone", entry.zone, "--name", entry.name)
 	}
 
-	for _, args := range [][]string{
-		{"iaas-api", "switch", "find", "--zone", "all"},
-		{"iaas-api", "switch", "find", "--request", `{"Zone":"all"}`},
-	} {
-		var found []*iaas.Switch
-		if err := json.Unmarshal(runCommand(args...), &found); err != nil {
-			t.Fatal(err)
-		}
-		if len(found) != 2 || found[0].Name != "switch-a" || found[1].Name != "switch-b" {
-			t.Errorf("find(%v) returned %#v, want one result from each configured zone", args, found)
-		}
+	var found []*iaas.Switch
+	if err := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--zone", "all"), &found); err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 2 || found[0].Name != "switch-a" || found[1].Name != "switch-b" {
+		t.Errorf("find all returned %#v, want one result from each configured zone", found)
 	}
 }
 
@@ -301,8 +296,8 @@ func TestSwitchFlagInputs(t *testing.T) {
 		{"delete", "--request", `{"Zone":"test-zone","ID":123}`, "--fail-if-not-found=false"},
 		{"read", "--zone", "all", "--id", "123"},
 		{"create", "--zone", "all", "--name", "switch"},
-		{"update", "--request", `{"Zone":"all","ID":123,"Name":"switch"}`},
-		{"delete", "--request", `{"Zone":"all","ID":123}`},
+		{"update", "--zone", "all", "--id", "123", "--name", "switch"},
+		{"delete", "--zone", "all", "--id", "123"},
 	} {
 		out, stderr, code := call(args...)
 		if code == 0 || len(out) != 0 || stderr == "" {
