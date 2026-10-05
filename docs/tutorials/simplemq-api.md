@@ -87,7 +87,7 @@ $ skr simplemq-api message receive --queue-name QUEUE-NAME --api-key-file simple
 
 送信結果の `id` と受信結果の `id` が一致し、受信結果の `content` が `HelloSimpleMQ` であることを確認してください。受信結果の `id` を続く操作の `MESSAGE-ID` に指定します。
 
-公式マニュアルによると、受信リクエストはキュー内の古いメッセージから配信します。配信保証は At least once です。同じメッセージを複数回受信する場合があるため、アプリケーション側で重複を避ける設計にしてください（[シンプルMQの基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)）。
+受信リクエストはキュー内の古いメッセージから配信します。配信保証は At least once です。同じメッセージを複数回受信する場合があるため、アプリケーション側で重複を避ける設計にしてください（[シンプルMQの基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)）。
 
 処理に可視性タイムアウトより長い時間がかかる場合は、受信したメッセージのタイムアウトを延長します。処理が終わったら、そのメッセージを削除します。
 
