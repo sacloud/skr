@@ -1,82 +1,133 @@
-# EventBus API: イベントを検知してシンプル通知を送る
+# EventBus API: スイッチ作成イベントを SimpleMQ で受信する
 
-EventBus はイベントの検知やスケジュールをきっかけにジョブを実行します。このチュートリアルでは、ネットワークスイッチの作成イベントを検知し、シンプル通知の通知先グループへ通知するトリガーを作成します。EventBus のジョブ実行はベストエフォート型であり、厳密なリアルタイム性は保証されません（[EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)）。
+EventBus はイベントやスケジュールをきっかけにジョブを実行します。このチュートリアルでは、通常スイッチの作成イベントで SimpleMQ にメッセージを送り、`skr simplemq-api message receive` で受信します。SimpleMQ はキューを介してソフトウェア間でメッセージを送受信するサービスです（[EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)、[SimpleMQ の基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)）。
 
 > [!WARNING]
-> この手順では EventBus の設定を作成し、テスト用のネットワークスイッチ作成イベントを発生させます。実行前に `skr config current` で対象プロファイルを確認し、通知先と対象ゾーンを確認してください。スイッチの作成・削除には `skr eventbus-api` 以外の手段を使います。テスト後はトリガーを先に削除してください。
+> この手順では SimpleMQ キュー、EventBus の実行設定とトリガー、テスト用スイッチを作成し、SimpleMQ キューからメッセージを受信します。実行前に `skr config current` で対象プロファイルとプロジェクトを確認してください。テスト専用の名前を使い、同じゾーンで他の通常スイッチを作成する操作と重ならない時間に実施してください。ゾーン条件が一致すると、そのゾーンで発生した他の通常スイッチ作成イベントもトリガーします。EventBus のジョブ実行はベストエフォート型で、即時実行は保証されません（[EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)、[ネットワーク関連イベントタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events_network.html)）。
 
 ## 前提条件
 
-- EventBus API を操作できる skr の認証設定があること。EventBus API の利用には「作成・削除」のアクセスレベルが必要です（[EventBus API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/eventbus/api.html)）。
-- 受信先と通知先グループを設定済みのシンプル通知、および EventBus からの呼び出しに使う API キーがあること。シンプル通知の通知先とグループは事前に設定します（[EventBus クイックスタート](https://manual.sakura.ad.jp/cloud/appliance/eventbus/basic.html)）。
-- テスト用の通常スイッチを作成できるプロジェクトとゾーンがあること。テストでは、作成後にすぐ削除できる専用スイッチを使ってください。
-- スイッチの作成イベントを発生させるため、対象ゾーンで他の通常スイッチ作成が重ならない時間に実施すること。この例ではイベントの `zone` 条件を指定しますが、同じゾーンで発生するほかのスイッチ作成イベントも対象になります。
+- `skr` と `jq` が利用でき、対象プロジェクトの SDK プロファイルまたは `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` が設定されていること。
+- EventBus API で実行設定とトリガーを作成・削除できる権限があること（[EventBus API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/eventbus/api.html)）。
+- SimpleMQ キューを作成・削除できる API 認証と、テスト用スイッチを作成・削除できる権限があること。SimpleMQ のキュー管理には「作成・削除」のアクセスレベルが必要です（[SimpleMQ API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/simplemq/api.html)）。
+- `UNIQUE-SUFFIX` を他のリソース名と重複しない短い英数字またはハイフン列に置き換えること。SimpleMQ キュー名は5〜64文字で、同一プロジェクト内で一意にします。作成後にキュー名は変更できません（[SimpleMQ コントロールパネルでの操作](https://manual.sakura.ad.jp/cloud/appliance/simplemq/control_panel.html)）。
+- `ZONE` はイベントタイプが受け付けるゾーン（`is1a`、`is1b`、`is1c`、`tk1a`、`tk1b`）に置き換えること（[EventBus のネットワーク関連イベントタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events_network.html)）。
 
-## 作成するリソース
+## 作成するリソースと順序
 
-1. **実行設定（process-configuration）** — シンプル通知の通知先グループと送信メッセージを指定します。
-2. **トリガー（trigger）** — 指定ゾーンの通常スイッチ作成イベントで実行設定を呼び出します。
-3. **テスト用スイッチ** — EventBus が検知するイベントを発生させます。スイッチはこの CLI ではなく、作成に使ったコントロールパネルまたは別の操作手段で削除します。
+1. **SimpleMQ キュー** — EventBus の送信先です。キューごとの API キーを発行します。
+2. **EventBus 実行設定** — 送信先のキュー名とメッセージ本文を指定し、キューの API キーをシークレットとして登録します。
+3. **EventBus トリガー** — 指定ゾーンの通常スイッチ作成イベントで実行設定を呼び出します。
+4. **テスト用スイッチ** — `skr iaas-api switch` で作成し、対象イベントを発生させます。
+5. **受信確認** — `skr simplemq-api message receive` で実行設定から送られた本文を確認します。
 
-## Step 1: プロファイルとコマンドを確認する
+## Step 1: 対象環境とコマンドを確認する
 
 ```console
 $ skr config current
-$ skr eventbus-api --help
+$ skr simplemq-api queue create --help
+$ skr simplemq-api queue rotate-api-key --help
+$ skr simplemq-api message receive --help
+$ skr simplemq-api queue clear-messages --help
 $ skr eventbus-api process-configuration create --help
 $ skr eventbus-api process-configuration update-secret --help
 $ skr eventbus-api trigger create --help
+$ skr iaas-api switch create --help
 ```
 
-`skr config current` の結果が対象のプロファイルであることを確認します。作成時の `--request` は `CommonServiceItem` を含む JSON で、ファイルは `@ファイル名` で指定できます。作成結果は既定で JSON 出力されるので、後続手順用に `ID` を控えます。`--output json`、`--output yaml`、`--output table` で API コマンドの出力形式を選択でき、プロファイルの `cli.default_output_type`（v0 は `DefaultOutputType`）でも既定値を設定できます。
+意図したプロファイルとプロジェクトを確認してください。SimpleMQ はゾーンを指定しないグローバルリソースです。メッセージ API にはキューごとの API キーを使います（[SimpleMQ コントロールパネルでの操作](https://manual.sakura.ad.jp/cloud/appliance/simplemq/control_panel.html)）。
+`UNIQUE-SUFFIX` と `QUEUE-NAME` は前提条件に従って決め、`ZONE` は作成先に置き換えます。作成前に同名リソースがないことを確認します。結果がすべて `[]` なら続行できます。
 
-## Step 2: シンプル通知の実行設定を作成する
+```console
+$ skr simplemq-api queue list --output json | jq '[.[] | select(.Name == "QUEUE-NAME")]'
+[]
+$ skr eventbus-api process-configuration list --output json | jq '[.[] | select(.Name == "eventbus-simplemq-job-UNIQUE-SUFFIX")]'
+[]
+$ skr eventbus-api trigger list --output json | jq '[.[] | select(.Name == "eventbus-simplemq-trigger-UNIQUE-SUFFIX")]'
+[]
+$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --output json | jq .
+[]
+```
 
-次の JSON を `process-configuration.json` として保存し、`NOTIFICATION-GROUP-ID` を既存の通知先グループ ID に置き換えます。`Parameters` は実行先サービス固有の JSON を文字列として指定します。ここでは通知先グループと通知メッセージを設定します（[実行設定の項目](https://manual.sakura.ad.jp/cloud/appliance/eventbus/control_panel.html)）。
+## Step 2: SimpleMQ キューと API キーを用意する
+
+`UNIQUE-SUFFIX` は使用していない値に、`QUEUE-NAME` はその値を使った5〜64文字の一意な名前に置き換えます。Step 1 の確認結果が `[]` であることを確かめてから作成します。
+
+```console
+$ umask 077
+$ skr simplemq-api queue create --name QUEUE-NAME --description eventbus-tutorial/UNIQUE-SUFFIX --output json > queue.json
+$ QUEUE_ID=$(jq -er '.ID' queue.json)
+$ skr simplemq-api queue list --output table
+```
+
+作成したキューの行が一覧に表示されることを確認します。次はその行の出力例です（ID、名前、説明、QueueName、日時を置換しています）。ほかのキューも別の行に表示されます。表示列と値の省略位置は端末幅で変わります。
+
+```text
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+| ID           | Name           | Status | Description | Tags   | Availability | ServiceClass | CreatedAt | ModifiedAt |
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+| <QUEUE-ID>   | QUEUE-NAME...  | {"Q... | eventbus... |        | available    | cloud/sim... | 2026-1...  | 2026-10... |
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+... +4 columns omitted
+```
+
+キューごとの API キーを発行します。発行結果を画面に表示せず、EventBus のシークレット登録に使う JSON ファイルと、メッセージ受信に使う API キーファイルを作成します。再発行すると以前のキーは無効になります（[SimpleMQ API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/simplemq/api.html)）。
+
+```console
+$ skr simplemq-api queue rotate-api-key "$QUEUE_ID" --output json > eventbus-secret.json
+$ jq -er '.APIKey' eventbus-secret.json > simplemq.key
+$ chmod 600 queue.json eventbus-secret.json simplemq.key
+```
+
+`eventbus-secret.json` は `process-configuration update-secret` 用、`simplemq.key` は `message receive --api-key-file` 用です。両ファイルとも作業端末上だけで管理し、コマンドラインやリポジトリにキーを書かないでください。
+
+## Step 3: SimpleMQ 宛ての実行設定を作成する
+
+`process-configuration.json` を作成します。`QUEUE-NAME` と `UNIQUE-SUFFIX` は Step 2 で決めた値に置き換えてください。`Parameters` には `queue_name` と `content` を持つ JSON を文字列として指定します。SimpleMQ のメッセージ本文には半角英数字と `+`、`/`、`=` を使います。この例の `EventBusSwitchCreated` はその条件を満たします（[SimpleMQ の基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)、[実行設定の項目](https://manual.sakura.ad.jp/cloud/appliance/eventbus/control_panel.html)）。
 
 ```json
 {
   "CommonServiceItem": {
-    "Name": "eventbus-tutorial-switch-created",
+    "Name": "eventbus-simplemq-job-UNIQUE-SUFFIX",
+    "Description": "eventbus-simplemq/UNIQUE-SUFFIX",
     "Settings": {
-      "Destination": "simplenotification",
-      "Parameters": "{\"group_id\":\"NOTIFICATION-GROUP-ID\",\"message\":\"A network switch was created.\"}"
+      "Destination": "simplemq",
+      "Parameters": "{\"queue_name\":\"QUEUE-NAME\",\"content\":\"EventBusSwitchCreated\"}"
     }
   }
 }
 ```
 
-EventBus からシンプル通知を呼び出す API キーのアクセストークンとアクセストークンシークレットを、作業端末上の `notification-secret.json` に保存します。値をコマンドラインやリポジトリに記録しないでください。ファイルのアクセス権を制限します。
-
-```json
-{
-  "AccessToken": "ACCESS-TOKEN",
-  "AccessTokenSecret": "ACCESS-TOKEN-SECRET"
-}
-```
+実行設定を作成し、結果の `ID` を控えます。続いて、キューの API キーを実行設定のシークレットとして登録します。シークレットは `--secret-file` から読み込み、コマンド引数には含めません。
 
 ```console
-$ chmod 600 notification-secret.json
-$ skr eventbus-api process-configuration create --request @process-configuration.json
+$ skr eventbus-api process-configuration create --request @process-configuration.json --output json > process-configuration-result.json
+$ PROCESS_CONFIGURATION_ID=$(jq -er '.ID' process-configuration-result.json)
+$ skr eventbus-api process-configuration update-secret "$PROCESS_CONFIGURATION_ID" --secret-file eventbus-secret.json
+$ skr eventbus-api process-configuration read "$PROCESS_CONFIGURATION_ID" --output json
+$ skr eventbus-api process-configuration list --output table
 ```
 
-作成結果の `ID` を `PROCESS-CONFIGURATION-ID` として控えます。次に、作成した実行設定へシークレットを登録します。
+作成した実行設定の `ID` と `Name` が一覧に表示されることを確認します。以下は実機の出力形式に基づく行の抜粋で、ID、名前、説明、日時を置換しています。ほかの実行設定の行や端末幅による省略は環境によって変わります。
 
-```console
-$ skr eventbus-api process-configuration update-secret PROCESS-CONFIGURATION-ID --secret-file notification-secret.json
-$ skr eventbus-api process-configuration read PROCESS-CONFIGURATION-ID
+```text
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+| ID           | Name           | Status | Description | Tags   | Availability | ServiceClass | CreatedAt | ModifiedAt |
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+| <ID>         | eventbus-job...|        | eventbus... |        | available    |              | 2026-1... | 2026-10... |
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+... +4 columns omitted
 ```
 
-## Step 3: スイッチ作成イベントのトリガーを作成する
+## Step 4: スイッチ作成イベントのトリガーを作成する
 
-イベントログのソースは `//eventbus.sakura.ad.jp/eventlog`、通常スイッチの作成タイプは `jp.ad.sakura.eventbus.eventlog.IaaS.request.Switch.normal.created` です。これらは [EventBus のイベントタイプ一覧](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events.html) と[ネットワーク関連のタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events_network.html)に記載されています。`ZONE` は対象ゾーン（`is1a`、`is1b`、`is1c`、`tk1a`、`tk1b` のいずれか）に置き換えます。
-
-次の JSON を `trigger.json` として保存し、`PROCESS-CONFIGURATION-ID` も Step 2 の実行設定 ID に置き換えます。`Conditions` はイベントの `zone` が指定値と一致する場合に絞り込みます。イベント条件で `zone` を使用できることは[イベントタイプ一覧](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events.html)で確認できます。
+イベントログのソースは `//eventbus.sakura.ad.jp/eventlog` です。通常スイッチの作成タイプは `jp.ad.sakura.eventbus.eventlog.IaaS.request.Switch.normal.created` です（[EventBus のイベントタイプ一覧](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events.html)、[ネットワーク関連イベントタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events_network.html)）。次の内容を `trigger.json` として保存し、名前と `PROCESS-CONFIGURATION-ID` を作成した値に置き換えます。
 
 ```json
 {
   "CommonServiceItem": {
-    "Name": "eventbus-tutorial-switch-created",
+    "Name": "eventbus-simplemq-trigger-UNIQUE-SUFFIX",
+    "Description": "eventbus-simplemq/UNIQUE-SUFFIX",
     "Settings": {
       "Source": "//eventbus.sakura.ad.jp/eventlog",
       "Types": [
@@ -95,47 +146,119 @@ $ skr eventbus-api process-configuration read PROCESS-CONFIGURATION-ID
 }
 ```
 
-```console
-$ skr eventbus-api trigger create --request @trigger.json
-$ skr eventbus-api trigger list
-```
-
-作成結果の `ID` を `TRIGGER-ID` として控えます。`list` にトリガーが表示されることを確認してください。
-
-## Step 4: イベントを発生させて通知を確認する
-
-対象ゾーンに、他の用途と共有しない通常スイッチを作成します。スイッチの作成操作は `skr eventbus-api` の対象外です。コントロールパネルなど、利用環境でスイッチを管理している手段を使ってください。EventBus がイベントを検知すると、実行設定で指定したメッセージがシンプル通知から通知先グループへ送られます。シンプル通知は設定済みのメールまたは Webhook などの通知先へ通知します（[シンプル通知の概要](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/about.html)）。
-
-ジョブの実行はベストエフォート型です。即時実行を前提にせず、通知先グループで結果を確認してください。
-
-実機では別の一時 SimpleMQ キューを実行先にして、同じスイッチ作成イベントを検証しました。`skr eventbus-api process-configuration create`、`update-secret`、`trigger create`、`trigger list` を実行し、`is1b` で作成したスイッチに対応するメッセージをキューから受信できました。試験で作成したトリガー、スイッチ、実行設定、キューは削除済みです。
-
-この確認では、EventBus のイベント検知から SimpleMQ への配送までを実際のコマンドで検証しました。sakumock テストだけでは実際のイベント検知を検証できません。一方、このチュートリアルに記載したシンプル通知宛ての経路や、メール・Webhook などの通知到達は実機では検証していません。
-
-## Step 5: 作成したリソースを削除する
-
-まずトリガーを削除し、以降のイベントで通知が発生しないようにします。続いて、作成したテスト用スイッチを作成時と同じ管理手段で削除し、最後に実行設定を削除します。既存の通知先グループや API キーはこの手順では作成していないため削除しません。
+`ZONE` は Step 5 でスイッチを作成するゾーンと同じ値にします。`Conditions` により `zone` が一致するイベントだけを対象にします。トリガーを作成して ID を控え、設定を読み戻します。
 
 ```console
-$ skr eventbus-api trigger delete TRIGGER-ID
-$ skr eventbus-api trigger list
+$ skr eventbus-api trigger create --request @trigger.json --output json > trigger-result.json
+$ TRIGGER_ID=$(jq -er '.ID' trigger-result.json)
+$ skr eventbus-api trigger read "$TRIGGER_ID" --output json
+$ skr eventbus-api trigger list --output table
 ```
 
-次に、テスト用スイッチを利用したコントロールパネルなどから削除します。その後、実行設定を削除し、`list` の結果に EventBus リソースが残っていないことを確認します。
+作成したトリガーの `ID` と `Name` が一覧に表示されることを確認します。出力例は ID、名前、説明、時刻を編集した抜粋です。実際の列や表示幅は端末サイズと一覧の内容によって変わります。
+
+```text
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+| ID           | Name           | Status | Description | Tags   | Availability | ServiceClass | CreatedAt | ModifiedAt |
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+| <TRIGGER-ID> | eventbus-trig… |        | eventbus-…  |        | available    | cloud/eve…   | 2026-10…  | 2026-10…   |
++--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
+... +4 columns omitted
+```
+
+トリガーの作成後、設定が反映されるまで60秒待ってからスイッチを作成します。EventBus のジョブ実行はベストエフォート型のため、即時実行を前提にしないでください（[EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)）。
+
+## Step 5: 通常スイッチを作成してイベントを発生させる
+
+対象ゾーンで他の通常スイッチを作成する操作が重ならないことを確認してください。名前には Step 2 と同じ一意な接尾辞を使います。`ZONE` は Step 4 の値に置き換えます。
 
 ```console
-$ skr eventbus-api process-configuration delete PROCESS-CONFIGURATION-ID
-$ skr eventbus-api process-configuration list
+$ skr iaas-api switch create --zone ZONE --name eventbus-switch-UNIQUE-SUFFIX --description "Temporary switch for EventBus tutorial" --output json > switch-result.json
+$ SWITCH_ID=$(jq -er '.ID' switch-result.json)
+$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --output table
 ```
 
-最後にローカルの `notification-secret.json` を削除してください。
+作成したスイッチを対象にするイベントタイプは通常スイッチの作成です。作成結果の `ID`、`Name`、`Description` を確認し、後で削除するために `SWITCH_ID` を保持してください（[スイッチの概要](https://manual.sakura.ad.jp/cloud/network/switch/about.html)）。
+検索結果で作成したスイッチの ID と名前を照合します。以下は実機の出力形式に基づく行の抜粋で、ID、名前、説明、日時を置換しています。
 
-## 参考資料
+```text
++--------------+--------------+-------------+--------+-------+-------------+----------------+--------------+-----------+
+| ID           | Name         | Description | Tags   | Scope | ServerCount | NetworkMaskLen | DefaultRoute | CreatedAt |
++--------------+--------------+-------------+--------+-------+-------------+----------------+--------------+-----------+
+| <ID>         | eventbus-... | eventbus-...|        | user  | 0           | 0              |              | 2026-1...  |
++--------------+--------------+-------------+--------+-------+-------------+----------------+--------------+-----------+
+... +4 columns omitted
+```
+
+## Step 6: SimpleMQ からメッセージを受信する
+
+実行設定に指定した本文は EventBus からキューへ送信されます。次のコマンドでキューを受信してください。
+
+返却されたメッセージの `content` が `EventBusSwitchCreated` と一致することを確認してください。空配列の場合は、少し待ってからコマンドを再実行します。
+
+メッセージの到着には時間を要する場合があります。EventBus は即時実行を保証しません。
+
+```console
+$ skr simplemq-api message receive --queue-name QUEUE-NAME --api-key-file simplemq.key --output json
+```
+
+SimpleMQ は Pull 型で、受信リクエストごとにメッセージを配信します。配信保証は At least once です。そのため、同じメッセージを複数回受信する場合があります（[SimpleMQ の基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)）。
+
+## Step 7: 作成したリソースを削除する
+
+まずトリガーを削除して以降のイベントで実行設定が起動しないようにします。ID と名前を確認し、この手順で作成したリソースだけを削除してください。
+
+```console
+$ skr eventbus-api trigger delete "$TRIGGER_ID"
+$ skr eventbus-api trigger list --output json | jq '[.[] | select(.Name == "eventbus-simplemq-trigger-UNIQUE-SUFFIX")]'
+[]
+$ skr iaas-api switch read --zone ZONE --id "$SWITCH_ID" --output json
+$ skr iaas-api switch delete --zone ZONE --id "$SWITCH_ID" --fail-if-not-found
+$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --output table
+```
+
+スイッチの検索結果がないことを確認します。
+
+```text
++------------+
+| No results |
++------------+
+```
+
+続けて実行設定を削除し、試験名で検索した結果が空であることを確認します。
+
+```console
+$ skr eventbus-api process-configuration delete "$PROCESS_CONFIGURATION_ID"
+$ skr eventbus-api process-configuration list --output json | jq '[.[] | select(.Name == "eventbus-simplemq-job-UNIQUE-SUFFIX")]'
+[]
+```
+
+最後に、キュー内のメッセージを消去してからキューを削除します。キューの `Name` と `Description` がこの手順で作成したものと一致することを `queue read` で確認してください。
+
+```console
+$ skr simplemq-api queue read "$QUEUE_ID" --output json
+$ skr simplemq-api queue clear-messages "$QUEUE_ID"
+$ skr simplemq-api queue delete "$QUEUE_ID"
+$ skr simplemq-api queue list --output json | jq '[.[] | select(.Name == "QUEUE-NAME")]'
+[]
+$ rm queue.json eventbus-secret.json simplemq.key process-configuration.json process-configuration-result.json trigger.json trigger-result.json switch-result.json
+```
+
+一覧に対象のキュー、トリガー、実行設定、スイッチが残っていないことを確認してください。
+
+## 参考情報
 
 - [EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)
-- [EventBus クイックスタート](https://manual.sakura.ad.jp/cloud/appliance/eventbus/basic.html)
 - [EventBus API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/eventbus/api.html)
-- [EventBus のトリガーとイベントタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events.html)
+- [EventBus の実行設定](https://manual.sakura.ad.jp/cloud/appliance/eventbus/control_panel.html)
+- [EventBus のイベントタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events.html)
 - [EventBus のネットワーク関連イベントタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events_network.html)
-- [EventBus コントロールパネルの実行設定](https://manual.sakura.ad.jp/cloud/appliance/eventbus/control_panel.html)
-- [シンプル通知の概要](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/about.html)
+- [SimpleMQ の基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)
+- [SimpleMQ API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/simplemq/api.html)
+- [SimpleMQ コントロールパネルでの操作](https://manual.sakura.ad.jp/cloud/appliance/simplemq/control_panel.html)
+- [SimpleMQ メッセージ API](https://manual.sakura.ad.jp/api/cloud/portal/simplemq-api/index.html)
+- [スイッチの概要](https://manual.sakura.ad.jp/cloud/network/switch/about.html)
+- [スイッチの作成・削除](https://manual.sakura.ad.jp/cloud/network/switch/router-switch.html)
+- [sacloud-sdk-go v0.3.0: EventBus API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/api/eventbus)
+- [sacloud-sdk-go v0.3.0: SimpleMQ API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/api/simplemq)
+- [sacloud-sdk-go v0.3.0: Switch サービス](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/swytch)

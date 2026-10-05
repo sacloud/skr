@@ -82,6 +82,8 @@ IaaS API と EventBus API の結果は JSON、YAML、table で表示できます
 
 `skr eventbus-api` は `sacloud-sdk-go/api/eventbus` の操作を直接公開します。SDK `v0.3.0` では process-configuration、schedule、trigger の操作があり、process-configuration には `UpdateSecret` もあります。現在の EventBus チュートリアルにある作成順序などの利用手順は、高レベル `skr event` を設計する際の根拠にできます。
 
+`test/e2e/eventbus-api` は `simplemq-api` と `iaas-api switch` を組み合わせ、`is1b` の通常スイッチ作成イベントから SimpleMQ への配送を実機で検証します。実行条件、秘密情報と証跡の扱い、リソースの後片付けは [EventBus API ライブ E2E 設計](eventbus-api.md) に記録します。
+
 `skr event` は EventBus のイベント設定をユーザーの作業単位として扱う高レベルコマンドの候補です。
 AppRun CLI のように、定義の初期化・表示、差分確認、適用、状態確認をまとめる方向を検討します。
 たとえば、1つの定義で process-configuration と trigger を関連付け、参照関係を解決する構成が考えられます。
