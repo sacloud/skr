@@ -170,8 +170,8 @@ func decodeSimpleMQCreateRequest(input string, destination *queue.CreateQueueReq
 type simpleMQQueueConfigCommand struct {
 	ID                       string  `arg:"" help:"設定を変更するキュー ID。"`
 	Request                  *string `help:"個別フラグと併用不可。ConfigQueueRequest JSON を直接または @path.json で指定します。Description、Tags、Icon など追加項目は JSON で指定します。例: --request='{\"CommonServiceItem\":{\"Settings\":{\"VisibilityTimeoutSeconds\":30,\"ExpireSeconds\":345600}}}'"`
-	VisibilityTimeoutSeconds *int    `name:"visibility-timeout-seconds" help:"必須: 可視性タイムアウト秒数 (5〜900)。SDK の CommonServiceItem.Settings.VisibilityTimeoutSeconds に設定します。--expire-seconds と併せて指定します。"`
-	ExpireSeconds            *int    `name:"expire-seconds" help:"必須: メッセージ保存期間秒数 (60〜1209600)。SDK の CommonServiceItem.Settings.ExpireSeconds に設定します。--visibility-timeout-seconds と併せて指定します。"`
+	VisibilityTimeoutSeconds *int    `name:"visibility-timeout-seconds" help:"必須: 可視性タイムアウト秒数 (5〜900)。API の CommonServiceItem.Settings.VisibilityTimeoutSeconds に対応します。--expire-seconds と併せて指定します。"`
+	ExpireSeconds            *int    `name:"expire-seconds" help:"必須: メッセージ保存期間秒数 (60〜1209600)。API の CommonServiceItem.Settings.ExpireSeconds に対応します。--visibility-timeout-seconds と併せて指定します。"`
 }
 
 func (c simpleMQQueueConfigCommand) Run(ctx *kong.Context) error {

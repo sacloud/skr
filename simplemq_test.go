@@ -47,7 +47,7 @@ func TestRunSimpleMQAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"simplemq-api", "queue", "config", "--help"},
-			want: []string{"--visibility-timeout-seconds", "--expire-seconds", "--request", "併用不可", "CommonServiceItem.Settings", "5〜900", "60〜1209600", "345600"},
+			want: []string{"--visibility-timeout-seconds", "--expire-seconds", "--request", "併用不可", "API の", "CommonServiceItem.Settings", "5〜900", "60〜1209600", "345600"},
 		},
 		{
 			args: []string{"simplemq-api", "queue", "rotate-api-key", "--help"},
