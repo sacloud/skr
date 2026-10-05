@@ -36,22 +36,30 @@ $ skr iaas-api switch create --help
 ```
 
 意図したプロファイルとプロジェクトを確認してください。SimpleMQ はゾーンを指定しないグローバルリソースです。メッセージ API にはキューごとの API キーを使います（[SimpleMQ コントロールパネルでの操作](https://manual.sakura.ad.jp/cloud/appliance/simplemq/control_panel.html)）。
-`UNIQUE-SUFFIX` と `QUEUE-NAME` は前提条件に従って決め、`ZONE` は作成先に置き換えます。作成前に同名リソースがないことを確認します。結果がすべて `[]` なら続行できます。
+`UNIQUE-SUFFIX` と `QUEUE-NAME` は前提条件に従って決め、`ZONE` は作成先に置き換えます。作成前に各一覧から同じ名前のリソースがないことを確認します。以下は実機 E2E で一覧が空だった場合の出力例です。ほかのリソースが表示された場合は、作成予定の名前と重複しないことを確認してください。
 
 ```console
-$ skr simplemq-api queue list --output json | jq '[.[] | select(.Name == "QUEUE-NAME")]'
-[]
-$ skr eventbus-api process-configuration list --output json | jq '[.[] | select(.Name == "eventbus-simplemq-job-UNIQUE-SUFFIX")]'
-[]
-$ skr eventbus-api trigger list --output json | jq '[.[] | select(.Name == "eventbus-simplemq-trigger-UNIQUE-SUFFIX")]'
-[]
-$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --output json | jq .
-[]
+$ skr simplemq-api queue list --output table
++------------+
+| No results |
++------------+
+$ skr eventbus-api process-configuration list --output table
++------------+
+| No results |
++------------+
+$ skr eventbus-api trigger list --output table
++------------+
+| No results |
++------------+
+$ skr iaas-api switch find --zone ZONE --output table
++------------+
+| No results |
++------------+
 ```
 
 ## Step 2: SimpleMQ キューと API キーを用意する
 
-`UNIQUE-SUFFIX` は使用していない値に、`QUEUE-NAME` はその値を使った5〜64文字の一意な名前に置き換えます。Step 1 の確認結果が `[]` であることを確かめてから作成します。
+`UNIQUE-SUFFIX` は使用していない値に、`QUEUE-NAME` はその値を使った5〜64文字の一意な名前に置き換えます。Step 1 で同じ名前のキューがないことを確認してから作成します。
 
 ```console
 $ umask 077
@@ -210,8 +218,18 @@ SimpleMQ は Pull 型で、受信リクエストごとにメッセージを配�
 
 ```console
 $ skr eventbus-api trigger delete "$TRIGGER_ID"
-$ skr eventbus-api trigger list --output json | jq '[.[] | select(.Name == "eventbus-simplemq-trigger-UNIQUE-SUFFIX")]'
-[]
+```
+
+トリガーを削除した後、一覧に試験用の名前がないことを確認します。以下は一覧自体が空の場合の出力例です。実行設定とキューの削除確認も同様です。ほかのリソースが表示される場合は、試験用の名前の行がないことを確認してください。
+
+```console
+$ skr eventbus-api trigger list --output table
++------------+
+| No results |
++------------+
+```
+
+```console
 $ skr iaas-api switch read --zone ZONE --id "$SWITCH_ID" --output json
 $ skr iaas-api switch delete --zone ZONE --id "$SWITCH_ID" --fail-if-not-found
 $ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --output table
@@ -225,12 +243,14 @@ $ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-U
 +------------+
 ```
 
-続けて実行設定を削除し、試験名で検索した結果が空であることを確認します。
+続けて実行設定を削除し、一覧に試験用の名前がないことを確認します。以下は一覧自体が空の場合の出力例です。
 
 ```console
 $ skr eventbus-api process-configuration delete "$PROCESS_CONFIGURATION_ID"
-$ skr eventbus-api process-configuration list --output json | jq '[.[] | select(.Name == "eventbus-simplemq-job-UNIQUE-SUFFIX")]'
-[]
+$ skr eventbus-api process-configuration list --output table
++------------+
+| No results |
++------------+
 ```
 
 最後に、キュー内のメッセージを消去してからキューを削除します。キューの `Name` と `Description` がこの手順で作成したものと一致することを `queue read` で確認してください。
@@ -239,8 +259,10 @@ $ skr eventbus-api process-configuration list --output json | jq '[.[] | select(
 $ skr simplemq-api queue read "$QUEUE_ID" --output json
 $ skr simplemq-api queue clear-messages "$QUEUE_ID"
 $ skr simplemq-api queue delete "$QUEUE_ID"
-$ skr simplemq-api queue list --output json | jq '[.[] | select(.Name == "QUEUE-NAME")]'
-[]
+$ skr simplemq-api queue list --output table
++------------+
+| No results |
++------------+
 $ rm queue.json eventbus-secret.json simplemq.key process-configuration.json process-configuration-result.json trigger.json trigger-result.json switch-result.json
 ```
 
