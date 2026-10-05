@@ -45,8 +45,8 @@ epoch のミリ秒を整数で指定します。`RecurringStep` と `RecurringUn
 $ skr eventbus-api schedule create --request='{"CommonServiceItem":{"Name":"daily-message","Settings":{"ProcessConfigurationID":"PROCESS-CONFIGURATION-ID","StartsAt":1893456000000,"RecurringStep":1,"RecurringUnit":"day"}}}'
 ```
 
-イベント発生を起点にする場合は trigger を作成します。`Source`、`Types` は対象のイベント
-ソースに合わせた値に置き換え、`ProcessConfigurationID` は実行するジョブを指定します。
+イベント発生を起点にする場合は trigger を作成します。対象のイベントソースに応じて
+`Source` と `Types` を指定し、`ProcessConfigurationID` には実行するジョブを指定します。
 
 ```console
 $ skr eventbus-api trigger create --request='{"CommonServiceItem":{"Name":"on-change","Settings":{"Source":"EVENT-SOURCE","Types":["EVENT-TYPE"],"ProcessConfigurationID":"PROCESS-CONFIGURATION-ID"}}}'

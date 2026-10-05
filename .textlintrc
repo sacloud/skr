@@ -8,6 +8,7 @@
     },
     "preset-ja-technical-writing": {
       "ja-no-mixed-period": false,
+      "no-mix-dearu-desumasu": false,
       "no-exclamation-question-mark": false,
       "sentence-length": {
         max:150
