@@ -25,10 +25,10 @@ import (
 )
 
 type switchCommands struct {
-	Find   switchFindCommand   `cmd:"" help:"スイッチを検索し JSON 配列で出力します。--zone all で全ゾーンを検索できます。例: skr iaas-api switch find --zone ZONE"`
-	Read   switchReadCommand   `cmd:"" help:"スイッチを読み取り JSON で出力します。例: skr iaas-api switch read --zone ZONE --id 123456789012"`
-	Create switchCreateCommand `cmd:"" help:"スイッチを作成し JSON で出力します。例: skr iaas-api switch create --zone ZONE --name example"`
-	Update switchUpdateCommand `cmd:"" help:"指定項目だけを更新し JSON で出力します。例: skr iaas-api switch update --zone ZONE --id 123456789012 --name updated"`
+	Find   switchFindCommand   `cmd:"" help:"スイッチを検索して出力します。--zone all で全ゾーンを検索できます。例: skr iaas-api switch find --zone ZONE"`
+	Read   switchReadCommand   `cmd:"" help:"スイッチを読み取って出力します。例: skr iaas-api switch read --zone ZONE --id 123456789012"`
+	Create switchCreateCommand `cmd:"" help:"スイッチを作成して出力します。例: skr iaas-api switch create --zone ZONE --name example"`
+	Update switchUpdateCommand `cmd:"" help:"指定項目だけを更新して出力します。例: skr iaas-api switch update --zone ZONE --id 123456789012 --name updated"`
 	Delete switchDeleteCommand `cmd:"" help:"スイッチを削除します。成功時は出力しません。例: skr iaas-api switch delete --zone ZONE --id 123456789012"`
 }
 
@@ -89,6 +89,10 @@ type switchFindCommand struct {
 }
 
 func (c *switchFindCommand) Run(ctx *kong.Context) error {
+	format, err := outputType(ctx)
+	if err != nil {
+		return err
+	}
 	request, err := switchRequest(c.Request, c.Zone != nil || c.Count != nil || c.From != nil, func() (swytch.FindRequest, error) {
 		zone, err := switchZone(c.Zone)
 		if err != nil {
@@ -111,11 +115,19 @@ func (c *switchFindCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 	var switches []*iaas.Switch
+	var tableZones []string
 	if c.Request == nil && c.Zone != nil && *c.Zone == allIaaSZones {
 		switches, err = findInAllIaaSZones(context.Background(), c.zoneFactory, func(ctx context.Context, zone string) ([]*iaas.Switch, error) {
 			zoneRequest := request
 			zoneRequest.Zone = zone
-			return op.FindWithContext(ctx, &zoneRequest)
+			items, err := op.FindWithContext(ctx, &zoneRequest)
+			if err != nil {
+				return nil, err
+			}
+			for range items {
+				tableZones = append(tableZones, zone)
+			}
+			return items, nil
 		})
 	} else {
 		switches, err = op.FindWithContext(context.Background(), &request)
@@ -123,7 +135,7 @@ func (c *switchFindCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(ctx, switches)
+	return writeOutputWithFormat(ctx, format, switches, tableZones)
 }
 
 type switchReadCommand struct {
@@ -134,6 +146,10 @@ type switchReadCommand struct {
 }
 
 func (c *switchReadCommand) Run(ctx *kong.Context) error {
+	format, err := outputType(ctx)
+	if err != nil {
+		return err
+	}
 	request, err := switchRequest(c.Request, c.Zone != nil || c.ID != nil, func() (swytch.ReadRequest, error) {
 		zone, err := switchSingleZone(c.Zone)
 		if err != nil {
@@ -153,7 +169,7 @@ func (c *switchReadCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(ctx, item)
+	return writeOutputWithFormat(ctx, format, item)
 }
 
 type switchCreateCommand struct {
@@ -168,6 +184,10 @@ type switchCreateCommand struct {
 }
 
 func (c *switchCreateCommand) Run(ctx *kong.Context) error {
+	format, err := outputType(ctx)
+	if err != nil {
+		return err
+	}
 	flags := c.Zone != nil || c.Name != nil || c.Description != nil || c.IconID != nil || c.NetworkMaskLen != nil || c.DefaultRoute != nil
 	request, err := switchRequest(c.Request, flags, func() (swytch.CreateRequest, error) {
 		zone, err := switchSingleZone(c.Zone)
@@ -203,7 +223,7 @@ func (c *switchCreateCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(ctx, item)
+	return writeOutputWithFormat(ctx, format, item)
 }
 
 type switchUpdateCommand struct {
@@ -219,6 +239,10 @@ type switchUpdateCommand struct {
 }
 
 func (c *switchUpdateCommand) Run(ctx *kong.Context) error {
+	format, err := outputType(ctx)
+	if err != nil {
+		return err
+	}
 	flags := c.Zone != nil || c.ID != nil || c.Name != nil || c.Description != nil || c.IconID != nil || c.NetworkMaskLen != nil || c.DefaultRoute != nil
 	request, err := switchRequest(c.Request, flags, func() (swytch.UpdateRequest, error) {
 		zone, err := switchSingleZone(c.Zone)
@@ -247,7 +271,7 @@ func (c *switchUpdateCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(ctx, item)
+	return writeOutputWithFormat(ctx, format, item)
 }
 
 type switchDeleteCommand struct {
