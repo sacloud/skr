@@ -79,6 +79,49 @@ $ skr eventbus-api schedule create --help
 JSON をファイルに保存して `--request @request.json` と指定すれば、引用符のエスケープを避けて
 作成・更新できます。
 
+## SimpleMQ API
+
+`skr simplemq-api` は SimpleMQ のキュー管理 API とメッセージ API を操作します。キュー管理には
+SDK のプロファイル、または `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で
+認証します。メッセージ API には対象キューの API キーが必要です。SimpleMQ API の仕様は
+[公式 API ドキュメント](https://manual.sakura.ad.jp/api/cloud/portal/?api=simplemq-sacloud-api)
+を参照してください。
+
+キュー名は5〜64文字で、英数字またはハイフンを使います。キューを作成した後、
+`rotate-api-key` でメッセージ API キーを発行します。発行結果の `APIKey` は標準出力に含まれる
+ため、ファイルへ保存する場合はアクセス権を制限してください。以下は出力をファイルに保存して
+送信する例です。
+
+```console
+$ skr simplemq-api queue create --name sample-queue
+$ umask 077
+$ skr simplemq-api queue rotate-api-key QUEUE-ID --output json | jq -r .APIKey > simplemq.key
+$ skr simplemq-api message send --queue-name sample-queue --api-key-file simplemq.key --content aGVsbG8=
+$ skr simplemq-api message receive --queue-name sample-queue --api-key-file simplemq.key
+```
+
+`QUEUE-ID` はキュー作成結果の ID に置き換えてください。API キーをコマンドライン引数に含めないで
+ください。`--api-key-file -` を指定すると標準入力からキーを読み込みます。メッセージ本文は API
+定義上、最大256000文字で、英数字と `+`、`/`、`=` を使用できます。送信結果と受信結果には
+メッセージ ID が含まれます。受信後は `message extend-timeout` でタイムアウトを延長し、
+`message delete` でメッセージを削除できます。
+
+キューの設定変更では `--request` に JSON を指定します。`VisibilityTimeoutSeconds` は5〜900秒、
+`ExpireSeconds` は60〜1209600秒で、両方を含めます。
+
+```console
+$ skr simplemq-api queue config QUEUE-ID --request='{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}'
+$ skr simplemq-api queue count-messages QUEUE-ID
+$ skr simplemq-api queue clear-messages QUEUE-ID
+```
+
+`queue list`、`read`、`create`、`config`、`count-messages`、`rotate-api-key` は SDK の結果を
+`--output json`、`--output yaml`、`--output table` で表示します。`delete` と `clear-messages` は
+成功時に出力しません。`message send`、`receive`、`extend-timeout` も SDK の結果を同じ出力形式で
+表示し、`message delete` は成功時に出力しません。各操作の入力形式と制約は
+`skr simplemq-api <resource> <operation> --help` で確認できます。
+手順の詳細は[SimpleMQ API チュートリアル](docs/tutorials/simplemq-api.md)を参照してください。
+
 ## IaaS Switch API
 
 `skr iaas-api switch` は、スイッチの `find`、`read`、
