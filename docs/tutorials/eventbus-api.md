@@ -108,7 +108,9 @@ $ skr eventbus-api trigger list
 
 ジョブの実行はベストエフォート型です。即時実行を前提にせず、通知先グループで結果を確認してください。
 
-実機では別の一時 SimpleMQ キューを実行先にした同じスイッチ作成イベントを検証し、`skr eventbus-api process-configuration create`、`update-secret`、`trigger create`、`trigger list` を実行した後、`is1b` で作成したスイッチに対応するメッセージをキューから受信できました。試験で作成したトリガー、スイッチ、実行設定、キューは削除済みです。この確認は EventBus のイベント検知から SimpleMQ への配送までを実際のコマンドで検証したものです。sakumock テストだけでは実際のイベント検知は検証できません。一方、このチュートリアルに記載したシンプル通知宛ての経路と、メールや Webhook などの通知到達は実機では検証していません。
+実機では別の一時 SimpleMQ キューを実行先にして、同じスイッチ作成イベントを検証しました。`skr eventbus-api process-configuration create`、`update-secret`、`trigger create`、`trigger list` を実行し、`is1b` で作成したスイッチに対応するメッセージをキューから受信できました。試験で作成したトリガー、スイッチ、実行設定、キューは削除済みです。
+
+この確認では、EventBus のイベント検知から SimpleMQ への配送までを実際のコマンドで検証しました。sakumock テストだけでは実際のイベント検知を検証できません。一方、このチュートリアルに記載したシンプル通知宛ての経路や、メール・Webhook などの通知到達は実機では検証していません。
 
 ## Step 5: 作成したリソースを削除する
 
