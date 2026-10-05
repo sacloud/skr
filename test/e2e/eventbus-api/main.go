@@ -153,7 +153,7 @@ func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]by
 
 func appendEvidenceOrder(evidence string, sequence int, step, result, filename string) error {
 	path := filepath.Join(evidence, "ORDER.txt")
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o600)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o600) //nolint:gosec // The filename is fixed inside the private evidence directory.
 	if err != nil {
 		return fmt.Errorf("open %s: %w", path, err)
 	}

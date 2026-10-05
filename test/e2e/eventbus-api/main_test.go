@@ -267,7 +267,7 @@ func TestCLIRunnerOrdersEvidenceAndRedactsAPIKey(t *testing.T) {
 	if got := recordInfo.Mode().Perm(); got != 0o600 {
 		t.Errorf("evidence file permissions = %o, want 600", got)
 	}
-	order, err := os.ReadFile(filepath.Join(evidence, "ORDER.txt"))
+	order, err := os.ReadFile(filepath.Join(evidence, "ORDER.txt")) //nolint:gosec // The file is created under t.TempDir.
 	if err != nil {
 		t.Fatal(err)
 	}
