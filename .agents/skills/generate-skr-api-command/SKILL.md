@@ -1,128 +1,80 @@
 ---
 name: generate-skr-api-command
-description: Add or evolve a skr command backed by a public sacloud-sdk-go API, including command design, self-documenting help, sakumock tests, and build verification.
+description: sacloud-sdk-go の公開 API を使った skr コマンドの追加・拡張を、コマンド設計、自己説明的なヘルプ、sakumock テスト、ビルド確認まで行います。
 ---
 
-# Generate a skr SDK API command
+# skr SDK API コマンドの作成
 
-Use this skill when adding a `skr <service>-api` command backed by
-`github.com/sacloud/sacloud-sdk-go`. Build for skr's current architecture and Go version.
-Do not assume compatibility with the older `usacloud` CLI or copy its internal packages.
+`github.com/sacloud/sacloud-sdk-go` を使う `skr <service>-api` コマンドを追加するときに、このスキルを使用してください。skr の現在のアーキテクチャと Go バージョンに合わせて実装します。旧 `usacloud` CLI との互換性を前提にしたり、内部パッケージを流用したりしないでください。
 
-## Guiding principles
+## 基本方針
 
-- Treat CLI help as the primary user guide. A user should be able to understand the
-  service workflow, prepare valid input, run the command, and interpret its output from
-  `--help` without first reading source code.
-- Base service behavior, field meanings, prerequisites, units, and examples only on the
-  target SDK's documentation and `manual.sakura.ad.jp`. Do not fill gaps with guesses,
-  prior knowledge, or examples from unrelated services.
-- Wrap public SDK interfaces and models. Do not recreate SDK behavior with raw HTTP or
-  copy SDK-internal implementation code.
-- Keep changes focused, preserve existing behavior, and document all new user-facing
-  commands.
+- CLI のヘルプを主要なユーザーガイドとして扱います。ユーザーがソースコードを読む前に `--help` を確認するだけで、サービスの使い方、入力の準備、コマンドの実行、出力の解釈ができるようにします。
+- サービスの動作、フィールドの意味、前提条件、単位、例は、対象 SDK のドキュメントと `manual.sakura.ad.jp` の情報だけを根拠にします。不明点を推測、過去の知識、無関係なサービスの例で補わないでください。
+- 公開 SDK のインターフェースとモデルをラップします。生の HTTP 通信で SDK の動作を再実装したり、SDK 内部の実装コードをコピーしたりしないでください。
+- 変更範囲を絞り、既存の動作を維持し、新しいユーザー向けコマンドをすべてドキュメント化します。
 
-## Workflow
+## 作業手順
 
-### 1. Establish the supported API and service workflow
+### 1. 対応する API とサービスの利用手順を確認する
 
-Read `AGENTS.md`, `go.mod`, `main.go`, the target SDK package, and relevant tests and
-documentation. Confirm the SDK version used by this repository and identify:
+`AGENTS.md`、`go.mod`、`main.go`、対象 SDK パッケージ、関連するテストとドキュメントを確認します。このリポジトリが使用する SDK のバージョンを特定し、次の項目を確認してください。
 
-- Public service operation interfaces and their methods.
-- Resource types, request and response models, union/discriminator fields, and
-  optional/null semantics.
-- Required setup order and how resources refer to each other.
-- Authentication, endpoint configuration, units, supported values, and any service
-  limitations that should be visible to users.
+- 公開サービス操作インターフェースとそのメソッド
+- リソース型、リクエスト／レスポンスモデル、union／discriminator フィールド、省略値や null の意味
+- 必要なセットアップの順序と、リソース間の参照方法
+- 認証、エンドポイント設定、単位、対応値、ユーザーに伝えるべきサービス上の制限
 
-Use the SDK and official manual as evidence for service behavior. If a critical field,
-discriminator, resource relationship, or prerequisite is unclear in these sources, do
-not invent an answer; narrow the feature or stop and report what needs clarification.
-When a prior implementation is supplied, use it as a reference, adapting its behavior
-to skr rather than importing its framework or dependencies.
+サービスの動作の根拠には SDK と公式マニュアルを使用してください。重要なフィールド、discriminator、リソース間の関係、前提条件がこれらの情報源で明らかでない場合、答えを作り上げず、機能範囲を狭めるか、確認が必要な点を報告して作業を止めてください。既存実装が提示されている場合は参考にしつつ、その動作を skr 向けに適応し、旧フレームワークや依存関係を持ち込まないでください。
 
-### 2. Design the command tree and its help
+### 2. コマンドツリーとヘルプを設計する
 
-Plan the command path, resource names, operation names, request shape, and output before
-implementing handlers. Follow the existing Kong patterns in `main.go` and the adjacent
-command code:
+ハンドラーを実装する前に、コマンドパス、リソース名、操作名、リクエスト形式、出力を設計します。`main.go` と隣接するコマンドコードの既存 Kong パターンに従ってください。
 
-- Register the command on the root CLI with an explicit `name` when the Go field name
-  does not produce the desired spelling.
-- Represent nested resources and operations with Kong command structs and
-  `Run(*kong.Context) error` handlers.
-- Use resource-specific command types when a shared generic description would hide
-  resource-specific fields, constraints, or examples.
-- Keep SDK client construction in a small helper and initialize `saclient.Client` from
-  `os.Environ()`. Use the SDK service client and operation constructors.
-- Return SDK, input, file, and output errors to Kong; do not silently ignore errors or
-  substitute success-shaped defaults.
+- Go のフィールド名から望む表記にならない場合は、明示的な `name` を付けてルート CLI に登録します。
+- Kong のコマンド構造体と `Run(*kong.Context) error` ハンドラーで、リソースと操作の階層を表現します。
+- 共通の説明ではリソース固有のフィールド、制約、例が伝わらなくなる場合は、リソースごとのコマンド型を使用します。
+- SDK クライアントの生成は小さなヘルパーにまとめ、`os.Environ()` から `saclient.Client` を初期化します。SDK のサービスクライアントと操作コンストラクターを使用してください。
+- SDK、入力、ファイル、出力に関するエラーは Kong に返します。エラーを無視したり、成功したように見えるデフォルト値に置き換えたりしないでください。
 
-Write help for the actual rendered command levels: service, resource, operation, and
-flags. Explain, where applicable:
+サービス、リソース、操作、フラグという実際に表示される各コマンド階層のヘルプを作成します。該当する場合は、次の内容を説明してください。
 
-- What each resource represents and how it relates to other resources.
-- Which resources to create first and which IDs to use in later commands.
-- Required and optional fields, valid values, units, and mutually exclusive choices.
-- Whether updates are partial, how omitted fields behave, and how to clear nullable
-  fields.
-- Authentication/configuration expectations and output format.
-- Secret file/stdin handling without encouraging secrets in command-line arguments.
-- A copyable command example with clearly marked values the user must replace.
+- 各リソースが表すものと、他のリソースとの関係
+- 先に作成するリソースと、後続コマンドで使う ID
+- 必須／任意フィールド、有効な値、単位、相互排他となる選択肢
+- 更新が部分更新かどうか、省略フィールドの扱い、nullable フィールドのクリア方法
+- 認証／設定の要件と出力形式
+- コマンドライン引数に秘密情報を含めないための、秘密情報のファイル／標準入力での扱い
+- ユーザーが置き換える値を明示した、コピー可能なコマンド例
 
-Keep examples accurate to the SDK/manual. Mark event sources, IDs, credentials, and
-other environment-specific values as placeholders when they cannot be universally
-valid. Avoid putting secrets in inline command examples.
+例は SDK／マニュアルの記載に沿った正確なものにしてください。イベントソース、ID、認証情報など、環境によって異なり、どこでも有効とは限らない値はプレースホルダーと明記します。インラインのコマンド例に秘密情報を含めないでください。
 
-### 3. Implement SDK request and response handling
+### 3. SDK のリクエストとレスポンスを実装する
 
-- Use the public SDK request and response types. Preserve required provider classes,
-  sum-type selections, and other operation invariants. If the command identifies the
-  resource type, set its service-specific discriminator in the command layer when
-  required by the SDK.
-- Make request input syntax explicit in flag help. If accepting JSON, state its SDK
-  request shape, whether it can be passed inline or as `@path.json`, and any
-  command-supplied fields. Keep complex examples in files in the documentation to avoid
-  shell-quoting ambiguity.
-- Use SDK JSON decoding/encoding behavior for SDK models, especially models with
-  optional values or sum types. Do not assume ordinary Go field JSON behavior is
-  equivalent.
-- Document and test the output shape. Preserve useful scalar IDs or resource data in
-  output; do not return a success-shaped result when the SDK reports an error.
-- Expose only operations supported by the public service API and justified by the task.
+- 公開 SDK のリクエスト／レスポンス型を使用します。必須のプロバイダークラス、sum type の選択、その他の操作上の不変条件を維持してください。コマンドがリソース型を特定しており、SDK が要求する場合は、そのサービス固有の discriminator をコマンド層で設定します。
+- リクエスト入力の構文をフラグのヘルプで明示します。JSON を受け付ける場合は、SDK のリクエスト形式、インラインまたは `@path.json` で渡せるか、コマンド側で設定するフィールドを説明します。シェルのクォートで曖昧になりやすい複雑な例は、ドキュメント内のファイルに記載してください。
+- SDK モデル、特に optional 値や sum type を含むモデルでは、SDK の JSON デコード／エンコード動作を使用します。通常の Go フィールドの JSON 動作と同じだと決めつけないでください。
+- 出力形式をドキュメント化してテストします。有用なスカラー ID やリソースデータを出力に残し、SDK がエラーを返したときに成功したような結果を返さないでください。
+- 公開サービス API でサポートされ、依頼内容から正当化できる操作だけを公開します。
 
-### 4. Add tests using sakumock
+### 4. sakumock でテストを追加する
 
-Use `github.com/sacloud/sakumock/<service>` for API behavior tests:
+API 動作のテストには `github.com/sacloud/sakumock/<service>` を使用してください。
 
-- Start the service's test server and close it with test cleanup.
-- Configure dummy credentials and the SDK endpoint environment variable; use an
-  isolated profile directory if profile discovery could affect the test.
-- Invoke the real CLI command path against sakumock. Verify the outgoing request's
-  resource class/settings and returned result through create, list, read, update, and
-  delete flows for each implemented resource.
-- Verify secret-setting operations with sakumock's inspection API when available.
-- Add focused unit tests for request decoding, file/stdin handling, validation, and
-  error paths. Add help tests that assert key workflow, input, and example details in
-  rendered help, not merely that command names exist.
+- サービスのテストサーバーを起動し、テストのクリーンアップで終了します。
+- ダミーの認証情報と SDK のエンドポイント環境変数を設定します。プロファイルの検出がテストに影響する可能性がある場合は、分離したプロファイルディレクトリを使用します。
+- 実際の CLI コマンドパスを sakumock に対して実行します。実装したリソースごとに create、list、read、update、delete の各フローで、送信リクエストのリソースクラス／設定と返却結果を検証します。
+- 利用可能であれば、sakumock の検査 API で秘密情報設定操作を検証します。
+- リクエストのデコード、ファイル／標準入力の扱い、バリデーション、エラー経路には対象を絞ったユニットテストを追加します。ヘルプテストでは、コマンド名が存在することだけでなく、表示されたヘルプに手順、入力形式、例の重要な情報が含まれていることを確認します。
 
-Fake API implementations may help isolate pure command logic, but they are not a
-replacement for sakumock coverage of the SDK request and response path.
+偽の API 実装はコマンドの純粋なロジックを分離するのに役立つ場合がありますが、SDK のリクエスト／レスポンス経路を sakumock で確認する代わりにはなりません。
 
-### 5. Document and verify the full command
+### 5. コマンド全体をドキュメント化して検証する
 
-- Update README usage instructions with the authentication/configuration expectations,
-  setup order, representative commands, request-file usage, output behavior, and
-  relevant cautions.
-- Run `gofmt` on changed Go files, targeted tests, and `go test ./...` when root command
-  registration or shared CLI behavior changes.
-- Run `make lint-go` and relevant documentation checks when available.
-- Run `make build` and smoke-test the built command's help.
-- The shared Go Makefile defaults `GO_ENTRY_FILE` to `main.go`, which builds only that
-  file. If the main package uses multiple source files, set `GO_ENTRY_FILE ?= .` in
-  this repository's `Makefile` so `make build` compiles the package, not only `main.go`.
-- Review `git diff --check` and verify no unrelated files or generated artifacts were
-  introduced.
-- For a user-facing walkthrough after the command is implemented, use
-  [the skr API tutorial generation skill](../generate-skr-api-manual/SKILL.md).
+- README の使用方法に、認証／設定要件、セットアップ順序、代表的なコマンド、リクエストファイルの使い方、出力の動作、関連する注意点を追加します。
+- 変更した Go ファイルに `gofmt` を実行し、対象テストを実行します。ルートコマンド登録や共通 CLI の動作を変更した場合は `go test ./...` も実行します。
+- 利用可能であれば `make lint-go` と関連するドキュメントチェックを実行します。
+- `make build` を実行し、ビルドしたコマンドのヘルプを簡単に確認します。
+- 共通 Go Makefile の `GO_ENTRY_FILE` のデフォルトは `main.go` であり、この設定ではそのファイルだけがビルドされます。main パッケージが複数のソースファイルを使う場合は、このリポジトリの `Makefile` で `GO_ENTRY_FILE ?= .` を設定し、`main.go` だけでなくパッケージ全体をビルドしてください。
+- `git diff --check` を確認し、無関係なファイルや生成物が追加されていないことを確かめます。
+- コマンド実装後にユーザー向けチュートリアルを作成する場合は、[skr API チュートリアル生成スキル](../generate-skr-api-manual/SKILL.md)を使用してください。

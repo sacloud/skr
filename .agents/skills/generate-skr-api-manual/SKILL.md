@@ -1,147 +1,94 @@
 ---
 name: generate-skr-api-manual
-description: Create user-focused Markdown tutorials for implemented skr API commands, grounded in official Sakura Cloud documentation and verified command behavior.
+description: 実装済みの skr API コマンドについて、さくらのクラウド公式ドキュメントと検証済みの動作に基づく、ユーザー向け Markdown チュートリアルを作成します。
 ---
 
-# Generate a skr API tutorial
+# skr API チュートリアルの作成
 
-Use this skill to write a user-facing tutorial for an implemented
-`skr <service>-api` command. The tutorial describes the service workflow as well as
-the CLI syntax; it is not a command reference copied from `--help`.
+実装済みの `skr <service>-api` コマンドについて、ユーザー向けチュートリアルを作成するときにこのスキルを使用してください。チュートリアルでは CLI の構文だけでなくサービスの利用手順も説明します。`--help` の内容をそのままコマンドリファレンスとしてコピーするものではありません。
 
-Generated tutorials are Markdown files under `docs/tutorials/`, named
-`<service>-api.md`. Do not generate reStructuredText.
+生成するチュートリアルは `docs/tutorials/` に `<service>-api.md` という名前で配置します。reStructuredText は生成しないでください。
 
-## Principles and source policy
+## 原則と情報源の方針
 
-- Base service behavior, use cases, resource meanings and relationships, prerequisites,
-  constraints, and examples only on the official service manual under
-  `https://manual.sakura.ad.jp/cloud/` and documentation in the exact
-  `sacloud-sdk-go` version used by this repository.
-- Do not infer product behavior from prior knowledge, search summaries, third-party
-  articles, or examples for another service. Record a source for each service-specific
-  factual claim. If a required fact has no authoritative source, omit it or stop and
-  explain what is missing.
-- Use the current skr command implementation and its rendered `--help` as the authority
-  for command paths, flags, JSON request shapes, output behavior, and file/stdin syntax.
-  Do not copy usacloud commands or promise usacloud compatibility.
-- Clearly distinguish facts supported by documentation from behavior verified by tests.
-  Never present an unverified scenario as a successful live end-to-end result.
-- Keep credentials and account-specific data out of the tutorial. Use placeholders for
-  IDs, names, event sources, zones, and other environment-specific values. Do not include
-  real profile names, API tokens, secrets, account IDs, production output, or logs.
+- サービスの動作、ユースケース、リソースの意味と関係、前提条件、制約、例は、公式サービスマニュアル `https://manual.sakura.ad.jp/cloud/` と、このリポジトリが使用する正確なバージョンの `sacloud-sdk-go` のドキュメントだけを根拠にします。
+- 過去の知識、検索結果の要約、第三者の記事、別サービスの例から製品の動作を推測しないでください。サービス固有の事実にはそれぞれ情報源を記録します。必要な事実に権威ある情報源がない場合は、記載を省くか、不足している情報を説明して作業を止めてください。
+- コマンドパス、フラグ、JSON リクエスト形式、出力の動作、ファイル／標準入力の構文については、現在の skr コマンド実装と実際に表示される `--help` を正とします。usacloud のコマンドをコピーしたり、usacloud との互換性を約束したりしないでください。
+- ドキュメントで裏付けられる事実と、テストで確認された動作を明確に区別します。ライブ環境でのエンドツーエンド動作を確認していないシナリオを、成功したものとして示してはいけません。
+- 認証情報やアカウント固有のデータをチュートリアルに含めないでください。ID、名前、イベントソース、ゾーンなど環境によって異なる値にはプレースホルダーを使います。実際のプロファイル名、API トークン、秘密情報、アカウント ID、本番環境の出力やログを含めないでください。
 
-## Inputs and deliverables
+## 入力と成果物
 
-Before drafting, confirm:
+執筆前に、次の内容を確認してください。
 
-- The target command exists and its `--help` describes its current syntax.
-- The repository SDK version and the target service's SDK documentation.
-- The official manual pages that substantiate the service model and steps.
-- The resources, dependencies, credentials, permissions, and observations required by a
-  useful end-to-end scenario.
-- The exact resources a live test would create, change, and delete, and how to clean
-  them up safely.
+- 対象コマンドが存在し、その `--help` に現在の構文が記載されていること
+- リポジトリの SDK バージョンと、対象サービスの SDK ドキュメント
+- サービスのモデルや手順を裏付ける公式マニュアルのページ
+- 有用なエンドツーエンドのシナリオに必要なリソース、依存関係、認証情報、権限、観察方法
+- ライブテストで作成、変更、削除する正確なリソースと、安全なクリーンアップ方法
 
-Create the tutorial at `docs/tutorials/<service>-api.md`. Use
-`assets/tutorial.md.tmpl` as a structure, not as text to leave filled with placeholders.
-Keep a temporary evidence table outside the repository; do not commit research notes.
-Include the source URL next to each fact in the evidence table, and retain only claims
-that can be traced to the official manual or the pinned SDK documentation.
+チュートリアルは `docs/tutorials/<service>-api.md` に作成します。`assets/tutorial.md.tmpl` は構成の参考にし、プレースホルダーを残したままにしないでください。一時的な根拠整理の表はリポジトリ外に置き、調査メモをコミットしないでください。根拠整理表では各事実の横に情報源 URL を記録し、公式マニュアルまたはバージョン固定された SDK ドキュメントで追跡できる主張だけを残してください。
 
-## Writing workflow
+## 執筆手順
 
-1. Read `AGENTS.md`, `go.mod`, the command implementation, relevant tests, and the
-   target SDK service documentation.
-2. Read the service manual from `manual.sakura.ad.jp`. Establish the problem the service
-   solves, the concepts and resource relationships, valid prerequisites, constraints,
-   and the intended result of the tutorial.
-3. Check the rendered root, resource, and operation help. Confirm the tutorial's JSON
-   examples against the implemented request decoder and SDK models. If help or code
-   disagrees with the documentation, do not silently choose one; resolve the discrepancy
-   before publishing instructions.
-4. Design a small, reproducible scenario that demonstrates useful service behavior,
-   not just successful `create`, `read`, or `list` requests. Identify how the user can
-   observe the actual result, including any required destination or dependent service.
-5. Separate setup, authentication, and pre-existing resources from resources created by
-   the tutorial. State all user-supplied values and permissions needed before commands
-   that mutate resources.
-6. Draft Markdown using `references/markdown-writing-guideline.md` and the template.
-   Explain the resource creation order, provide copyable commands or JSON files, verify
-   the observable result, and give cleanup commands in reverse dependency order.
-7. Review every command against the CLI's real `--help`; review every service fact
-   against the evidence table. Mark non-universal values as placeholders and never
-   invent event types, enum values, source identifiers, or successful outputs.
-8. Run the Markdown link checker and its tests. Preview the document and verify local
-   links, headings, fenced code blocks, and command rendering.
-9. Report the generated tutorial path and whether its end-to-end behavior was verified
-   with sakumock, a live service, or documentation alone. State any remaining manual
-   verification or dependency clearly.
+1. `AGENTS.md`、`go.mod`、コマンド実装、関連テスト、対象 SDK サービスのドキュメントを読みます。
+2. `manual.sakura.ad.jp` のサービスマニュアルを読みます。サービスが解決する課題、概念とリソースの関係、必要な前提条件、制約、チュートリアルで示す結果を確認します。
+3. ルート、リソース、操作の各ヘルプを表示して確認します。チュートリアルの JSON 例が、実装済みのリクエストデコーダーと SDK モデルに合っていることを確かめます。ヘルプやコードとドキュメントに食い違いがあれば、どちらかを黙って選ばず、公開前に解決してください。
+4. 単に `create`、`read`、`list` が成功するだけではなく、サービスの有用な動作を示す、小さく再現可能なシナリオを設計します。必要な宛先や依存サービスも含め、実際の結果をどう観察できるかを明らかにします。
+5. セットアップ、認証、既存リソースと、チュートリアルが新たに作成するリソースを区別します。リソースを変更するコマンドの前に、ユーザーが指定する値と必要な権限をすべて説明します。
+6. `references/markdown-writing-guideline.md` とテンプレートに沿って Markdown を作成します。リソースの作成順序を説明し、コピー可能なコマンドまたは JSON ファイル、観察可能な結果の確認方法、依存関係を逆順にたどるクリーンアップ手順を記載します。
+7. すべてのコマンドを実際の CLI `--help` と照合し、サービスに関する記述を根拠整理表と照合します。一般化できない値はプレースホルダーと明記し、イベント種別、列挙値、ソース識別子、成功した出力例を作り上げないでください。
+8. Markdown リンクチェッカーとそのテストを実行します。ドキュメントをプレビューし、ローカルリンク、見出し、コードフェンス、コマンド表示を確認します。
+9. 生成したチュートリアルのパスと、エンドツーエンドの動作を sakumock、ライブサービス、ドキュメントのみのいずれで確認したかを報告します。残る手動確認や依存事項があれば明示します。
 
-## Live service safety
+## ライブサービスの安全性
 
-A live tutorial test may create billable or production resources, change existing
-resources, send notifications or messages, trigger automation, or delete data.
-Never perform those actions based only on the request to write a tutorial.
+ライブのチュートリアルテストでは、課金対象または本番リソースの作成、既存リソースの変更、通知やメッセージの送信、自動化の起動、データの削除が発生する可能性があります。チュートリアルの作成を依頼されただけで、これらの操作を実行してはいけません。
 
-Before any live mutation:
+ライブ環境で変更を行う前に、次のすべてを実施してください。
 
-1. Show the user the target profile/zone or project, dependencies, exact resources and
-   actions, expected side effects, and cleanup plan.
-2. Obtain explicit approval for that specific live test.
-3. Check the active profile/configuration and use only the approved account and scope.
-4. Avoid reusing or deleting pre-existing resources. Use uniquely named test resources.
-5. Keep secret values in a local protected file or supported secure input; do not ask the
-   user to paste credentials into the conversation or place them in shell history.
-6. Confirm the observed service behavior, then clean up only the resources created for
-   the test and verify their removal.
+1. 対象のプロファイル／ゾーンまたはプロジェクト、依存関係、対象リソースと具体的な操作、副作用、クリーンアップ計画をユーザーに提示します。
+2. そのライブテストに対する明示的な承認を得ます。
+3. 有効なプロファイル／設定を確認し、承認されたアカウントと範囲だけを使用します。
+4. 既存のリソースを再利用したり削除したりしないでください。一意の名前を付けたテスト用リソースを使用します。
+5. 秘密情報はローカルの保護されたファイル、またはサポートされている安全な入力方法で扱います。ユーザーに会話で認証情報を貼り付けるよう求めたり、シェル履歴に残したりしないでください。
+6. サービスの動作を確認してから、テスト用に作成したリソースだけをクリーンアップし、削除されたことを確認します。
 
-If approval, required dependencies, safe cleanup, or a way to observe the actual
-behavior is unavailable, do not claim live end-to-end verification. Use sakumock for
-request/response behavior where supported and state the limit. If the tutorial's main
-claim cannot be explained or substantiated without the missing live test, stop and
-report the blocker rather than substituting a CRUD-only test.
+承認、必要な依存関係、安全なクリーンアップ、または実際の動作を観察する方法がない場合、ライブのエンドツーエンド検証を行ったと主張しないでください。対応している場合はリクエスト／レスポンスの確認に sakumock を使い、その制約を明記します。チュートリアルの中心的な主張を、ライブテストなしでは説明または裏付けできない場合、CRUD だけのテストで代替せず、作業を止めて阻害要因を報告してください。
 
-## Required tutorial sections
+## 必須セクション
 
-Every tutorial should cover, when applicable:
+該当する内容を、すべてのチュートリアルで扱ってください。
 
-1. **Purpose** — when and why to use the service, supported by official sources.
-2. **Prerequisites** — skr version/command, authentication configuration, permissions,
-   pre-existing resources, and any dependent service.
-3. **Workflow and resources** — what will be created and in which order.
-4. **Inspect command help** — root/resource/operation help relevant to the steps.
-5. **Create/configure** — valid JSON files or commands and explanations for required
-   fields, units, choices, and placeholders.
-6. **Verify behavior** — an observable service result beyond resource CRUD, or an
-   explicit statement of which part was not live-verified and why.
-7. **Clean up** — delete only tutorial-created resources in reverse dependency order
-   and verify removal.
-8. **References** — links to official manual pages and relevant CLI help commands.
+1. **目的** — 公式情報源を根拠に、サービスをいつ、なぜ使うかを説明します。
+2. **前提条件** — skr のバージョン／コマンド、認証設定、権限、既存リソース、依存サービスを記載します。
+3. **手順とリソース** — 作成するリソースとその順序を説明します。
+4. **コマンドヘルプの確認** — 手順に関係するルート／リソース／操作のヘルプを示します。
+5. **作成／設定** — 有効な JSON ファイルやコマンドを示し、必須フィールド、単位、選択肢、プレースホルダーを説明します。
+6. **動作の確認** — CRUD を超える観察可能なサービス結果を示すか、ライブで未検証の部分とその理由を明記します。
+7. **クリーンアップ** — チュートリアルで作成したリソースだけを依存関係の逆順で削除し、削除を確認します。
+8. **参考情報** — 公式マニュアルのページと関連する CLI ヘルプコマンドへのリンクを記載します。
 
-Do not force irrelevant sections or facts into a tutorial. Prefer a concise, complete
-scenario over a long catalog of API fields.
+チュートリアルに関係のないセクションや事実を無理に含めないでください。API フィールドの長い一覧より、簡潔で完結したシナリオを優先します。
 
-## Validation
+## 検証
 
-Run the checker tests:
+チェッカーのテストを実行します。
 
 ```sh
 python3 -m unittest discover -s .agents/skills/generate-skr-api-manual/scripts -p 'test_*.py'
 ```
 
-Check links in generated tutorials:
+生成したチュートリアルのリンクを確認します。
 
 ```sh
 python3 ./.agents/skills/generate-skr-api-manual/scripts/check_tutorial_links.py
 ```
 
-The checker can also receive explicit Markdown files and supports `--timeout`, `--retries`,
-and `--jobs`. A failed external link must be rechecked against the official source and
-updated if it moved; do not remove a correct citation merely to make the check pass.
+チェッカーには Markdown ファイルを明示的に渡すこともできます。また、`--timeout`、`--retries`、`--jobs` を指定できます。外部リンクの確認に失敗した場合は、公式情報源を再確認し、移動していればリンクを更新してください。チェックを通すためだけに正しい引用を削除してはいけません。
 
-## References
+## 参考資料
 
-- [Markdown writing guidelines](references/markdown-writing-guideline.md)
-- [Tutorial template](assets/tutorial.md.tmpl)
-- [Markdown external-link checker](scripts/check_tutorial_links.py)
+- [Markdown 執筆ガイドライン](references/markdown-writing-guideline.md)
+- [チュートリアルテンプレート](assets/tutorial.md.tmpl)
+- [Markdown 外部リンクチェッカー](scripts/check_tutorial_links.py)
