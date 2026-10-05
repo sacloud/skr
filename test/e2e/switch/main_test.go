@@ -23,8 +23,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 type fakeCLI struct {
@@ -222,11 +224,15 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	runner := cliRunner{binary: binary, evidence: dir}
+	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "switch-api"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := cliRunner{binary: binary, evidence: recorder}
 	if _, err := runner.call(context.Background(), "test-find", map[string]any{"Zone": zone}); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "test-find.json")
+	path := filepath.Join(recorder.Dir(), "001-test-find.json")
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
@@ -240,6 +246,13 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "test-find") || !strings.Contains(string(data), `"tk1v"`) {
 		t.Fatalf("evidence missing step or request: %s", data)
+	}
+	order, err := os.ReadFile(filepath.Join(recorder.Dir(), "ORDER.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(order), "001\ttest-find\tok\t001-test-find.json") {
+		t.Fatalf("evidence order missing find step: %s", order)
 	}
 }
 

@@ -108,11 +108,19 @@ $ skr simplemq-api queue count-messages QUEUE-ID --output json
 $ skr simplemq-api queue read QUEUE-ID --output json
 $ skr simplemq-api queue clear-messages QUEUE-ID
 $ skr simplemq-api queue delete QUEUE-ID
-$ skr simplemq-api queue list --output json
+$ skr simplemq-api queue list --output table
 $ rm simplemq.key
 ```
 
-`queue list` に対象キューが残っていないことを確認します。API キーを別の場所に保存した場合は、そのファイルもこの手順で作成したものだけを削除してください。
+`queue list` に対象キューが残っていないことを確認します。削除後に結果が空の場合の出力は次のとおりです。
+
+```text
++------------+
+| No results |
++------------+
+```
+
+API キーを別の場所に保存した場合は、そのファイルもこの手順で作成したものだけを削除してください。
 
 ## 参考資料
 

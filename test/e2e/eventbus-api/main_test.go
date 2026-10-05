@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 type fakeCLI struct {
@@ -228,11 +230,11 @@ func TestCLIRunnerOrdersEvidenceAndRedactsAPIKey(t *testing.T) {
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil { //nolint:gosec // The test helper must be executable.
 		t.Fatal(err)
 	}
-	evidence, err := createEvidenceDir(filepath.Join(dir, "tmp", "eventbus-api"), time.Date(2026, 10, 5, 17, 1, 0, 0, time.Local))
+	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "eventbus-api"), time.Date(2026, 10, 5, 17, 1, 0, 0, time.Local))
 	if err != nil {
 		t.Fatal(err)
 	}
-	runner := &cliRunner{binary: binary, evidence: evidence}
+	runner := &cliRunner{binary: binary, evidence: recorder}
 	if _, err := runner.call(context.Background(), "profile-current", "config", "current"); err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +245,7 @@ func TestCLIRunnerOrdersEvidenceAndRedactsAPIKey(t *testing.T) {
 	if !strings.Contains(string(output), "test-only-api-key") {
 		t.Fatalf("CLI output = %q, want raw API key for caller", output)
 	}
-	recordPath := filepath.Join(evidence, "002-rotate-api-key.json")
+	recordPath := filepath.Join(recorder.Dir(), "002-rotate-api-key.json")
 	record, err := os.ReadFile(recordPath) //nolint:gosec // The file is created under t.TempDir.
 	if err != nil {
 		t.Fatal(err)
@@ -267,7 +269,7 @@ func TestCLIRunnerOrdersEvidenceAndRedactsAPIKey(t *testing.T) {
 	if got := recordInfo.Mode().Perm(); got != 0o600 {
 		t.Errorf("evidence file permissions = %o, want 600", got)
 	}
-	order, err := os.ReadFile(filepath.Join(evidence, "ORDER.txt")) //nolint:gosec // The file is created under t.TempDir.
+	order, err := os.ReadFile(filepath.Join(recorder.Dir(), "ORDER.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,35 +279,6 @@ func TestCLIRunnerOrdersEvidenceAndRedactsAPIKey(t *testing.T) {
 	} {
 		if !strings.Contains(string(order), want) {
 			t.Errorf("evidence order is missing %q:\n%s", want, order)
-		}
-	}
-}
-
-func TestCreateEvidenceDirUsesTimestampAndAvoidsOverwrite(t *testing.T) {
-	baseDir := filepath.Join(t.TempDir(), "tmp", "eventbus-api")
-	createdAt := time.Date(2026, 10, 5, 17, 1, 0, 0, time.Local)
-
-	first, err := createEvidenceDir(baseDir, createdAt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := createEvidenceDir(baseDir, createdAt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := filepath.Base(first), "202610051701"; got != want {
-		t.Errorf("first evidence directory = %q, want %q", got, want)
-	}
-	if got, want := filepath.Base(second), "202610051701-02"; got != want {
-		t.Errorf("second evidence directory = %q, want %q", got, want)
-	}
-	for _, path := range []string{first, second} {
-		info, err := os.Stat(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := info.Mode().Perm(); got != 0o700 {
-			t.Errorf("evidence directory permissions = %o, want 700", got)
 		}
 	}
 }

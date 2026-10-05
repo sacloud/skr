@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 const (
@@ -49,7 +50,7 @@ type switchItem struct {
 
 type cliRunner struct {
 	binary   string
-	evidence string
+	evidence *evidence.Recorder
 }
 
 func operation(step string) (string, error) {
@@ -62,6 +63,9 @@ func operation(step string) (string, error) {
 }
 
 func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, error) {
+	if err := evidence.ValidateStep(step); err != nil {
+		return nil, err
+	}
 	var args []string
 	if request == nil {
 		args = []string{"config", "current"}
@@ -80,23 +84,11 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	runErr := command.Run()
-	record := struct {
-		Step    string   `json:"step"`
-		Args    []string `json:"args"`
-		Request any      `json:"request,omitempty"`
-		Stdout  string   `json:"stdout"`
-		Stderr  string   `json:"stderr"`
-		Error   string   `json:"error,omitempty"`
-	}{Step: step, Args: args, Request: request, Stdout: stdout.String(), Stderr: stderr.String()}
-	if runErr != nil {
-		record.Error = runErr.Error()
-	}
-	data, err := json.MarshalIndent(record, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("%s: encode evidence: %w", step, err)
-	}
-	if err := os.WriteFile(filepath.Join(r.evidence, step+".json"), append(data, '\n'), 0o600); err != nil {
-		return nil, fmt.Errorf("%s: write evidence: %w", step, err)
+	if err := r.evidence.Record(step, args, request, stdout.String(), stderr.String(), runErr, false); err != nil {
+		if runErr != nil {
+			return nil, errors.Join(fmt.Errorf("%s: CLI failed: %w (see evidence for stderr)", step, runErr), err)
+		}
+		return nil, err
 	}
 	if runErr != nil {
 		return nil, fmt.Errorf("%s: CLI failed: %w (see evidence for stderr)", step, runErr)
@@ -381,25 +373,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	return checkItem(read, id, updatedName)
 }
 
-func evidenceDir() (string, error) {
-	dir, err := os.MkdirTemp("", "skr-e2e-switch-")
-	if err != nil {
-		return "", fmt.Errorf("create evidence directory: %w", err)
-	}
-	command := exec.Command("git", "-C", dir, "rev-parse", "--is-inside-work-tree") //nolint:gosec // The directory was just created by MkdirTemp and is not user input.
-	output, err := command.Output()
-	if err == nil && strings.TrimSpace(string(output)) == "true" {
-		_ = os.Remove(dir)
-		return "", fmt.Errorf("refusing to save evidence inside a Git worktree: %s", dir)
-	}
-	var exitErr *exec.ExitError
-	if err != nil && !errors.As(err, &exitErr) {
-		return "", fmt.Errorf("verify evidence location: %w", err)
-	}
-	return dir, nil
-}
-
-func runMain() int {
+func runMain() (exitCode int) {
 	binary := flag.String("skr", "./skr", "Path to a built skr binary")
 	confirmed := flag.Bool("confirm-tk1v", false, "Confirm deleting prior skr-e2e- Switches and creating/updating/deleting a test Switch in tk1v")
 	flag.Parse()
@@ -416,20 +390,32 @@ func runMain() int {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	dir, err := evidenceDir()
+	recorder, err := evidence.New("switch-api")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	fmt.Println("Evidence (private, outside Git):", dir)
+	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+	defer func() {
+		result := "failed"
+		if exitCode == 0 {
+			result = "passed"
+		}
+		if err := recorder.SetResult(result, time.Now()); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			exitCode = 1
+		}
+	}()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	runner := cliRunner{binary: path, evidence: dir}
+	runner := cliRunner{binary: path, evidence: recorder}
 	if err := (scenario{call: runner.call}).run(ctx, name); err != nil {
 		fmt.Fprintln(os.Stderr, "Switch E2E failed:", err)
+		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
 	}
 	fmt.Println("Switch E2E passed; test Switch deleted and absence verified.")
+	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
 }
 
