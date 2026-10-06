@@ -34,6 +34,10 @@ Homebrew、deb、rpm、GPG 署名は設定しません。
 
 既存の Dockerfile を使い、Linux の amd64 と arm64 をまとめたイメージを `ghcr.io/sacloud/skr` に公開します。
 
+ビルドステージは `make build` で `CGO_ENABLED=0` のバイナリを生成します。開発用ツールをインストールする `make tools` は実行しません。
+実行用ベースイメージには `gcr.io/distroless/static-debian13:latest` を使い、バイナリを `/usr/bin/skr` に配置します。CA 証明書はベースイメージに含まれるものを使用します。
+実行ユーザーは従来どおり root です。実行用イメージにはシェルとパッケージマネージャーがないため、コンテナ内でのシェル操作やパッケージ追加はできません。
+
 | タグ | 更新条件 |
 | --- | --- |
 | `v` 付きリリースタグ | tagpr がタグを作成したときに公開します。 |
@@ -72,4 +76,5 @@ $ goreleaser release --snapshot
 - [usacloud の tagpr・リリースワークフロー](https://github.com/sacloud/usacloud/blob/main/.github/workflows/tagpr_and_release.yml)
 - [tagpr の設定](https://github.com/Songmu/tagpr#configuration)
 - [GoReleaser](https://goreleaser.com/)
+- [Distroless イメージ](https://github.com/GoogleContainerTools/distroless)
 - [GITHUB_TOKEN によるワークフロー起動の制約](https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow#triggering-a-workflow-from-a-workflow)
