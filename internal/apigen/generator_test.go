@@ -116,6 +116,51 @@ func TestGenerate(t *testing.T) {
 	}
 }
 
+func TestGenerateValueRequestAndPositionalArguments(t *testing.T) {
+	config := Config{
+		Package:     "exampleapi",
+		Resource:    "Example API",
+		CommandType: "Commands",
+		APIType:     "API",
+		FactoryType: "APIFactory",
+		RuntimeType: "Runtime",
+		Imports: map[string]string{
+			"example": "github.com/example/sdk/api/example",
+		},
+		Operations: []Operation{
+			{
+				Name:           "Update",
+				CommandType:    "UpdateCommand",
+				Help:           "更新します。",
+				Method:         "Update",
+				RequestType:    "example.UpdateRequest",
+				RequestByValue: true,
+				ResponseType:   "*example.Item",
+				Arguments: []Argument{
+					{Name: "id", Field: "ID", Type: "string", Help: "更新対象の ID。"},
+				},
+			},
+		},
+	}
+
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if _, err := parser.ParseFile(token.NewFileSet(), "generated.go", source, parser.AllErrors); err != nil {
+		t.Fatalf("generated source does not parse: %v", err)
+	}
+	for _, want := range []string{
+		"Update(context.Context, string, example.UpdateRequest) (*example.Item, error)",
+		`arg:\"\" name:\"id\" help:\"更新対象の ID。\"`,
+		"op.Update(context.Background(), c.ID, *request)",
+	} {
+		if !strings.Contains(string(source), want) {
+			t.Errorf("generated source does not contain %q", want)
+		}
+	}
+}
+
 func TestDecodeConfigRejectsUnknownFieldsAndTrailingJSON(t *testing.T) {
 	for _, input := range []string{
 		`{"package":"main","unexpected":true}`,
@@ -124,6 +169,27 @@ func TestDecodeConfigRejectsUnknownFieldsAndTrailingJSON(t *testing.T) {
 		if _, err := DecodeConfig([]byte(input)); err == nil {
 			t.Errorf("DecodeConfig(%q) succeeded; want error", input)
 		}
+	}
+}
+
+func TestValidateRequestByValueRequiresRequestType(t *testing.T) {
+	config := Config{
+		Package:     "exampleapi",
+		Resource:    "Example API",
+		CommandType: "Commands",
+		APIType:     "API",
+		FactoryType: "APIFactory",
+		RuntimeType: "Runtime",
+		Operations: []Operation{{
+			Name:           "List",
+			CommandType:    "ListCommand",
+			Help:           "一覧を表示します。",
+			Method:         "List",
+			RequestByValue: true,
+		}},
+	}
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "request_by_value requires request_type") {
+		t.Fatalf("Validate() error = %v, want request_by_value error", err)
 	}
 }
 

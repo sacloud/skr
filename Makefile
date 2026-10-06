@@ -14,6 +14,12 @@ include includes/go/single.mk
 default: $(DEFAULT_GOALS)
 tools: dev-tools
 
+.PHONY: generate-api
+generate-api:
+	@test -n "$(API_CONFIG)" || (echo "API_CONFIG is required" >&2; exit 2)
+	@test -n "$(API_OUTPUT)" || (echo "API_OUTPUT is required" >&2; exit 2)
+	$(GO) run ./cmd/apigen-api -config "$(API_CONFIG)" -out "$(API_OUTPUT)"
+
 .PHONY: generate-iaas-api
 generate-iaas-api:
 	@test -n "$(API_CONFIG)" || (echo "API_CONFIG is required" >&2; exit 2)

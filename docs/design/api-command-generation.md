@@ -1,11 +1,11 @@
-# IaaS 低レベル API コマンド生成器
+# 低レベル API コマンド生成器
 
 - Status: Implemented
 - Related ADR: [ADR 0016](../adr/0016-generate-low-level-api-commands.md)
 
 ## 目的
 
-`cmd/apigen-iaas` は、明示した IaaS SDK 操作のコマンド登録、型付き API インターフェース、操作ハンドラー、標準的なリクエスト入力と出力を Go ソースに生成します。生成コードはリポジトリに含め、実行時や通常のビルド時に生成器を必要としません。生成処理の共通実装は `internal/apigen` にあります。
+`cmd/apigen-iaas` は、明示した IaaS SDK 操作のコマンド登録、型付き API インターフェース、操作ハンドラー、標準的なリクエスト入力と出力を Go ソースに生成します。IaaS 以外の Ogen 系 API には共通入口 `cmd/apigen-api` を使います。生成コードはリポジトリに含め、実行時や通常のビルド時に生成器を必要としません。設定解析と共有可能な生成処理は `internal/apigen` にあります。IaaS と Ogen 系 API は別の CLI 入口を保ち、共通化できる範囲で実装を共有します。
 
 生成器は SDK の操作を探索して公開範囲や入力の意味を決めません。対象操作、SDK メソッド名、リクエスト／レスポンス型、個別フラグ、ヘルプは設定で明示します。設定内容は SDK の公開インターフェースとリクエスト型に照らして確認します。
 
@@ -48,6 +48,36 @@
 
 SDK のメソッドは `context.Context` と、指定した場合は `*request_type` を受け取ります。結果を返す操作には `response_type` を指定し、戻り値と `error` を出力します。`response_type` を省略した操作は `error` のみを返し、成功時に出力しません。`request_type` を省略した操作は入力なしで呼び出します。インポートの別名を含む型名は、`imports` に定義します。
 
+## IaaS 以外の API ドメイン
+
+IaaS 以外の EventBus と SimpleMQ も、同じ `cmd/apigen-api` / `generate-api` から生成します。たとえば次の項目は、位置引数を取る操作と値渡しのリクエストを表します。
+
+```json
+{
+  "arguments": [
+    {
+      "name": "id",
+      "field": "ID",
+      "type": "string",
+      "help": "対象リソースの ID。"
+    }
+  ],
+  "request_type": "v1.UpdateRequest",
+  "request_by_value": true
+}
+```
+
+`arguments` は SDK 操作の `context.Context` の後に並ぶ引数と、対応する Kong の位置引数を定義します。`request_by_value` は `request_type` をポインターではなく値で SDK 操作へ渡します。省略時は従来どおりポインターで渡します。これらは SDK のメソッドシグネチャに合わせるための指定であり、操作範囲、引数の意味、ヘルプを自動推測するものではありません。
+
+リポジトリルートから、共通生成器に対象操作の設定と出力先を渡します。
+
+```console
+$ make generate-api API_CONFIG=path/to/eventbus-example.json API_OUTPUT=path/to/eventbus_api_generated.go
+$ make generate-api API_CONFIG=path/to/simplemq-example.json API_OUTPUT=path/to/simplemq_api_generated.go
+```
+
+上記のパスは設定例です。設定ファイルと生成先は対象 API とパッケージ構成に合わせて用意します。生成器が利用できることは、EventBus / SimpleMQ の全操作が生成済み、または CLI で公開済みであることを意味しません。プロバイダークラスの補完、秘密情報の扱い、独自の入力検証などは設定から意味を推測せず、対象の設計に従って手書きに残します。
+
 生成器は操作名とフィールド名を Go 識別子として扱います。Kong のコマンド名は操作名の小文字表記です。フラグ型は `string`、`bool`、`int`、`int64` に限定し、API リクエストの同名フィールドに代入します。`pointer: true` は明示指定された値だけをリクエストのポインター項目へ設定します。`conversion` を指定すると、その型へ変換してから設定します。`required: true` はフラグ経路での指定有無を検証します。`request_validator` を指定すると、JSON／フラグからリクエストを構築した後、SDK 呼び出し前にサービス固有の検証関数を実行します。
 
 リクエストを持つ操作では `--request` にインライン JSON または `@path.json` を指定できます。個別フラグを設定した場合は `--request` と併用できません。JSON 経路では個別フラグの必須指定を要求せず、フラグ経路では必須フラグと、少なくとも 1 つのフラグの指定を確認してから SDK を呼び出します。配列、map、union、nullable 値、秘密情報など生成器の単純な型で表現しない入力は `--request` に残します。
@@ -66,7 +96,7 @@ Switch コマンドは [`api/commands/iaas-switch.json`](../../api/commands/iaas
 $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=internal/iaas/switchapi/switch_api_generated.go
 ```
 
-同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型で受け付けず、出力は `go/format` で整形します。将来別の API 形式に専用の生成器を追加する場合は、IaaS の機能や名称と混同しないコマンド入口を設けます。
+同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型で受け付けず、出力は `go/format` で整形します。IaaS は `zone_search` などの固有機能を扱うため専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
 
 ## 手書きコードとの境界
 
