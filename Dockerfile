@@ -20,20 +20,18 @@ RUN  apt-get update && apt-get -y install \
         git  \
         make \
         zip  \
-        bzr  \
       && apt-get clean \
       && rm -rf /var/cache/apt/archives/* /var/lib/apt/lists/*
 
 ADD . /go/src/github.com/sacloud/skr
 WORKDIR /go/src/github.com/sacloud/skr
 ENV CGO_ENABLED=0
-RUN make tools build
+RUN make build
 # ======
 
-FROM alpine:3.24.2
+FROM gcr.io/distroless/static-debian13:latest
 LABEL org.opencontainers.image.authors="Usacloud Authors <sacloud.users@gmail.com>"
 
-RUN apk add --no-cache --update ca-certificates
 COPY --from=builder /go/src/github.com/sacloud/skr/skr /usr/bin/
 
 ENTRYPOINT ["/usr/bin/skr"]
