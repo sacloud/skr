@@ -93,7 +93,7 @@ func runHelp(cliPath string, commandPath []string) (string, error) {
 	defer cancel()
 
 	args := append(append([]string(nil), commandPath...), "--help")
-	output, err := exec.CommandContext(ctx, cliPath, args...).CombinedOutput()
+	output, err := exec.CommandContext(ctx, cliPath, args...).CombinedOutput() //nolint:gosec // cliPath is the explicitly selected skr executable; arguments are fixed help flags and no shell is used.
 	if err != nil {
 		return "", fmt.Errorf("run skr %s --help: %w\n%s", strings.Join(commandPath, " "), err, output)
 	}
@@ -150,7 +150,7 @@ func renderManual(manualPath, outputPath string) error {
 			return nil
 		}
 
-		source, err := os.ReadFile(sourcePath)
+		source, err := os.ReadFile(sourcePath) //nolint:gosec // WalkDir yields Markdown paths confined to the configured manual tree.
 		if err != nil {
 			return fmt.Errorf("read manual %s: %w", sourcePath, err)
 		}
@@ -167,7 +167,7 @@ func renderManual(manualPath, outputPath string) error {
 		if strings.EqualFold(title, "README") {
 			title = "skr 利用者向けドキュメント"
 		}
-		if err := writePage(outputPath, webPath, title, template.HTML(rendered)); err != nil {
+		if err := writePage(outputPath, webPath, title, template.HTML(rendered)); err != nil { //nolint:gosec // Goldmark's default renderer suppresses raw HTML and dangerous links.
 			return fmt.Errorf("write manual page %s: %w", webPath, err)
 		}
 		return nil
@@ -244,7 +244,7 @@ func renderCommandPage(commands []commandHelp, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	return writePage(outputPath, "commands/index.html", "CLI コマンドヘルプ", template.HTML(body))
+	return writePage(outputPath, "commands/index.html", "CLI コマンドヘルプ", template.HTML(body)) //nolint:gosec // The body is rendered by html/template with all help values escaped.
 }
 
 func renderCommandBody(data commandPageData) (string, error) {
@@ -305,10 +305,10 @@ func writePage(outputPath, webPath, title string, body template.HTML) error {
 		return err
 	}
 	target := filepath.Join(outputPath, filepath.FromSlash(webPath))
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil { //nolint:gosec // Published static pages need traversable directories in the Pages artifact.
 		return err
 	}
-	if err := os.WriteFile(target, output.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(target, output.Bytes(), 0o644); err != nil { //nolint:gosec // Generated pages are public documentation and must be readable in the artifact.
 		return err
 	}
 	return nil
@@ -335,6 +335,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 :root{color-scheme:light dark;font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#fff;--fg:#1f2328;--muted:#59636e;--border:#d1d9e0;--surface:#f6f8fa;--link:#0969da}
 @media(prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9198a1;--border:#30363d;--surface:#161b22;--link:#4493f8}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg)}a{color:var(--link)}.site-header{display:flex;gap:2rem;align-items:center;padding:.85rem max(1rem,calc((100% - 1100px)/2));border-bottom:1px solid var(--border);background:var(--surface)}.brand{font-weight:700;text-decoration:none;font-size:1.15rem}.site-header nav{display:flex;gap:1.25rem;flex-wrap:wrap}.site-header nav a{text-decoration:none}.content{max-width:1100px;margin:2.5rem auto;padding:0 1.25rem 3rem}h1{line-height:1.25;border-bottom:1px solid var(--border);padding-bottom:.5rem}h2{margin-top:2rem}pre{overflow:auto;padding:1rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);line-height:1.5}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}blockquote{margin-left:0;padding:.25rem 1rem;border-left:4px solid var(--border);color:var(--muted)}table{border-collapse:collapse;display:block;max-width:100%;overflow:auto}th,td{border:1px solid var(--border);padding:.4rem .65rem}th{background:var(--surface)}img{max-width:100%}.search-label{display:block;font-weight:600;margin:1rem 0 .35rem}.search-input{width:min(100%,40rem);padding:.7rem .8rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}.muted{color:var(--muted)}.command-group{margin:1.5rem 0}.command-group h2{font-size:1.25rem}.command-item{margin:.5rem 0;border:1px solid var(--border);border-radius:6px}.command-item summary{cursor:pointer;padding:.6rem .8rem;font-weight:600}.command-item pre{margin:0;border:0;border-top:1px solid var(--border);border-radius:0 0 6px 6px}.command-item[hidden],.command-group[hidden]{display:none}
+.development-banner{display:flex;align-items:center;gap:.75rem;padding:.75rem max(1rem,calc((100% - 1100px)/2));background:#fff4e5;color:#7d3600;border-bottom:2px solid #d98b00}.development-label{flex:none;font-weight:700}@media(prefers-color-scheme:dark){.development-banner{background:#2b2113;color:#f0c36d;border-color:#9e6a03}}@media(max-width:600px){.development-banner{align-items:flex-start;flex-direction:column;gap:.25rem}}
 </style>
 </head>
 <body>
@@ -345,6 +346,10 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <a href="{{.CommandsURL}}">CLI コマンドヘルプ</a>
 </nav>
 </header>
+<aside class="development-banner" aria-label="開発中バージョン">
+<span class="development-label">🚧 開発中バージョン</span>
+<span>コマンドや設定、入出力は変更されることがあります。既存の usacloud との互換性は保証しません。</span>
+</aside>
 <main class="content">{{.ManualMarkup}}</main>
 </body>
 </html>`))

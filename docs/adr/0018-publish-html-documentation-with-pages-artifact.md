@@ -13,10 +13,12 @@
 - Markdown の変換には Goldmark を使い、生成サイトは `_site/` に出力します。
 - `main` への push と手動実行で GitHub Actions を起動し、Pages artifact をアップロードして GitHub Pages にデプロイします。公開用ブランチは使いません。
 - `package.json` と npm の依存関係は導入しません。
+- HTML サイトの全ページ上部とリポジトリ README に「開発中バージョン」と明示し、利用者に仕様変更の可能性を伝えます。
 
 ## Consequences
 
 - `docs/manual/` の内容と CLI のヘルプが同じサイトから読めます。コマンドヘルプ一覧は検索できます。
+- 利用者はどのページから閲覧を始めても、開発中で仕様変更があり得ることを確認できます。
 - Pull Request の CI でサイトを生成するため、HTML 変換とヘルプ収集の失敗を公開前に検知できます。
 - GitHub Pages の Source は初回設定で `GitHub Actions` を選択する必要があります。
 - Go module に Goldmark が追加されますが、Node.js のパッケージ依存は増えません。

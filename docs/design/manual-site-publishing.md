@@ -8,6 +8,7 @@
 
 - `make docs-site` は `skr` を一時ディレクトリにビルドし、`cmd/docsite` で `_site/` に HTML を生成します。
 - Markdown は Go の Goldmark で変換します。生成物の CSS と検索スクリプトは HTML に含め、サイト閲覧時に外部 CDN や npm パッケージを必要としません。
+- 全ページのナビゲーション直下に「開発中バージョン」のバナーを表示し、コマンドや仕様が変更される可能性と `usacloud` との互換性がないことを知らせます。
 - `docs/manual/README.md` をサイトの `index.html` にし、その他の Markdown は相対パスを保った HTML に変換します。内部の Markdown リンクは HTML のリンクへ変換します。
 - `skr --help` のコマンド一覧から全コマンドパスを取得し、各パスと親コマンドに対して `--help` を実行します。結果は `commands/index.html` にまとめ、ブラウザー内検索で絞り込めるようにします。
 

@@ -97,6 +97,19 @@ func TestRenderMarkdownRewritesLocalMarkdownLinks(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdownSuppressesUnsafeContent(t *testing.T) {
+	source := []byte("<script>alert(1)</script>\n\n[x](javascript:alert%281%29)")
+	got, err := renderMarkdown(source)
+	if err != nil {
+		t.Fatalf("renderMarkdown() error = %v", err)
+	}
+	for _, unsafe := range []string{"<script>", `href="javascript:`} {
+		if strings.Contains(got, unsafe) {
+			t.Errorf("renderMarkdown() = %q, want it to exclude %q", got, unsafe)
+		}
+	}
+}
+
 func TestRewriteMarkdownLinksRejectsInvalidURL(t *testing.T) {
 	document := goldmark.DefaultParser().Parse(text.NewReader([]byte("[link](%zz.md)")))
 	if err := rewriteMarkdownLinks(document); err == nil {
