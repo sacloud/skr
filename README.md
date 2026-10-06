@@ -28,6 +28,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr iaas-api disk` | ディスクの検索、参照、作成、更新、削除 |
 | `skr iaas-api server` | サーバの検索、参照、作成、更新、削除 |
 | `skr iaas-api switch` | スイッチの検索、参照、作成、更新、削除 |
+| `skr iaas-api zone` | ゾーン一覧の取得 |
 | `skr simplemq-api queue` | キューの管理、メッセージ数の確認、キュー内メッセージの削除 |
 | `skr simplemq-api message` | メッセージの送信、受信、タイムアウト延長、削除 |
 | `skr eventbus-api process-configuration` | 実行設定の管理、実行先サービス用シークレットの登録 |
@@ -63,6 +64,8 @@ IaaS API、EventBus API、SimpleMQ のキュー管理 API は、SDK のプロフ
 API コマンドの出力形式は `--output json`、`--output yaml`、`--output table` で選択できます。
 省略時はプロファイルの `cli.default_output_type`（プロファイル v0 では `DefaultOutputType`）を
 使い、未設定の場合は JSON で出力します。
+`--query` に jq 式を指定すると、API の結果を加工して JSON で出力できます。詳細は
+[API 出力の jq 加工ガイド](docs/manual/query.md)を参照してください。
 
 SDK の HTTP リクエストとレスポンスは、コマンドの前に `--trace` を指定するとトレースできます。
 トレースには認証情報などが含まれる場合があるため、出力の取り扱いに注意してください。

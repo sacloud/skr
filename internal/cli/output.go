@@ -38,6 +38,12 @@ import (
 const defaultOutputType = "json"
 
 func writeOutputWithFormat(ctx *kong.Context, format string, value any, zones ...[]string) error {
+	if query, set, err := queryExpression(ctx); err != nil {
+		return err
+	} else if set {
+		return writeQueryOutput(ctx.Stdout, query, value)
+	}
+
 	switch format {
 	case "json":
 		encoder := json.NewEncoder(ctx.Stdout)
@@ -103,6 +109,17 @@ func yamlCompatibleValue(value any) any {
 }
 
 func outputType(ctx *kong.Context) (string, error) {
+	query, set, err := queryExpression(ctx)
+	if err != nil {
+		return "", err
+	}
+	if set {
+		if _, err := compileQuery(query); err != nil {
+			return "", err
+		}
+		return "json", nil
+	}
+
 	for _, flag := range ctx.Flags() {
 		if flag.Name == "output" && flag.Set {
 			value, ok := ctx.FlagValue(flag).(*string)

@@ -18,6 +18,7 @@ import (
 	diskSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
+	zoneSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	diskresource "github.com/sacloud/skr/internal/iaas/disk"
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
@@ -25,6 +26,7 @@ import (
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
 	switchresource "github.com/sacloud/skr/internal/iaas/switch"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
+	zoneapi "github.com/sacloud/skr/internal/iaas/zoneapi"
 	iaaszones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -32,9 +34,23 @@ type iaasAPICommand struct {
 	Disk   diskapi.Commands   `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。find は --zone all で全ゾーンを検索できます。"`
 	Switch switchapi.Commands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。find は --zone all で全ゾーンを検索できます。両経路は併用できません。"`
 	Server serverapi.Commands `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、削除します。作成や複雑な構成には --request JSON を使用します。find は --zone all で全ゾーンを検索できます。"`
+	Zone   zoneapi.Commands   `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
 }
 
 func (c *cli) initIaaSAPI() {
+	c.IaaSAPI.Zone.SetRuntime(zoneapi.Runtime{
+		DecodeRequest: decodeRequest,
+		OutputType:    outputType,
+		WriteOutput:   writeOutputWithFormat,
+	})
+	c.IaaSAPI.Zone.SetFactory(func() (zoneapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return zoneSDK.New(client), nil
+	})
+
 	c.IaaSAPI.Disk.SetRuntime(diskapi.Runtime{
 		DecodeRequest:   decodeRequest,
 		OutputType:      outputType,

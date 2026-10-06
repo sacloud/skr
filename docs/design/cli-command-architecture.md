@@ -72,15 +72,23 @@ skr http <url> [--method ...] [--data ...]
 
 `skr iaas-api switch` は `sacloud-sdk-go/service/iaas/swytch` の公開操作に合わせて `find`、`read`、`create`、`update`、`delete` を提供します。各操作は SDK の request 型を `--request` の JSON か個別フラグで受け取り、SDK が返す Switch を共通の出力形式で出力します。`find` は上記の共通 zone 仕様に従い、個別フラグの `--zone all` をサポートします。フラグ経路では必須の `Zone`、操作ごとの `Name` や `ID`、独立した任意スカラーを設定します。`Names`、`Tags`、`Sort` などの配列は JSON 経路に残します。ポインタ型の任意フラグで更新時の未指定と明示的な空文字列・ゼロ値を区別し、両経路の併用を拒否します。
 
+#### Zone API
+
+`skr iaas-api zone find` は sacloud-sdk-go v0.3.0 の `service/iaas/zone` が提供する `FindWithContext` を使ってゾーン一覧を取得します。リクエストは省略でき、指定する場合は `zone.FindRequest` JSON を使います。結果は他の API コマンドと同じ JSON、YAML、table、jq 出力経路を通します。この読み取り専用コマンドを jq の例とライブ E2E に使い、ゾーン名の抽出を検証します。詳細は [Zone チュートリアル](../manual/tutorials/iaas-api/zone.md) を参照してください。
+
 ### API コマンドの出力形式
 
 IaaS API と EventBus API の結果は JSON、YAML、table で表示できます。コマンドラインの `--output` が最優先で、未指定時は選択中プロファイルの `cli.default_output_type`（v1）または `DefaultOutputType`（v0）を使います。どちらも未設定の場合は JSON です。JSON/YAML は SDK が返すデータ形状を保ち、table はトップレベルのフィールドを列として表示します。列は Zone、ID、Name、状態、説明など利用者が識別に使う項目を優先します。table の列幅は端末幅に合わせ、長い値は省略します。列が収まらない場合は優先度の低い列を隠し、省略した列数を表示します。`--zone all` の table は、各 Switch の行に Zone 列を追加して先頭に表示します。JSON/YAML にはこの表示用 Zone 列を追加しません。
+
+API コマンドではグローバル `--query` に jq 式を指定できます。クエリは API の結果全体に適用し、複数の結果値は JSON として順に出力します。`--query` を指定した場合は `--output` とプロファイルの既定形式より優先し、クエリ結果を JSON で出力します。評価には Go 実装の gojq を使い、外部 jq バイナリには依存しません。`skr http` の生レスポンスには適用しません。
 
 `sakumock v0.9.1` に IaaS mock がないため、Switch の CLI テストでは `internal/sakumock/iaas` のインメモリ実装を使用します。この実装は SDK の `api/iaas.APICaller` を満たし、Switch の API 操作をテストします。将来 sakumock に IaaS 対応が追加された場合は、テストで使う API caller を置き換え、CLI と SDK の操作テストを維持します。
 
 ライブの管理操作は `test/e2e/switch` の Go スクリプトで再現します。ビルド済みの skr CLI を起動し、単純な操作では個別フラグ、`Names` による検索では JSON 経路を使います。`tk1v` だけを対象とし、実行確認フラグを必須にします。実行前に `skr-e2e-` で始まるスイッチを全ページから探し、E2E 用の説明値が一致するものだけ ID と内容を再確認して削除します。その後、固定名 `skr-e2e-switch` で作成し、JSON で操作結果を検証するとともに、作成したスイッチの table 出力も証跡に記録します。確認後、ID と名前・説明を照合して削除します。コマンドの入出力は共通の `test/e2e/internal/evidence` を使い、`tmp/switch-api/<YYYYMMDDHHmm>/` に記録して異常終了後の調査に使います。
 
 Disk API のライブ操作は `test/e2e/disk` で検証します。対象は `is1b` の SSD プラン ID 4、20 GB のディスクです。ランダムな名前を使い、同名のディスクがあれば変更せず中止します。作成後は検索・参照・名前更新・再参照・削除し、削除後に対象が存在しないことを確認します。途中で失敗した場合も ID、名前、E2E 説明、サイズを照合してから作成済みのディスクだけを削除します。実行確認フラグを必須とし、コマンドの入出力は `test/e2e/internal/evidence` を使って `tmp/disk-api/<YYYYMMDDHHmm>/` に保存します。
+
+Zone API の読み取り専用ライブ E2E は `test/e2e/zone` にあります。対象プロファイルと IaaS API の読み取り権限を確認してから `make build`、`./skr config current`、`go run ./test/e2e/zone --skr ./skr --confirm-zone-live` を実行します。runner は選択中プロファイルを確認してから `zone find --output table` と `zone find --query 'map(.Name)'` を実行し、table の Name 列と jq が返すゾーン名配列を検証します。クラウドリソースの作成・変更・削除は行いません。入力・出力・エラーは共通の private evidence 機構で `tmp/zone-api/<YYYYMMDDHHmm>/` に保存します。
 
 実行する開発者は対象プロファイルとプロジェクトを確認します。`tk1v` の既存テスト用スイッチの事前削除を含む変更の承認を得てください。その後、リポジトリのルートで `make build`、`./skr config current`、`go run ./test/e2e/switch --skr ./skr --confirm-tk1v` を実行します。スクリプトは選択中のプロファイルを要求します。同じ分に複数回実行した場合は `-02` 以降を付けて既存の証跡を上書きしません。各 JSON の先頭にある連番と `ORDER.txt` で実行順を確認し、`RESULT.txt` で最終結果を確認します。証跡のディレクトリは `0700`、入力と出力を含む JSON ファイルは `0600` です。実際の ID やアカウント情報を含むため Git に追加・共有しません。削除に失敗した場合はエラーと証跡から対象を確認します。
 

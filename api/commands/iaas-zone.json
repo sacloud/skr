@@ -1,0 +1,24 @@
+{
+  "package": "zoneapi",
+  "resource": "IaaS Zone",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "zone": "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_type": "FindCommand",
+      "help": "ゾーン一覧を取得します。名前の抽出例: skr iaas-api zone find --query 'map(.Name)'",
+      "method": "FindWithContext",
+      "request_type": "zone.FindRequest",
+      "response_type": "[]*iaas.Zone",
+      "request_help": "任意: FindRequest JSON を直接または @path.json で指定します。Names、Sort、Count、From で検索条件を指定できます。省略時はゾーン一覧を取得します。",
+      "handwritten": true
+    }
+  ]
+}

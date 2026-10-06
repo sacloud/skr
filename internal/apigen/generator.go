@@ -90,10 +90,11 @@ type importSpec struct {
 
 type templateConfig struct {
 	Config
-	Imports       []importSpec
-	Operations    []templateOperation
-	FactoryParams string
-	HasZoneSearch bool
+	Imports                []importSpec
+	Operations             []templateOperation
+	FactoryParams          string
+	HasZoneSearch          bool
+	HasGeneratedOperations bool
 }
 
 type templateOperation struct {
@@ -108,7 +109,9 @@ package {{.Package}}
 
 import (
 	"context"
+{{- if .HasGeneratedOperations }}
 	"fmt"
+{{- end }}
 
 	"github.com/alecthomas/kong"
 {{- if .HasZoneSearch }}
@@ -576,11 +579,15 @@ func Generate(config Config) ([]byte, error) {
 	sort.Slice(imports, func(i, j int) bool { return imports[i].Alias < imports[j].Alias })
 	operations := make([]templateOperation, 0, len(config.Operations))
 	hasZoneSearch := false
+	hasGeneratedOperations := false
 	for _, operation := range config.Operations {
 		item := templateOperation{Operation: operation}
 		if operation.ZoneSearch != nil {
 			item.ZoneSearchItemType, _ = responseSliceElement(operation.ResponseType)
 			hasZoneSearch = true
+		}
+		if !operation.Handwritten {
+			hasGeneratedOperations = true
 		}
 		operations = append(operations, item)
 	}
@@ -617,6 +624,7 @@ func Generate(config Config) ([]byte, error) {
 	if err := tmpl.Execute(&source, templateConfig{
 		Config: config, Imports: imports, Operations: operations,
 		FactoryParams: strings.Join(factoryParams, ", "), HasZoneSearch: hasZoneSearch,
+		HasGeneratedOperations: hasGeneratedOperations,
 	}); err != nil {
 		return nil, fmt.Errorf("render source: %w", err)
 	}
