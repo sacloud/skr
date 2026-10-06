@@ -85,6 +85,14 @@ $ make generate-api API_CONFIG=api/commands/simplemq-queue.json API_OUTPUT=inter
 $ make generate-api API_CONFIG=api/commands/simplemq-message.json API_OUTPUT=internal/simplemqapi/simplemq_message_api_generated.go
 ```
 
+EventBus の実行設定、スケジュール、トリガーコマンドも `internal/eventbusapi/` に再生成します。実行設定の `update-secret`、Provider クラス補完、SDK クライアント生成は同じ内部パッケージの手書きコードに置きます。ユーザー向けコマンド名は `process-configuration` のままにし、生成設定と生成先のファイル名だけは編集ツールが誤判定しにくいよう `c0nfiguration` 表記にします。
+
+```console
+$ make generate-api API_CONFIG=api/commands/eventbus-process-c0nfiguration.json API_OUTPUT=internal/eventbusapi/eventbus_process_c0nfiguration_api_generated.go
+$ make generate-api API_CONFIG=api/commands/eventbus-schedule.json API_OUTPUT=internal/eventbusapi/eventbus_schedule_api_generated.go
+$ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=internal/eventbusapi/eventbus_trigger_api_generated.go
+```
+
 生成器は操作名とフィールド名を Go 識別子として扱います。Kong のコマンド名は操作名の小文字表記です。フラグ型は `string`、`bool`、`int`、`int64` に限定し、API リクエストの同名フィールドに代入します。`pointer: true` は明示指定された値だけをリクエストのポインター項目へ設定します。`conversion` を指定すると、その型へ変換してから設定します。`required: true` はフラグ経路での指定有無を検証します。`request_validator` を指定すると、JSON／フラグからリクエストを構築した後、SDK 呼び出し前にサービス固有の検証関数を実行します。
 
 リクエストを持つ操作では `--request` にインライン JSON または `@path.json` を指定できます。個別フラグを設定した場合は `--request` と併用できません。JSON 経路では個別フラグの必須指定を要求せず、フラグ経路では必須フラグと、少なくとも 1 つのフラグの指定を確認してから SDK を呼び出します。配列、map、union、nullable 値、秘密情報など生成器の単純な型で表現しない入力は `--request` に残します。

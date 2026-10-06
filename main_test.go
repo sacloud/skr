@@ -233,6 +233,9 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 	if created.ID == "" {
 		t.Fatal("create returned an empty ID")
 	}
+	if got, want := created.Provider.Class, v1.ProviderClassEventbusprocessconfiguration; got != want {
+		t.Errorf("created process configuration provider class = %q, want %q", got, want)
+	}
 
 	var items []v1.CommonServiceItem
 	if err := json.Unmarshal(runCommand("eventbus-api", "process-configuration", "list"), &items); err != nil {
@@ -252,7 +255,7 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 		}
 	}
 
-	exerciseResource := func(resource, name, updatedName string, settings any) {
+	exerciseResource := func(resource, name, updatedName string, providerClass v1.ProviderClass, settings any) {
 		t.Helper()
 		requestJSON, err := json.Marshal(map[string]any{
 			"CommonServiceItem": map[string]any{
@@ -269,6 +272,9 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 		}
 		if item.ID == "" {
 			t.Fatalf("create %s returned an empty ID", resource)
+		}
+		if got, want := item.Provider.Class, providerClass; got != want {
+			t.Errorf("created %s provider class = %q, want %q", resource, got, want)
 		}
 
 		var listed []v1.CommonServiceItem
@@ -311,13 +317,13 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 		}
 	}
 
-	exerciseResource("schedule", "sakumock-schedule", "updated-sakumock-schedule", map[string]any{
+	exerciseResource("schedule", "sakumock-schedule", "updated-sakumock-schedule", v1.ProviderClassEventbusschedule, map[string]any{
 		"ProcessConfigurationID": created.ID,
 		"StartsAt":               1700000000000,
 		"RecurringStep":          1,
 		"RecurringUnit":          "day",
 	})
-	exerciseResource("trigger", "sakumock-trigger", "updated-sakumock-trigger", map[string]any{
+	exerciseResource("trigger", "sakumock-trigger", "updated-sakumock-trigger", v1.ProviderClassEventbustrigger, map[string]any{
 		"ProcessConfigurationID": created.ID,
 		"Source":                 "//sakumock/source",
 		"Types":                  []string{"sakumock.created"},

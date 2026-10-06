@@ -36,6 +36,9 @@ func TestSimpleMQGeneratedCodeMatchesConfig(t *testing.T) {
 	}{
 		{config: "api/commands/simplemq-queue.json", output: "internal/simplemqapi/simplemq_queue_api_generated.go"},
 		{config: "api/commands/simplemq-message.json", output: "internal/simplemqapi/simplemq_message_api_generated.go"},
+		{config: "api/commands/eventbus-process-c0nfiguration.json", output: "internal/eventbusapi/eventbus_process_c0nfiguration_api_generated.go"},
+		{config: "api/commands/eventbus-schedule.json", output: "internal/eventbusapi/eventbus_schedule_api_generated.go"},
+		{config: "api/commands/eventbus-trigger.json", output: "internal/eventbusapi/eventbus_trigger_api_generated.go"},
 	} {
 		configData, err := os.ReadFile(test.config)
 		if err != nil {
@@ -54,7 +57,7 @@ func TestSimpleMQGeneratedCodeMatchesConfig(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !bytes.Equal(got, want) {
-			t.Fatalf("generated SimpleMQ commands are stale; run make generate-api API_CONFIG=%s API_OUTPUT=%s", test.config, test.output)
+			t.Fatalf("generated API commands are stale; run make generate-api API_CONFIG=%s API_OUTPUT=%s", test.config, test.output)
 		}
 	}
 }

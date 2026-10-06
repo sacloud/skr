@@ -25,6 +25,7 @@ IaaS の API と Ogen 由来の API では SDK の生成形式が異なり、操
 - Ogen 系 API のサービス数に比例して生成器入口が増えることを防ぎ、設定形式と生成ロジックの保守箇所を抑えられます。
 - 位置引数や値渡しリクエストを含む Ogen 系 SDK の定型コードを生成できます。一方、すべての Ogen 操作が同一の CLI 表現に収まるわけではなく、独自処理は引き続き手書きが必要です。
 - SimpleMQ では queue / message の操作を設定から生成し、Provider の補完、設定フラグ変換、特殊な結果整形は手書きハンドラーに残します。
+- EventBus では process-configuration / schedule / trigger の定型操作を設定から生成し、Provider の補完、実行設定のシークレット登録、SDK クライアント生成は手書きコードに残します。ユーザー向けコマンド名は `process-configuration` を維持し、生成設定と生成先のファイル名だけは `c0nfiguration` 表記にします。
 - 生成設定は引き続き SDK の公開シグネチャと CLI の意図を照合して作成し、生成後は SDK 呼び出し、入力、出力、エラーを対象テストで検証します。
 
 ## Alternatives considered

@@ -1,0 +1,78 @@
+{
+  "package": "eventbusapi",
+  "resource": "EventBus schedule",
+  "command_type": "ScheduleCommands",
+  "api_type": "ScheduleAPI",
+  "factory_type": "ScheduleAPIFactory",
+  "runtime_type": "ScheduleRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "ScheduleListCommand",
+      "help": "スケジュールを一覧表示します。",
+      "method": "List",
+      "response_type": "[]v1.CommonServiceItem"
+    },
+    {
+      "name": "Read",
+      "command_type": "ScheduleReadCommand",
+      "help": "ID を指定してスケジュールを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.CommonServiceItem",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "list の出力で確認したリソース ID。"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "ScheduleCreateCommand",
+      "help": "実行スケジュールを作成します。StartsAt は Unix epoch ミリ秒の整数です。RecurringStep と RecurringUnit（min、hour、day）、または Crontab を指定します。周期は最短 1 分です。例: skr eventbus-api schedule create --request='{\"CommonServiceItem\":{\"Name\":\"daily\",\"Settings\":{\"ProcessConfigurationID\":\"PROCESS-CONFIGURATION-ID\",\"StartsAt\":1893456000000,\"RecurringStep\":1,\"RecurringUnit\":\"day\"}}}'",
+      "method": "Create",
+      "request_type": "v1.CreateCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.CommonServiceItem",
+      "request_help": "Settings は ProcessConfigurationID、StartsAt（Unix epoch ミリ秒の整数）、RecurringStep と RecurringUnit（min、hour、day）で指定します。RecurringStep/RecurringUnit の代わりに Crontab も指定できます。直接 JSON または @path.json。Provider は eventbusschedule に自動設定されます。",
+      "request_validator": "setScheduleProvider"
+    },
+    {
+      "name": "Update",
+      "command_type": "ScheduleUpdateCommand",
+      "help": "スケジュールを部分更新します。未指定項目は変更されません。Settings を更新する場合は ProcessConfigurationID と StartsAt、および周期または Crontab を含めます。",
+      "method": "Update",
+      "request_type": "v1.UpdateCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.CommonServiceItem",
+      "request_help": "変更する項目を含む UpdateCommonServiceItemRequest JSON。Settings は schedule 用の JSON オブジェクトです。直接 JSON または @path.json。Description を null にすると説明を消去します。",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新するスケジュール ID。"
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "ScheduleDeleteCommand",
+      "help": "ID を指定してスケジュールを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するリソース ID。list の出力で確認できます。"
+        }
+      ]
+    }
+  ]
+}
