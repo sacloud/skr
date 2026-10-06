@@ -38,7 +38,7 @@ func main() {
 }
 
 func generate(configPath, outputPath string) error {
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) // #nosec G304 -- The config path is explicitly provided by the local CLI user.
 	if err != nil {
 		return fmt.Errorf("read config %q: %w", configPath, err)
 	}
@@ -50,7 +50,7 @@ func generate(configPath, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(outputPath, source, 0o644); err != nil {
+	if err := os.WriteFile(outputPath, source, 0o644); err != nil { // #nosec G306 G703 -- The local user selects the output path; generated Go source is non-sensitive and must remain readable.
 		return fmt.Errorf("write generated Go file %q: %w", outputPath, err)
 	}
 	return nil
