@@ -10,6 +10,7 @@
 - [IaaS Zone API: ゾーン一覧を jq で加工する](tutorials/iaas-api/zone.md)
 - [SimpleMQ API: キューを作成してメッセージを送受信する](tutorials/simplemq-api.md)
 - [EventBus API: スイッチ作成イベントを SimpleMQ で受信する](tutorials/eventbus-api.md)
+- [AppRun Dedicated API: is1b にアプリケーションをデプロイする](tutorials/apprun-dedicated-api.md)
 - [HTTP API: `get_zone` でゾーン一覧を取得する](tutorials/http-request.md)
 
 ## 共通機能
