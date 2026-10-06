@@ -42,6 +42,7 @@ API コマンドの出力形式は `--output json`、`--output yaml`、`--output
 ## 利用者向けドキュメント
 
 [利用者向けドキュメント一覧](docs/manual/README.md)から、チュートリアルや共通機能の解説を確認できます。
+HTML 版は [GitHub Pages](https://sacloud.github.io/skr/) で公開しています。CLI の全サブコマンドのヘルプも一覧で確認できます。
 
 ## 開発
 
