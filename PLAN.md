@@ -79,7 +79,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 | 未対応 | `addon` |
 | 未対応 | `apigw` |
 | 未対応 | `apprun` |
-| 未対応 | `apprun-dedicated` |
+| 入口あり | `apprun-dedicated` — `apprun-dedicated-api` |
 | 未対応 | `cloudhsm` |
 | 未対応 | `dedicated-storage` |
 | 入口あり | `eventbus` — `eventbus-api` |

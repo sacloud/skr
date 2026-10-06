@@ -34,6 +34,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr eventbus-api process-configuration` | 実行設定の管理、実行先サービス用シークレットの登録 |
 | `skr eventbus-api schedule` | スケジュールの管理 |
 | `skr eventbus-api trigger` | イベントトリガーの管理 |
+| `skr apprun-dedicated-api` | AppRun 専有型のクラスタ、アプリケーション、ワーカノードなどの管理 |
 | `skr http <url>` | SDK の認証情報を使った任意の HTTPS エンドポイントへのリクエスト |
 | `skr config current` | 現在選択されているプロファイル名の確認 |
 
@@ -45,6 +46,7 @@ $ skr iaas-api disk --help
 $ skr iaas-api switch --help
 $ skr simplemq-api --help
 $ skr eventbus-api --help
+$ skr apprun-dedicated-api --help
 $ skr http --help
 ```
 
@@ -56,7 +58,7 @@ $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 
 
 ## 認証と出力
 
-IaaS API、EventBus API、SimpleMQ のキュー管理 API は、SDK のプロファイル、または
+IaaS API、EventBus API、SimpleMQ のキュー管理 API、AppRun Dedicated API は、SDK のプロファイル、または
 `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で認証します。SimpleMQ の
 メッセージ API では対象キューの API キーが必要です。キーは `--api-key-file` でファイルから
 読み込み、コマンドライン引数に直接含めないでください。
