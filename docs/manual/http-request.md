@@ -15,12 +15,12 @@ $ skr http 'https://API-HOST/PATH'
 $ skr http 'https://API-HOST/PATH' --method PATCH
 ```
 
-`--data`（`-d`）で本文を指定できます。値をそのまま渡す方法、`@ファイルパス` でファイルを読み込む方法、`-` で標準入力から読む方法があります。必要な `Content-Type` などの HTTP ヘッダーは `--header` で指定します。ヘッダーは複数指定できます。
+`--data`（`-d`）で本文を指定できます。値をそのまま渡す方法、`@ファイルパス` でファイルを読み込む方法、`-` で標準入力から読む方法があります。必要な `Content-Type` などの HTTP ヘッダーは `--header`（`-H`）で指定します。ヘッダーは複数指定できます。
 
 ```console
 $ skr http 'https://API-HOST/PATH' \
     --method POST \
-    --header 'Content-Type: application/json' \
+    -H 'Content-Type: application/json' \
     --data @request.json
 $ cat request.json | skr http 'https://API-HOST/PATH' --method POST --data -
 ```

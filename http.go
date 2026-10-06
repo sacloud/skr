@@ -39,7 +39,7 @@ type httpCommand struct {
 	URL    string   `arg:"" name:"url" help:"呼び出す HTTPS URL。指定したホストへ SDK の認証情報が送信されます。"`
 	Method string   `name:"method" short:"X" default:"GET" help:"HTTP メソッド。省略時は GET です。例: PATCH"`
 	Data   *string  `name:"data" short:"d" help:"リクエスト本文。文字列、@ファイルパス、または -（標準入力）を指定します。秘密情報を含む本文はファイルまたは標準入力で渡してください。"`
-	Header []string `name:"header" help:"追加する HTTP ヘッダー。'名前: 値' の形式で複数指定できます。"`
+	Header []string `name:"header" short:"H" help:"追加する HTTP ヘッダー。'名前: 値' の形式で複数指定できます。"`
 
 	doerFactory authenticatedHTTPDoerFactory
 }
