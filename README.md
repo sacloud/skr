@@ -11,6 +11,7 @@
 
 | コマンド | 操作できる API |
 | --- | --- |
+| `skr iaas-api server` | サーバの検索、参照、作成、更新、削除 |
 | `skr iaas-api switch` | スイッチの検索、参照、作成、更新、削除 |
 | `skr simplemq-api queue` | キューの管理、メッセージ数の確認、キュー内メッセージの削除 |
 | `skr simplemq-api message` | メッセージの送信、受信、タイムアウト延長、削除 |
@@ -26,6 +27,12 @@ $ skr --help
 $ skr iaas-api switch --help
 $ skr simplemq-api --help
 $ skr eventbus-api --help
+```
+
+Server creation requires a CPU/memory combination available in the target zone. Use a JSON `--request` file for array-based configuration. Confirm the target environment and pricing before creating a server ([server creation and deletion](https://manual.sakura.ad.jp/cloud/server/create-delete.html)).
+
+```console
+$ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1
 ```
 
 ## 認証と出力
