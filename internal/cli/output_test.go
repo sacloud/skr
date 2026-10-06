@@ -122,9 +122,85 @@ func TestIaaSSwitchOutputFormatAndProfileDefault(t *testing.T) {
 		t.Errorf("profile table headers start with %v, want ID Name Description", got[:min(3, len(got))])
 	}
 
+	queryOutput := runCommand("iaas-api", "switch", "read", "--zone", "test-zone", "--id", created.ID.String(), "--query", ".Name", "--output", "table")
+	if got := strings.TrimSpace(queryOutput); got != `"output-test"` {
+		t.Errorf("--query output = %q, want JSON string %q", got, `"output-test"`)
+	}
+
+	queryListOutput := runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone","Names":["output-test"]}`, "--query", ".[].Name")
+	if got := strings.TrimSpace(queryListOutput); got != `"output-test"` {
+		t.Errorf("--query list output = %q, want JSON string %q", got, `"output-test"`)
+	}
+
 	jsonOutput := runCommand("iaas-api", "switch", "read", "--zone", "test-zone", "--id", created.ID.String(), "--output", "json")
 	if !strings.HasPrefix(strings.TrimSpace(jsonOutput), "{") {
 		t.Errorf("--output json returned %q, want a JSON object", jsonOutput)
+	}
+}
+
+func TestQueryErrors(t *testing.T) {
+	commandLine := newCLI()
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"iaas-api", "switch", "read", "--zone", "test-zone", "--id", "1", "--query", "("}, &stdout, &stderr, commandLine); code == 0 {
+		t.Fatal("invalid --query expression succeeded")
+	}
+	if !strings.Contains(stderr.String(), "parse --query expression") {
+		t.Errorf("invalid --query error = %q, want parse error", stderr.String())
+	}
+}
+
+func TestWriteQueryOutput(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		expression string
+		value      any
+		want       string
+	}{
+		{
+			name:       "preserves large numbers",
+			expression: ".ID",
+			value:      map[string]any{"ID": json.Number("9007199254740993")},
+			want:       "9007199254740993\n",
+		},
+		{
+			name:       "writes multiple results",
+			expression: ".[]",
+			value:      []int{1, 2},
+			want:       "1\n2\n",
+		},
+		{
+			name:       "empty result",
+			expression: ".[]",
+			value:      []int{},
+			want:       "",
+		},
+		{
+			name:       "halt stops after previous results",
+			expression: `("before", halt, "after")`,
+			value:      map[string]any{},
+			want:       `"before"` + "\n",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			if err := writeQueryOutput(&output, test.expression, test.value); err != nil {
+				t.Fatal(err)
+			}
+			if got := output.String(); got != test.want {
+				t.Errorf("writeQueryOutput() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestWriteQueryOutputDoesNotWritePartialResultsOnError(t *testing.T) {
+	var output bytes.Buffer
+	err := writeQueryOutput(&output, `(.Name, error("query failed"))`, map[string]any{"Name": "example"})
+	if err == nil {
+		t.Fatal("writeQueryOutput() succeeded, want evaluation error")
+	}
+	if got := output.String(); got != "" {
+		t.Errorf("writeQueryOutput() wrote partial output %q", got)
 	}
 }
 

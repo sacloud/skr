@@ -30,6 +30,7 @@ type cli struct {
 	Trace       bool                 `name:"trace" help:"SDK の HTTP リクエストとレスポンスをトレースします。認証情報などが出力される場合があります。"`
 	Version     kong.VersionFlag     `name:"version" help:"Print version information and quit."`
 	Output      *string              `name:"output" enum:"json,yaml,table" help:"出力形式 (json、yaml、table)。未指定時はプロファイルの cli.default_output_type (v0: DefaultOutputType) を使います。"`
+	Query       *string              `name:"query" help:"jq 式で API の出力を加工します。指定時は --output を無視して JSON を出力します。"`
 	VersionCmd  versionCommand       `cmd:"" name:"version" help:"Print version information."`
 	Config      configCommand        `cmd:"" help:"Manage configuration profiles."`
 	IaaSAPI     iaasAPICommand       `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は --output で JSON、YAML、table の形式を選択できます。"`

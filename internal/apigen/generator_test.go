@@ -162,6 +162,41 @@ func TestGenerateValueRequestAndPositionalArguments(t *testing.T) {
 	}
 }
 
+func TestGenerateHandwrittenOnlyOperationsOmitFmtImport(t *testing.T) {
+	config := Config{
+		Package:     "zoneapi",
+		Resource:    "IaaS Zone",
+		CommandType: "Commands",
+		APIType:     "API",
+		FactoryType: "APIFactory",
+		RuntimeType: "Runtime",
+		Imports: map[string]string{
+			"iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+			"zone": "github.com/sacloud/sacloud-sdk-go/service/iaas/zone",
+		},
+		Operations: []Operation{{
+			Name:         "Find",
+			CommandType:  "FindCommand",
+			Help:         "ゾーン一覧を取得します。",
+			Method:       "FindWithContext",
+			RequestType:  "zone.FindRequest",
+			ResponseType: "[]*iaas.Zone",
+			Handwritten:  true,
+		}},
+	}
+
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if _, err := parser.ParseFile(token.NewFileSet(), "generated.go", source, parser.AllErrors); err != nil {
+		t.Fatalf("generated source does not parse: %v", err)
+	}
+	if strings.Contains(string(source), `"fmt"`) {
+		t.Fatal("generated source imports fmt without generated handlers")
+	}
+}
+
 func TestGenerateFactoryArgumentsAndNamedMethodArguments(t *testing.T) {
 	config := Config{
 		Package:     "exampleapi",

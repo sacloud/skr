@@ -5,6 +5,7 @@ go 1.27.1
 require (
 	github.com/alecthomas/kong v1.16.1
 	github.com/goccy/go-yaml v1.19.2
+	github.com/itchyny/gojq v0.12.19
 	github.com/sacloud/sacloud-sdk-go v0.3.0
 	github.com/sacloud/sakumock v0.12.0
 	github.com/yuin/goldmark v1.8.6
@@ -39,6 +40,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
+	github.com/itchyny/timefmt-go v0.1.8 // indirect
 	github.com/leodido/go-urn v1.5.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
