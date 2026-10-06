@@ -16,11 +16,11 @@
 
 AUTHOR                  ?= The sacloud/makefile Authors
 COPYRIGHT_YEAR          ?= 2026
-COPYRIGHT_FILES         ?= $$(find . -name "*.go" -print | grep -v "/vendor/")
 GO                      ?= go
 DEFAULT_GOALS           ?= fmt set-license go-licenses-check goimports lint vulncheck test
 GOLANG_CI_LINT_VERSION  ?= v2.14.0
 TEXTLINT_ACTION_VERSION ?= v0.1.0
+GO_LICENSES_PACKAGE     ?= .
 
 .DEFAULT_GOAL = default
 
@@ -85,7 +85,7 @@ set-license:
 .PHONY: go-licenses-check
 go-licenses-check:
 	@echo "running go-licenses..."
-	@go-licenses check .
+	@go-licenses check $(GO_LICENSES_PACKAGE)
 
 .PHONY: vulncheck
 vulncheck:

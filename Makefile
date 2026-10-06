@@ -6,6 +6,8 @@ BIN            ?= skr
 GO_FILES       ?= $(shell find . -name '*.go')
 GO_ENTRY_FILE  ?= ./cmd/skr
 GO_INSTALL_PACKAGE ?= ./cmd/skr
+COPYRIGHT_FILES ?= $$(find . -name "*.go" -print | grep -v "/vendor/" | grep -v "_generated\.go$$")
+GO_LICENSES_PACKAGE ?= ./...
 DOCS_OUTPUT    ?= _site
 
 include includes/go/common.mk
