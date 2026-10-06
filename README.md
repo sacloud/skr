@@ -48,6 +48,9 @@ API コマンドの出力形式は `--output json`、`--output yaml`、`--output
 省略時はプロファイルの `cli.default_output_type`（プロファイル v0 では `DefaultOutputType`）を
 使い、未設定の場合は JSON で出力します。
 
+SDK の HTTP リクエストとレスポンスは、コマンドの前に `--trace` を指定するとトレースできます。
+トレースには認証情報などが含まれる場合があるため、出力の取り扱いに注意してください。
+
 `skr http` は SDK のプロファイルまたは同じ環境変数を使って認証し、指定 URL のホストへリクエストを送ります。
 HTTPS URL のみ指定でき、レスポンス本文は加工せずに出力します。認証情報を送るため、信頼できる接続先だけを指定してください。
 使い方は[HTTP リクエストのガイド](docs/manual/http-request.md)を参照してください。

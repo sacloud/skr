@@ -26,6 +26,7 @@ import (
 )
 
 type cli struct {
+	Trace       bool                 `name:"trace" help:"SDK の HTTP リクエストとレスポンスをトレースします。認証情報などが出力される場合があります。"`
 	Output      *string              `name:"output" enum:"json,yaml,table" help:"出力形式 (json、yaml、table)。未指定時はプロファイルの cli.default_output_type (v0: DefaultOutputType) を使います。"`
 	Config      configCommand        `cmd:"" help:"Manage configuration profiles."`
 	IaaSAPI     iaasAPICommand       `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は --output で JSON、YAML、table の形式を選択できます。"`
@@ -59,8 +60,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return runCLI(args, stdout, stderr, newCLI())
 }
 
-func newCLI() cli {
-	result := cli{}
+func newCLI() *cli {
+	result := &cli{}
 	result.initIaaSAPI()
 	result.initEventbusAPI()
 	result.initSimpleMQAPI()
@@ -68,10 +69,10 @@ func newCLI() cli {
 	return result
 }
 
-func runCLI(args []string, stdout, stderr io.Writer, commandLine cli) int {
+func runCLI(args []string, stdout, stderr io.Writer, commandLine *cli) int {
 	exitCode := -1
 	parser, err := kong.New(
-		&commandLine,
+		commandLine,
 		kong.Name("skr"),
 		kong.Description("CLI for Sakura Cloud."),
 		kong.Writers(stdout, stderr),

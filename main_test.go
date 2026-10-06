@@ -72,6 +72,18 @@ func TestRunConfigCurrentWithoutSelection(t *testing.T) {
 	}
 }
 
+func TestRunTraceHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"--trace", "--help"}, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+	for _, text := range []string{"--trace", "認証情報"} {
+		if !strings.Contains(stdout.String(), text) {
+			t.Errorf("help output does not contain %q", text)
+		}
+	}
+}
+
 func TestRunEventbusAPIHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if exitCode := run([]string{"eventbus-api", "--help"}, &stdout, &stderr); exitCode != 0 {
