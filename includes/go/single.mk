@@ -17,13 +17,14 @@
 GO             ?= go
 BIN            ?= TODO_PLEASE_SET_BIN_VARIABLE
 GO_ENTRY_FILE  ?= main.go
+GO_INSTALL_PACKAGE ?= .
 GO_FILES       ?= $(shell find . -name '*.go')
 BUILD_LDFLAGS  ?=
 
 .PHONY: install
 install:
 	@echo "running 'go install'..."
-	$(GO) install
+	$(GO) install $(GO_INSTALL_PACKAGE)
 
 .PHONY: build
 build: $(BIN)

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package cli
 
 import (
 	"bytes"
@@ -26,6 +26,10 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	eventbusmock "github.com/sacloud/sakumock/eventbus"
 )
+
+func repositoryPath(path string) string {
+	return filepath.Join("..", "..", path)
+}
 
 func TestRunConfigCurrent(t *testing.T) {
 	profileDir := t.TempDir()

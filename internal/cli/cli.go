@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package cli
 
 import (
 	"fmt"
@@ -56,8 +56,12 @@ func (currentCommand) Run(ctx *kong.Context) error {
 	return err
 }
 
-func run(args []string, stdout, stderr io.Writer) int {
+func Run(args []string, stdout, stderr io.Writer) int {
 	return runCLI(args, stdout, stderr, newCLI())
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	return Run(args, stdout, stderr)
 }
 
 func newCLI() *cli {
@@ -99,8 +103,4 @@ func runCLI(args []string, stdout, stderr io.Writer, commandLine *cli) int {
 		return 1
 	}
 	return 0
-}
-
-func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }

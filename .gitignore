@@ -4,6 +4,7 @@ dist/
 _site/
 work/
 skr
+!/cmd/skr/
 /tmp/eventbus-api/
 /tmp/simplemq-api/
 /tmp/switch-api/
