@@ -6,6 +6,10 @@
 
 一覧は SDK の提供範囲を把握するためのもので、すべてのパッケージをそのまま CLI コマンドにすることを決めるものではありません。各パッケージで公開操作、入力、出力、固有の検証を確認し、対応範囲を明示して段階的に実装します。コマンドの階層は `<domain>-api <resource>` とし、SDK の型だけから公開操作や入力の意味を推測しません。詳細は [ADR 0016](docs/adr/0016-generate-low-level-api-commands.md) に従います。
 
+API コマンド生成器は、IaaS 用の `cmd/apigen-iaas` / `generate-iaas-api` と、IaaS 以外の Ogen 系 API 用の共通入口 `cmd/apigen-api` / `generate-api` を使います。EventBus、SimpleMQ などの Ogen 系 API は、サービスごとに生成器入口を増やさず、操作・引数・ヘルプを設定で明示して生成します。IaaS と Ogen 系 API は異なる SDK 形式に合わせて別の入口を維持し、共通化できる実装のみ共有します。入口があることは、そのドメインの全操作が CLI に実装済みであることを意味しません。
+
+SimpleMQ のキュー／メッセージ API コマンドは [`api/commands/simplemq-queue.json`](api/commands/simplemq-queue.json) と [`api/commands/simplemq-message.json`](api/commands/simplemq-message.json) を使って生成します。SDK 固有の入力補完や出力整形が必要な操作は手書きハンドラーに残します。
+
 ## IaaS リソース候補
 
 SDK のサービスパッケージごとに対応状況を管理します。`swytch` は `skr iaas-api switch` の入口が実装済みです。その他は未対応候補です。
@@ -89,7 +93,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 | 未対応 | `security-control` |
 | 未対応 | `service-endpoint-gateway` |
 | 未対応 | `simple-notification` |
-| 入口あり | `simplemq` — `simplemq-api` |
+| 入口あり | `simplemq` — `simplemq-api` (queue / message commands use `apigen-api`) |
 | 未対応 | `webaccel` |
 | 未対応 | `workflows` |
 

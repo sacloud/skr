@@ -1,0 +1,82 @@
+{
+  "package": "simplemqapi",
+  "resource": "SimpleMQ message",
+  "command_type": "MessageCommands",
+  "api_type": "MessageAPI",
+  "factory_type": "MessageAPIFactory",
+  "runtime_type": "MessageRuntime",
+  "factory_arguments": [
+    {
+      "name": "queue-name",
+      "field": "QueueName",
+      "type": "string",
+      "help": "対象キュー名 (5〜64文字の英数字またはハイフン)。",
+      "required": true
+    },
+    {
+      "name": "api-key-file",
+      "field": "APIKeyFile",
+      "type": "string",
+      "help": "キュー API キーのファイル。キーを直接引数に指定せず、- の場合は標準入力から読み込みます。",
+      "required": true
+    }
+  ],
+  "imports": {
+    "message": "github.com/sacloud/sacloud-sdk-go/api/simplemq/apis/v1/message"
+  },
+  "operations": [
+    {
+      "name": "Send",
+      "command_type": "MessageSendCommand",
+      "help": "キューへメッセージを送信します。",
+      "method": "Send",
+      "response_type": "*message.NewMessage",
+      "arguments": [
+        {
+          "name": "content",
+          "field": "Content",
+          "type": "string",
+          "help": "メッセージ本文。API 定義では英数字と + / = の文字で最大256000文字です。",
+          "flag": true,
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Receive",
+      "command_type": "MessageReceiveCommand",
+      "help": "キューからメッセージを受信します。",
+      "method": "Receive",
+      "response_type": "[]message.Message"
+    },
+    {
+      "name": "ExtendTimeout",
+      "command_type": "MessageExtendTimeoutCommand",
+      "help": "受信したメッセージの可視性タイムアウトを延長します。",
+      "method": "ExtendTimeout",
+      "response_type": "*message.Message",
+      "arguments": [
+        {
+          "name": "message-id",
+          "field": "MessageID",
+          "type": "string",
+          "help": "receive の出力にあるメッセージ ID。"
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "MessageDeleteCommand",
+      "help": "受信したメッセージを削除します。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "message-id",
+          "field": "MessageID",
+          "type": "string",
+          "help": "削除するメッセージ ID。"
+        }
+      ]
+    }
+  ]
+}

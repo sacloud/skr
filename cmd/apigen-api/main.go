@@ -23,7 +23,7 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "", "path to the IaaS API generator config")
+	configPath := flag.String("config", "", "path to the Ogen API generator config")
 	outputPath := flag.String("out", "", "path to the generated Go file")
 	flag.Parse()
 
