@@ -7,10 +7,10 @@
 ## コマンド
 
 ```text
-skr http <url> [--method <method>] [--header "name: value"]... [--data <value|@path|->]
+skr http <url> [--method <method>] [-H, --header "name: value"]... [--data <value|@path|->]
 ```
 
-`<url>` は絶対 HTTPS URL です。URL 内のユーザー情報とフラグメントは拒否します。`--method`（`-X`）は省略時 `GET` です。HTTP ヘッダーは `--header` で複数指定できます。`--data`（`-d`）はインラインの文字列、`@path` で読み込むファイル、`-` で読む標準入力です。
+`<url>` は絶対 HTTPS URL です。URL 内のユーザー情報とフラグメントは拒否します。`--method`（`-X`）は省略時 `GET` です。HTTP ヘッダーは `--header`（`-H`）で複数指定できます。`--data`（`-d`）はインラインの文字列、`@path` で読み込むファイル、`-` で読む標準入力です。
 
 ## 認証とリクエスト
 
