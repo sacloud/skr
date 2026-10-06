@@ -1,6 +1,6 @@
 # AppRun Dedicated API コマンド設計
 
-- Status: Implemented
+- Status: API commands implemented; live E2E and tutorial tracked in [#59](https://github.com/sacloud/skr/issues/59)
 - SDK: `github.com/sacloud/sacloud-sdk-go v0.3.0`
 - Related ADR: [ADR 0027](../adr/0027-apprun-dedicated-api-commands.md)
 
@@ -22,16 +22,7 @@
 
 `internal/cli/apprundedicated_test.go` は sakumock の AppRun Dedicated server に対して、クラスタ、オートスケーリンググループ、ワーカノード、ロードバランサ、証明書、アプリケーション、バージョンの実際の CLI パスを実行します。ヘルプ、ID の受け渡し、入力ファイル、更新と削除を検証します。
 
-ライブ E2E は `test/e2e/apprun-dedicated-api` にあります。利用者が指定する cluster、auto-scaling-group、version JSON を受け取り、固有名と `is1b` を runner 側で設定します。安全性のためワーカノード数とアプリケーション複製数は各 1 に固定します。実行確認には `--confirm-is1b-live` が必要です。runner は選択中プロファイルを確認し、名前衝突があれば中止します。クラスタ、グループ、アプリケーションの作成結果を ID と内容で読み戻し、バージョンを有効化してアプリケーション配置を確認します。今回作成したバージョン、アプリケーション、グループ、クラスタをこの順に削除し、削除後に各一覧から消えたことを検証します。
-
-実機実行には専用ワーカノード作成を伴い料金が発生します。ローカルの対象プロファイル、プロジェクト、サービスプリンシパル、リソース設定とイメージを確認し、承認を得てから実行します。実行前に `make build` と `./skr config current` を確認し、private evidence は `tmp/apprun-dedicated-api/` に保存します。証跡はアカウント固有の情報を含む可能性があるため共有・コミットしません。
-
-```console
-$ go test ./test/e2e/apprun-dedicated-api
-$ make build
-$ ./skr config current
-$ go run ./test/e2e/apprun-dedicated-api --skr ./skr --cluster-request /secure/cluster.json --auto-scaling-group-request /secure/group.json --version-request /secure/version.json --confirm-is1b-live
-```
+is1b のライブ E2E と利用者向けチュートリアルは未実装です。課金を伴うライブ検証の入力、実行、安全なクリーンアップを整え、確認済みの結果に基づいてチュートリアルを作成する作業を [#59](https://github.com/sacloud/skr/issues/59) で管理します。
 
 ## 根拠
 
