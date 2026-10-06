@@ -5,6 +5,20 @@
 > [!WARNING]
 > 🚧 **開発中バージョンです。** `skr` は現在開発中の CLI であり、コマンド、オプション、設定、入出力は変更されることがあります。利用前やアップデート前に、対象コマンドの `--help` と関連ドキュメントを確認してください。既存の `usacloud` との互換性は保証しません。
 
+## リリースの入手
+
+[GitHub Releases](https://github.com/sacloud/skr/releases) から、対象 OS・CPU 向けの ZIP ファイルと SHA-256 チェックサムを取得できます。
+バイナリは Linux（amd64、386、arm、arm64）、macOS（amd64、arm64）、Windows（amd64、386）向けに公開します。
+ZIP ファイルを展開し、`skr`（Windows では `skr.exe`）を PATH の通ったディレクトリに配置してください。
+
+コンテナイメージは `ghcr.io/sacloud/skr` で公開します。Linux の amd64 と arm64 に対応しています。
+バージョンを固定する場合は `v` 付きのリリースタグを指定してください。`latest` は最新の正式リリース、`dev` は `main` ブランチの開発版です。
+プレリリースでは `latest` を更新しません。Homebrew 向けの配布は行いません。
+
+```console
+$ docker run --rm ghcr.io/sacloud/skr:latest --help
+```
+
 ## コマンド
 
 現在利用できる主なコマンドは次のとおりです。
@@ -69,6 +83,9 @@ $ make build
 $ ./skr --help
 $ make test
 ```
+
+リリースは tagpr のリリース PR を `main` にマージすると開始します。
+GoReleaser によるバイナリ公開とコンテナイメージ公開の構成は、[リリース設計](docs/design/release.md)を参照してください。
 
 ## ライセンス
 
