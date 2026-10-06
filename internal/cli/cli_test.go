@@ -25,10 +25,28 @@ import (
 	v1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	eventbusmock "github.com/sacloud/sakumock/eventbus"
+	"github.com/sacloud/skr/version"
 )
 
 func repositoryPath(path string) string {
 	return filepath.Join("..", "..", path)
+}
+
+func TestRunVersion(t *testing.T) {
+	for _, args := range [][]string{{"version"}, {"--version"}} {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+				t.Fatalf("run(%v) exit code = %d, want 0; stderr: %s", args, exitCode, stderr.String())
+			}
+			if got, want := stdout.String(), version.FullVersion()+"\n"; got != want {
+				t.Errorf("stdout = %q, want %q", got, want)
+			}
+			if got := stderr.String(); got != "" {
+				t.Errorf("stderr = %q, want empty", got)
+			}
+		})
+	}
 }
 
 func TestRunConfigCurrent(t *testing.T) {
