@@ -62,6 +62,34 @@ func TestDiscoverCommandPathsWithoutCommands(t *testing.T) {
 	}
 }
 
+func TestRenderCommandBodyIncludesExpandCollapseControls(t *testing.T) {
+	got, err := renderCommandBody(commandPageData{
+		Groups: []commandGroup{{
+			Name: "config",
+			Items: []commandHelp{
+				{Path: "config", ID: "config", Help: "Configuration commands"},
+				{Path: "config current", ID: "config-current", Help: "Print current profile"},
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("renderCommandBody() error = %v", err)
+	}
+
+	for _, want := range []string{
+		`<button class="control-button" id="expand-all" type="button" aria-controls="command-groups">すべて展開</button>`,
+		`<button class="control-button" id="collapse-all" type="button" aria-controls="command-groups">すべて折りたたむ</button>`,
+		`const items = Array.from(document.querySelectorAll(".command-item"));`,
+		`for (const item of items) item.open = open;`,
+		`expandAll.addEventListener("click", () => setCommandsOpen(true));`,
+		`collapseAll.addEventListener("click", () => setCommandsOpen(false));`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("renderCommandBody() = %q, want it to contain %q", got, want)
+		}
+	}
+}
+
 func TestManualWebPath(t *testing.T) {
 	tests := []struct {
 		input string
