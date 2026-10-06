@@ -4,7 +4,8 @@ COPYRIGHT_YEAR ?= 2022-2026
 
 BIN            ?= skr
 GO_FILES       ?= $(shell find . -name '*.go')
-GO_ENTRY_FILE  ?= .
+GO_ENTRY_FILE  ?= ./cmd/skr
+GO_INSTALL_PACKAGE ?= ./cmd/skr
 DOCS_OUTPUT    ?= _site
 
 include includes/go/common.mk
@@ -31,5 +32,5 @@ docs-site:
 	@set -eu; \
 		tmp_dir=$$(mktemp -d); \
 		trap 'rm -f "$$tmp_dir/skr"; rmdir "$$tmp_dir"' EXIT; \
-		$(GO) build -o "$$tmp_dir/skr" .; \
+		$(GO) build -o "$$tmp_dir/skr" ./cmd/skr; \
 		$(GO) run ./cmd/docsite -cli "$$tmp_dir/skr" -manual docs/manual -out "$(DOCS_OUTPUT)"

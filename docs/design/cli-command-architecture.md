@@ -60,7 +60,7 @@ skr http <url> [--method ...] [--data ...]
 
 `skr iaas` の高レベル操作が必要になった場合は、SDK の API 操作を組み合わせる skr 内の service layer を実装し、それをコマンドから呼び出します。SDK の `service/iaas/<resource>` という配置を、そのまま `skr iaas` の実装境界とみなす設計ではありません。全リソースに同じ操作があるとは仮定せず、SDK の実際の操作とサービス上の意味を確認して公開範囲を決めます。
 
-ルートコマンドの初期化は `main.go` で行い、`iaas-api` のリソース登録と初期化は `iaas.go` にまとめます。各 IaaS リソースのコマンドと SDK クライアントはリソース専用ファイルに分け、別リソースを追加するときも Switch や EventBus のファイルを編集せずに登録できます。
+実行可能ファイルの入口は `cmd/skr/main.go` に置き、CLI のコマンド構成、IaaS の登録、出力処理などの実装とテストは `internal/cli/` にまとめます。各 IaaS リソースのコマンドと SDK クライアントはリソース専用パッケージに分け、別リソースを追加するときも Switch や EventBus のファイルを編集せずに登録できます。
 
 #### IaaS zone の共通仕様
 

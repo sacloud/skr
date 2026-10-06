@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package cli
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ import (
 )
 
 func TestServerGeneratedCodeMatchesConfig(t *testing.T) {
-	configData, err := os.ReadFile("api/commands/iaas-server.json")
+	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-server.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestServerGeneratedCodeMatchesConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := os.ReadFile("internal/iaas/serverapi/server_api_generated.go")
+	got, err := os.ReadFile(repositoryPath("internal/iaas/serverapi/server_api_generated.go"))
 	if err != nil {
 		t.Fatal(err)
 	}

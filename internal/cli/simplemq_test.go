@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package cli
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ func TestSimpleMQGeneratedCodeMatchesConfig(t *testing.T) {
 		{config: "api/commands/eventbus-schedule.json", output: "internal/eventbusapi/eventbus_schedule_api_generated.go"},
 		{config: "api/commands/eventbus-trigger.json", output: "internal/eventbusapi/eventbus_trigger_api_generated.go"},
 	} {
-		configData, err := os.ReadFile(test.config)
+		configData, err := os.ReadFile(repositoryPath(test.config))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,7 +52,7 @@ func TestSimpleMQGeneratedCodeMatchesConfig(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := os.ReadFile(test.output)
+		got, err := os.ReadFile(repositoryPath(test.output))
 		if err != nil {
 			t.Fatal(err)
 		}
