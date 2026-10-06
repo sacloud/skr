@@ -1,12 +1,11 @@
-before:
-  hooks:
-    - go mod tidy
+version: 2
+project_name: skr
 builds:
-  - env:
+  - main: ./cmd/skr
+    env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w
-      - -X github.com/sacloud/skr/version.Revision={{.ShortCommit}}
+      - -s -w -X github.com/sacloud/skr/version.Version={{.Version}} -X github.com/sacloud/skr/version.Revision={{.ShortCommit}}
     goos:
       - windows
       - linux
@@ -25,58 +24,15 @@ builds:
         goarch: arm
       - goos: windows
         goarch: arm64
-    binary: '{{ .ProjectName }}'
+    binary: skr
 archives:
-  - format: zip
+  - formats: [zip]
     name_template: '{{ .ProjectName }}_{{ .Os }}-{{ .Arch }}'
 changelog:
-  skip: false
   filters:
     exclude:
       - '^docs:'
-
-#---
-# 以下は必要に応じて
-#---
-
-#checksum:
-#  name_template: '{{ .ProjectName }}_SHA256SUMS'
-#  algorithm: sha256
-
-#signs:
-#  - artifacts: checksum
-#    args:
-#      - "--local-user"
-#      - "E37EC0B895A9AC27DC4919AB96CEB4B93D86849D"
-#      - "--output"
-#      - "${signature}"
-#      - "--detach-sign"
-#      - "${artifact}"
-#      -
-
-#release:
-#  draft: true
-
-#nfpms:
-#  - homepage: https://docs.usacloud.jp/skr
-#    file_name_template: "{{ .ProjectName }}_{{ .Os }}-{{ .Arch }}"
-#    maintainer: Usacloud <sacloud.users@gmail.com>
-#    description: CLI to manage to resources on the SAKURA Cloud
-#    license: Apache 2.0
-#    formats:
-#      - deb
-#      - rpm
-
-#brews:
-#  - tap:
-#      owner: sacloud
-#      name: homebrew-skr
-#      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-#    url_template: "https://github.com/sacloud/skr/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-#    commit_author:
-#      name: sacloud-bot
-#      email: sacloud.users@gmail.com
-#    homepage: "https://github.com/sacloud/skr"
-#    license: "Apache 2.0"
-#    test: |
-#      system "#{bin}/skr --version"
+checksum:
+  name_template: '{{ .ProjectName }}_SHA256SUMS'
+release:
+  prerelease: auto
