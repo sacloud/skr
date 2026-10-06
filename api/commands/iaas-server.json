@@ -1,0 +1,315 @@
+{
+  "package": "serverapi",
+  "resource": "IaaS Server",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "server": "github.com/sacloud/sacloud-sdk-go/service/iaas/server",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_type": "FindCommand",
+      "help": "サーバを検索して出力します。--zone all で全ゾーンを検索し、--count と --from は各ゾーンの検索に適用します。例: skr iaas-api server find --zone ZONE",
+      "method": "FindWithContext",
+      "request_type": "server.FindRequest",
+      "response_type": "[]*iaas.Server",
+      "request_validator": "validateServerFindRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数)、From (開始位置)。配列条件は JSON で指定します。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'",
+      "zone_search": {
+        "flag_field": "Zone",
+        "request_field": "Zone"
+      },
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。all を指定すると全ゾーンを検索します。JSON の --request では全ゾーン検索になりません。",
+          "required": true
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数 (整数)。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置 (整数)。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "ReadCommand",
+      "help": "サーバを読み取って出力します。例: skr iaas-api server read --zone ZONE --id 123456789012",
+      "method": "ReadWithContext",
+      "request_type": "server.ReadRequest",
+      "response_type": "*iaas.Server",
+      "request_validator": "validateServerReadRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (作成結果の数値)。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: サーバ ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "CreateCommand",
+      "help": "サーバを作成して出力します。--zone、--name、--cpu、--memory-gb のフラグ、または --request JSON で指定します。CPU とメモリは対象ゾーンで利用可能な組み合わせを指定してください。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1",
+      "method": "CreateWithContext",
+      "request_type": "server.CreateRequest",
+      "response_type": "*iaas.Server",
+      "request_validator": "validateServerCreateRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、CPU と MemoryGB (対象ゾーンで利用できるプランの組み合わせ)。任意フラグは Description、IconID、GPU、GPUModel、CPUModel、Commitment、Generation、ConfidentialVM、InterfaceDriver、CDROMID、PrivateHostID、BootAfterCreate です。Tags (文字列配列)、Disks、NetworkInterfaces、NoWait は JSON で指定します。NoWait はディスク作成時の待機設定で、BootAfterCreate が true の場合は指定できません。ディスクレス構成では Disks と NetworkInterfaces を省略できます。BootAfterCreate を true にすると作成後に起動します。CPU と MemoryGB の数値は例です。対象ゾーンで利用可能な組み合わせに置き換えてください。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"SERVER-NAME\",\"CPU\":1,\"MemoryGB\":1,\"Tags\":[\"example\"]}",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 作成先のゾーン名。",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "必須: サーバ名。",
+          "required": true
+        },
+        {
+          "name": "cpu",
+          "field": "CPU",
+          "type": "int",
+          "help": "必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。",
+          "required": true
+        },
+        {
+          "name": "memory-gb",
+          "field": "MemoryGB",
+          "type": "int",
+          "help": "必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。",
+          "required": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: サーバの説明 (最大512文字)。"
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコンの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "gpu",
+          "field": "GPU",
+          "type": "int",
+          "help": "任意: GPU 数。"
+        },
+        {
+          "name": "gpu-model",
+          "field": "GPUModel",
+          "type": "string",
+          "help": "任意: GPU モデル。"
+        },
+        {
+          "name": "cpu-model",
+          "field": "CPUModel",
+          "type": "string",
+          "help": "任意: CPU モデル。"
+        },
+        {
+          "name": "commitment",
+          "field": "Commitment",
+          "type": "string",
+          "help": "任意: CPU プランのコミットメント。standard または dedicatedcpu を指定します。",
+          "conversion": "types.ECommitment"
+        },
+        {
+          "name": "generation",
+          "field": "Generation",
+          "type": "int",
+          "help": "任意: サーバプラン世代 (0: 既定、100、200)。",
+          "conversion": "types.EPlanGeneration"
+        },
+        {
+          "name": "confidential-vm",
+          "field": "ConfidentialVM",
+          "type": "bool",
+          "help": "任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください (https://manual.sakura.ad.jp/cloud/server/confidential-vm-plan/about.html)。"
+        },
+        {
+          "name": "interface-driver",
+          "field": "InterfaceDriver",
+          "type": "string",
+          "help": "任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。",
+          "conversion": "types.EInterfaceDriver"
+        },
+        {
+          "name": "boot-after-create",
+          "field": "BootAfterCreate",
+          "type": "bool",
+          "help": "任意: true の場合、作成後にサーバを起動します。"
+        },
+        {
+          "name": "cdrom-id",
+          "field": "CDROMID",
+          "type": "int64",
+          "help": "任意: 作成時に挿入する CD-ROM イメージの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "private-host-id",
+          "field": "PrivateHostID",
+          "type": "int64",
+          "help": "任意: 接続先の専有ホスト ID (数値)。",
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "command_type": "UpdateCommand",
+      "help": "サーバの指定項目を更新して出力します。省略した項目は変更しません。CPU または MemoryGB の変更はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated",
+      "method": "UpdateWithContext",
+      "request_type": "server.UpdateRequest",
+      "response_type": "*iaas.Server",
+      "request_validator": "validateServerUpdateRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)、変更するフィールドを1つ以上。任意: Name、Description、Tags、IconID、CPU、MemoryGB、GPU、GPUModel、CPUModel、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID、NetworkInterfaces、Disks、NoWait、ForceShutdown。Tags、各 ID のクリア、列挙値、ディスク／ネットワーク設定には JSON を使用します。省略した項目は変更しません。CPU または MemoryGB を指定するとプランを変更します。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"Name\":\"updated\"}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 更新対象のサーバ ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 新しい名前。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 新しい説明。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "cpu",
+          "field": "CPU",
+          "type": "int",
+          "help": "任意: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。",
+          "pointer": true
+        },
+        {
+          "name": "memory-gb",
+          "field": "MemoryGB",
+          "type": "int",
+          "help": "任意: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。",
+          "pointer": true
+        },
+        {
+          "name": "gpu",
+          "field": "GPU",
+          "type": "int",
+          "help": "任意: GPU 数。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "gpu-model",
+          "field": "GPUModel",
+          "type": "string",
+          "help": "任意: GPU モデル。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "cpu-model",
+          "field": "CPUModel",
+          "type": "string",
+          "help": "任意: CPU モデル。未指定なら変更しません。",
+          "pointer": true
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "DeleteCommand",
+      "help": "サーバを削除します。成功時は出力しません。ディスクも削除する場合は --with-disks を指定します。例: skr iaas-api server delete --zone ZONE --id 123456789012",
+      "method": "DeleteWithContext",
+      "request_type": "server.DeleteRequest",
+      "request_validator": "validateServerDeleteRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: WithDisks (true の場合は接続中のディスクも削除)、FailIfNotFound (true の場合は対象がないとエラー。省略時はエラーにしない)、Force (起動中サーバを強制停止してから削除)。ディスクを残す場合は WithDisks を省略または false にします。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 削除対象のサーバ ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "with-disks",
+          "field": "WithDisks",
+          "type": "bool",
+          "help": "任意: true の場合、接続中のディスクも削除します。対象を確認してから指定してください。"
+        },
+        {
+          "name": "fail-if-not-found",
+          "field": "FailIfNotFound",
+          "type": "bool",
+          "help": "任意: 対象サーバが見つからない場合にエラーにします。"
+        },
+        {
+          "name": "force",
+          "field": "Force",
+          "type": "bool",
+          "help": "任意: 起動中の場合に強制停止してから削除します。"
+        }
+      ]
+    }
+  ]
+}
