@@ -25,7 +25,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/simplemq"
 	"github.com/sacloud/sacloud-sdk-go/api/simplemq/apis/v1/queue"
-	"github.com/sacloud/sacloud-sdk-go/common/saclient"
+	clientconfig "github.com/sacloud/skr/internal/saclient"
 )
 
 type Commands struct {
@@ -263,19 +263,19 @@ func requestData(input string) ([]byte, error) {
 	return []byte(input), nil
 }
 
-func NewQueueAPI() (QueueAPI, error) {
-	var client saclient.Client
-	if err := client.SetEnviron(os.Environ()); err != nil {
+func NewQueueAPI(trace bool) (QueueAPI, error) {
+	client, err := clientconfig.New(trace)
+	if err != nil {
 		return nil, err
 	}
-	queueClient, err := simplemq.NewQueueClient(&client)
+	queueClient, err := simplemq.NewQueueClient(client)
 	if err != nil {
 		return nil, err
 	}
 	return simplemq.NewQueueOp(queueClient), nil
 }
 
-func NewMessageAPI(queueName, apiKeyFile string) (MessageAPI, error) {
+func NewMessageAPI(queueName, apiKeyFile string, trace bool) (MessageAPI, error) {
 	data, err := readSecretFile(apiKeyFile)
 	if err != nil {
 		return nil, err
@@ -285,11 +285,11 @@ func NewMessageAPI(queueName, apiKeyFile string) (MessageAPI, error) {
 		return nil, fmt.Errorf("API key file is empty")
 	}
 
-	var client saclient.Client
-	if err := client.SetEnviron(os.Environ()); err != nil {
+	client, err := clientconfig.New(trace)
+	if err != nil {
 		return nil, err
 	}
-	messageClient, err := simplemq.NewMessageClient(apiKey, &client)
+	messageClient, err := simplemq.NewMessageClient(apiKey, client)
 	if err != nil {
 		return nil, err
 	}

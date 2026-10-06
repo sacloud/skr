@@ -12,17 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package saclient
 
 import (
-	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	clientconfig "github.com/sacloud/skr/internal/saclient"
+	"os"
+
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
-func New(trace bool) (*iaas.Client, error) {
-	client, err := clientconfig.New(trace)
-	if err != nil {
+func New(trace bool) (*saclient.Client, error) {
+	var client saclient.Client
+	if err := client.SetEnviron(os.Environ()); err != nil {
 		return nil, err
 	}
-	return iaas.NewClientFromSaclient(client), nil
+	if trace {
+		if err := client.SetWith(saclient.WithTraceMode("all")); err != nil {
+			return nil, err
+		}
+	}
+	return &client, nil
 }

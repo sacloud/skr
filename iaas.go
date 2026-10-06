@@ -38,13 +38,15 @@ func (c *cli) initIaaSAPI() {
 		ValidateRequest: switchresource.ValidateRequest,
 	})
 	c.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
-		client, err := iaasclient.New()
+		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
 		}
 		return swytch.New(client), nil
 	})
-	c.IaaSAPI.Switch.SetZoneFactory(iaaszones.New)
+	c.IaaSAPI.Switch.SetZoneFactory(func() (iaaszones.API, error) {
+		return iaaszones.New(c.Trace)
+	})
 
 	c.IaaSAPI.Server.SetRuntime(serverapi.Runtime{
 		DecodeRequest:   decodeRequest,
@@ -53,11 +55,13 @@ func (c *cli) initIaaSAPI() {
 		ValidateRequest: serverresource.ValidateRequest,
 	})
 	c.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) {
-		client, err := iaasclient.New()
+		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
 		}
 		return serverSDK.New(client), nil
 	})
-	c.IaaSAPI.Server.SetZoneFactory(iaaszones.New)
+	c.IaaSAPI.Server.SetZoneFactory(func() (iaaszones.API, error) {
+		return iaaszones.New(c.Trace)
+	})
 }

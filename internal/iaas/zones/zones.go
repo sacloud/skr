@@ -31,8 +31,8 @@ type API interface {
 
 type Factory func() (API, error)
 
-func New() (API, error) {
-	client, err := iaasclient.New()
+func New(trace bool) (API, error) {
+	client, err := iaasclient.New(trace)
 	if err != nil {
 		return nil, err
 	}

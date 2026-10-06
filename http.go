@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/sacloud/sacloud-sdk-go/common/saclient"
+	skrSaclient "github.com/sacloud/skr/internal/saclient"
 )
 
 type authenticatedHTTPDoer interface {
@@ -45,15 +45,17 @@ type httpCommand struct {
 }
 
 func (c *cli) initHTTP() {
-	c.HTTP.doerFactory = newAuthenticatedHTTPDoer
+	c.HTTP.doerFactory = func() (authenticatedHTTPDoer, error) {
+		return newAuthenticatedHTTPDoer(c.Trace)
+	}
 }
 
-func newAuthenticatedHTTPDoer() (authenticatedHTTPDoer, error) {
-	var client saclient.Client
-	if err := client.SetEnviron(os.Environ()); err != nil {
+func newAuthenticatedHTTPDoer(trace bool) (authenticatedHTTPDoer, error) {
+	client, err := skrSaclient.New(trace)
+	if err != nil {
 		return nil, err
 	}
-	return &client, nil
+	return client, nil
 }
 
 func (c *httpCommand) Run(ctx *kong.Context) error {

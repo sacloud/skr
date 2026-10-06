@@ -36,9 +36,15 @@ func (c *cli) initEventbusAPI() {
 		ValidateRequest: eventbusapi.ValidateRequest,
 	}
 	c.EventbusAPI.ProcessConfiguration.SetRuntime(processConfigurationRuntime)
-	c.EventbusAPI.ProcessConfiguration.SetFactory(eventbusapi.NewProcessConfigurationAPI)
+	c.EventbusAPI.ProcessConfiguration.SetFactory(func() (eventbusapi.ProcessConfigurationAPI, error) {
+		return eventbusapi.NewProcessConfigurationAPI(c.Trace)
+	})
 	c.EventbusAPI.Schedule.SetRuntime(scheduleRuntime)
-	c.EventbusAPI.Schedule.SetFactory(eventbusapi.NewScheduleAPI)
+	c.EventbusAPI.Schedule.SetFactory(func() (eventbusapi.ScheduleAPI, error) {
+		return eventbusapi.NewScheduleAPI(c.Trace)
+	})
 	c.EventbusAPI.Trigger.SetRuntime(triggerRuntime)
-	c.EventbusAPI.Trigger.SetFactory(eventbusapi.NewTriggerAPI)
+	c.EventbusAPI.Trigger.SetFactory(func() (eventbusapi.TriggerAPI, error) {
+		return eventbusapi.NewTriggerAPI(c.Trace)
+	})
 }

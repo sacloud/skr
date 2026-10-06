@@ -12,17 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package saclient
 
-import (
-	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	clientconfig "github.com/sacloud/skr/internal/saclient"
-)
+import "testing"
 
-func New(trace bool) (*iaas.Client, error) {
-	client, err := clientconfig.New(trace)
+func TestNewTraceMode(t *testing.T) {
+	t.Setenv("SAKURACLOUD_TRACE", "error")
+
+	client, err := New(false)
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
-	return iaas.NewClientFromSaclient(client), nil
+	if got := client.JSON()["TraceMode"]; got != "error" {
+		t.Errorf("TraceMode without --trace = %v, want error from environment", got)
+	}
+
+	client, err = New(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := client.JSON()["TraceMode"]; got != "all" {
+		t.Errorf("TraceMode with --trace = %v, want all", got)
+	}
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/eventbus"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
-	"github.com/sacloud/sacloud-sdk-go/common/saclient"
+	clientconfig "github.com/sacloud/skr/internal/saclient"
 )
 
 type Commands struct {
@@ -61,24 +61,24 @@ func (c *ProcessConfigurationUpdateSecretCommand) Run(_ *kong.Context) error {
 	return op.UpdateSecret(context.Background(), c.ID, request)
 }
 
-func NewProcessConfigurationAPI() (ProcessConfigurationAPI, error) {
-	client, err := newClient()
+func NewProcessConfigurationAPI(trace bool) (ProcessConfigurationAPI, error) {
+	client, err := newClient(trace)
 	if err != nil {
 		return nil, err
 	}
 	return eventbus.NewProcessConfigurationOp(client), nil
 }
 
-func NewScheduleAPI() (ScheduleAPI, error) {
-	client, err := newClient()
+func NewScheduleAPI(trace bool) (ScheduleAPI, error) {
+	client, err := newClient(trace)
 	if err != nil {
 		return nil, err
 	}
 	return eventbus.NewScheduleOp(client), nil
 }
 
-func NewTriggerAPI() (TriggerAPI, error) {
-	client, err := newClient()
+func NewTriggerAPI(trace bool) (TriggerAPI, error) {
+	client, err := newClient(trace)
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +167,12 @@ func requestData(input string) ([]byte, error) {
 	return []byte(input), nil
 }
 
-func newClient() (*v1.Client, error) {
-	var client saclient.Client
-	if err := client.SetEnviron(os.Environ()); err != nil {
+func newClient(trace bool) (*v1.Client, error) {
+	client, err := clientconfig.New(trace)
+	if err != nil {
 		return nil, err
 	}
-	return eventbus.NewClient(&client)
+	return eventbus.NewClient(client)
 }
 
 func readSecretFile(path string) ([]byte, error) {

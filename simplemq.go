@@ -22,10 +22,14 @@ func (c *cli) initSimpleMQAPI() {
 		OutputType:    outputType,
 		WriteOutput:   writeOutputWithFormat,
 	})
-	c.SimpleMQAPI.Queue.SetFactory(simplemqapi.NewQueueAPI)
+	c.SimpleMQAPI.Queue.SetFactory(func() (simplemqapi.QueueAPI, error) {
+		return simplemqapi.NewQueueAPI(c.Trace)
+	})
 	c.SimpleMQAPI.Message.SetRuntime(simplemqapi.MessageRuntime{
 		OutputType:  outputType,
 		WriteOutput: writeOutputWithFormat,
 	})
-	c.SimpleMQAPI.Message.SetFactory(simplemqapi.NewMessageAPI)
+	c.SimpleMQAPI.Message.SetFactory(func(queueName, apiKeyFile string) (simplemqapi.MessageAPI, error) {
+		return simplemqapi.NewMessageAPI(queueName, apiKeyFile, c.Trace)
+	})
 }
