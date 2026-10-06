@@ -18,6 +18,7 @@
 | `skr eventbus-api process-configuration` | 実行設定の管理、実行先サービス用シークレットの登録 |
 | `skr eventbus-api schedule` | スケジュールの管理 |
 | `skr eventbus-api trigger` | イベントトリガーの管理 |
+| `skr http <url>` | SDK の認証情報を使った任意の HTTPS エンドポイントへのリクエスト |
 | `skr config current` | 現在選択されているプロファイル名の確認 |
 
 コマンドの一覧と使い方は、`skr --help` または各コマンドの `--help` で確認できます。
@@ -27,6 +28,7 @@ $ skr --help
 $ skr iaas-api switch --help
 $ skr simplemq-api --help
 $ skr eventbus-api --help
+$ skr http --help
 ```
 
 Server creation requires a CPU/memory combination available in the target zone. Use a JSON `--request` file for array-based configuration. Confirm the target environment and pricing before creating a server ([server creation and deletion](https://manual.sakura.ad.jp/cloud/server/create-delete.html)).
@@ -45,6 +47,10 @@ IaaS API、EventBus API、SimpleMQ のキュー管理 API は、SDK のプロフ
 API コマンドの出力形式は `--output json`、`--output yaml`、`--output table` で選択できます。
 省略時はプロファイルの `cli.default_output_type`（プロファイル v0 では `DefaultOutputType`）を
 使い、未設定の場合は JSON で出力します。
+
+`skr http` は SDK のプロファイルまたは同じ環境変数を使って認証し、指定 URL のホストへリクエストを送ります。
+HTTPS URL のみ指定でき、レスポンス本文は加工せずに出力します。認証情報を送るため、信頼できる接続先だけを指定してください。
+使い方は[HTTP リクエストのガイド](docs/manual/http-request.md)を参照してください。
 
 ## 利用者向けドキュメント
 

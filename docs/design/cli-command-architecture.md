@@ -14,14 +14,18 @@ skr では、SDK の API 操作を直接実行する低レベルコマンドと�
 ```text
 skr <domain>-api <resource> <sdk-operation> ...
 skr <domain> <workflow-or-resource> <operation> ...
+skr http <url> [--method ...] [--data ...]
 ```
 
 | 階層 | 例 | 役割 |
 | --- | --- | --- |
 | 低レベル API | `skr iaas-api ...`、`skr eventbus-api ...` | SDK の公開 API 操作を直接実行します。SDK のリソース、操作名、入力モデル、戻り値を基本的にそのまま公開します。 |
 | 高レベル | `skr iaas ...`、`skr event ...` | skr 内の service layer をコマンドから利用し、SDK の複数の API 操作を作業単位として提供します。定義ファイル、差分表示、適用、状態確認などを必要に応じて実装します。 |
+| 認証付き HTTP | `skr http <url>` | SDK の認証を利用して任意の HTTPS URL へ直接リクエストを送り、レスポンス本文をそのまま出力します。 |
 
 `iaas-api` と `eventbus-api` は、API を直接操作したい利用者やスクリプト向けです。`iaas` と `event` は、実施手順や複数リソース間の関係をコマンド側で扱いたい利用者向けです。同じリソースを扱う場合でも、低レベルコマンドは SDK 操作の薄い入口、高レベルコマンドは明示的に設計したワークフローとして責務を分けます。
+
+`http` は、SDK に対応する API 操作がまだない場合の低レベルな入口です。SDK の認証付き HTTP クライアントへ利用者が指定した HTTPS URL とリクエストを渡します。SDK 対応済みの操作には、サービス固有の型や検証を提供する低レベル API コマンドを優先します。詳細は[認証付き HTTP リクエストコマンドの設計](http-command.md)に記録します。
 
 ## 低レベル API コマンド
 

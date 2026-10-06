@@ -7,4 +7,5 @@ skr
 /tmp/eventbus-api/
 /tmp/simplemq-api/
 /tmp/switch-api/
+/tmp/http-api/
 ./tmp/
