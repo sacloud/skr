@@ -15,9 +15,12 @@
 package cli
 
 import (
+	diskSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
+	diskresource "github.com/sacloud/skr/internal/iaas/disk"
+	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
 	serverresource "github.com/sacloud/skr/internal/iaas/server"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
 	switchresource "github.com/sacloud/skr/internal/iaas/switch"
@@ -26,11 +29,29 @@ import (
 )
 
 type iaasAPICommand struct {
+	Disk   diskapi.Commands   `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。find は --zone all で全ゾーンを検索できます。"`
 	Switch switchapi.Commands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。find は --zone all で全ゾーンを検索できます。両経路は併用できません。"`
 	Server serverapi.Commands `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、削除します。作成や複雑な構成には --request JSON を使用します。find は --zone all で全ゾーンを検索できます。"`
 }
 
 func (c *cli) initIaaSAPI() {
+	c.IaaSAPI.Disk.SetRuntime(diskapi.Runtime{
+		DecodeRequest:   decodeRequest,
+		OutputType:      outputType,
+		WriteOutput:     writeOutputWithFormat,
+		ValidateRequest: diskresource.ValidateRequest,
+	})
+	c.IaaSAPI.Disk.SetFactory(func() (diskapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return diskSDK.New(client), nil
+	})
+	c.IaaSAPI.Disk.SetZoneFactory(func() (iaaszones.API, error) {
+		return iaaszones.New(c.Trace)
+	})
+
 	c.IaaSAPI.Switch.SetRuntime(switchapi.Runtime{
 		DecodeRequest:   decodeRequest,
 		OutputType:      outputType,

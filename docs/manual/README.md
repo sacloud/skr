@@ -4,6 +4,7 @@
 
 ## チュートリアル
 
+- [IaaS Disk API: ディスクを作成・確認・削除する](tutorials/iaas-api/disk.md)
 - [IaaS Server API: サーバを作成・確認・削除する](tutorials/iaas-api/server.md)
 - [IaaS Switch API: Sandbox でスイッチの管理手順を確認する](tutorials/iaas-api/switch.md)
 - [SimpleMQ API: キューを作成してメッセージを送受信する](tutorials/simplemq-api.md)

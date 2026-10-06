@@ -25,6 +25,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 
 | コマンド | 操作できる API |
 | --- | --- |
+| `skr iaas-api disk` | ディスクの検索、参照、作成、更新、削除 |
 | `skr iaas-api server` | サーバの検索、参照、作成、更新、削除 |
 | `skr iaas-api switch` | スイッチの検索、参照、作成、更新、削除 |
 | `skr simplemq-api queue` | キューの管理、メッセージ数の確認、キュー内メッセージの削除 |
@@ -39,6 +40,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 
 ```console
 $ skr --help
+$ skr iaas-api disk --help
 $ skr iaas-api switch --help
 $ skr simplemq-api --help
 $ skr eventbus-api --help
