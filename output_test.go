@@ -24,6 +24,7 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
+	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
 )
 
@@ -85,7 +86,7 @@ func TestIaaSSwitchOutputFormatAndProfileDefault(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	commandLine := newCLI()
-	commandLine.IaaSAPI.Switch.setFactory(func() (switchAPI, error) {
+	commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
 		return swytch.New(server), nil
 	})
 	runCommand := func(args ...string) string {

@@ -12,29 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package zones
 
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
+	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 )
 
-const allIaaSZones = "all"
+const All = "all"
 
-type iaasZoneAPI interface {
+type API interface {
 	FindWithContext(context.Context, *zone.FindRequest) ([]*iaas.Zone, error)
 }
 
-type iaasZoneAPIFactory func() (iaasZoneAPI, error)
+type Factory func() (API, error)
 
-func findInAllIaaSZones[T any](
+func New() (API, error) {
+	client, err := iaasclient.New()
+	if err != nil {
+		return nil, err
+	}
+	return zone.New(client), nil
+}
+
+func FindInAll[T any](
 	ctx context.Context,
-	newZoneAPI iaasZoneAPIFactory,
+	newZoneAPI Factory,
 	find func(context.Context, string) ([]T, error),
 ) ([]T, error) {
 	if newZoneAPI == nil {
@@ -63,25 +70,9 @@ func findInAllIaaSZones[T any](
 	return result, nil
 }
 
-func validateSingleIaaSZone(zone string) error {
-	if zone == allIaaSZones {
-		return fmt.Errorf("Zone が %q の場合は find のみ対応しています", allIaaSZones)
+func ValidateSingleZone(zone string) error {
+	if zone == All {
+		return fmt.Errorf("Zone が %q の場合は find のみ対応しています", All)
 	}
 	return nil
-}
-
-func newIaaSClient() (*iaas.Client, error) {
-	var client saclient.Client
-	if err := client.SetEnviron(os.Environ()); err != nil {
-		return nil, err
-	}
-	return iaas.NewClientFromSaclient(&client), nil
-}
-
-func newIaaSZoneAPI() (iaasZoneAPI, error) {
-	client, err := newIaaSClient()
-	if err != nil {
-		return nil, err
-	}
-	return zone.New(client), nil
 }

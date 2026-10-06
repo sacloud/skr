@@ -1,0 +1,241 @@
+{
+  "package": "switchapi",
+  "resource": "IaaS Switch",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types",
+    "swytch": "github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_type": "FindCommand",
+      "help": "スイッチを検索して出力します。--zone all で全ゾーンを検索できます。例: skr iaas-api switch find --zone ZONE",
+      "method": "FindWithContext",
+      "request_type": "swytch.FindRequest",
+      "response_type": "[]*iaas.Switch",
+      "request_validator": "validateSwitchFindRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数の整数)、From (開始位置の整数)。Sort の要素は Key (API のソート対象フィールド名) と Order (0: 昇順、1: 降順) を持つオブジェクトです。有効な Key は対象 API の仕様で確認してください。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'",
+      "zone_search": {
+        "flag_field": "Zone",
+        "request_field": "Zone"
+      },
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。all を指定すると全ゾーンを検索します。例: --zone tk1v または --zone all",
+          "required": true
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数 (整数)。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置 (整数)。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "ReadCommand",
+      "help": "スイッチを読み取って出力します。例: skr iaas-api switch read --zone ZONE --id 123456789012",
+      "method": "ReadWithContext",
+      "request_type": "swytch.ReadRequest",
+      "response_type": "*iaas.Switch",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (作成結果にある数値)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "request_validator": "validateSwitchReadRequest",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 作成結果の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "CreateCommand",
+      "help": "スイッチを作成して出力します。例: skr iaas-api switch create --zone ZONE --name example",
+      "method": "CreateWithContext",
+      "request_type": "swytch.CreateRequest",
+      "response_type": "*iaas.Switch",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)。任意: Description (説明、最大512文字)、Tags (タグの文字列配列、フラグでは指定不可)、IconID (数値)、NetworkMaskLen (整数)、DefaultRoute (文字列)。例: --request='{\"Zone\":\"tk1v\",\"Name\":\"example\",\"Tags\":[\"test\"]}'",
+      "request_validator": "validateSwitchCreateRequest",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 作成先のゾーン名。",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "必須: スイッチの名前。",
+          "required": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 説明 (最大512文字)。"
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコンの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "network-mask-len",
+          "field": "NetworkMaskLen",
+          "type": "int",
+          "help": "任意: ネットワークマスク長 (整数)。"
+        },
+        {
+          "name": "default-route",
+          "field": "DefaultRoute",
+          "type": "string",
+          "help": "任意: デフォルトルート (文字列)。"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "command_type": "UpdateCommand",
+      "help": "指定項目だけを更新して出力します。例: skr iaas-api switch update --zone ZONE --id 123456789012 --name updated",
+      "method": "UpdateWithContext",
+      "request_type": "swytch.UpdateRequest",
+      "response_type": "*iaas.Switch",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Name (名前)、Description (説明、最大512文字)、Tags (タグの文字列配列、フラグでは指定不可)、IconID (数値)、NetworkMaskLen (整数)、DefaultRoute (文字列)。省略した項目は変更しません。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012,\"Tags\":[\"test\"]}'。ID は実際の値に置き換えます。",
+      "request_validator": "validateSwitchUpdateRequest",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 更新対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 新しい名前。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 新しい説明 (最大512文字)。空文字列も指定できます。",
+          "pointer": true
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコンの ID (数値)。",
+          "pointer": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "network-mask-len",
+          "field": "NetworkMaskLen",
+          "type": "int",
+          "help": "任意: ネットワークマスク長 (整数)。0 も明示できます。",
+          "pointer": true
+        },
+        {
+          "name": "default-route",
+          "field": "DefaultRoute",
+          "type": "string",
+          "help": "任意: デフォルトルート (文字列)。空文字列も指定できます。",
+          "pointer": true
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "DeleteCommand",
+      "help": "スイッチを削除します。成功時は出力しません。例: skr iaas-api switch delete --zone ZONE --id 123456789012",
+      "method": "DeleteWithContext",
+      "request_type": "swytch.DeleteRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: FailIfNotFound (真偽値)、WaitForRelease (真偽値)、WaitForReleaseTimeout (秒の整数)、WaitForReleaseTick (秒の整数)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
+      "request_validator": "validateSwitchDeleteRequest",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 削除対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "fail-if-not-found",
+          "field": "FailIfNotFound",
+          "type": "bool",
+          "help": "任意: 対象が見つからない場合にエラーにします (真偽値)。"
+        },
+        {
+          "name": "wait-for-release",
+          "field": "WaitForRelease",
+          "type": "bool",
+          "help": "任意: 他リソースから参照されている間は削除を待ちます (真偽値)。"
+        },
+        {
+          "name": "wait-for-release-timeout",
+          "field": "WaitForReleaseTimeout",
+          "type": "int",
+          "help": "任意: 待機のタイムアウト (秒の整数、既定3600秒)。"
+        },
+        {
+          "name": "wait-for-release-tick",
+          "field": "WaitForReleaseTick",
+          "type": "int",
+          "help": "任意: 待機時の確認間隔 (秒の整数、既定5秒)。"
+        }
+      ]
+    }
+  ]
+}

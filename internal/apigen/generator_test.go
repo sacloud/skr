@@ -1,0 +1,192 @@
+// Copyright 2022-2026 The sacloud/skr Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package apigen
+
+import (
+	"go/parser"
+	"go/token"
+	"strings"
+	"testing"
+)
+
+func TestGenerate(t *testing.T) {
+	config := Config{
+		Package:     "main",
+		Resource:    "switch",
+		CommandType: "switchCommands",
+		APIType:     "switchAPI",
+		FactoryType: "switchAPIFactory",
+		RuntimeType: "switchAPIRuntime",
+		Imports: map[string]string{
+			"swytch": "github.com/sacloud/sacloud-sdk-go/service/iaas/swytch",
+		},
+		Operations: []Operation{
+			{
+				Name:         "Find",
+				CommandType:  "switchFindCommand",
+				Help:         "Find `switches`.",
+				Method:       "FindWithContext",
+				RequestType:  "swytch.FindRequest",
+				ResponseType: "[]string",
+				Handwritten:  true,
+			},
+			{
+				Name:         "Search",
+				CommandType:  "switchSearchCommand",
+				Help:         "Search with generated flags.",
+				Method:       "SearchWithContext",
+				RequestType:  "swytch.FindRequest",
+				ResponseType: "[]string",
+				ZoneSearch:   &ZoneSearch{FlagField: "Zone", RequestField: "Zone"},
+				Flags: []Flag{
+					{Name: "zone", Field: "Zone", Type: "string", Help: "Target `zone`.", Required: true},
+					{Name: "count", Field: "Count", Type: "int", Help: "Maximum results.", Pointer: true},
+				},
+			},
+			{
+				Name:             "Delete",
+				CommandType:      "switchDeleteCommand",
+				Help:             "Delete a switch.",
+				Method:           "DeleteWithContext",
+				RequestType:      "swytch.DeleteRequest",
+				RequestValidator: "validateSwitchDeleteRequest",
+			},
+			{
+				Name:         "Version",
+				CommandType:  "switchVersionCommand",
+				Help:         "Print the API version.",
+				Method:       "VersionWithContext",
+				ResponseType: "string",
+			},
+		},
+	}
+
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if _, err := parser.ParseFile(token.NewFileSet(), "generated.go", source, parser.AllErrors); err != nil {
+		t.Fatalf("generated source does not parse: %v", err)
+	}
+
+	for _, want := range []string{
+		"FindWithContext(context.Context, *swytch.FindRequest) ([]string, error)",
+		"SearchWithContext(context.Context, *swytch.FindRequest) ([]string, error)",
+		"DeleteWithContext(context.Context, *swytch.DeleteRequest) error",
+		"VersionWithContext(context.Context) (string, error)",
+		"--request と個別フラグは併用できません",
+		"if c.Count != nil",
+		"request.Count = c.Count",
+		"if c.Zone == nil",
+		"request.Zone = *c.Zone",
+		"c.runtime.WriteOutput(ctx, format, result)",
+		"return op.DeleteWithContext(context.Background(), request)",
+		"ValidateRequest(\"validateSwitchDeleteRequest\", request)",
+		"switchFindCommand",
+		"zones.FindInAll(context.Background(), c.zoneFactory",
+		"zoneRequest.Zone = zone",
+		"c.Request == nil",
+	} {
+		if !strings.Contains(string(source), want) {
+			t.Errorf("generated source does not contain %q", want)
+		}
+	}
+	if strings.Contains(string(source), "type switchFindCommand struct") {
+		t.Fatal("handwritten operation command was generated")
+	}
+
+	second, err := Generate(config)
+	if err != nil {
+		t.Fatalf("second Generate() error = %v", err)
+	}
+	if string(source) != string(second) {
+		t.Fatal("Generate() output is not deterministic")
+	}
+}
+
+func TestDecodeConfigRejectsUnknownFieldsAndTrailingJSON(t *testing.T) {
+	for _, input := range []string{
+		`{"package":"main","unexpected":true}`,
+		`{"package":"main"} {}`,
+	} {
+		if _, err := DecodeConfig([]byte(input)); err == nil {
+			t.Errorf("DecodeConfig(%q) succeeded; want error", input)
+		}
+	}
+}
+
+func TestValidateRejectsUnsupportedFlagsAndDuplicateNames(t *testing.T) {
+	config := Config{
+		Package:     "main",
+		Resource:    "switch",
+		CommandType: "switchCommands",
+		APIType:     "switchAPI",
+		FactoryType: "switchAPIFactory",
+		RuntimeType: "switchAPIRuntime",
+		Operations: []Operation{
+			{
+				Name:        "Find",
+				CommandType: "switchFindCommand",
+				Help:        "Find.",
+				Method:      "FindWithContext",
+				RequestType: "FindRequest",
+				Flags:       []Flag{{Name: "zone", Field: "Zone", Type: "[]string", Help: "Zone."}},
+			},
+		},
+	}
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "unsupported type") {
+		t.Fatalf("Validate() error = %v, want unsupported flag type error", err)
+	}
+
+	config.Operations[0].Flags[0].Type = "string"
+	config.Operations = append(config.Operations, config.Operations[0])
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "duplicate operation") {
+		t.Fatalf("Validate() error = %v, want duplicate operation error", err)
+	}
+}
+
+func TestValidateZoneSearchRequirements(t *testing.T) {
+	config := Config{
+		Package:     "main",
+		Resource:    "IaaS example",
+		CommandType: "exampleCommands",
+		APIType:     "exampleAPI",
+		FactoryType: "exampleAPIFactory",
+		RuntimeType: "exampleRuntime",
+		Operations: []Operation{
+			{
+				Name:         "Find",
+				CommandType:  "exampleFindCommand",
+				Help:         "Find.",
+				Method:       "FindWithContext",
+				RequestType:  "FindRequest",
+				ResponseType: "*Item",
+				ZoneSearch:   &ZoneSearch{FlagField: "Zone", RequestField: "Zone"},
+				Flags: []Flag{
+					{Name: "zone", Field: "Zone", Type: "string", Help: "Zone.", Required: true},
+				},
+			},
+		},
+	}
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "slice type") {
+		t.Fatalf("Validate() error = %v, want slice response error", err)
+	}
+
+	config.Operations[0].ResponseType = "[]*Item"
+	config.Operations[0].Flags[0].Required = false
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "required string flag") {
+		t.Fatalf("Validate() error = %v, want required zone flag error", err)
+	}
+}
