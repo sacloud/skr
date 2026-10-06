@@ -20,6 +20,14 @@
 - 設計内容は design doc として記録してください。
 - 現在のテンプレート由来のモジュール名、バイナリ名、ビルド設定を製品の要件とみなさないでください。依頼に必要な場合に限り変更してください。
 
+## パッケージ構成
+
+- API コマンド生成器の CLI 入口は API ドメインごとに `cmd/apigen-<domain>` に配置し、対応する Make ターゲットも `generate-<domain>-api` とします。IaaS 用は `cmd/apigen-iaas` と `generate-iaas-api` です。対象が曖昧になる汎用名 `cmd/apigen` や `generate-api` は新設しません。
+- 生成器の共通設定解析・検証・コード生成機構は `internal/apigen` に配置します。IaaS 固有の `zone_search` などは明示的な設定で有効にし、別ドメイン固有の処理や設定を追加するときは、そのドメイン専用の入口またはパッケージに分離します。共通化できない処理を無理に共通パッケージへ集めません。
+- 生成された IaaS リソースコマンドは `internal/iaas/<resource>api/` に配置します。たとえば Switch の生成コマンドは `internal/iaas/switchapi/`、Switch 固有の検証は `internal/iaas/switch/`、複数リソースで共有するクライアントとゾーン処理は `internal/iaas/client/` と `internal/iaas/zones/` に配置します。
+- ルート `package main` は CLI の登録と runtime／SDK factory の接続を担当します。生成パッケージから `package main` の非公開処理へ依存させず、必要な共通処理は callback または `internal/` パッケージを通じて接続します。
+- CLI 全体の登録・実行を検証する統合テストは、`package main` の非公開処理を使う場合はルートに配置します。個別パッケージの単体テストは、検証対象のパッケージと同じディレクトリに配置します。
+
 ## 検証
 
 - Go のコードを変更した場合は `gofmt` で整形してください。

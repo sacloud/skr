@@ -14,11 +14,31 @@
 
 package main
 
+import (
+	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
+	iaasclient "github.com/sacloud/skr/internal/iaas/client"
+	switchresource "github.com/sacloud/skr/internal/iaas/switch"
+	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
+	iaaszones "github.com/sacloud/skr/internal/iaas/zones"
+)
+
 type iaasAPICommand struct {
-	Switch switchCommands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。find は --zone all で全ゾーンを検索できます。両経路は併用できません。"`
+	Switch switchapi.Commands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。find は --zone all で全ゾーンを検索できます。両経路は併用できません。"`
 }
 
 func (c *cli) initIaaSAPI() {
-	c.IaaSAPI.Switch.setFactory(newSwitchAPI)
-	c.IaaSAPI.Switch.setZoneFactory(newIaaSZoneAPI)
+	c.IaaSAPI.Switch.SetRuntime(switchapi.Runtime{
+		DecodeRequest:   decodeRequest,
+		OutputType:      outputType,
+		WriteOutput:     writeOutputWithFormat,
+		ValidateRequest: switchresource.ValidateRequest,
+	})
+	c.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
+		client, err := iaasclient.New()
+		if err != nil {
+			return nil, err
+		}
+		return swytch.New(client), nil
+	})
+	c.IaaSAPI.Switch.SetZoneFactory(iaaszones.New)
 }
