@@ -252,6 +252,10 @@ func renderCommandBody(data commandPageData) (string, error) {
 <p>実際の <code>skr --help</code> の出力を掲載しています。コマンド名を選ぶと、対応する <code>--help</code> の内容を確認できます。</p>
 <label class="search-label" for="command-filter">コマンドを検索</label>
 <input id="command-filter" class="search-input" type="search" placeholder="例: simplemq queue create" autocomplete="off">
+<div class="command-controls" role="group" aria-label="コマンドの一括操作">
+<button class="control-button" id="expand-all" type="button" aria-controls="command-groups">すべて展開</button>
+<button class="control-button" id="collapse-all" type="button" aria-controls="command-groups">すべて折りたたむ</button>
+</div>
 <p id="command-count" class="muted" aria-live="polite"></p>
 <div id="command-groups">
 {{range .Groups}}<section class="command-group">
@@ -267,6 +271,11 @@ const filter = document.getElementById("command-filter");
 const items = Array.from(document.querySelectorAll(".command-item"));
 const groups = Array.from(document.querySelectorAll(".command-group"));
 const count = document.getElementById("command-count");
+const expandAll = document.getElementById("expand-all");
+const collapseAll = document.getElementById("collapse-all");
+function setCommandsOpen(open) {
+  for (const item of items) item.open = open;
+}
 function filterCommands() {
   const query = filter.value.trim().toLocaleLowerCase();
   let visible = 0;
@@ -279,6 +288,8 @@ function filterCommands() {
   }
   count.textContent = visible + " / " + items.length + " コマンド";
 }
+expandAll.addEventListener("click", () => setCommandsOpen(true));
+collapseAll.addEventListener("click", () => setCommandsOpen(false));
 filter.addEventListener("input", filterCommands);
 filterCommands();
 </script>{{end}}`
@@ -334,7 +345,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <style>
 :root{color-scheme:light dark;font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#fff;--fg:#1f2328;--muted:#59636e;--border:#d1d9e0;--surface:#f6f8fa;--link:#0969da}
 @media(prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9198a1;--border:#30363d;--surface:#161b22;--link:#4493f8}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg)}a{color:var(--link)}.site-header{display:flex;gap:2rem;align-items:center;padding:.85rem max(1rem,calc((100% - 1100px)/2));border-bottom:1px solid var(--border);background:var(--surface)}.brand{font-weight:700;text-decoration:none;font-size:1.15rem}.site-header nav{display:flex;gap:1.25rem;flex-wrap:wrap}.site-header nav a{text-decoration:none}.content{max-width:1100px;margin:2.5rem auto;padding:0 1.25rem 3rem}h1{line-height:1.25;border-bottom:1px solid var(--border);padding-bottom:.5rem}h2{margin-top:2rem}pre{overflow:auto;padding:1rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);line-height:1.5}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}blockquote{margin-left:0;padding:.25rem 1rem;border-left:4px solid var(--border);color:var(--muted)}table{border-collapse:collapse;display:block;max-width:100%;overflow:auto}th,td{border:1px solid var(--border);padding:.4rem .65rem}th{background:var(--surface)}img{max-width:100%}.search-label{display:block;font-weight:600;margin:1rem 0 .35rem}.search-input{width:min(100%,40rem);padding:.7rem .8rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}.muted{color:var(--muted)}.command-group{margin:1.5rem 0}.command-group h2{font-size:1.25rem}.command-item{margin:.5rem 0;border:1px solid var(--border);border-radius:6px}.command-item summary{cursor:pointer;padding:.6rem .8rem;font-weight:600}.command-item pre{margin:0;border:0;border-top:1px solid var(--border);border-radius:0 0 6px 6px}.command-item[hidden],.command-group[hidden]{display:none}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg)}a{color:var(--link)}.site-header{display:flex;gap:2rem;align-items:center;padding:.85rem max(1rem,calc((100% - 1100px)/2));border-bottom:1px solid var(--border);background:var(--surface)}.brand{font-weight:700;text-decoration:none;font-size:1.15rem}.site-header nav{display:flex;gap:1.25rem;flex-wrap:wrap}.site-header nav a{text-decoration:none}.content{max-width:1100px;margin:2.5rem auto;padding:0 1.25rem 3rem}h1{line-height:1.25;border-bottom:1px solid var(--border);padding-bottom:.5rem}h2{margin-top:2rem}pre{overflow:auto;padding:1rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);line-height:1.5}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}blockquote{margin-left:0;padding:.25rem 1rem;border-left:4px solid var(--border);color:var(--muted)}table{border-collapse:collapse;display:block;max-width:100%;overflow:auto}th,td{border:1px solid var(--border);padding:.4rem .65rem}th{background:var(--surface)}img{max-width:100%}.search-label{display:block;font-weight:600;margin:1rem 0 .35rem}.search-input{width:min(100%,40rem);padding:.7rem .8rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}.command-controls{display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0}.control-button{padding:.45rem .75rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--fg);font:inherit;cursor:pointer}.control-button:hover{background:var(--border)}.control-button:focus-visible{outline:2px solid var(--link);outline-offset:2px}.muted{color:var(--muted)}.command-group{margin:1.5rem 0}.command-group h2{font-size:1.25rem}.command-item{margin:.5rem 0;border:1px solid var(--border);border-radius:6px}.command-item summary{cursor:pointer;padding:.6rem .8rem;font-weight:600}.command-item pre{margin:0;border:0;border-top:1px solid var(--border);border-radius:0 0 6px 6px}.command-item[hidden],.command-group[hidden]{display:none}
 .development-banner{display:flex;align-items:center;gap:.75rem;padding:.75rem max(1rem,calc((100% - 1100px)/2));background:#fff4e5;color:#7d3600;border-bottom:2px solid #d98b00}.development-label{flex:none;font-weight:700}@media(prefers-color-scheme:dark){.development-banner{background:#2b2113;color:#f0c36d;border-color:#9e6a03}}@media(max-width:600px){.development-banner{align-items:flex-start;flex-direction:column;gap:.25rem}}
 </style>
 </head>
