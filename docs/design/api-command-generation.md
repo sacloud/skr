@@ -67,7 +67,7 @@ IaaS 以外の EventBus と SimpleMQ も、同じ `cmd/apigen-api` / `generate-a
 }
 ```
 
-`arguments` は SDK 操作の `context.Context` の後に並ぶ引数と、対応する Kong の位置引数を定義します。`request_by_value` は `request_type` をポインターではなく値で SDK 操作へ渡します。省略時は従来どおりポインターで渡します。これらは SDK のメソッドシグネチャに合わせるための指定であり、操作範囲、引数の意味、ヘルプを自動推測するものではありません。
+`arguments` は SDK 操作の `context.Context` の後に並ぶ引数を定義します。既定では Kong の位置引数になり、`flag: true` を指定すると名前付きフラグになります。`required: true` は名前付きフラグの必須指定を表します。`factory_arguments` は各操作コマンドに共通して生成する名前付き入力と、API クライアント factory に渡す引数を定義します。SimpleMQ メッセージ API のキュー名と API キーファイルはこの方法でクライアント生成へ渡します。`request_by_value` は `request_type` をポインターではなく値で SDK 操作へ渡します。省略時はポインターで渡します。これらは SDK のメソッドシグネチャに合わせるための指定であり、操作範囲、引数の意味、ヘルプを自動推測するものではありません。
 
 リポジトリルートから、共通生成器に対象操作の設定と出力先を渡します。
 
@@ -77,6 +77,13 @@ $ make generate-api API_CONFIG=path/to/simplemq-example.json API_OUTPUT=path/to/
 ```
 
 上記のパスは設定例です。設定ファイルと生成先は対象 API とパッケージ構成に合わせて用意します。生成器が利用できることは、EventBus / SimpleMQ の全操作が生成済み、または CLI で公開済みであることを意味しません。プロバイダークラスの補完、秘密情報の扱い、独自の入力検証などは設定から意味を推測せず、対象の設計に従って手書きに残します。
+
+SimpleMQ のキュー／メッセージコマンドは次の設定から `internal/simplemqapi/` に再生成します。生成コマンドと Provider クラス補完、キュー設定のフラットなフラグ、メッセージ数と API キーの出力形状を同じ内部パッケージに置き、ルートの `package main` は CLI 登録と Runtime／SDK factory の接続を担当します。
+
+```console
+$ make generate-api API_CONFIG=api/commands/simplemq-queue.json API_OUTPUT=internal/simplemqapi/simplemq_queue_api_generated.go
+$ make generate-api API_CONFIG=api/commands/simplemq-message.json API_OUTPUT=internal/simplemqapi/simplemq_message_api_generated.go
+```
 
 生成器は操作名とフィールド名を Go 識別子として扱います。Kong のコマンド名は操作名の小文字表記です。フラグ型は `string`、`bool`、`int`、`int64` に限定し、API リクエストの同名フィールドに代入します。`pointer: true` は明示指定された値だけをリクエストのポインター項目へ設定します。`conversion` を指定すると、その型へ変換してから設定します。`required: true` はフラグ経路での指定有無を検証します。`request_validator` を指定すると、JSON／フラグからリクエストを構築した後、SDK 呼び出し前にサービス固有の検証関数を実行します。
 
@@ -100,7 +107,7 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 ## 手書きコードとの境界
 
-生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力形式の選択、出力処理、リクエスト検証を受け取ります。生成されたコマンド構造体を親コマンドへ登録し、生成された API interface を実際の SDK クライアントに結ぶ factory は、CLI 側で設定します。
+生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力形式の選択、出力処理、リクエスト検証を受け取ります。生成されたコマンド構造体を親コマンドへ登録し、生成された API interface を実際の SDK クライアントに結ぶ factory は、CLI 側で設定します。
 
 `request_validator` は、JSON／フラグから同じリクエストを構築した後、SDK 呼び出し前に行う明示的なサービス固有検証の関数名です。`handwritten: true` は、操作を親コマンドと型付き API インターフェースには登録しながら、そのコマンド構造体と `Run` ハンドラーを手書きにする指定です。これにより、標準操作と個別処理を同じコマンド階層に配置できます。
 

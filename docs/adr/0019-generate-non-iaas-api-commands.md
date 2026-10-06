@@ -14,14 +14,17 @@ IaaS の API と Ogen 由来の API では SDK の生成形式が異なり、操
 - IaaS は専用の `cmd/apigen-iaas` / `generate-iaas-api` を維持します。IaaS 固有の `zone_search` などは明示的な設定で有効にします。
 - Ogen 系 API はサービスごとに入口を増やさず、`cmd/apigen-api` / `generate-api` の共通入口を使います。EventBus、SimpleMQ を含む複数 API ドメインがこの入口を利用します。
 - Ogen 系 API の操作設定では位置引数の Go フィールド、型、ヘルプを明示できます。`request_by_value` を指定した操作は `request_type` を値渡しで宣言し、省略時は既定のポインター渡しを使います。
+- API クライアント生成に必要なコマンド入力は `factory_arguments` で明示し、各操作の生成コマンドから factory へ渡します。SDK メソッドの位置引数または名前付きフラグは `arguments` で指定します。
 - 設定解析・検証や生成処理のうち共通化できる部分は `internal/apigen` で共有します。IaaS と Ogen 系 API の生成形態を同一とみなさず、共通化によってどちらかの処理が複雑になる場合は実装を分離します。
 - SDK の Ogen 定義を走査して CLI 操作を自動選択することはしません。公開する操作、引数の意味、必須入力、ヘルプ、ドメイン固有処理を設定または手書きコードで明示します。
 - 生成器入口の有無は対象ドメインの全操作の実装や CLI 公開を意味しません。対応操作は PLAN の範囲確認と個別のテストを経て段階的に追加します。
+- 生成されたコマンドとドメイン固有の手書きハンドラーは `internal/<domain>api/` に配置します。ルート `package main` は CLI 登録と Runtime callback／SDK factory の接続を担当し、内部パッケージからルートの非公開処理へ依存させません。
 
 ## Consequences
 
 - Ogen 系 API のサービス数に比例して生成器入口が増えることを防ぎ、設定形式と生成ロジックの保守箇所を抑えられます。
 - 位置引数や値渡しリクエストを含む Ogen 系 SDK の定型コードを生成できます。一方、すべての Ogen 操作が同一の CLI 表現に収まるわけではなく、独自処理は引き続き手書きが必要です。
+- SimpleMQ では queue / message の操作を設定から生成し、Provider の補完、設定フラグ変換、特殊な結果整形は手書きハンドラーに残します。
 - 生成設定は引き続き SDK の公開シグネチャと CLI の意図を照合して作成し、生成後は SDK 呼び出し、入力、出力、エラーを対象テストで検証します。
 
 ## Alternatives considered

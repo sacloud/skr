@@ -25,8 +25,10 @@
 - API コマンド生成器は、IaaS 用の `cmd/apigen-iaas` / `generate-iaas-api` と、Ogen 系 API 用の `cmd/apigen-api` / `generate-api` を使います。IaaS は Ogen 系 API と生成対象の形が異なるため専用入口を維持し、Ogen 系 API はサービスごとに入口を増やさず共通入口を使います。
 - 生成器の設定解析・検証・共有可能なコード生成機構は `internal/apigen` に配置します。IaaS 固有の `zone_search` などは明示的な設定で有効にし、共通化できない処理を無理に共通パッケージへ集めません。生成処理の差が大きくなった場合は、IaaS と Ogen 系 API の実装を個別に保守できる境界を検討します。
 - 生成された IaaS リソースコマンドは `internal/iaas/<resource>api/` に配置します。たとえば Switch の生成コマンドは `internal/iaas/switchapi/`、Switch 固有の検証は `internal/iaas/switch/`、複数リソースで共有するクライアントとゾーン処理は `internal/iaas/client/` と `internal/iaas/zones/` に配置します。
+- Ogen 系の非 IaaS API コマンドは `internal/<domain>api/` に配置します。SimpleMQ のように生成コマンドとドメイン固有の手書きハンドラーが混在する場合は、両方を同じドメインパッケージに置き、公開する Commands 型、API interface、factory、Runtime を通じて接続します。生成コードは設定から再生成し、直接編集しません。
 - ルート `package main` は CLI の登録と runtime／SDK factory の接続を担当します。生成パッケージから `package main` の非公開処理へ依存させず、必要な共通処理は callback または `internal/` パッケージを通じて接続します。
-- CLI 全体の登録・実行を検証する統合テストは、`package main` の非公開処理を使う場合はルートに配置します。個別パッケージの単体テストは、検証対象のパッケージと同じディレクトリに配置します。
+- ルートの CLI 構造体はドメインパッケージの Commands 型を登録し、ルートに残すドメイン用ファイルは Runtime callback と SDK factory の接続に限定します。ドメイン固有のコマンド実装や単体テストはドメインパッケージに置き、CLI 全体の登録・実行を検証する統合テストはルートに置きます。
+- 個別パッケージの単体テストは、検証対象のパッケージと同じディレクトリに配置します。
 
 ## 検証
 

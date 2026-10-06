@@ -32,14 +32,15 @@ import (
 )
 
 type Config struct {
-	Package     string            `json:"package"`
-	Resource    string            `json:"resource"`
-	CommandType string            `json:"command_type"`
-	APIType     string            `json:"api_type"`
-	FactoryType string            `json:"factory_type"`
-	RuntimeType string            `json:"runtime_type"`
-	Imports     map[string]string `json:"imports"`
-	Operations  []Operation       `json:"operations"`
+	Package          string            `json:"package"`
+	Resource         string            `json:"resource"`
+	CommandType      string            `json:"command_type"`
+	APIType          string            `json:"api_type"`
+	FactoryType      string            `json:"factory_type"`
+	RuntimeType      string            `json:"runtime_type"`
+	Imports          map[string]string `json:"imports"`
+	FactoryArguments []Argument        `json:"factory_arguments,omitempty"`
+	Operations       []Operation       `json:"operations"`
 }
 
 type Operation struct {
@@ -59,10 +60,12 @@ type Operation struct {
 }
 
 type Argument struct {
-	Name  string `json:"name"`
-	Field string `json:"field"`
-	Type  string `json:"type"`
-	Help  string `json:"help"`
+	Name     string `json:"name"`
+	Field    string `json:"field"`
+	Type     string `json:"type"`
+	Help     string `json:"help"`
+	Flag     bool   `json:"flag,omitempty"`
+	Required bool   `json:"required,omitempty"`
 }
 
 type ZoneSearch struct {
@@ -89,6 +92,7 @@ type templateConfig struct {
 	Config
 	Imports       []importSpec
 	Operations    []templateOperation
+	FactoryParams string
 	HasZoneSearch bool
 }
 
@@ -127,7 +131,7 @@ type {{.APIType}} interface {
 {{- end }}
 }
 
-type {{.FactoryType}} func() ({{.APIType}}, error)
+type {{.FactoryType}} func({{.FactoryParams}}) ({{.APIType}}, error)
 
 type {{.RuntimeType}} struct {
 	DecodeRequest func(string, any) error
@@ -138,9 +142,7 @@ type {{.RuntimeType}} struct {
 
 func (c *{{.CommandType}}) SetRuntime(runtime {{.RuntimeType}}) {
 {{- range .Operations }}
-{{- if not .Handwritten }}
 	c.{{.Name}}.runtime = runtime
-{{- end }}
 {{- end }}
 }
 
@@ -163,8 +165,15 @@ func (c *{{.CommandType}}) SetZoneFactory(factory zones.Factory) {
 {{range .Operations}}
 {{- if not .Handwritten }}
 type {{.CommandType}} struct {
+{{- range $.FactoryArguments }}
+	{{.Field}} {{.Type}} {{argumentFlagTag .Name .Help .Required}}
+{{- end }}
 {{- range .Arguments }}
+{{- if .Flag }}
+	{{.Field}} {{.Type}} {{argumentFlagTag .Name .Help .Required}}
+{{- else }}
 	{{.Field}} {{.Type}} {{argumentTag .Name .Help}}
+{{- end }}
 {{- end }}
 {{- if .RequestType }}
 	Request *string {{if .RequestHelp}}{{helpTag .RequestHelp}}{{else}}{{helpTag "API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。"}}{{end}}
@@ -247,7 +256,7 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 	if c.factory == nil {
 	return fmt.Errorf("API クライアントが設定されていません")
 	}
-	op, err := c.factory()
+	op, err := c.factory({{range $.FactoryArguments}}c.{{.Field}}, {{end}})
 	if err != nil {
 	return err
 	}
@@ -348,6 +357,31 @@ func (c Config) Validate() error {
 		aliases[alias] = true
 	}
 
+	factoryArgumentNames := make(map[string]bool, len(c.FactoryArguments))
+	factoryArgumentFields := make(map[string]bool, len(c.FactoryArguments))
+	for _, argument := range c.FactoryArguments {
+		if !isKebabName(argument.Name) {
+			return fmt.Errorf("factory argument name %q must be kebab-case", argument.Name)
+		}
+		if !token.IsIdentifier(argument.Field) || token.Lookup(argument.Field).IsKeyword() {
+			return fmt.Errorf("factory argument field %q must be a valid Go identifier", argument.Field)
+		}
+		if factoryArgumentNames[argument.Name] || factoryArgumentFields[argument.Field] {
+			return fmt.Errorf("duplicate factory argument name or field")
+		}
+		if argument.Type == "" {
+			return fmt.Errorf("factory argument %q type must not be empty", argument.Name)
+		}
+		if err := validateType(argument.Type); err != nil {
+			return fmt.Errorf("factory argument %q type: %w", argument.Name, err)
+		}
+		if strings.TrimSpace(argument.Help) == "" {
+			return fmt.Errorf("factory argument %q help must not be empty", argument.Name)
+		}
+		factoryArgumentNames[argument.Name] = true
+		factoryArgumentFields[argument.Field] = true
+	}
+
 	operations := make(map[string]bool, len(c.Operations))
 	methods := make(map[string]bool, len(c.Operations))
 	commandTypes := map[string]bool{c.CommandType: true, c.APIType: true, c.FactoryType: true}
@@ -398,6 +432,10 @@ func (c Config) Validate() error {
 		argumentNames := make(map[string]bool, len(operation.Arguments))
 		cliNames := make(map[string]bool, len(operation.Arguments)+len(operation.Flags))
 		fields := map[string]bool{"factory": true, "runtime": true}
+		for _, argument := range c.FactoryArguments {
+			cliNames[argument.Name] = true
+			fields[argument.Field] = true
+		}
 		if operation.RequestType != "" {
 			fields["Request"] = true
 			cliNames["request"] = true
@@ -546,6 +584,10 @@ func Generate(config Config) ([]byte, error) {
 		}
 		operations = append(operations, item)
 	}
+	factoryParams := make([]string, 0, len(config.FactoryArguments))
+	for _, argument := range config.FactoryArguments {
+		factoryParams = append(factoryParams, argument.Field+" "+argument.Type)
+	}
 
 	tmpl, err := template.New("api").Funcs(template.FuncMap{
 		"commandTag": func(help string) string {
@@ -557,6 +599,13 @@ func Generate(config Config) ([]byte, error) {
 		"argumentTag": func(name, help string) string {
 			return strconv.Quote("arg:\"\" name:" + strconv.Quote(name) + " help:" + strconv.Quote(help))
 		},
+		"argumentFlagTag": func(name, help string, required bool) string {
+			tag := "name:" + strconv.Quote(name) + " help:" + strconv.Quote(help)
+			if required {
+				tag += " required:\"\""
+			}
+			return strconv.Quote(tag)
+		},
 		"helpTag": func(help string) string {
 			return strconv.Quote("help:" + strconv.Quote(help))
 		},
@@ -566,7 +615,8 @@ func Generate(config Config) ([]byte, error) {
 	}
 	var source bytes.Buffer
 	if err := tmpl.Execute(&source, templateConfig{
-		Config: config, Imports: imports, Operations: operations, HasZoneSearch: hasZoneSearch,
+		Config: config, Imports: imports, Operations: operations,
+		FactoryParams: strings.Join(factoryParams, ", "), HasZoneSearch: hasZoneSearch,
 	}); err != nil {
 		return nil, fmt.Errorf("render source: %w", err)
 	}
