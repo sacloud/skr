@@ -12,27 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
-
-import (
-	"flag"
-	"fmt"
-	"os"
-
-	"github.com/sacloud/skr/internal/apigen"
-)
-
-func main() {
-	configPath := flag.String("config", "", "path to the IaaS API generator config")
-	outputPath := flag.String("out", "", "path to the generated Go file")
-	flag.Parse()
-
-	if *configPath == "" || *outputPath == "" {
-		fmt.Fprintln(os.Stderr, "both -config and -out are required")
-		os.Exit(2)
-	}
-	if err := apigen.GenerateFile(*configPath, *outputPath); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
+// Package serverapi contains generated low-level IaaS Server API commands.
+package serverapi

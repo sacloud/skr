@@ -1,6 +1,7 @@
 .env
 vendor/
 dist/
+_site/
 work/
 skr
 /tmp/eventbus-api/

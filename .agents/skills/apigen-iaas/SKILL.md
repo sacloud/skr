@@ -5,7 +5,7 @@ description: cmd/apigen-iaas を使って IaaS API コマンドの設定を更�
 
 # apigen-iaas による IaaS API コマンド生成
 
-`cmd/apigen-iaas` を使って低レベル IaaS API コマンドを追加・変更するときに、このスキルを使用してください。IaaS 以外の API 形式を対象にした生成器の作業には使用しません。対象サービスの仕様調査やコマンド設計には [`generate-skr-api-command`](../generate-skr-api-command/SKILL.md) も適用します。生成器の機能追加では、生成器自身の実装・テストと、設定・生成結果をまとめて更新します。
+`cmd/apigen-iaas` を使って低レベル IaaS API コマンドを追加・変更するときに、このスキルを使用してください。IaaS 以外の Ogen 系 API には共通入口 `cmd/apigen-api` を使います。対象サービスの仕様調査やコマンド設計には [`generate-skr-api-command`](../generate-skr-api-command/SKILL.md) も適用します。生成器の機能追加では、生成器自身の実装・テストと、設定・生成結果をまとめて更新します。
 
 ## 基本方針
 

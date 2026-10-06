@@ -1,0 +1,123 @@
+{
+  "package": "simplemqapi",
+  "resource": "SimpleMQ queue",
+  "command_type": "QueueCommands",
+  "api_type": "QueueAPI",
+  "factory_type": "QueueAPIFactory",
+  "runtime_type": "QueueRuntime",
+  "imports": {
+    "queue": "github.com/sacloud/sacloud-sdk-go/api/simplemq/apis/v1/queue"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "QueueListCommand",
+      "help": "キューを一覧表示します。",
+      "method": "List",
+      "response_type": "[]queue.CommonServiceItem"
+    },
+    {
+      "name": "Read",
+      "command_type": "QueueReadCommand",
+      "help": "ID を指定してキューを読み取ります。",
+      "method": "Read",
+      "response_type": "*queue.CommonServiceItem",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "list の出力にあるキュー ID。"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "QueueCreateCommand",
+      "help": "キューを作成します。作成後、rotate-api-key でメッセージ API 用のキーを発行してください。",
+      "method": "Create",
+      "request_type": "queue.CreateQueueRequest",
+      "request_by_value": true,
+      "response_type": "*queue.CommonServiceItem",
+      "handwritten": true
+    },
+    {
+      "name": "Config",
+      "command_type": "QueueConfigCommand",
+      "help": "キューの設定を更新します。--visibility-timeout-seconds と --expire-seconds を指定するか、--request JSON を指定してください。",
+      "method": "Config",
+      "request_type": "queue.ConfigQueueRequest",
+      "request_by_value": true,
+      "response_type": "*queue.CommonServiceItem",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "設定を変更するキュー ID。"
+        }
+      ],
+      "handwritten": true
+    },
+    {
+      "name": "Delete",
+      "command_type": "QueueDeleteCommand",
+      "help": "ID を指定してキューを削除します。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するキュー ID。"
+        }
+      ]
+    },
+    {
+      "name": "CountMessages",
+      "command_type": "QueueCountMessagesCommand",
+      "help": "キュー内のメッセージ数を取得します。",
+      "method": "CountMessages",
+      "response_type": "int",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "メッセージ数を取得するキュー ID。"
+        }
+      ],
+      "handwritten": true
+    },
+    {
+      "name": "RotateAPIKey",
+      "command_type": "QueueRotateAPIKeyCommand",
+      "help": "メッセージ API キーを発行または再発行し、結果を出力します。APIKey は認証情報として安全に扱ってください。",
+      "method": "RotateAPIKey",
+      "response_type": "string",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "キーを発行するキュー ID。"
+        }
+      ],
+      "handwritten": true
+    },
+    {
+      "name": "ClearMessages",
+      "command_type": "QueueClearMessagesCommand",
+      "help": "キュー内のメッセージをすべて削除します。",
+      "method": "ClearMessages",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "メッセージをすべて削除するキュー ID。"
+        }
+      ]
+    }
+  ]
+}

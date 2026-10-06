@@ -19,19 +19,20 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sacloud/skr/internal/apigen"
+	"github.com/sacloud/skr/internal/docsite"
 )
 
 func main() {
-	configPath := flag.String("config", "", "path to the IaaS API generator config")
-	outputPath := flag.String("out", "", "path to the generated Go file")
+	cliPath := flag.String("cli", "", "path to the skr executable")
+	manualPath := flag.String("manual", "docs/manual", "path to the user manual")
+	outputPath := flag.String("out", "_site", "directory for generated HTML")
 	flag.Parse()
 
-	if *configPath == "" || *outputPath == "" {
-		fmt.Fprintln(os.Stderr, "both -config and -out are required")
+	if *cliPath == "" {
+		fmt.Fprintln(os.Stderr, "-cli is required")
 		os.Exit(2)
 	}
-	if err := apigen.GenerateFile(*configPath, *outputPath); err != nil {
+	if err := docsite.Generate(*cliPath, *manualPath, *outputPath); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
