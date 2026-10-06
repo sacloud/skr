@@ -7,3 +7,8 @@
 - [IaaS Switch API: Sandbox でスイッチの管理手順を確認する](tutorials/iaas-api/switch.md)
 - [SimpleMQ API: キューを作成してメッセージを送受信する](tutorials/simplemq-api.md)
 - [EventBus API: スイッチ作成イベントを SimpleMQ で受信する](tutorials/eventbus-api.md)
+- [HTTP API: `get_zone` でゾーン一覧を取得する](tutorials/http-request.md)
+
+## 共通機能
+
+- [認証付き HTTP リクエスト](http-request.md)
