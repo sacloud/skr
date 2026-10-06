@@ -23,11 +23,14 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"github.com/sacloud/skr/internal/eventbusapi"
 	"github.com/sacloud/skr/internal/simplemqapi"
+	"github.com/sacloud/skr/version"
 )
 
 type cli struct {
 	Trace       bool                 `name:"trace" help:"SDK の HTTP リクエストとレスポンスをトレースします。認証情報などが出力される場合があります。"`
+	Version     kong.VersionFlag     `name:"version" help:"Print version information and quit."`
 	Output      *string              `name:"output" enum:"json,yaml,table" help:"出力形式 (json、yaml、table)。未指定時はプロファイルの cli.default_output_type (v0: DefaultOutputType) を使います。"`
+	VersionCmd  versionCommand       `cmd:"" name:"version" help:"Print version information."`
 	Config      configCommand        `cmd:"" help:"Manage configuration profiles."`
 	IaaSAPI     iaasAPICommand       `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は --output で JSON、YAML、table の形式を選択できます。"`
 	EventbusAPI eventbusapi.Commands `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。実行先を process-configuration で定義し、schedule または trigger から参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は --output で JSON、YAML、table の形式を選択できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
@@ -37,6 +40,13 @@ type cli struct {
 
 type configCommand struct {
 	Current currentCommand `cmd:"" help:"Print the current profile name."`
+}
+
+type versionCommand struct{}
+
+func (versionCommand) Run(ctx *kong.Context) error {
+	_, err := fmt.Fprintln(ctx.Stdout, version.FullVersion())
+	return err
 }
 
 type currentCommand struct{}
@@ -81,6 +91,7 @@ func runCLI(args []string, stdout, stderr io.Writer, commandLine *cli) int {
 		kong.Description("CLI for Sakura Cloud."),
 		kong.Writers(stdout, stderr),
 		kong.Exit(func(code int) { exitCode = code }),
+		kong.Vars{"version": version.FullVersion()},
 	)
 	if err != nil {
 		if _, writeErr := fmt.Fprintln(stderr, err); writeErr != nil {
