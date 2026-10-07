@@ -63,7 +63,7 @@ IaaS API、EventBus API、SimpleMQ のキュー管理 API、AppRun Dedicated API
 メッセージ API では対象キューの API キーが必要です。キーは `--api-key-file` でファイルから
 読み込み、コマンドライン引数に直接含めないでください。
 
-API コマンドの出力形式は `--output json`、`--output yaml`、`--output table` で選択できます。
+API コマンドの出力形式は `--output json` または `--output table` で選択できます。
 省略時はプロファイルの `cli.default_output_type`（プロファイル v0 では `DefaultOutputType`）を
 使い、未設定の場合は JSON で出力します。
 `--query` に jq 式を指定すると、API の結果を加工して JSON で出力できます。詳細は

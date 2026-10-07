@@ -56,7 +56,7 @@ SDK が行います。認証情報を含む値を CLI のフラグとして受�
 - `queue rotate-api-key` は SDK が返した API キーを `APIKey` フィールドとして通常の出力形式で返します。
 - `message send` は SDK のスカラー引数として本文を受け取ります。SDK OpenAPI 定義では最大256000文字で、
   英数字、`+`、`/`、`=` の文字に制約されています。
-- 操作結果はグローバル `--output` に従って JSON、YAML、table で出力します。delete と clear-messages
+- 操作結果はグローバル `--output` に従って JSON または table で出力します。delete と clear-messages
   は成功時に出力しません。
 
 ## 検証

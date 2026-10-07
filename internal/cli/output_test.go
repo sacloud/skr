@@ -44,8 +44,8 @@ func TestProfileOutputType(t *testing.T) {
 		{
 			name:       "v0",
 			filename:   "config.json",
-			contents:   `{"DefaultOutputType":"yaml"}`,
-			wantFormat: "yaml",
+			contents:   `{"DefaultOutputType":"table"}`,
+			wantFormat: "table",
 		},
 		{
 			name:       "unset",
@@ -78,6 +78,40 @@ func TestProfileOutputType(t *testing.T) {
 	}
 }
 
+func TestYAMLOutputIsRejected(t *testing.T) {
+	if _, err := validateOutputType("yaml"); err == nil {
+		t.Fatal("validateOutputType(\"yaml\") succeeded, want unsupported format error")
+	}
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"iaas-api", "switch", "find", "--output", "yaml"}, &stdout, &stderr, newCLI()); code == 0 {
+		t.Fatal("--output yaml succeeded, want an unsupported format error")
+	}
+	if !strings.Contains(stderr.String(), "yaml") {
+		t.Errorf("--output yaml error = %q, want it to mention yaml", stderr.String())
+	}
+
+	profileDir := t.TempDir()
+	profilePath := filepath.Join(profileDir, "example")
+	if err := os.Mkdir(profilePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, "current"), []byte("example\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profilePath, "config.json"), []byte(`{"DefaultOutputType":"yaml"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	format, err := profileOutputType([]string{"SAKURA_PROFILE_DIR=" + profileDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validateOutputType(format); err == nil {
+		t.Fatal("YAML profile output format was accepted")
+	}
+}
+
 func TestIaaSSwitchOutputFormatAndProfileDefault(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
@@ -101,10 +135,6 @@ func TestIaaSSwitchOutputFormatAndProfileDefault(t *testing.T) {
 	var created iaas.Switch
 	if err := json.Unmarshal([]byte(runCommand("iaas-api", "switch", "create", "--zone", "test-zone", "--name", "output-test")), &created); err != nil {
 		t.Fatal(err)
-	}
-	yamlOutput := runCommand("iaas-api", "switch", "read", "--zone", "test-zone", "--id", created.ID.String(), "--output", "yaml")
-	if !strings.Contains(yamlOutput, "Name: output-test") {
-		t.Errorf("YAML output = %q, want Name field", yamlOutput)
 	}
 
 	profilePath := filepath.Join(profileDir, "example")
@@ -265,19 +295,6 @@ func TestWriteTableOmitsZeroTimestamps(t *testing.T) {
 	}
 	if !strings.Contains(got, "ModifiedAt") {
 		t.Errorf("table output does not contain ModifiedAt column:\n%s", got)
-	}
-}
-
-func TestMarshalYAMLPreservesLargeNumbersAndJSONFieldNames(t *testing.T) {
-	output, err := marshalYAML(map[string]any{
-		"ID":   json.Number("9007199254740993"),
-		"Name": "example",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := string(output); !strings.Contains(got, "ID: 9007199254740993") || !strings.Contains(got, "Name: example") {
-		t.Fatalf("YAML output = %q, want original field names and exact numeric ID", got)
 	}
 }
 

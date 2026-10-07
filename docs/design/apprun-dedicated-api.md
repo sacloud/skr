@@ -16,7 +16,7 @@
 - 証明書、アプリケーションバージョンの入力は秘密情報を含み得るため、`@path.json` または標準入力のみ受け付けます。リクエスト内容をコマンドライン引数へ露出しません。
 - Application の作成は `--name` と `--cluster-id` を受け付けます。バージョン有効化と解除は `--active-version` または `--deactivate` のどちらか一方を指定します。
 - ワーカノードの draining 更新は `--draining true|false` を指定します。
-- API エラーは Kong に返し、成功したような出力に変換しません。出力形式は共通の JSON、YAML、table と jq 処理を使います。
+- API エラーは Kong に返し、成功したような出力に変換しません。出力形式は共通の JSON、table と jq 処理を使います。
 
 ## テスト
 
