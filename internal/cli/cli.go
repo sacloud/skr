@@ -43,6 +43,8 @@ type cli struct {
 
 type configCommand struct {
 	Current currentCommand `cmd:"" help:"Print the current profile name."`
+	List    listCommand    `cmd:"" help:"List configuration profiles."`
+	Show    showCommand    `cmd:"" help:"Show a configuration profile."`
 }
 
 type versionCommand struct{}
