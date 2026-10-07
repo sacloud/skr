@@ -469,7 +469,7 @@ func TestRunConfigCreateInsecurePrivateKeyPermissionsFail(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 	keyPath := writeTestPrivateKey(t, profileDir)
-	if err := os.Chmod(keyPath, 0o644); err != nil {
+	if err := os.Chmod(keyPath, 0o644); err != nil { // #nosec G302 -- Lax permissions are intentional; this test verifies the CLI rejects insecure private key files.
 		t.Fatal(err)
 	}
 
@@ -558,7 +558,7 @@ func TestRunConfigEditInsecurePrivateKeyPermissionsFail(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 	oldKey := writeTestPrivateKey(t, profileDir)
 	newKey := filepath.Join(profileDir, "insecure.pem")
-	if err := os.WriteFile(newKey, []byte("not used"), 0o644); err != nil {
+	if err := os.WriteFile(newKey, []byte("not used"), 0o644); err != nil { // #nosec G306 -- Lax permissions are intentional; this test verifies the CLI rejects insecure private key files.
 		t.Fatal(err)
 	}
 
