@@ -49,15 +49,6 @@ func writeOutputWithFormat(ctx *kong.Context, format string, value any, zones ..
 		encoder := json.NewEncoder(ctx.Stdout)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(value)
-	case "yaml":
-		data, err := marshalYAML(value)
-		if err != nil {
-			return fmt.Errorf("encode output YAML: %w", err)
-		}
-		if _, err := ctx.Stdout.Write(data); err != nil {
-			return fmt.Errorf("write output YAML: %w", err)
-		}
-		return nil
 	case "table":
 		var zoneNames []string
 		if len(zones) > 0 {
@@ -66,45 +57,6 @@ func writeOutputWithFormat(ctx *kong.Context, format string, value any, zones ..
 		return writeTable(ctx.Stdout, value, zoneNames)
 	default:
 		return fmt.Errorf("unsupported output format %q", format)
-	}
-}
-
-func marshalYAML(value any) ([]byte, error) {
-	data, err := json.Marshal(value)
-	if err != nil {
-		return nil, fmt.Errorf("encode output JSON for YAML: %w", err)
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	var decoded any
-	if err := decoder.Decode(&decoded); err != nil {
-		return nil, fmt.Errorf("decode output JSON for YAML: %w", err)
-	}
-	data, err = yaml.Marshal(yamlCompatibleValue(decoded))
-	if err != nil {
-		return nil, fmt.Errorf("marshal output YAML: %w", err)
-	}
-	return data, nil
-}
-
-func yamlCompatibleValue(value any) any {
-	switch value := value.(type) {
-	case json.Number:
-		return yaml.RawMessage(value.String())
-	case []any:
-		converted := make([]any, len(value))
-		for i, item := range value {
-			converted[i] = yamlCompatibleValue(item)
-		}
-		return converted
-	case map[string]any:
-		converted := make(map[string]any, len(value))
-		for key, item := range value {
-			converted[key] = yamlCompatibleValue(item)
-		}
-		return converted
-	default:
-		return value
 	}
 }
 
@@ -140,10 +92,10 @@ func outputType(ctx *kong.Context) (string, error) {
 func validateOutputType(format string) (string, error) {
 	format = strings.ToLower(strings.TrimSpace(format))
 	switch format {
-	case "json", "yaml", "table":
+	case "json", "table":
 		return format, nil
 	default:
-		return "", fmt.Errorf("unsupported output format %q (choose json, yaml, or table)", format)
+		return "", fmt.Errorf("unsupported output format %q (choose json or table)", format)
 	}
 }
 

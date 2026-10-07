@@ -29,7 +29,7 @@ $ skr iaas-api disk update --help
 $ skr iaas-api disk delete --help
 ```
 
-意図したプロファイル、プロジェクト、認証情報を確認します。ディスク作成と更新は SDK のリクエスト JSON を使います。JSON は `--request` に直接指定するか、`@ファイル名` で読み込めます。検索、参照、削除では個別フラグまたは JSON を使い、両方は併用できません。API の出力形式は `--output json`、`--output yaml`、`--output table` で選択できます。
+意図したプロファイル、プロジェクト、認証情報を確認します。ディスク作成と更新は SDK のリクエスト JSON を使います。JSON は `--request` に直接指定するか、`@ファイル名` で読み込めます。検索、参照、削除では個別フラグまたは JSON を使い、両方は併用できません。API の出力形式は `--output json` または `--output table` で選択できます。
 
 `find --zone all` は全ゾーンを検索できます。`--count` と `--from` は各ゾーンの検索に適用されます。全ゾーン検索は個別フラグで指定するため、複雑な条件を含む `--request` JSON とは併用できません。
 

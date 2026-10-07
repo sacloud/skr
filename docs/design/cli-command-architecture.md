@@ -74,11 +74,11 @@ skr http <url> [--method ...] [--data ...]
 
 #### Zone API
 
-`skr iaas-api zone find` は sacloud-sdk-go v0.3.0 の `service/iaas/zone` が提供する `FindWithContext` を使ってゾーン一覧を取得します。リクエストは省略でき、指定する場合は `zone.FindRequest` JSON を使います。結果は他の API コマンドと同じ JSON、YAML、table、jq 出力経路を通します。この読み取り専用コマンドを jq の例とライブ E2E に使い、ゾーン名の抽出を検証します。詳細は [Zone チュートリアル](../manual/tutorials/iaas-api/zone.md) を参照してください。
+`skr iaas-api zone find` は sacloud-sdk-go v0.3.0 の `service/iaas/zone` が提供する `FindWithContext` を使ってゾーン一覧を取得します。リクエストは省略でき、指定する場合は `zone.FindRequest` JSON を使います。結果は他の API コマンドと同じ JSON、table、jq 出力経路を通します。この読み取り専用コマンドを jq の例とライブ E2E に使い、ゾーン名の抽出を検証します。詳細は [Zone チュートリアル](../manual/tutorials/iaas-api/zone.md) を参照してください。
 
 ### API コマンドの出力形式
 
-IaaS API と EventBus API の結果は JSON、YAML、table で表示できます。コマンドラインの `--output` が最優先で、未指定時は選択中プロファイルの `cli.default_output_type`（v1）または `DefaultOutputType`（v0）を使います。どちらも未設定の場合は JSON です。JSON/YAML は SDK が返すデータ形状を保ち、table はトップレベルのフィールドを列として表示します。列は Zone、ID、Name、状態、説明など利用者が識別に使う項目を優先します。table の列幅は端末幅に合わせ、長い値は省略します。列が収まらない場合は優先度の低い列を隠し、省略した列数を表示します。`--zone all` の table は、各 Switch の行に Zone 列を追加して先頭に表示します。JSON/YAML にはこの表示用 Zone 列を追加しません。
+API コマンドの結果は JSON または table で表示できます。コマンドラインの `--output` が最優先で、未指定時は選択中プロファイルの `cli.default_output_type`（v1）または `DefaultOutputType`（v0）を使います。どちらも未設定の場合は JSON です。JSON は SDK が返すデータ形状を保ち、table はトップレベルのフィールドを列として表示します。列は Zone、ID、Name、状態、説明など利用者が識別に使う項目を優先します。table の列幅は端末幅に合わせ、長い値は省略します。列が収まらない場合は優先度の低い列を隠し、省略した列数を表示します。`--zone all` の table は、各 Switch の行に Zone 列を追加して先頭に表示します。JSON にはこの表示用 Zone 列を追加しません。
 
 API コマンドではグローバル `--query` に jq 式を指定できます。クエリは API の結果全体に適用し、複数の結果値は JSON として順に出力します。`--query` を指定した場合は `--output` とプロファイルの既定形式より優先し、クエリ結果を JSON で出力します。評価には Go 実装の gojq を使い、外部 jq バイナリには依存しません。`skr http` の生レスポンスには適用しません。
 
