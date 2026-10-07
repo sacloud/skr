@@ -21,8 +21,10 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -459,6 +461,41 @@ func TestRunConfigCreateInvalidPrivateKeyFails(t *testing.T) {
 	}
 }
 
+func TestRunConfigCreateInsecurePrivateKeyPermissionsFail(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("private key permission validation is not supported on Windows")
+	}
+
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+	if err := os.Chmod(keyPath, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"config", "create", "prod",
+		"--service-principal-id", "spid-123",
+		"--service-principal-key-id", "kid-456",
+		"--private-key-file", keyPath,
+	}
+	if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("run() exit code = 0, want non-zero")
+	}
+	if got := stderr.String(); !strings.Contains(got, "permissions are too lax") {
+		t.Errorf("stderr = %q, want private key permission error", got)
+	}
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := profileOp.Read("prod"); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("read profile error = %v, want os.ErrNotExist", err)
+	}
+}
+
 func TestRunConfigEditNonInteractive(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
@@ -509,6 +546,50 @@ func TestRunConfigEditNonInteractive(t *testing.T) {
 	}
 	if got, want := profile.Attributes["zone"], "is1a"; got != want {
 		t.Errorf("zone = %q, want %q", got, want)
+	}
+}
+
+func TestRunConfigEditInsecurePrivateKeyPermissionsFail(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("private key permission validation is not supported on Windows")
+	}
+
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	oldKey := writeTestPrivateKey(t, profileDir)
+	newKey := filepath.Join(profileDir, "insecure.pem")
+	if err := os.WriteFile(newKey, []byte("not used"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	attributes := map[string]any{
+		attrServicePrincipalID:    "old-spid",
+		attrServicePrincipalKeyID: "old-kid",
+		attrPrivateKeyPEMPath:     oldKey,
+	}
+	if err := profileOp.Create(&saclient.Profile{Name: "prod", Attributes: attributes}); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	args := []string{"config", "edit", "prod", "--private-key-file", newKey}
+	if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("run() exit code = 0, want non-zero")
+	}
+	if got := stderr.String(); !strings.Contains(got, "permissions are too lax") {
+		t.Errorf("stderr = %q, want private key permission error", got)
+	}
+
+	profile, err := profileOp.Read("prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := profile.Attributes[attrPrivateKeyPEMPath], oldKey; got != want {
+		t.Errorf("PrivateKeyPEMPath = %q, want %q", got, want)
 	}
 }
 

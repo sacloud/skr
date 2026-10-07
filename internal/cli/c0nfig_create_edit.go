@@ -81,7 +81,7 @@ func (c *createCommand) Run(ctx *kong.Context) error {
 		return fmt.Errorf("missing required values: %s", strings.Join(missing, ", "))
 	}
 
-	if err := validatePrivateKeyFile(values[attrPrivateKeyPEMPath].(string), interactive, ctx.Stdout); err != nil {
+	if err := validatePrivateKeyFile(values[attrPrivateKeyPEMPath].(string)); err != nil {
 		return err
 	}
 
@@ -150,7 +150,7 @@ func (c *editCommand) Run(ctx *kong.Context) error {
 	}
 
 	if path, ok := values[attrPrivateKeyPEMPath].(string); ok {
-		if err := validatePrivateKeyFile(path, interactive, ctx.Stdout); err != nil {
+		if err := validatePrivateKeyFile(path); err != nil {
 			return err
 		}
 	}
@@ -316,7 +316,7 @@ func validateProfileName(name string) error {
 	return nil
 }
 
-func validatePrivateKeyFile(path string, interactive bool, out io.Writer) error {
+func validatePrivateKeyFile(path string) error {
 	if path == "" {
 		return fmt.Errorf("private key file path is required")
 	}
@@ -330,21 +330,7 @@ func validatePrivateKeyFile(path string, interactive bool, out io.Writer) error 
 	}
 
 	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
-		msg := fmt.Sprintf("Warning: private key file %q permissions are too lax (%o).", path, info.Mode().Perm())
-		if interactive {
-			reader := bufio.NewReader(os.Stdin)
-			cont, err := confirm(reader, out, msg+" Continue anyway?")
-			if err != nil {
-				return err
-			}
-			if !cont {
-				return fmt.Errorf("cancelled")
-			}
-		} else {
-			if _, err := fmt.Fprintln(out, msg); err != nil {
-				return err
-			}
-		}
+		return fmt.Errorf("private key file %q permissions are too lax (%o): group and other permissions must be disabled", path, info.Mode().Perm())
 	}
 
 	//nolint:gosec // The private key path is provided by the user and intentionally read.
