@@ -45,6 +45,8 @@ type configCommand struct {
 	Current currentCommand `cmd:"" help:"Print the current profile name."`
 	List    listCommand    `cmd:"" help:"List configuration profiles."`
 	Show    showCommand    `cmd:"" help:"Show a configuration profile."`
+	Create  createCommand  `cmd:"" help:"コントロールパネルで作成したサービスプリンシパルキーを含む profile を新規作成します。"`
+	Edit    editCommand    `cmd:"" help:"既存 profile のサービスプリンシパルキー認証情報を編集します。"`
 }
 
 type versionCommand struct{}

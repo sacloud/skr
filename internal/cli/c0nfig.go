@@ -91,11 +91,39 @@ func (c *showCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(profile.Attributes, "", "  ")
+	data, err := json.MarshalIndent(maskSensitiveAttributes(profile.Attributes), "", "  ")
 	if err != nil {
 		return err
 	}
 
 	_, err = fmt.Fprintln(ctx.Stdout, string(data))
 	return err
+}
+
+var sensitiveProfileAttributes = []string{"AccessToken", "AccessTokenSecret", "PrivateKey", "PrivateKeyPEMPath"}
+
+func maskSensitiveAttributes(attrs map[string]any) map[string]any {
+	if attrs == nil {
+		return nil
+	}
+	masked := make(map[string]any, len(attrs))
+	for k, v := range attrs {
+		if isSensitiveAttribute(k) {
+			if v != nil && v != "" {
+				masked[k] = "(masked)"
+				continue
+			}
+		}
+		masked[k] = v
+	}
+	return masked
+}
+
+func isSensitiveAttribute(key string) bool {
+	for _, s := range sensitiveProfileAttributes {
+		if key == s {
+			return true
+		}
+	}
+	return false
 }

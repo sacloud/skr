@@ -16,7 +16,11 @@ package cli
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"strings"
@@ -226,5 +230,434 @@ func TestRunConfigShowUnknownProfile(t *testing.T) {
 	}
 	if got := stderr.String(); !strings.Contains(got, "missing") {
 		t.Errorf("stderr = %q, want an error mentioning the profile", got)
+	}
+}
+
+func writeTestPrivateKey(t *testing.T, dir string) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "key.pem")
+	block := &pem.Block{Type: "PRIVATE KEY", Bytes: der}
+	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestRunConfigCreateNonInteractive(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"config", "create", "prod",
+		"--service-principal-id", "spid-123",
+		"--service-principal-key-id", "kid-456",
+		"--private-key-file", keyPath,
+	}
+	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+	if got := stderr.String(); got != "" {
+		t.Errorf("stderr = %q, want empty", got)
+	}
+	if got := stdout.String(); !strings.Contains(got, "prod") || !strings.Contains(got, "created") {
+		t.Errorf("stdout = %q, want creation message", got)
+	}
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := profileOp.Read("prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := profile.Attributes[attrServicePrincipalID], "spid-123"; got != want {
+		t.Errorf("ServicePrincipalID = %q, want %q", got, want)
+	}
+	if got, want := profile.Attributes[attrServicePrincipalKeyID], "kid-456"; got != want {
+		t.Errorf("ServicePrincipalKeyID = %q, want %q", got, want)
+	}
+	if got, want := profile.Attributes[attrPrivateKeyPEMPath], keyPath; got != want {
+		t.Errorf("PrivateKeyPEMPath = %q, want %q", got, want)
+	}
+
+	current, err := profileOp.GetCurrentName()
+	if err == nil {
+		t.Errorf("current profile = %q, want no current profile set", current)
+	}
+}
+
+func TestRunConfigCreateWithUse(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"config", "create", "prod",
+		"--service-principal-id", "spid-123",
+		"--service-principal-key-id", "kid-456",
+		"--private-key-file", keyPath,
+		"--use",
+	}
+	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := profileOp.GetCurrentName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := current, "prod"; got != want {
+		t.Errorf("current profile = %q, want %q", got, want)
+	}
+}
+
+func TestRunConfigCreateInvalidName(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+	baseArgs := []string{"--service-principal-id", "spid", "--service-principal-key-id", "kid", "--private-key-file", keyPath}
+
+	for _, invalidName := range []string{".", "..", "a/b"} {
+		t.Run(invalidName, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			args := append([]string{"config", "create", invalidName}, baseArgs...)
+			if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
+				t.Fatal("run() exit code = 0, want non-zero")
+			}
+			if got := stderr.String(); got == "" {
+				t.Error("stderr is empty, want an error")
+			}
+		})
+	}
+}
+
+func TestRunConfigCreateDefaultName(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"config", "create",
+		"--service-principal-id", "spid-123",
+		"--service-principal-key-id", "kid-456",
+		"--private-key-file", keyPath,
+	}
+	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := profileOp.Read("default"); err != nil {
+		t.Fatalf("read default profile: %v", err)
+	}
+}
+
+func TestRunConfigCreateExistingProfileFails(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.Create(&saclient.Profile{Name: "prod", Attributes: map[string]any{}}); err != nil {
+		t.Fatal(err)
+	}
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"config", "create", "prod",
+		"--service-principal-id", "spid-123",
+		"--service-principal-key-id", "kid-456",
+		"--private-key-file", keyPath,
+	}
+	if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("run() exit code = 0, want non-zero")
+	}
+	if got := stderr.String(); !strings.Contains(got, "already exists") {
+		t.Errorf("stderr = %q, want already exists error", got)
+	}
+}
+
+func TestRunConfigCreateMissingFlagsFails(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "missing service principal id",
+			args: []string{"config", "create", "prod", "--service-principal-key-id", "kid", "--private-key-file", keyPath},
+		},
+		{
+			name: "missing service principal key id",
+			args: []string{"config", "create", "prod", "--service-principal-id", "spid", "--private-key-file", keyPath},
+		},
+		{
+			name: "missing private key file",
+			args: []string{"config", "create", "prod", "--service-principal-id", "spid", "--service-principal-key-id", "kid"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if exitCode := run(tt.args, &stdout, &stderr); exitCode == 0 {
+				t.Fatal("run() exit code = 0, want non-zero")
+			}
+			if got := stderr.String(); got == "" {
+				t.Error("stderr is empty, want an error")
+			}
+		})
+	}
+}
+
+func TestRunConfigCreateInvalidPrivateKeyFails(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := filepath.Join(profileDir, "invalid.pem")
+	if err := os.WriteFile(keyPath, []byte("not a key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"config", "create", "prod",
+		"--service-principal-id", "spid-123",
+		"--service-principal-key-id", "kid-456",
+		"--private-key-file", keyPath,
+	}
+	if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("run() exit code = 0, want non-zero")
+	}
+	if got := stderr.String(); !strings.Contains(got, "private key") {
+		t.Errorf("stderr = %q, want private key error", got)
+	}
+}
+
+func TestRunConfigEditNonInteractive(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	oldKey := writeTestPrivateKey(t, profileDir)
+	newKey := writeTestPrivateKey(t, profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.Create(&saclient.Profile{
+		Name: "prod",
+		Attributes: map[string]any{
+			attrServicePrincipalID:    "old-spid",
+			attrServicePrincipalKeyID: "old-kid",
+			attrPrivateKeyPEMPath:     oldKey,
+			"zone":                    "is1a",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.SetCurrentName("prod"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"config", "edit", "prod",
+		"--service-principal-key-id", "new-kid",
+		"--private-key-file", newKey,
+	}
+	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+
+	profile, err := profileOp.Read("prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := profile.Attributes[attrServicePrincipalID], "old-spid"; got != want {
+		t.Errorf("ServicePrincipalID = %q, want %q", got, want)
+	}
+	if got, want := profile.Attributes[attrServicePrincipalKeyID], "new-kid"; got != want {
+		t.Errorf("ServicePrincipalKeyID = %q, want %q", got, want)
+	}
+	if got, want := profile.Attributes[attrPrivateKeyPEMPath], newKey; got != want {
+		t.Errorf("PrivateKeyPEMPath = %q, want %q", got, want)
+	}
+	if got, want := profile.Attributes["zone"], "is1a"; got != want {
+		t.Errorf("zone = %q, want %q", got, want)
+	}
+}
+
+func TestRunConfigEditNoFlagsFails(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.Create(&saclient.Profile{
+		Name:       "prod",
+		Attributes: map[string]any{attrServicePrincipalID: "spid", attrServicePrincipalKeyID: "kid", attrPrivateKeyPEMPath: keyPath},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.SetCurrentName("prod"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"config", "edit"}, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("run() exit code = 0, want non-zero")
+	}
+	if got := stderr.String(); got == "" {
+		t.Error("stderr is empty, want an error")
+	}
+}
+
+func TestRunConfigEditUseSwitchesCurrent(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"default", "prod"} {
+		attrs := map[string]any{attrServicePrincipalID: "spid", attrServicePrincipalKeyID: "kid", attrPrivateKeyPEMPath: keyPath}
+		if err := profileOp.Create(&saclient.Profile{Name: name, Attributes: attrs}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := profileOp.SetCurrentName("default"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	args := []string{"config", "edit", "prod", "--service-principal-id", "new-spid", "--use"}
+	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+
+	current, err := profileOp.GetCurrentName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := current, "prod"; got != want {
+		t.Errorf("current profile = %q, want %q", got, want)
+	}
+}
+
+func TestRunConfigEditUseSwitchesCurrentWithoutChanges(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"default", "prod"} {
+		attrs := map[string]any{attrServicePrincipalID: "spid", attrServicePrincipalKeyID: "kid", attrPrivateKeyPEMPath: keyPath}
+		if err := profileOp.Create(&saclient.Profile{Name: name, Attributes: attrs}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := profileOp.SetCurrentName("default"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"config", "edit", "prod", "--use"}, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+
+	current, err := profileOp.GetCurrentName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := current, "prod"; got != want {
+		t.Errorf("current profile = %q, want %q", got, want)
+	}
+}
+
+func TestRunConfigShowMasksSensitiveAttributes(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.Create(&saclient.Profile{
+		Name: "prod",
+		Attributes: map[string]any{
+			"zone":                    "is1a",
+			attrServicePrincipalID:    "spid-123",
+			attrServicePrincipalKeyID: "kid-456",
+			attrPrivateKeyPEMPath:     keyPath,
+			"AccessToken":             "token",
+			"AccessTokenSecret":       "secret",
+			"PrivateKey":              "pem-content",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.SetCurrentName("prod"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"config", "show"}, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+
+	var attrs map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &attrs); err != nil {
+		t.Fatalf("decode stdout: %v", err)
+	}
+	if got, want := attrs["zone"], "is1a"; got != want {
+		t.Errorf("zone = %q, want %q", got, want)
+	}
+	if got, want := attrs[attrServicePrincipalID], "spid-123"; got != want {
+		t.Errorf("ServicePrincipalID = %q, want %q", got, want)
+	}
+	if got, want := attrs[attrServicePrincipalKeyID], "kid-456"; got != want {
+		t.Errorf("ServicePrincipalKeyID = %q, want %q", got, want)
+	}
+	for _, key := range []string{"AccessToken", "AccessTokenSecret", "PrivateKey", attrPrivateKeyPEMPath} {
+		if got := attrs[key]; got != "(masked)" {
+			t.Errorf("%s = %q, want masked", key, got)
+		}
+	}
+	if got := stderr.String(); got != "" {
+		t.Errorf("stderr = %q, want empty", got)
 	}
 }
