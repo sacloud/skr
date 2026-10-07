@@ -31,8 +31,8 @@ type ScheduleAPIFactory func() (ScheduleAPI, error)
 
 type ScheduleRuntime struct {
 	DecodeRequest   func(string, any) error
-	OutputType      func(*kong.Context) (string, error)
-	WriteOutput     func(*kong.Context, string, any, ...[]string) error
+	ValidateOutput  func(*kong.Context) error
+	WriteOutput     func(*kong.Context, any) error
 	ValidateRequest func(string, any) error
 }
 
@@ -58,11 +58,10 @@ type ScheduleListCommand struct {
 }
 
 func (c *ScheduleListCommand) Run(ctx *kong.Context) error {
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -79,7 +78,7 @@ func (c *ScheduleListCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type ScheduleReadCommand struct {
@@ -89,11 +88,10 @@ type ScheduleReadCommand struct {
 }
 
 func (c *ScheduleReadCommand) Run(ctx *kong.Context) error {
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -110,7 +108,7 @@ func (c *ScheduleReadCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type ScheduleCreateCommand struct {
@@ -141,11 +139,10 @@ func (c *ScheduleCreateCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.ValidateRequest("setScheduleProvider", request); err != nil {
 		return err
 	}
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -162,7 +159,7 @@ func (c *ScheduleCreateCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type ScheduleUpdateCommand struct {
@@ -188,11 +185,10 @@ func (c *ScheduleUpdateCommand) Run(ctx *kong.Context) error {
 	} else {
 		return fmt.Errorf("--request が必要です")
 	}
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -209,7 +205,7 @@ func (c *ScheduleUpdateCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type ScheduleDeleteCommand struct {

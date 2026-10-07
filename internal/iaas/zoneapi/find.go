@@ -29,11 +29,10 @@ type FindCommand struct {
 }
 
 func (c *FindCommand) Run(ctx *kong.Context) error {
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 
@@ -61,5 +60,5 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }

@@ -28,34 +28,38 @@ import (
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
 )
 
-func TestProfileOutputType(t *testing.T) {
+func TestOutputFlagIsRejectedBeforeAPICall(t *testing.T) {
+	for _, format := range []string{"json", "table", "yaml"} {
+		for _, query := range []bool{false, true} {
+			t.Run(format+map[bool]string{false: "", true: "-query"}[query], func(t *testing.T) {
+				commandLine := newCLI()
+				commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
+					t.Fatal("API factory called for unsupported --output")
+					return nil, nil
+				})
+				args := []string{"iaas-api", "switch", "create", "--zone", "test-zone", "--name", "test", "--output", format}
+				if query {
+					args = append(args, "--query", ".Name")
+				}
+				var stdout, stderr bytes.Buffer
+				if code := runCLI(args, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "--output") {
+					t.Fatalf("removed flag: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+				}
+			})
+		}
+	}
+}
+
+func TestJSONOutputIgnoresLegacyProfileFormat(t *testing.T) {
 	for _, test := range []struct {
-		name       string
-		filename   string
-		contents   string
-		wantFormat string
+		name, filename, contents string
 	}{
-		{
-			name:       "v1",
-			filename:   "config.yaml",
-			contents:   "version: 1\ncli:\n  default_output_type: table\n",
-			wantFormat: "table",
-		},
-		{
-			name:       "v0",
-			filename:   "config.json",
-			contents:   `{"DefaultOutputType":"table"}`,
-			wantFormat: "table",
-		},
-		{
-			name:       "unset",
-			filename:   "config.yaml",
-			contents:   "version: 1\ncli:\n  argument_match_mode: exact\n",
-			wantFormat: "json",
-		},
+		{"v1", "config.yaml", "version: 1\ncli:\n  default_output_type: table\n"},
+		{"v0", "config.json", `{"DefaultOutputType":"table"}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			profileDir := t.TempDir()
+			t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 			profilePath := filepath.Join(profileDir, "example")
 			if err := os.Mkdir(profilePath, 0o700); err != nil {
 				t.Fatal(err)
@@ -66,150 +70,64 @@ func TestProfileOutputType(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(profilePath, test.filename), []byte(test.contents), 0o600); err != nil {
 				t.Fatal(err)
 			}
-
-			format, err := profileOutputType([]string{"SAKURA_PROFILE_DIR=" + profileDir})
-			if err != nil {
+			server := iaasmock.NewTestServer(iaasmock.Config{})
+			t.Cleanup(server.Close)
+			runCommand := func(args ...string) []byte {
+				t.Helper()
+				commandLine := newCLI()
+				commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) { return swytch.New(server), nil })
+				var stdout, stderr bytes.Buffer
+				if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
+					t.Fatalf("run(%v): code %d, stderr %s", args, code, stderr.String())
+				}
+				return stdout.Bytes()
+			}
+			var created iaas.Switch
+			if err := json.Unmarshal(runCommand("iaas-api", "switch", "create", "--zone", "test-zone", "--name", "output-test"), &created); err != nil {
 				t.Fatal(err)
 			}
-			if format != test.wantFormat {
-				t.Fatalf("profileOutputType() = %q, want %q", format, test.wantFormat)
+			if created.Name != "output-test" {
+				t.Fatalf("JSON create returned %+v", created)
+			}
+			output := runCommand("iaas-api", "switch", "find", "--zone", "test-zone", "--query", "map({ID,Name})")
+			var projected []map[string]json.RawMessage
+			if err := json.Unmarshal(output, &projected); err != nil {
+				t.Fatal(err)
+			}
+			if len(projected) != 1 || len(projected[0]) != 2 || string(projected[0]["Name"]) != `"output-test"` {
+				t.Fatalf("projected output = %s", output)
 			}
 		})
 	}
 }
 
-func TestYAMLOutputIsRejected(t *testing.T) {
-	if _, err := validateOutputType("yaml"); err == nil {
-		t.Fatal("validateOutputType(\"yaml\") succeeded, want unsupported format error")
-	}
-
-	var stdout, stderr bytes.Buffer
-	if code := runCLI([]string{"iaas-api", "switch", "find", "--output", "yaml"}, &stdout, &stderr, newCLI()); code == 0 {
-		t.Fatal("--output yaml succeeded, want an unsupported format error")
-	}
-	if !strings.Contains(stderr.String(), "yaml") {
-		t.Errorf("--output yaml error = %q, want it to mention yaml", stderr.String())
-	}
-
-	profileDir := t.TempDir()
-	profilePath := filepath.Join(profileDir, "example")
-	if err := os.Mkdir(profilePath, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(profileDir, "current"), []byte("example\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(profilePath, "config.json"), []byte(`{"DefaultOutputType":"yaml"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	format, err := profileOutputType([]string{"SAKURA_PROFILE_DIR=" + profileDir})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := validateOutputType(format); err == nil {
-		t.Fatal("YAML profile output format was accepted")
-	}
-}
-
-func TestIaaSSwitchOutputFormatAndProfileDefault(t *testing.T) {
-	profileDir := t.TempDir()
-	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
-	t.Setenv("COLUMNS", "100")
-	server := iaasmock.NewTestServer(iaasmock.Config{})
-	t.Cleanup(server.Close)
-
-	commandLine := newCLI()
-	commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
-		return swytch.New(server), nil
-	})
-	runCommand := func(args ...string) string {
-		t.Helper()
-		var stdout, stderr bytes.Buffer
-		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-			t.Fatalf("run(%v) = %d; stderr: %s", args, code, stderr.String())
-		}
-		return stdout.String()
-	}
-
-	var created iaas.Switch
-	if err := json.Unmarshal([]byte(runCommand("iaas-api", "switch", "create", "--zone", "test-zone", "--name", "output-test")), &created); err != nil {
-		t.Fatal(err)
-	}
-
-	profilePath := filepath.Join(profileDir, "example")
-	if err := os.Mkdir(profilePath, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(profileDir, "current"), []byte("example\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(profilePath, "config.yaml"), []byte("version: 1\ncli:\n  default_output_type: table\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	profileTable := runCommand("iaas-api", "switch", "find", "--zone", "test-zone")
-	if got := tableHeaderCells(profileTable); len(got) < 3 || strings.Join(got[:3], " ") != "ID Name Description" {
-		t.Errorf("profile table headers start with %v, want ID Name Description", got[:min(3, len(got))])
-	}
-
-	queryOutput := runCommand("iaas-api", "switch", "read", "--zone", "test-zone", "--id", created.ID.String(), "--query", ".Name", "--output", "table")
-	if got := strings.TrimSpace(queryOutput); got != `"output-test"` {
-		t.Errorf("--query output = %q, want JSON string %q", got, `"output-test"`)
-	}
-
-	queryListOutput := runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone","Names":["output-test"]}`, "--query", ".[].Name")
-	if got := strings.TrimSpace(queryListOutput); got != `"output-test"` {
-		t.Errorf("--query list output = %q, want JSON string %q", got, `"output-test"`)
-	}
-
-	jsonOutput := runCommand("iaas-api", "switch", "read", "--zone", "test-zone", "--id", created.ID.String(), "--output", "json")
-	if !strings.HasPrefix(strings.TrimSpace(jsonOutput), "{") {
-		t.Errorf("--output json returned %q, want a JSON object", jsonOutput)
-	}
-}
-
-func TestQueryErrors(t *testing.T) {
-	commandLine := newCLI()
-	var stdout, stderr bytes.Buffer
-	if code := runCLI([]string{"iaas-api", "switch", "read", "--zone", "test-zone", "--id", "1", "--query", "("}, &stdout, &stderr, commandLine); code == 0 {
-		t.Fatal("invalid --query expression succeeded")
-	}
-	if !strings.Contains(stderr.String(), "parse --query expression") {
-		t.Errorf("invalid --query error = %q, want parse error", stderr.String())
+func TestQueryErrorsBeforeAPICall(t *testing.T) {
+	for _, expression := range []string{"(", "unknown_function"} {
+		t.Run(expression, func(t *testing.T) {
+			commandLine := newCLI()
+			commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
+				t.Fatal("API factory called with invalid query")
+				return nil, nil
+			})
+			var stdout, stderr bytes.Buffer
+			if code := runCLI([]string{"iaas-api", "switch", "create", "--zone", "test-zone", "--name", "test", "--query", expression}, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "--query expression") {
+				t.Fatalf("invalid query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+			}
+		})
 	}
 }
 
 func TestWriteQueryOutput(t *testing.T) {
 	for _, test := range []struct {
-		name       string
-		expression string
-		value      any
-		want       string
+		name, expression string
+		value            any
+		want             string
 	}{
-		{
-			name:       "preserves large numbers",
-			expression: ".ID",
-			value:      map[string]any{"ID": json.Number("9007199254740993")},
-			want:       "9007199254740993\n",
-		},
-		{
-			name:       "writes multiple results",
-			expression: ".[]",
-			value:      []int{1, 2},
-			want:       "1\n2\n",
-		},
-		{
-			name:       "empty result",
-			expression: ".[]",
-			value:      []int{},
-			want:       "",
-		},
-		{
-			name:       "halt stops after previous results",
-			expression: `("before", halt, "after")`,
-			value:      map[string]any{},
-			want:       `"before"` + "\n",
-		},
+		{"preserves large numbers", ".ID", map[string]any{"ID": json.Number("9007199254740993")}, "9007199254740993\n"},
+		{"writes multiple results", ".[]", []int{1, 2}, "1\n2\n"},
+		{"empty result", ".[]", []int{}, ""},
+		{"empty projection", "map({ID,Name})", []any{}, "[]\n"},
+		{"halt stops after previous results", `("before", halt, "after")`, map[string]any{}, "\"before\"\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var output bytes.Buffer
@@ -225,87 +143,10 @@ func TestWriteQueryOutput(t *testing.T) {
 
 func TestWriteQueryOutputDoesNotWritePartialResultsOnError(t *testing.T) {
 	var output bytes.Buffer
-	err := writeQueryOutput(&output, `(.Name, error("query failed"))`, map[string]any{"Name": "example"})
-	if err == nil {
+	if err := writeQueryOutput(&output, `(.Name, error("query failed"))`, map[string]any{"Name": "example"}); err == nil {
 		t.Fatal("writeQueryOutput() succeeded, want evaluation error")
 	}
 	if got := output.String(); got != "" {
 		t.Errorf("writeQueryOutput() wrote partial output %q", got)
 	}
-}
-
-func TestWriteTableFitsTerminalWidthAndAddsBorders(t *testing.T) {
-	t.Setenv("COLUMNS", "40")
-	value := []map[string]any{{
-		"ID":          json.Number("12345"),
-		"Name":        "サーバー長い名前",
-		"Description": "日本語の長い説明文が端末幅で省略されることを確認します",
-		"Tags":        []string{"production", "database"},
-		"CreatedAt":   "2026-10-05T12:00:00Z",
-	}}
-	var output bytes.Buffer
-	if err := writeTable(&output, value, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	lines := strings.Split(strings.TrimSuffix(output.String(), "\n"), "\n")
-	for _, line := range lines {
-		if got := displayWidth(line); got > 40 {
-			t.Errorf("table line width = %d, want <= 40: %q", got, line)
-		}
-	}
-	if !strings.HasPrefix(lines[0], "+") || !strings.Contains(lines[1], "|") || !strings.HasPrefix(lines[2], "+") {
-		t.Fatalf("table output lacks visible borders:\n%s", output.String())
-	}
-	headers := tableHeaderCells(output.String())
-	if len(headers) < 3 || strings.Join(headers[:3], " ") != "ID Name Description" {
-		t.Errorf("table headers = %v, want ID Name Description first", headers)
-	}
-	if !strings.Contains(output.String(), "columns omitted") {
-		t.Errorf("table output should indicate omitted columns:\n%s", output.String())
-	}
-}
-
-func TestWriteTablePreservesLargeNumericIDs(t *testing.T) {
-	var output bytes.Buffer
-	value := []map[string]any{{"ID": json.Number("9007199254740993")}}
-	if err := writeTable(&output, value, nil); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(output.String(), "9007199254740993") {
-		t.Errorf("table output altered a large numeric ID:\n%s", output.String())
-	}
-}
-
-func TestWriteTableOmitsZeroTimestamps(t *testing.T) {
-	t.Setenv("COLUMNS", "120")
-	value := []map[string]any{{
-		"ID":         "123",
-		"Name":       "switch",
-		"CreatedAt":  "0001-01-01T00:00:00Z",
-		"ModifiedAt": "0001-01-01T00:00:00Z",
-	}}
-	var output bytes.Buffer
-	if err := writeTable(&output, value, nil); err != nil {
-		t.Fatal(err)
-	}
-	got := output.String()
-	if strings.Contains(got, "0001-01-01") {
-		t.Errorf("table output shows zero timestamp:\n%s", got)
-	}
-	if !strings.Contains(got, "ModifiedAt") {
-		t.Errorf("table output does not contain ModifiedAt column:\n%s", got)
-	}
-}
-
-func tableHeaderCells(output string) []string {
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	if len(lines) < 2 {
-		return nil
-	}
-	cells := strings.Split(strings.Trim(lines[1], "|"), "|")
-	for i, cell := range cells {
-		cells[i] = strings.TrimSpace(cell)
-	}
-	return cells
 }

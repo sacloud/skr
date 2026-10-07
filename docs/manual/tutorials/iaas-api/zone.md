@@ -1,6 +1,6 @@
 # IaaS Zone API: ゾーン一覧を jq で加工する
 
-`skr iaas-api zone find` は IaaS API からゾーン一覧を取得します。このチュートリアルでは、一覧を table で確認し、`--query` でゾーン名だけを取り出します。
+`skr iaas-api zone find` は IaaS API からゾーン一覧を取得します。このチュートリアルでは、JSON の一覧を確認し、`--query` でゾーン名だけを取り出します。
 
 ## 前提条件
 
@@ -21,13 +21,13 @@ $ skr iaas-api zone --help
 $ skr iaas-api zone find --help
 ```
 
-### 2. ゾーン一覧を table で確認する
+### 2. ゾーン一覧を JSON で確認する
 
 ```console
-$ skr iaas-api zone find --output table
+$ skr iaas-api zone find
 ```
 
-表示されるゾーンは利用環境によって異なります。端末幅によっては、table の一部の列を省略して表示します。
+表示されるゾーンは利用環境によって異なります。必要な項目だけを確認するには、次のクエリを使います。
 
 ### 3. jq 式でゾーン名を取り出す
 
@@ -35,7 +35,16 @@ $ skr iaas-api zone find --output table
 $ skr iaas-api zone find --query 'map(.Name)'
 ```
 
-`map(.Name)` は取得結果の各要素から `Name` を選び、名前の配列を JSON で出力します。クエリを指定した場合、`--output` とプロファイル既定の出力形式は適用されず、結果を JSON で返します。jq 式は skr に組み込まれた gojq で評価するため、外部の jq コマンドは不要です。
+`map(.Name)` は取得結果の各要素から `Name` を選び、名前の配列を JSON で出力します。次は CLI テストで確認した出力例です。名前はテスト用の値に置き換えています。
+
+```json
+[
+  "test-zone-a",
+  "test-zone-b"
+]
+```
+
+jq 式は skr に組み込まれた gojq で評価するため、外部の jq コマンドは不要です。
 
 ## クリーンアップ
 

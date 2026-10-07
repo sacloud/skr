@@ -35,6 +35,7 @@ type fakeCLI struct {
 	changeCleanupIdentity bool
 	calls                 []string
 	callArgs              map[string][]string
+	queryOut              []byte
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
@@ -65,8 +66,11 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		return data, err
 	case "e2e-list-created", "e2e-cleanup-list", "e2e-cleanup-list-after":
 		return f.queueList()
-	case "e2e-list-created-table":
-		return []byte("ID Name\nqueue-123 skr-e2e-sqm-test\n"), nil
+	case "e2e-list-created-query":
+		if f.queryOut != nil {
+			return f.queryOut, nil
+		}
+		return f.queueList()
 	case "e2e-config":
 		f.item.Settings.VisibilityTimeoutSeconds = 30
 		f.item.Settings.ExpireSeconds = 345600
@@ -140,7 +144,7 @@ func TestScenarioCleansUpAfterSuccess(t *testing.T) {
 		t.Fatal("test queue was not deleted")
 	}
 	for _, want := range []string{
-		"e2e-list-created-table",
+		"e2e-list-created-query",
 		"e2e-config",
 		"e2e-rotate-api-key",
 		"e2e-send",
@@ -160,6 +164,9 @@ func TestScenarioCleansUpAfterSuccess(t *testing.T) {
 		if !strings.Contains(configArgs, want) {
 			t.Errorf("E2E config args %q do not contain %q", configArgs, want)
 		}
+		if got := strings.Join(fake.callArgs["e2e-list-created-query"], " "); got != "simplemq-api queue list --query map({ID,Name})" {
+			t.Errorf("projection args = %q", got)
+		}
 	}
 	if got := strings.Join(fake.callArgs["e2e-profile-current"], " "); got != "config current" {
 		t.Errorf("profile check args = %q, want %q", got, "config current")
@@ -174,6 +181,20 @@ func TestScenarioCleansUpAfterFailure(t *testing.T) {
 	}
 	if fake.item != nil || !contains(fake.calls, "e2e-cleanup-delete") {
 		t.Fatal("created queue was not cleaned up after failure")
+	}
+}
+
+func TestScenarioRejectsInvalidProjectionAndCleansUp(t *testing.T) {
+	for _, output := range []string{"null", "[]", `{"Name":"skr-e2e-sqm-test"}`, `[{"ID":"wrong","Name":"skr-e2e-sqm-test"}]`, `[{"ID":"queue-123","Name":"wrong"}]`} {
+		t.Run(output, func(t *testing.T) {
+			f := &fakeCLI{queryOut: []byte(output)}
+			if err := testScenario(t, f); err == nil {
+				t.Fatal("invalid projection accepted")
+			}
+			if f.item != nil || !contains(f.calls, "e2e-cleanup-delete") {
+				t.Fatal("created queue not cleaned up")
+			}
+		})
 	}
 }
 

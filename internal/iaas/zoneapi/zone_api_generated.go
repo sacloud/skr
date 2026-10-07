@@ -23,8 +23,8 @@ type APIFactory func() (API, error)
 
 type Runtime struct {
 	DecodeRequest   func(string, any) error
-	OutputType      func(*kong.Context) (string, error)
-	WriteOutput     func(*kong.Context, string, any, ...[]string) error
+	ValidateOutput  func(*kong.Context) error
+	WriteOutput     func(*kong.Context, any) error
 	ValidateRequest func(string, any) error
 }
 

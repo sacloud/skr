@@ -5,6 +5,8 @@
 
 ## Context
 
+JSON と table を併存させる決定は [ADR 0030](0030-remove-table-output.md) で置き換えました。YAML API 出力を廃止する方針は維持します。
+
 [ADR 0009](0009-api-output-formats.md) で API コマンドに JSON、YAML、table の出力形式を導入しました。現在まで YAML 出力への需要は確認されていません。このため、利用者向け CLI と実装から YAML 出力を除きます。
 
 ## Decision

@@ -37,8 +37,8 @@ type QueueAPIFactory func() (QueueAPI, error)
 
 type QueueRuntime struct {
 	DecodeRequest   func(string, any) error
-	OutputType      func(*kong.Context) (string, error)
-	WriteOutput     func(*kong.Context, string, any, ...[]string) error
+	ValidateOutput  func(*kong.Context) error
+	WriteOutput     func(*kong.Context, any) error
 	ValidateRequest func(string, any) error
 }
 
@@ -70,11 +70,10 @@ type QueueListCommand struct {
 }
 
 func (c *QueueListCommand) Run(ctx *kong.Context) error {
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -91,7 +90,7 @@ func (c *QueueListCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type QueueReadCommand struct {
@@ -101,11 +100,10 @@ type QueueReadCommand struct {
 }
 
 func (c *QueueReadCommand) Run(ctx *kong.Context) error {
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -122,7 +120,7 @@ func (c *QueueReadCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type QueueDeleteCommand struct {

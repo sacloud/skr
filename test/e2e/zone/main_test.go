@@ -46,8 +46,6 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 	switch step {
 	case "profile-current":
 		return []byte("test-profile\n"), nil
-	case "zone-list-table":
-		return []byte("+------+\n| Name |\n+------+\n"), nil
 	case "zone-names-jq":
 		if f.queryOut != nil {
 			return f.queryOut, nil
@@ -63,13 +61,10 @@ func TestScenarioListsZonesAndAppliesJQ(t *testing.T) {
 	if err := (scenario{client: fake}).run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := strings.Join(fake.args["zone-list-table"], " "), "iaas-api zone find --output table"; got != want {
-		t.Errorf("table args = %q, want %q", got, want)
-	}
 	if got, want := strings.Join(fake.args["zone-names-jq"], " "), "iaas-api zone find --query map(.Name)"; got != want {
 		t.Errorf("query args = %q, want %q", got, want)
 	}
-	if got, want := strings.Join(fake.calls, " "), "profile-current zone-list-table zone-names-jq"; got != want {
+	if got, want := strings.Join(fake.calls, " "), "profile-current zone-names-jq"; got != want {
 		t.Errorf("scenario calls = %q, want %q", got, want)
 	}
 }

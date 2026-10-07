@@ -39,9 +39,9 @@ type iaasAPICommand struct {
 
 func (c *cli) initIaaSAPI() {
 	c.IaaSAPI.Zone.SetRuntime(zoneapi.Runtime{
-		DecodeRequest: decodeRequest,
-		OutputType:    outputType,
-		WriteOutput:   writeOutputWithFormat,
+		DecodeRequest:  decodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
 	})
 	c.IaaSAPI.Zone.SetFactory(func() (zoneapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
@@ -53,8 +53,8 @@ func (c *cli) initIaaSAPI() {
 
 	c.IaaSAPI.Disk.SetRuntime(diskapi.Runtime{
 		DecodeRequest:   decodeRequest,
-		OutputType:      outputType,
-		WriteOutput:     writeOutputWithFormat,
+		ValidateOutput:  validateOutput,
+		WriteOutput:     writeOutput,
 		ValidateRequest: diskresource.ValidateRequest,
 	})
 	c.IaaSAPI.Disk.SetFactory(func() (diskapi.API, error) {
@@ -70,8 +70,8 @@ func (c *cli) initIaaSAPI() {
 
 	c.IaaSAPI.Switch.SetRuntime(switchapi.Runtime{
 		DecodeRequest:   decodeRequest,
-		OutputType:      outputType,
-		WriteOutput:     writeOutputWithFormat,
+		ValidateOutput:  validateOutput,
+		WriteOutput:     writeOutput,
 		ValidateRequest: switchresource.ValidateRequest,
 	})
 	c.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
@@ -87,8 +87,8 @@ func (c *cli) initIaaSAPI() {
 
 	c.IaaSAPI.Server.SetRuntime(serverapi.Runtime{
 		DecodeRequest:   decodeRequest,
-		OutputType:      outputType,
-		WriteOutput:     writeOutputWithFormat,
+		ValidateOutput:  validateOutput,
+		WriteOutput:     writeOutput,
 		ValidateRequest: serverresource.ValidateRequest,
 	})
 	c.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) {

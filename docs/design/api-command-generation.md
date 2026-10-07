@@ -97,7 +97,7 @@ $ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=int
 
 リクエストを持つ操作では `--request` にインライン JSON または `@path.json` を指定できます。個別フラグを設定した場合は `--request` と併用できません。JSON 経路では個別フラグの必須指定を要求せず、フラグ経路では必須フラグと、少なくとも 1 つのフラグの指定を確認してから SDK を呼び出します。配列、map、union、nullable 値、秘密情報など生成器の単純な型で表現しない入力は `--request` に残します。
 
-IaaS のゾーン横断検索には、操作の `zone_search` に `flag_field` と `request_field` を指定します。対象フラグを `--zone all` にした場合、生成コードは Zone API で取得した各ゾーンに同じ検索条件を適用し、結果を連結します。いずれかの検索が失敗した場合は部分結果を出力しません。table 出力には結果ごとの Zone 列を付けます。JSON の `--request` 経路では `all` を展開せず、入力された値をそのまま SDK に渡します。IaaS リソース初期化時には、生成された `setZoneFactory` に Zone API factory を設定します。
+IaaS のゾーン横断検索には、操作の `zone_search` に `flag_field` と `request_field` を指定します。対象フラグを `--zone all` にした場合、生成コードは Zone API で取得した各ゾーンに同じ検索条件を適用し、結果を連結します。いずれかの検索が失敗した場合は部分結果を出力しません。表示用の Zone ラベルは集めず、JSON に追加しません。JSON の `--request` 経路では `all` を展開せず、入力された値をそのまま SDK に渡します。IaaS リソース初期化時には、生成された `setZoneFactory` に Zone API factory を設定します。
 
 リポジトリルートから実行し、生成先を明示します。
 
@@ -115,11 +115,13 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 ## 手書きコードとの境界
 
-生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力形式の選択、出力処理、リクエスト検証を受け取ります。生成されたコマンド構造体を親コマンドへ登録し、生成された API interface を実際の SDK クライアントに結ぶ factory は、CLI 側で設定します。
+生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理、リクエスト検証を受け取ります。生成されたコマンド構造体を親コマンドへ登録し、生成された API interface を実際の SDK クライアントに結ぶ factory は、CLI 側で設定します。
+
+[ADR 0030](../adr/0030-remove-table-output.md) に従い、出力形式は JSON のみです。`ValidateOutput func(*kong.Context) error` は結果を返す操作の API 呼び出し前にクエリを検証し、`WriteOutput func(*kong.Context, any) error` は結果全体またはクエリ結果を JSON で書き込みます。出力形式と表示用 Zone ラベルは callback に渡しません。手書きハンドラーも同じ契約に揃えます。
 
 `request_validator` は、JSON／フラグから同じリクエストを構築した後、SDK 呼び出し前に行う明示的なサービス固有検証の関数名です。`handwritten: true` は、操作を親コマンドと型付き API インターフェースには登録しながら、そのコマンド構造体と `Run` ハンドラーを手書きにする指定です。これにより、標準操作と個別処理を同じコマンド階層に配置できます。
 
-Switch では `find`、`read`、`create`、`update`、`delete` を生成します。`find` の `zone_search` 設定が `--zone all` のゾーン取得、検索の反復、結果集約、table の Zone 列を共通処理として生成します。個別の Zone／ID 検証は `request_validator` で明示します。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
+Switch では `find`、`read`、`create`、`update`、`delete` を生成します。`find` の `zone_search` 設定が `--zone all` のゾーン取得、検索の反復、結果集約を共通処理として生成します。個別の Zone／ID 検証は `request_validator` で明示します。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
 
 Server では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-server.json`](../../api/commands/iaas-server.json)、生成先は `internal/iaas/serverapi/` です。`find` は Switch と同じ zone 横断検索を使い、Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー値をフラグで指定できます。CPU と MemoryGB のプラン組み合わせ、タグ、ディスク、ネットワークインターフェースなどを含む複雑な構成は JSON リクエストで渡し、JSON と個別フラグの併用を拒否します。ディスク作成の待機設定 `NoWait` はディスク構成や `BootAfterCreate` と関係するため JSON 経路に残します。更新では単純なスカラーを任意フラグにし、未指定値を保持します。指定項目がない更新リクエストは拒否します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。サービス固有の検証は `internal/iaas/server/` に置きます。これらの操作は `server_test.go` と `internal/iaas/server/validation_test.go` で検証します。
 

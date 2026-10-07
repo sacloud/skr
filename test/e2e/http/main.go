@@ -32,7 +32,7 @@ import (
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
-const zoneListURL = "https://secure.sakura.ad.jp/cloud/zone/is1a/api/cloud/1.1/zone"
+const zoneListURL = "https://secure.sakura.ad.jp/cloud/zone/is1b/api/cloud/1.1/zone"
 
 type cli interface {
 	call(context.Context, string, ...string) ([]byte, error)

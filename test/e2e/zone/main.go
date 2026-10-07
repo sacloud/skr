@@ -78,14 +78,6 @@ func (s scenario) run(ctx context.Context) error {
 		return errors.New("selected SDK profile name is empty")
 	}
 
-	table, err := s.client.call(ctx, "zone-list-table", "iaas-api", "zone", "find", "--output", "table")
-	if err != nil {
-		return err
-	}
-	if !strings.Contains(string(table), "Name") {
-		return errors.New("zone table output does not contain the Name column")
-	}
-
 	output, err := s.client.call(ctx, "zone-names-jq", "iaas-api", "zone", "find", "--query", "map(.Name)")
 	if err != nil {
 		return err
@@ -153,7 +145,7 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
 	}
-	fmt.Println("Zone E2E passed; the zone table and jq name output were verified.")
+	fmt.Println("Zone E2E passed; the projected JSON zone names were verified.")
 	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
 }

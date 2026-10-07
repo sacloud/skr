@@ -29,7 +29,7 @@ $ skr iaas-api disk update --help
 $ skr iaas-api disk delete --help
 ```
 
-意図したプロファイル、プロジェクト、認証情報を確認します。ディスク作成と更新は SDK のリクエスト JSON を使います。JSON は `--request` に直接指定するか、`@ファイル名` で読み込めます。検索、参照、削除では個別フラグまたは JSON を使い、両方は併用できません。API の出力形式は `--output json` または `--output table` で選択できます。
+意図したプロファイル、プロジェクト、認証情報を確認します。ディスク作成と更新は SDK のリクエスト JSON を使います。JSON は `--request` に直接指定するか、`@ファイル名` で読み込めます。検索、参照、削除では個別フラグまたは JSON を使い、両方は併用できません。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
 
 `find --zone all` は全ゾーンを検索できます。`--count` と `--from` は各ゾーンの検索に適用されます。全ゾーン検索は個別フラグで指定するため、複雑な条件を含む `--request` JSON とは併用できません。
 
@@ -58,7 +58,22 @@ $ skr iaas-api disk create --request @disk-create.json
 成功すると Disk の情報が出力されます。以降の操作で使う `ID` を控えてください。`123456789012` は仮の値です。作成結果の ID に置き換えて検索・参照してください。
 
 ```console
-$ skr iaas-api disk find --request='{"Zone":"is1b","Names":["TEST-DISK-NAME"]}' --output table
+$ skr iaas-api disk find --request='{"Zone":"is1b","Names":["TEST-DISK-NAME"]}' --query 'map({ID,Name,SizeMB})'
+```
+
+次は CLI テストで確認した出力形式の例です。ID と名前は置き換えています。
+
+```json
+[
+  {
+    "ID": 123456789012,
+    "Name": "TEST-DISK-NAME",
+    "SizeMB": 20480
+  }
+]
+```
+
+```console
 $ skr iaas-api disk read --zone is1b --id 123456789012
 ```
 
@@ -89,10 +104,14 @@ $ skr iaas-api disk read --zone is1b --id 123456789012
 
 ```console
 $ skr iaas-api disk delete --zone is1b --id 123456789012 --fail-if-not-found
-$ skr iaas-api disk find --request='{"Zone":"is1b","Names":["UPDATED-TEST-DISK-NAME"]}' --output table
+$ skr iaas-api disk find --request='{"Zone":"is1b","Names":["UPDATED-TEST-DISK-NAME"]}' --query 'map({ID,Name})'
 ```
 
 削除成功時、`delete` は標準出力に何も出しません。検索結果に削除した ID が含まれないことを確認してください。
+
+```json
+[]
+```
 
 ## ライブ E2E の実行
 

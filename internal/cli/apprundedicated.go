@@ -24,7 +24,7 @@ func (c *cli) initAppRunDedicatedAPI() {
 		NewClient: func() (*v1.Client, error) {
 			return apprundedicatedapi.NewClient(c.Trace)
 		},
-		OutputType:  outputType,
-		WriteOutput: writeOutputWithFormat,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
 	})
 }

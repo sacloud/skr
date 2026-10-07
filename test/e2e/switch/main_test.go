@@ -35,6 +35,8 @@ type fakeCLI struct {
 	failAt    string
 	badCreate bool
 	deleted   []types.ID
+	zone      string
+	queryOut  []byte
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, value any) ([]byte, error) {
@@ -48,8 +50,15 @@ func (f *fakeCLI) call(_ context.Context, step string, value any) ([]byte, error
 	if !ok {
 		return nil, errors.New("unexpected request shape")
 	}
-	if zone, ok := request["Zone"].(string); !ok || zone != "tk1v" {
+	wantZone := zone
+	if f.zone != "" {
+		wantZone = f.zone
+	}
+	if zone, ok := request["Zone"].(string); !ok || zone != wantZone {
 		return nil, errors.New("unexpected zone")
+	}
+	if step == "test-find-query" && f.queryOut != nil {
+		return f.queryOut, nil
 	}
 	op, err := operation(step)
 	if err != nil {
@@ -131,6 +140,30 @@ func TestScenarioCleansUpAfterSuccess(t *testing.T) {
 	}
 	if len(f.deleted) != 1 || f.item != nil {
 		t.Fatal("test switch was not deleted")
+	}
+}
+
+func TestLiveScenarioPreservesPriorResources(t *testing.T) {
+	f := &fakeCLI{zone: "is1b", prior: []switchItem{{ID: 9876, Name: "skr-e2e-other", Description: "existing resource"}}}
+	if err := (scenario{call: f.call, zone: "is1b", skipPriorCleanup: true}).run(context.Background(), name); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.prior) != 1 || len(f.deleted) != 1 || f.deleted[0] != 1234 {
+		t.Fatalf("live scenario modified prior resources: prior=%+v deleted=%v", f.prior, f.deleted)
+	}
+}
+
+func TestScenarioRejectsInvalidProjectionAndCleansUp(t *testing.T) {
+	for _, output := range []string{"null", "[]", `{"ID":1234,"Name":"skr-e2e-switch"}`, `[{"ID":1234,"Name":"wrong"}]`, `[{"ID":4321,"Name":"skr-e2e-switch"}]`} {
+		t.Run(output, func(t *testing.T) {
+			f := &fakeCLI{queryOut: []byte(output)}
+			if err := (scenario{call: f.call}).run(context.Background(), name); err == nil {
+				t.Fatal("invalid projection accepted")
+			}
+			if f.item != nil || len(f.deleted) != 1 {
+				t.Fatal("created Switch not cleaned up")
+			}
+		})
 	}
 }
 
@@ -262,11 +295,11 @@ func TestSwitchArgsUsesFlagsAndJSONForNames(t *testing.T) {
 		request map[string]any
 		want    string
 	}{
-		{"test-create", map[string]any{"Zone": zone, "Name": name, "Description": description}, "--zone tk1v --output json --name skr-e2e-switch --description Temporary switch for skr API tutorial"},
+		{"test-create", map[string]any{"Zone": zone, "Name": name, "Description": description}, "--zone tk1v --name skr-e2e-switch --description Temporary switch for skr API tutorial"},
 		{"test-find", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
-		{"test-find-table", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
-		{"preflight-find-page-000", map[string]any{"Zone": zone, "Count": pageSize, "From": 0}, "--zone tk1v --output json --count 100 --from 0"},
-		{"cleanup-delete", map[string]any{"Zone": zone, "ID": types.ID(123), "FailIfNotFound": true}, "--zone tk1v --output json --id 123 --fail-if-not-found=true"},
+		{"test-find-query", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
+		{"preflight-find-page-000", map[string]any{"Zone": zone, "Count": pageSize, "From": 0}, "--zone tk1v --count 100 --from 0"},
+		{"cleanup-delete", map[string]any{"Zone": zone, "ID": types.ID(123), "FailIfNotFound": true}, "--zone tk1v --id 123 --fail-if-not-found=true"},
 	} {
 		args, err := switchArgs(tc.step, tc.request)
 		if err != nil {
@@ -275,12 +308,12 @@ func TestSwitchArgsUsesFlagsAndJSONForNames(t *testing.T) {
 		if !strings.Contains(strings.Join(args, " "), tc.want) {
 			t.Fatalf("%s: args = %v, want %q", tc.step, args, tc.want)
 		}
-		output := "json"
-		if strings.HasSuffix(tc.step, "-table") {
-			output = "table"
+		got := strings.Join(args, " ")
+		if strings.Contains(got, "--output") {
+			t.Errorf("%s: args contain removed flag: %v", tc.step, args)
 		}
-		if !strings.Contains(strings.Join(args, " "), "--output "+output) {
-			t.Errorf("%s: args = %v, want output format %q", tc.step, args, output)
+		if strings.HasSuffix(tc.step, "-query") && !strings.Contains(got, "--query map({ID,Name})") {
+			t.Errorf("%s: args lack projection: %v", tc.step, args)
 		}
 	}
 }

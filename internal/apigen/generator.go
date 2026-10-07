@@ -138,8 +138,8 @@ type {{.FactoryType}} func({{.FactoryParams}}) ({{.APIType}}, error)
 
 type {{.RuntimeType}} struct {
 	DecodeRequest func(string, any) error
-	OutputType func(*kong.Context) (string, error)
-	WriteOutput func(*kong.Context, string, any, ...[]string) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput func(*kong.Context, any) error
 	ValidateRequest func(string, any) error
 }
 
@@ -248,11 +248,10 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 {{- end }}
 {{- end }}
 {{- if .ResponseType }}
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 	return err
 	}
 {{- end }}
@@ -265,16 +264,12 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 	}
 {{- if .ZoneSearch }}
 	if c.Request == nil && c.{{.ZoneSearch.FlagField}} != nil && *c.{{.ZoneSearch.FlagField}} == zones.All {
-		var tableZones []string
 		result, err := zones.FindInAll(context.Background(), c.zoneFactory, func(ctx context.Context, zone string) ([]{{.ZoneSearchItemType}}, error) {
 			zoneRequest := *request
 			zoneRequest.{{.ZoneSearch.RequestField}} = zone
 			items, err := op.{{.Method}}(ctx{{range .Arguments}}, c.{{.Field}}{{end}}, {{if .RequestByValue}}zoneRequest{{else}}&zoneRequest{{end}})
 			if err != nil {
 				return nil, err
-			}
-			for range items {
-				tableZones = append(tableZones, zone)
 			}
 			return items, nil
 		})
@@ -284,7 +279,7 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 		if c.runtime.WriteOutput == nil {
 			return fmt.Errorf("API 出力処理が設定されていません")
 		}
-		return c.runtime.WriteOutput(ctx, format, result, tableZones)
+		return c.runtime.WriteOutput(ctx, result)
 	}
 {{- end }}
 {{- if .ResponseType }}
@@ -299,7 +294,7 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 {{- else }}
 {{- if .RequestType }}
 	return op.{{.Method}}(context.Background(){{range .Arguments}}, c.{{.Field}}{{end}}, {{if .RequestByValue}}*request{{else}}request{{end}})

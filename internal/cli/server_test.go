@@ -216,7 +216,7 @@ func TestIaaSServerFindUsesSDKCaller(t *testing.T) {
 	commandLine.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) {
 		return server.New(caller), nil
 	})
-	code := runCLI([]string{"iaas-api", "server", "find", "--zone", "test-zone", "--output", "json"}, &stdout, &stderr, commandLine)
+	code := runCLI([]string{"iaas-api", "server", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
 	if code != 0 || stderr.Len() != 0 {
 		t.Fatalf("find: code %d, stderr %q", code, stderr.String())
 	}

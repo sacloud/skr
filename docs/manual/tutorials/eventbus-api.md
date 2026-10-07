@@ -36,25 +36,17 @@ $ skr iaas-api switch create --help
 ```
 
 意図したプロファイルとプロジェクトを確認してください。SimpleMQ はゾーンを指定しないグローバルリソースです。メッセージ API にはキューごとの API キーを使います（[SimpleMQ コントロールパネルでの操作](https://manual.sakura.ad.jp/cloud/appliance/simplemq/control_panel.html)）。
-`UNIQUE-SUFFIX` と `QUEUE-NAME` は前提条件に従って決め、`ZONE` は作成先に置き換えます。作成前に各一覧から同じ名前のリソースがないことを確認します。以下は実機 E2E で一覧が空だった場合の出力例です。ほかのリソースが表示された場合は、作成予定の名前と重複しないことを確認してください。
+`UNIQUE-SUFFIX` と `QUEUE-NAME` は前提条件に従って決め、`ZONE` は作成先に置き換えます。作成前に各一覧から同じ名前のリソースがないことを確認します。以下は CLI テストで確認した投影 JSON の形式に基づく、空一覧の出力例です。ほかのリソースが表示された場合は、作成予定の名前と重複しないことを確認してください。
 
 ```console
-$ skr simplemq-api queue list --output table
-+------------+
-| No results |
-+------------+
-$ skr eventbus-api process-configuration list --output table
-+------------+
-| No results |
-+------------+
-$ skr eventbus-api trigger list --output table
-+------------+
-| No results |
-+------------+
-$ skr iaas-api switch find --zone ZONE --output table
-+------------+
-| No results |
-+------------+
+$ skr simplemq-api queue list --query 'map({ID,Name})'
+[]
+$ skr eventbus-api process-configuration list --query 'map({ID,Name})'
+[]
+$ skr eventbus-api trigger list --query 'map({ID,Name})'
+[]
+$ skr iaas-api switch find --zone ZONE --query 'map({ID,Name})'
+[]
 ```
 
 ## Step 2: SimpleMQ キューと API キーを用意する
@@ -63,26 +55,26 @@ $ skr iaas-api switch find --zone ZONE --output table
 
 ```console
 $ umask 077
-$ skr simplemq-api queue create --name QUEUE-NAME --description eventbus-tutorial/UNIQUE-SUFFIX --output json > queue.json
+$ skr simplemq-api queue create --name QUEUE-NAME --description eventbus-tutorial/UNIQUE-SUFFIX > queue.json
 $ QUEUE_ID=$(jq -er '.ID' queue.json)
-$ skr simplemq-api queue list --output table
+$ skr simplemq-api queue list --query 'map({ID,Name})'
 ```
 
-作成したキューの行が一覧に表示されることを確認します。次はその行の出力例です（ID、名前、説明、QueueName、日時を置換しています）。ほかのキューも別の行に表示されます。表示列と値の省略位置は端末幅で変わります。
+作成したキューの ID と名前が一覧に表示されることを確認します。次は CLI テストで確認した出力形式の例で、ID と名前は置き換えています。ほかのキューがある場合は同じ配列に含まれます。
 
-```text
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-| ID           | Name           | Status | Description | Tags   | Availability | ServiceClass | CreatedAt | ModifiedAt |
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-| <QUEUE-ID>   | QUEUE-NAME...  | {"Q... | eventbus... |        | available    | cloud/sim... | 2026-1...  | 2026-10... |
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-... +4 columns omitted
+```json
+[
+  {
+    "ID": "123456789012",
+    "Name": "QUEUE-NAME"
+  }
+]
 ```
 
 キューごとの API キーを発行します。発行結果を画面に表示せず、EventBus のシークレット登録に使う JSON ファイルと、メッセージ受信に使う API キーファイルを作成します。再発行すると以前のキーは無効になります（[SimpleMQ API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/simplemq/api.html)）。
 
 ```console
-$ skr simplemq-api queue rotate-api-key "$QUEUE_ID" --output json > eventbus-secret.json
+$ skr simplemq-api queue rotate-api-key "$QUEUE_ID" > eventbus-secret.json
 $ jq -er '.APIKey' eventbus-secret.json > simplemq.key
 $ chmod 600 queue.json eventbus-secret.json simplemq.key
 ```
@@ -109,22 +101,22 @@ $ chmod 600 queue.json eventbus-secret.json simplemq.key
 実行設定を作成し、結果の `ID` を控えます。続いて、キューの API キーを実行設定のシークレットとして登録します。シークレットは `--secret-file` から読み込み、コマンド引数には含めません。
 
 ```console
-$ skr eventbus-api process-configuration create --request @process-configuration.json --output json > process-configuration-result.json
+$ skr eventbus-api process-configuration create --request @process-configuration.json > process-configuration-result.json
 $ PROCESS_CONFIGURATION_ID=$(jq -er '.ID' process-configuration-result.json)
 $ skr eventbus-api process-configuration update-secret "$PROCESS_CONFIGURATION_ID" --secret-file eventbus-secret.json
-$ skr eventbus-api process-configuration read "$PROCESS_CONFIGURATION_ID" --output json
-$ skr eventbus-api process-configuration list --output table
+$ skr eventbus-api process-configuration read "$PROCESS_CONFIGURATION_ID"
+$ skr eventbus-api process-configuration list --query 'map({ID,Name})'
 ```
 
-作成した実行設定の `ID` と `Name` が一覧に表示されることを確認します。以下は実機の出力形式に基づく行の抜粋で、ID、名前、説明、日時を置換しています。ほかの実行設定の行や端末幅による省略は環境によって変わります。
+作成した実行設定の `ID` と `Name` が一覧に表示されることを確認します。以下は CLI テストで確認した出力形式の例で、ID と名前は置き換えています。全件一覧から対象の要素だけを抜粋しています。
 
-```text
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-| ID           | Name           | Status | Description | Tags   | Availability | ServiceClass | CreatedAt | ModifiedAt |
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-| <ID>         | eventbus-job...|        | eventbus... |        | available    |              | 2026-1... | 2026-10... |
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-... +4 columns omitted
+```json
+[
+  {
+    "ID": "123456789013",
+    "Name": "eventbus-simplemq-job-UNIQUE-SUFFIX"
+  }
+]
 ```
 
 ## Step 4: スイッチ作成イベントのトリガーを作成する
@@ -157,21 +149,21 @@ $ skr eventbus-api process-configuration list --output table
 `ZONE` は Step 5 でスイッチを作成するゾーンと同じ値にします。`Conditions` により `zone` が一致するイベントだけを対象にします。トリガーを作成して ID を控え、設定を読み戻します。
 
 ```console
-$ skr eventbus-api trigger create --request @trigger.json --output json > trigger-result.json
+$ skr eventbus-api trigger create --request @trigger.json > trigger-result.json
 $ TRIGGER_ID=$(jq -er '.ID' trigger-result.json)
-$ skr eventbus-api trigger read "$TRIGGER_ID" --output json
-$ skr eventbus-api trigger list --output table
+$ skr eventbus-api trigger read "$TRIGGER_ID"
+$ skr eventbus-api trigger list --query 'map({ID,Name})'
 ```
 
-作成したトリガーの `ID` と `Name` が一覧に表示されることを確認します。出力例は ID、名前、説明、時刻を編集した抜粋です。実際の列や表示幅は端末サイズと一覧の内容によって変わります。
+作成したトリガーの `ID` と `Name` が一覧に表示されることを確認します。以下は CLI テストで確認した出力形式の例で、ID と名前は置き換えています。全件一覧から対象の要素だけを抜粋しています。
 
-```text
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-| ID           | Name           | Status | Description | Tags   | Availability | ServiceClass | CreatedAt | ModifiedAt |
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-| <TRIGGER-ID> | eventbus-trig… |        | eventbus-…  |        | available    | cloud/eve…   | 2026-10…  | 2026-10…   |
-+--------------+----------------+--------+-------------+--------+--------------+--------------+-----------+------------+
-... +4 columns omitted
+```json
+[
+  {
+    "ID": "123456789014",
+    "Name": "eventbus-simplemq-trigger-UNIQUE-SUFFIX"
+  }
+]
 ```
 
 トリガーの作成後、設定が反映されるまで60秒待ってからスイッチを作成します。EventBus のジョブ実行はベストエフォート型のため、即時実行を前提にしないでください（[EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)）。
@@ -181,21 +173,21 @@ $ skr eventbus-api trigger list --output table
 対象ゾーンで他の通常スイッチを作成する操作が重ならないことを確認してください。名前には Step 2 と同じ一意な接尾辞を使います。`ZONE` は Step 4 の値に置き換えます。
 
 ```console
-$ skr iaas-api switch create --zone ZONE --name eventbus-switch-UNIQUE-SUFFIX --description "Temporary switch for EventBus tutorial" --output json > switch-result.json
+$ skr iaas-api switch create --zone ZONE --name eventbus-switch-UNIQUE-SUFFIX --description "Temporary switch for EventBus tutorial" > switch-result.json
 $ SWITCH_ID=$(jq -er '.ID' switch-result.json)
-$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --output table
+$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --query 'map({ID,Name})'
 ```
 
 作成したスイッチを対象にするイベントタイプは通常スイッチの作成です。作成結果の `ID`、`Name`、`Description` を確認し、後で削除するために `SWITCH_ID` を保持してください（[スイッチの概要](https://manual.sakura.ad.jp/cloud/network/switch/about.html)）。
-検索結果で作成したスイッチの ID と名前を照合します。以下は実機の出力形式に基づく行の抜粋で、ID、名前、説明、日時を置換しています。
+検索結果で作成したスイッチの ID と名前を照合します。以下は CLI テストで確認した出力形式の例で、ID と名前は置き換えています。
 
-```text
-+--------------+--------------+-------------+--------+-------+-------------+----------------+--------------+-----------+
-| ID           | Name         | Description | Tags   | Scope | ServerCount | NetworkMaskLen | DefaultRoute | CreatedAt |
-+--------------+--------------+-------------+--------+-------+-------------+----------------+--------------+-----------+
-| <ID>         | eventbus-... | eventbus-...|        | user  | 0           | 0              |              | 2026-1...  |
-+--------------+--------------+-------------+--------+-------+-------------+----------------+--------------+-----------+
-... +4 columns omitted
+```json
+[
+  {
+    "ID": 123456789015,
+    "Name": "eventbus-switch-UNIQUE-SUFFIX"
+  }
+]
 ```
 
 ## Step 6: SimpleMQ からメッセージを受信する
@@ -207,7 +199,7 @@ $ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-U
 メッセージの到着には時間を要する場合があります。EventBus は即時実行を保証しません。
 
 ```console
-$ skr simplemq-api message receive --queue-name QUEUE-NAME --api-key-file simplemq.key --output json
+$ skr simplemq-api message receive --queue-name QUEUE-NAME --api-key-file simplemq.key
 ```
 
 SimpleMQ は Pull 型で、受信リクエストごとにメッセージを配信します。配信保証は At least once です。そのため、同じメッセージを複数回受信する場合があります（[SimpleMQ の基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)）。
@@ -220,49 +212,41 @@ SimpleMQ は Pull 型で、受信リクエストごとにメッセージを配�
 $ skr eventbus-api trigger delete "$TRIGGER_ID"
 ```
 
-トリガーを削除した後、一覧に試験用の名前がないことを確認します。以下は一覧自体が空の場合の出力例です。実行設定とキューの削除確認も同様です。ほかのリソースが表示される場合は、試験用の名前の行がないことを確認してください。
+トリガーを削除した後、一覧に試験用の名前がないことを確認します。以下は一覧自体が空の場合の出力例です。実行設定とキューの削除確認も同様です。ほかのリソースが表示される場合は、試験用の名前の要素がないことを確認してください。
 
 ```console
-$ skr eventbus-api trigger list --output table
-+------------+
-| No results |
-+------------+
+$ skr eventbus-api trigger list --query 'map({ID,Name})'
+[]
 ```
 
 ```console
-$ skr iaas-api switch read --zone ZONE --id "$SWITCH_ID" --output json
+$ skr iaas-api switch read --zone ZONE --id "$SWITCH_ID"
 $ skr iaas-api switch delete --zone ZONE --id "$SWITCH_ID" --fail-if-not-found
-$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --output table
+$ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --query 'map({ID,Name})'
 ```
 
 スイッチの検索結果がないことを確認します。
 
-```text
-+------------+
-| No results |
-+------------+
+```json
+[]
 ```
 
 続けて実行設定を削除し、一覧に試験用の名前がないことを確認します。以下は一覧自体が空の場合の出力例です。
 
 ```console
 $ skr eventbus-api process-configuration delete "$PROCESS_CONFIGURATION_ID"
-$ skr eventbus-api process-configuration list --output table
-+------------+
-| No results |
-+------------+
+$ skr eventbus-api process-configuration list --query 'map({ID,Name})'
+[]
 ```
 
 最後に、キュー内のメッセージを消去してからキューを削除します。キューの `Name` と `Description` がこの手順で作成したものと一致することを `queue read` で確認してください。
 
 ```console
-$ skr simplemq-api queue read "$QUEUE_ID" --output json
+$ skr simplemq-api queue read "$QUEUE_ID"
 $ skr simplemq-api queue clear-messages "$QUEUE_ID"
 $ skr simplemq-api queue delete "$QUEUE_ID"
-$ skr simplemq-api queue list --output table
-+------------+
-| No results |
-+------------+
+$ skr simplemq-api queue list --query 'map({ID,Name})'
+[]
 $ rm queue.json eventbus-secret.json simplemq.key process-configuration.json process-configuration-result.json trigger.json trigger-result.json switch-result.json
 ```
 

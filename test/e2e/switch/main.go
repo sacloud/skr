@@ -17,6 +17,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -80,9 +82,6 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // Binary is an explicitly selected local skr executable; arguments are structured JSON, not a shell.
-	if hasTableOutput(args) {
-		command.Env = append(os.Environ(), "COLUMNS=200")
-	}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -99,15 +98,6 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	return stdout.Bytes(), nil
 }
 
-func hasTableOutput(args []string) bool {
-	for i := 0; i+1 < len(args); i++ {
-		if args[i] == "--output" && args[i+1] == "table" {
-			return true
-		}
-	}
-	return false
-}
-
 func switchArgs(step string, value any) ([]string, error) {
 	op, err := operation(step)
 	if err != nil {
@@ -121,11 +111,11 @@ func switchArgs(step string, value any) ([]string, error) {
 	if !ok || zone == "" {
 		return nil, fmt.Errorf("%s: missing Zone", step)
 	}
-	output := "json"
-	if strings.HasSuffix(step, "-table") {
-		output = "table"
+	var queryArgs []string
+	if strings.HasSuffix(step, "-query") {
+		queryArgs = []string{"--query", "map({ID,Name})"}
 	}
-	args := []string{"iaas-api", "switch", op, "--zone", zone, "--output", output}
+	args := []string{"iaas-api", "switch", op, "--zone", zone}
 	fields := map[string]string{"ID": "--id", "Name": "--name", "Description": "--description", "Count": "--count", "From": "--from", "FailIfNotFound": "--fail-if-not-found"}
 	for field := range request {
 		if field != "Zone" && field != "Names" && fields[field] == "" {
@@ -152,13 +142,22 @@ func switchArgs(step string, value any) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: encode request: %w", step, err)
 		}
-		return []string{"iaas-api", "switch", op, "--request", string(data), "--output", output}, nil
+		return append([]string{"iaas-api", "switch", op, "--request", string(data)}, queryArgs...), nil
 	}
-	return args, nil
+	return append(args, queryArgs...), nil
 }
 
 type scenario struct {
-	call func(context.Context, string, any) ([]byte, error)
+	call             func(context.Context, string, any) ([]byte, error)
+	zone             string
+	skipPriorCleanup bool
+}
+
+func (s scenario) targetZone() string {
+	if s.zone != "" {
+		return s.zone
+	}
+	return zone
 }
 
 func (s scenario) item(ctx context.Context, step string, request any) (switchItem, error) {
@@ -177,7 +176,7 @@ func (s scenario) item(ctx context.Context, step string, request any) (switchIte
 }
 
 func (s scenario) find(ctx context.Context, step, name string) ([]switchItem, error) {
-	data, err := s.call(ctx, step, map[string]any{"Zone": zone, "Names": []string{name}})
+	data, err := s.call(ctx, step, map[string]any{"Zone": s.targetZone(), "Names": []string{name}})
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +208,7 @@ func (s scenario) list(ctx context.Context, phase string) ([]switchItem, error) 
 	seen := make(map[types.ID]bool)
 	for page := range maxSwitchPages {
 		step := fmt.Sprintf("%s-find-page-%03d", phase, page)
-		data, err := s.call(ctx, step, map[string]any{"Zone": zone, "Count": pageSize, "From": page * pageSize})
+		data, err := s.call(ctx, step, map[string]any{"Zone": s.targetZone(), "Count": pageSize, "From": page * pageSize})
 		if err != nil {
 			return nil, err
 		}
@@ -249,7 +248,7 @@ func (s scenario) removePriorTests(ctx context.Context) error {
 		}
 	}
 	for i, match := range matches {
-		request := map[string]any{"Zone": zone, "ID": match.ID}
+		request := map[string]any{"Zone": s.targetZone(), "ID": match.ID}
 		current, err := s.item(ctx, fmt.Sprintf("preflight-read-%03d", i), request)
 		if err != nil {
 			return err
@@ -258,7 +257,7 @@ func (s scenario) removePriorTests(ctx context.Context) error {
 			return fmt.Errorf("preflight cleanup refused: %w", err)
 		}
 		if _, err := s.call(ctx, fmt.Sprintf("preflight-delete-%03d", i),
-			map[string]any{"Zone": zone, "ID": match.ID, "FailIfNotFound": true}); err != nil {
+			map[string]any{"Zone": s.targetZone(), "ID": match.ID, "FailIfNotFound": true}); err != nil {
 			return fmt.Errorf("preflight delete Switch %s: %w", match.ID, err)
 		}
 	}
@@ -292,7 +291,7 @@ func (s scenario) cleanup(name, updatedName string, knownID types.ID) error {
 		}
 		id = matches[0].ID
 	}
-	request := map[string]any{"Zone": zone, "ID": id}
+	request := map[string]any{"Zone": s.targetZone(), "ID": id}
 	current, err := s.item(ctx, "cleanup-read", request)
 	if err != nil {
 		return fmt.Errorf("cannot verify Switch before cleanup: %w", err)
@@ -302,7 +301,7 @@ func (s scenario) cleanup(name, updatedName string, knownID types.ID) error {
 			return fmt.Errorf("cleanup refused: Switch identity changed; manual cleanup required: %w", err)
 		}
 	}
-	_, err = s.call(ctx, "cleanup-delete", map[string]any{"Zone": zone, "ID": id, "FailIfNotFound": true})
+	_, err = s.call(ctx, "cleanup-delete", map[string]any{"Zone": s.targetZone(), "ID": id, "FailIfNotFound": true})
 	if err != nil {
 		return fmt.Errorf("delete test Switch %s: %w", id, err)
 	}
@@ -328,8 +327,10 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if _, err := s.call(ctx, "profile-current", nil); err != nil {
 		return fmt.Errorf("selected profile required: %w", err)
 	}
-	if err := s.removePriorTests(ctx); err != nil {
-		return fmt.Errorf("preflight cleanup failed: %w", err)
+	if !s.skipPriorCleanup {
+		if err := s.removePriorTests(ctx); err != nil {
+			return fmt.Errorf("preflight cleanup failed: %w", err)
+		}
 	}
 	before, err := s.find(ctx, "before-find", name)
 	if err != nil {
@@ -352,7 +353,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 			result = errors.Join(result, fmt.Errorf("cleanup failed: %w", cleanupErr))
 		}
 	}()
-	created, err := s.item(ctx, "test-create", map[string]any{"Zone": zone, "Name": name, "Description": description})
+	created, err := s.item(ctx, "test-create", map[string]any{"Zone": s.targetZone(), "Name": name, "Description": description})
 	if err != nil {
 		return err
 	}
@@ -367,14 +368,21 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if len(found) != 1 || checkItem(found[0], id, name) != nil {
 		return fmt.Errorf("find did not return exactly the created Switch %s", id)
 	}
-	table, err := s.call(ctx, "test-find-table", map[string]any{"Zone": zone, "Names": []string{name}})
+	output, err := s.call(ctx, "test-find-query", map[string]any{"Zone": s.targetZone(), "Names": []string{name}})
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(string(table), id.String()) || !strings.Contains(string(table), name) {
-		return fmt.Errorf("Switch table output does not contain created Switch %s", id)
+	var projected []struct {
+		ID   types.ID
+		Name string
 	}
-	request := map[string]any{"Zone": zone, "ID": id}
+	if err := json.Unmarshal(output, &projected); err != nil {
+		return fmt.Errorf("decode projected Switch list: %w", err)
+	}
+	if len(projected) != 1 || projected[0].ID != id || projected[0].Name != name {
+		return fmt.Errorf("projected Switch list does not match created Switch %s", id)
+	}
+	request := map[string]any{"Zone": s.targetZone(), "ID": id}
 	read, err := s.item(ctx, "test-read", request)
 	if err != nil {
 		return err
@@ -382,7 +390,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := checkItem(read, id, name); err != nil {
 		return err
 	}
-	updated, err := s.item(ctx, "test-update", map[string]any{"Zone": zone, "ID": id, "Name": updatedName})
+	updated, err := s.item(ctx, "test-update", map[string]any{"Zone": s.targetZone(), "ID": id, "Name": updatedName})
 	if err != nil {
 		return err
 	}
@@ -399,10 +407,21 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 func runMain() (exitCode int) {
 	binary := flag.String("skr", "./skr", "Path to a built skr binary")
 	confirmed := flag.Bool("confirm-tk1v", false, "Confirm deleting prior skr-e2e- Switches and creating/updating/deleting a test Switch in tk1v")
+	liveConfirmed := flag.Bool("confirm-is1b-live", false, "Confirm creating/updating/deleting a randomly named Switch in is1b without deleting prior resources")
 	flag.Parse()
-	if flag.NArg() != 0 || !*confirmed {
-		fmt.Fprintln(os.Stderr, "usage: go run ./test/e2e/switch --skr ./skr --confirm-tk1v")
+	if flag.NArg() != 0 || *confirmed == *liveConfirmed {
+		fmt.Fprintln(os.Stderr, "usage: go run ./test/e2e/switch --skr ./skr (--confirm-tk1v | --confirm-is1b-live)")
 		return 2
+	}
+	testName, targetZone := name, zone
+	if *liveConfirmed {
+		var suffix [8]byte
+		if _, err := rand.Read(suffix[:]); err != nil {
+			fmt.Fprintln(os.Stderr, "generate unique Switch name:", err)
+			return 1
+		}
+		testName = name + "-" + hex.EncodeToString(suffix[:])
+		targetZone = "is1b"
 	}
 	path, err := filepath.Abs(*binary)
 	if err != nil {
@@ -432,7 +451,7 @@ func runMain() (exitCode int) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	runner := cliRunner{binary: path, evidence: recorder}
-	if err := (scenario{call: runner.call}).run(ctx, name); err != nil {
+	if err := (scenario{call: runner.call, zone: targetZone, skipPriorCleanup: *liveConfirmed}).run(ctx, testName); err != nil {
 		fmt.Fprintln(os.Stderr, "Switch E2E failed:", err)
 		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1

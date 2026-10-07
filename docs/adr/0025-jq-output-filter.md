@@ -5,6 +5,8 @@
 
 ## Context
 
+出力形式の優先順位は [ADR 0030](0030-remove-table-output.md) で置き換えました。クエリを JSON で出力する方針は維持します。
+
 API コマンドの JSON、YAML、table 出力は、利用者が必要なフィールドだけを選んだり、一覧を条件で絞り込んだりする機能を持ちません。JMESPath ではなく、jq 式による加工を提供します。
 
 ## Decision
