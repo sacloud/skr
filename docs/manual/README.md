@@ -14,5 +14,6 @@
 
 ## 共通機能
 
+- [プロファイルの管理](c0nfig.md)
 - [API 出力の jq 加工](query.md)
 - [認証付き HTTP リクエスト](http-request.md)
