@@ -90,13 +90,14 @@ func writePrivateKey(dir string) (string, error) {
 }
 
 type scenario struct {
-	client      cli
-	keyPath     string
-	profileName string
+	client            cli
+	keyPath           string
+	profileName       string
+	secondProfileName string
 }
 
 func (s scenario) run(ctx context.Context) error {
-	_, err := s.client.call(ctx, "config-create",
+	_, err := s.client.call(ctx, "c0nfig-create",
 		"config", "create", s.profileName,
 		"--service-principal-id", "spid-e2e",
 		"--service-principal-key-id", "kid-e2e",
@@ -107,7 +108,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("create profile: %w", err)
 	}
 
-	current, err := s.client.call(ctx, "config-current", "config", "current")
+	current, err := s.client.call(ctx, "c0nfig-current", "config", "current")
 	if err != nil {
 		return fmt.Errorf("get current profile: %w", err)
 	}
@@ -115,15 +116,42 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("current profile = %q, want %q", string(current), s.profileName)
 	}
 
-	list, err := s.client.call(ctx, "config-list", "config", "list")
+	_, err = s.client.call(ctx, "c0nfig-create-second",
+		"config", "create", s.secondProfileName,
+		"--service-principal-id", "spid-e2e",
+		"--service-principal-key-id", "kid-e2e",
+		"--private-key-file", s.keyPath,
+	)
+	if err != nil {
+		return fmt.Errorf("create second profile: %w", err)
+	}
+
+	_, err = s.client.call(ctx, "c0nfig-use",
+		"config", "use", s.secondProfileName,
+	)
+	if err != nil {
+		return fmt.Errorf("use profile: %w", err)
+	}
+
+	current, err = s.client.call(ctx, "c0nfig-current-after-use", "config", "current")
+	if err != nil {
+		return fmt.Errorf("get current profile after use: %w", err)
+	}
+	if strings.TrimSpace(string(current)) != s.secondProfileName {
+		return fmt.Errorf("current profile after use = %q, want %q", string(current), s.secondProfileName)
+	}
+
+	list, err := s.client.call(ctx, "c0nfig-list", "config", "list")
 	if err != nil {
 		return fmt.Errorf("list profiles: %w", err)
 	}
-	if !strings.Contains(string(list), s.profileName) {
-		return fmt.Errorf("profile list does not contain %q: %q", s.profileName, string(list))
+	for _, name := range []string{s.profileName, s.secondProfileName} {
+		if !strings.Contains(string(list), name) {
+			return fmt.Errorf("profile list does not contain %q: %q", name, string(list))
+		}
 	}
 
-	show, err := s.client.call(ctx, "config-show", "config", "show", s.profileName)
+	show, err := s.client.call(ctx, "c0nfig-show", "config", "show", s.profileName)
 	if err != nil {
 		return fmt.Errorf("show profile: %w", err)
 	}
@@ -141,7 +169,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("after create: %w", err)
 	}
 
-	_, err = s.client.call(ctx, "config-edit",
+	_, err = s.client.call(ctx, "c0nfig-edit",
 		"config", "edit", s.profileName,
 		"--service-principal-id", "spid-edited",
 	)
@@ -149,7 +177,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("edit profile: %w", err)
 	}
 
-	showAfterEdit, err := s.client.call(ctx, "config-show-after-edit", "config", "show", s.profileName)
+	showAfterEdit, err := s.client.call(ctx, "c0nfig-show-after-edit", "config", "show", s.profileName)
 	if err != nil {
 		return fmt.Errorf("show edited profile: %w", err)
 	}
@@ -259,15 +287,16 @@ func runMain() (exitCode int) {
 		evidence: recorder,
 	}
 	if err := (scenario{
-		client:      runner,
-		keyPath:     keyPath,
-		profileName: "skr-e2e-config",
+		client:            runner,
+		keyPath:           keyPath,
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
 	}).run(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "Config E2E failed:", err)
 		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
 	}
-	fmt.Println("Config E2E passed; the profile was created, shown, edited, and listed in isolation.")
+	fmt.Println("Config E2E passed; profiles were created, switched, shown, edited, and listed in isolation.")
 	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
 }

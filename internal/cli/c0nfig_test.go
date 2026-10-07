@@ -219,6 +219,136 @@ func TestRunConfigShowWithoutCurrent(t *testing.T) {
 	}
 }
 
+func TestRunConfigUse(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"default", "production"} {
+		if err := profileOp.Create(&saclient.Profile{
+			Name:       name,
+			Attributes: map[string]any{},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := profileOp.SetCurrentName("default"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"config", "use", "production"}, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+	if got := stdout.String(); got != "" {
+		t.Errorf("stdout = %q, want empty", got)
+	}
+	if got := stderr.String(); got != "" {
+		t.Errorf("stderr = %q, want empty", got)
+	}
+
+	current, err := profileOp.GetCurrentName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := current, "production"; got != want {
+		t.Errorf("current profile = %q, want %q", got, want)
+	}
+}
+
+func TestRunConfigUseDefaultsToCurrent(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.Create(&saclient.Profile{
+		Name:       "production",
+		Attributes: map[string]any{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.SetCurrentName("production"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"config", "use"}, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+
+	current, err := profileOp.GetCurrentName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := current, "production"; got != want {
+		t.Errorf("current profile = %q, want %q", got, want)
+	}
+}
+
+func TestRunConfigUseUnknownProfile(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := profileOp.Create(&saclient.Profile{
+		Name:       "default",
+		Attributes: map[string]any{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"config", "use", "missing"}, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("run() exit code = 0, want non-zero")
+	}
+	if got := stdout.String(); got != "" {
+		t.Errorf("stdout = %q, want empty", got)
+	}
+	if got := stderr.String(); !strings.Contains(got, "missing") {
+		t.Errorf("stderr = %q, want an error mentioning the profile", got)
+	}
+}
+
+func TestRunConfigUseInvalidName(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+
+	for _, invalidName := range []string{".", "..", "a/b"} {
+		t.Run(invalidName, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if exitCode := run([]string{"config", "use", invalidName}, &stdout, &stderr); exitCode == 0 {
+				t.Fatal("run() exit code = 0, want non-zero")
+			}
+			if got := stderr.String(); got == "" {
+				t.Error("stderr is empty, want an error")
+			}
+		})
+	}
+}
+
+func TestRunConfigUseWithoutCurrent(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"config", "use"}, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("run() exit code = 0, want non-zero")
+	}
+	if got := stdout.String(); got != "" {
+		t.Errorf("stdout = %q, want empty", got)
+	}
+	if got := stderr.String(); !strings.Contains(got, "current") {
+		t.Errorf("stderr = %q, want an error mentioning the current profile", got)
+	}
+}
+
 func TestRunConfigShowUnknownProfile(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)

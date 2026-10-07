@@ -37,6 +37,14 @@ $ skr config edit <profile-name> --service-principal-key-id <NEW-KEY-ID>
 
 `edit` で現在の profile 以外を編集した場合、対話モードでは完了後に現在の profile へ切り替えるかを確認します。非対話利用では `--use` を指定した場合だけ切り替えます。
 
+## 現在の profile を切り替える
+
+```console
+$ skr config use <profile-name>
+```
+
+指定した profile を現在の profile に設定します。profile 名を省略すると現在の profile が対象になります。存在しない profile 名を指定した場合はエラーになり、profile の選択は変更されません。成功時には何も出力しません。切り替え後の選択は `skr config current` と `skr config list` で確認できます。
+
 ## 利用可能なプロファイルを確認する
 
 ```console

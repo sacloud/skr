@@ -123,7 +123,6 @@ func readRequest(input string, sensitive bool) ([]byte, error) {
 		return data, nil
 	}
 	if strings.HasPrefix(input, "@") {
-		//nolint:gosec // The request path is explicitly supplied by the user.
 		data, err := os.ReadFile(strings.TrimPrefix(input, "@"))
 		if err != nil {
 			return nil, fmt.Errorf("リクエストファイルを読み込めません: %w", err)

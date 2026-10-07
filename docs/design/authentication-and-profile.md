@@ -30,6 +30,8 @@ API キーの `access_token` と `access_token_secret` は profile v1 の形式�
 
 `create` の名前を省略した場合は `default` を使い、同名 profile があればエラーにして既存内容を上書きしません。作成した profile を現在の profile にするかは `--use` で明示します。`--use` を省略した場合は現在の profile を変更しません。`edit` の名前を省略した場合は現在の profile を対象とし、名前を指定した場合はその profile を編集します。`edit` も既定では現在の profile 選択を変更せず、切り替えを希望する場合に `--use` を指定します。ヘルプでは、コントロールパネルで作成したサービスプリンシパルキーをローカル profile に設定する操作であることを明記します。
 
+既存 profile を後から現在の profile に切り替えるには `skr config use [name]` を使います。名前を省略した場合は現在の profile が対象になり、存在しない profile 名を指定した場合はエラーになります。成功時には何も出力しません。切り替え操作の設計は [ADR 0029](../adr/0029-c0nfig-use-command.md) に従います。
+
 対話フローは次の順序にします。
 
 1. `create` では profile 名を確認します。`edit` では対象 profile を確認し、既存の CLI／SDK 設定を保持します。
