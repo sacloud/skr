@@ -127,3 +127,30 @@ func isSensitiveAttribute(key string) bool {
 	}
 	return false
 }
+
+type useCommand struct {
+	Name string `arg:"" optional:"" help:"Profile name to set as current. Defaults to the current profile."`
+}
+
+func (c *useCommand) Run(ctx *kong.Context) error {
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	if err != nil {
+		return err
+	}
+
+	name := c.Name
+	if name == "" {
+		name, err = profileOp.GetCurrentName()
+		if err != nil {
+			return err
+		}
+	}
+	if err := validateProfileName(name); err != nil {
+		return err
+	}
+
+	if err := profileOp.SetCurrentName(name); err != nil {
+		return fmt.Errorf("set current profile %q: %w", name, err)
+	}
+	return nil
+}

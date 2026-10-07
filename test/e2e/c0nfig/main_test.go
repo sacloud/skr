@@ -52,40 +52,47 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 
 func fakeResponses(spid string) map[string][]byte {
 	return map[string][]byte{
-		"config-create":          []byte("Profile \"skr-e2e-config\" created\n"),
-		"config-current":         []byte("skr-e2e-config\n"),
-		"config-list":            []byte("skr-e2e-config\n"),
-		"config-show":            []byte(`{"ServicePrincipalID":"` + spid + `","ServicePrincipalKeyID":"kid-e2e","PrivateKeyPEMPath":"(masked)"}`),
-		"config-edit":            []byte("Profile \"skr-e2e-config\" updated\n"),
-		"config-show-after-edit": []byte(`{"ServicePrincipalID":"spid-edited","ServicePrincipalKeyID":"kid-e2e","PrivateKeyPEMPath":"(masked)"}`),
+		"c0nfig-create":            []byte("Profile \"skr-e2e-config\" created\n"),
+		"c0nfig-current":           []byte("skr-e2e-config\n"),
+		"c0nfig-create-second":     []byte("Profile \"skr-e2e-config-second\" created\n"),
+		"c0nfig-use":               []byte(""),
+		"c0nfig-current-after-use": []byte("skr-e2e-config-second\n"),
+		"c0nfig-list":              []byte("skr-e2e-config\nskr-e2e-config-second\n"),
+		"c0nfig-show":              []byte(`{"ServicePrincipalID":"` + spid + `","ServicePrincipalKeyID":"kid-e2e","PrivateKeyPEMPath":"(masked)"}`),
+		"c0nfig-edit":              []byte("Profile \"skr-e2e-config\" updated\n"),
+		"c0nfig-show-after-edit":   []byte(`{"ServicePrincipalID":"spid-edited","ServicePrincipalKeyID":"kid-e2e","PrivateKeyPEMPath":"(masked)"}`),
 	}
 }
 
 func TestScenarioCreatesAndEditsProfile(t *testing.T) {
 	fake := &fakeCLI{responses: fakeResponses("spid-e2e")}
 	err := (scenario{
-		client:      fake,
-		keyPath:     "/tmp/key.pem",
-		profileName: "skr-e2e-config",
+		client:            fake,
+		keyPath:           "/tmp/key.pem",
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
 	}).run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	wantCalls := []string{
-		"config-create",
-		"config-current",
-		"config-list",
-		"config-show",
-		"config-edit",
-		"config-show-after-edit",
+		"c0nfig-create",
+		"c0nfig-current",
+		"c0nfig-create-second",
+		"c0nfig-use",
+		"c0nfig-current-after-use",
+		"c0nfig-list",
+		"c0nfig-show",
+		"c0nfig-edit",
+		"c0nfig-show-after-edit",
 	}
 	if len(fake.calls) != len(wantCalls) {
 		t.Fatalf("calls = %v, want %v", fake.calls, wantCalls)
 	}
 	for i, want := range wantCalls {
 		if fake.calls[i] != want {
-			t.Errorf("call[%d] = %q, want %q", i, fake.calls[i], want)
+			t.Errorf("call[%d] = %q, want %q", i, want, fake.calls[i])
 		}
 	}
 
@@ -96,25 +103,31 @@ func TestScenarioCreatesAndEditsProfile(t *testing.T) {
 		"--private-key-file", "/tmp/key.pem",
 		"--use",
 	}
-	if got := fake.args["config-create"]; strings.Join(got, "\x00") != strings.Join(wantCreate, "\x00") {
+	if got := fake.args["c0nfig-create"]; strings.Join(got, "\x00") != strings.Join(wantCreate, "\x00") {
 		t.Errorf("create args = %v, want %v", got, wantCreate)
+	}
+
+	wantUse := []string{"config", "use", "skr-e2e-config-second"}
+	if got := fake.args["c0nfig-use"]; strings.Join(got, "\x00") != strings.Join(wantUse, "\x00") {
+		t.Errorf("use args = %v, want %v", got, wantUse)
 	}
 
 	wantEdit := []string{
 		"config", "edit", "skr-e2e-config",
 		"--service-principal-id", "spid-edited",
 	}
-	if got := fake.args["config-edit"]; strings.Join(got, "\x00") != strings.Join(wantEdit, "\x00") {
+	if got := fake.args["c0nfig-edit"]; strings.Join(got, "\x00") != strings.Join(wantEdit, "\x00") {
 		t.Errorf("edit args = %v, want %v", got, wantEdit)
 	}
 }
 
 func TestScenarioFailsWhenCreateFails(t *testing.T) {
-	fake := &fakeCLI{responses: fakeResponses("spid-e2e"), failStep: "config-create"}
+	fake := &fakeCLI{responses: fakeResponses("spid-e2e"), failStep: "c0nfig-create"}
 	err := (scenario{
-		client:      fake,
-		keyPath:     "/tmp/key.pem",
-		profileName: "skr-e2e-config",
+		client:            fake,
+		keyPath:           "/tmp/key.pem",
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
 	}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "create profile") {
 		t.Fatalf("scenario error = %v, want create failure", err)
@@ -123,26 +136,56 @@ func TestScenarioFailsWhenCreateFails(t *testing.T) {
 
 func TestScenarioFailsWhenCurrentProfileUnexpected(t *testing.T) {
 	responses := fakeResponses("spid-e2e")
-	responses["config-current"] = []byte("other-profile\n")
+	responses["c0nfig-current"] = []byte("other-profile\n")
 	fake := &fakeCLI{responses: responses}
 	err := (scenario{
-		client:      fake,
-		keyPath:     "/tmp/key.pem",
-		profileName: "skr-e2e-config",
+		client:            fake,
+		keyPath:           "/tmp/key.pem",
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
 	}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "current profile") {
 		t.Fatalf("scenario error = %v, want current profile mismatch", err)
 	}
 }
 
-func TestScenarioFailsWhenProfileMissingFromList(t *testing.T) {
+func TestScenarioFailsWhenUseFails(t *testing.T) {
+	fake := &fakeCLI{responses: fakeResponses("spid-e2e"), failStep: "c0nfig-use"}
+	err := (scenario{
+		client:            fake,
+		keyPath:           "/tmp/key.pem",
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
+	}).run(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "use profile") {
+		t.Fatalf("scenario error = %v, want use failure", err)
+	}
+}
+
+func TestScenarioFailsWhenCurrentAfterUseUnexpected(t *testing.T) {
 	responses := fakeResponses("spid-e2e")
-	responses["config-list"] = []byte("other-profile\n")
+	responses["c0nfig-current-after-use"] = []byte("other-profile\n")
 	fake := &fakeCLI{responses: responses}
 	err := (scenario{
-		client:      fake,
-		keyPath:     "/tmp/key.pem",
-		profileName: "skr-e2e-config",
+		client:            fake,
+		keyPath:           "/tmp/key.pem",
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
+	}).run(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "current profile after use") {
+		t.Fatalf("scenario error = %v, want current profile mismatch after use", err)
+	}
+}
+
+func TestScenarioFailsWhenProfileMissingFromList(t *testing.T) {
+	responses := fakeResponses("spid-e2e")
+	responses["c0nfig-list"] = []byte("other-profile\n")
+	fake := &fakeCLI{responses: responses}
+	err := (scenario{
+		client:            fake,
+		keyPath:           "/tmp/key.pem",
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
 	}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "does not contain") {
 		t.Fatalf("scenario error = %v, want missing profile in list", err)
@@ -153,9 +196,10 @@ func TestScenarioFailsWhenShowValueUnexpected(t *testing.T) {
 	responses := fakeResponses("wrong-spid")
 	fake := &fakeCLI{responses: responses}
 	err := (scenario{
-		client:      fake,
-		keyPath:     "/tmp/key.pem",
-		profileName: "skr-e2e-config",
+		client:            fake,
+		keyPath:           "/tmp/key.pem",
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
 	}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "ServicePrincipalID") {
 		t.Fatalf("scenario error = %v, want unexpected ServicePrincipalID", err)
@@ -163,11 +207,12 @@ func TestScenarioFailsWhenShowValueUnexpected(t *testing.T) {
 }
 
 func TestScenarioFailsWhenEditFails(t *testing.T) {
-	fake := &fakeCLI{responses: fakeResponses("spid-e2e"), failStep: "config-edit"}
+	fake := &fakeCLI{responses: fakeResponses("spid-e2e"), failStep: "c0nfig-edit"}
 	err := (scenario{
-		client:      fake,
-		keyPath:     "/tmp/key.pem",
-		profileName: "skr-e2e-config",
+		client:            fake,
+		keyPath:           "/tmp/key.pem",
+		profileName:       "skr-e2e-config",
+		secondProfileName: "skr-e2e-config-second",
 	}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "edit profile") {
 		t.Fatalf("scenario error = %v, want edit failure", err)
