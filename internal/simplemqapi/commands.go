@@ -42,8 +42,7 @@ type QueueCreateCommand struct {
 }
 
 func (c *QueueCreateCommand) Run(ctx *kong.Context) error {
-	format, err := c.runtime.outputType(ctx)
-	if err != nil {
+	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
 	flags := c.Name != nil || c.Description != nil
@@ -78,7 +77,7 @@ func (c *QueueCreateCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.runtime.writeOutput(ctx, format, item)
+	return c.runtime.writeOutput(ctx, item)
 }
 
 func decodeCreateRequest(input string, destination *queue.CreateQueueRequest) error {
@@ -130,8 +129,7 @@ type QueueConfigCommand struct {
 }
 
 func (c *QueueConfigCommand) Run(ctx *kong.Context) error {
-	format, err := c.runtime.outputType(ctx)
-	if err != nil {
+	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
 	request, err := configRequest(c.Request, c.VisibilityTimeoutSeconds, c.ExpireSeconds, c.runtime.DecodeRequest)
@@ -149,7 +147,7 @@ func (c *QueueConfigCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.runtime.writeOutput(ctx, format, item)
+	return c.runtime.writeOutput(ctx, item)
 }
 
 func configRequest(input *string, visibilityTimeoutSeconds, expireSeconds *int, decode func(string, any) error) (queue.ConfigQueueRequest, error) {
@@ -195,8 +193,7 @@ type QueueCountMessagesCommand struct {
 }
 
 func (c *QueueCountMessagesCommand) Run(ctx *kong.Context) error {
-	format, err := c.runtime.outputType(ctx)
-	if err != nil {
+	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -210,7 +207,7 @@ func (c *QueueCountMessagesCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.runtime.writeOutput(ctx, format, map[string]int{"Count": count})
+	return c.runtime.writeOutput(ctx, map[string]int{"Count": count})
 }
 
 type QueueRotateAPIKeyCommand struct {
@@ -220,8 +217,7 @@ type QueueRotateAPIKeyCommand struct {
 }
 
 func (c *QueueRotateAPIKeyCommand) Run(ctx *kong.Context) error {
-	format, err := c.runtime.outputType(ctx)
-	if err != nil {
+	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -235,21 +231,21 @@ func (c *QueueRotateAPIKeyCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.runtime.writeOutput(ctx, format, map[string]string{"APIKey": apiKey})
+	return c.runtime.writeOutput(ctx, map[string]string{"APIKey": apiKey})
 }
 
-func (r QueueRuntime) outputType(ctx *kong.Context) (string, error) {
-	if r.OutputType == nil {
-		return "", fmt.Errorf("API 出力処理が設定されていません")
+func (r QueueRuntime) validateOutput(ctx *kong.Context) error {
+	if r.ValidateOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return r.OutputType(ctx)
+	return r.ValidateOutput(ctx)
 }
 
-func (r QueueRuntime) writeOutput(ctx *kong.Context, format string, value any) error {
+func (r QueueRuntime) writeOutput(ctx *kong.Context, value any) error {
 	if r.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return r.WriteOutput(ctx, format, value)
+	return r.WriteOutput(ctx, value)
 }
 
 func requestData(input string) ([]byte, error) {

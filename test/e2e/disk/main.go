@@ -72,9 +72,6 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	defer cancel()
 
 	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The caller selects a local skr binary; structured arguments are not passed through a shell.
-	if hasTableOutput(args) {
-		command.Env = append(os.Environ(), "COLUMNS=300")
-	}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -91,15 +88,6 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	return stdout.Bytes(), nil
 }
 
-func hasTableOutput(args []string) bool {
-	for i := 0; i+1 < len(args); i++ {
-		if args[i] == "--output" && args[i+1] == "table" {
-			return true
-		}
-	}
-	return false
-}
-
 func diskArgs(step string, value any) ([]string, error) {
 	if step == "profile-current" {
 		return []string{"config", "current"}, nil
@@ -112,9 +100,9 @@ func diskArgs(step string, value any) ([]string, error) {
 	if !ok || requestZone != zone {
 		return nil, fmt.Errorf("%s: expected Zone %q", step, zone)
 	}
-	output := "json"
-	if strings.HasSuffix(step, "-table") {
-		output = "table"
+	var queryArgs []string
+	if strings.HasSuffix(step, "-query") {
+		queryArgs = []string{"--query", "map({ID,Name})"}
 	}
 	op := ""
 	switch {
@@ -138,21 +126,21 @@ func diskArgs(step string, value any) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: encode request: %w", step, err)
 		}
-		args = append(args, "--request", string(data), "--output", output)
+		args = append(args, "--request", string(data))
 	case "read":
 		id, err := requestID(request)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", step, err)
 		}
-		args = append(args, "--zone", zone, "--id", id, "--output", output)
+		args = append(args, "--zone", zone, "--id", id)
 	case "delete":
 		id, err := requestID(request)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", step, err)
 		}
-		args = append(args, "--zone", zone, "--id", id, "--fail-if-not-found", "--output", output)
+		args = append(args, "--zone", zone, "--id", id, "--fail-if-not-found")
 	}
-	return args, nil
+	return append(args, queryArgs...), nil
 }
 
 func requestID(request map[string]any) (string, error) {
@@ -309,12 +297,19 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if len(found) != 1 || checkDisk(found[0], id, name, true) != nil {
 		return fmt.Errorf("find did not return exactly the created Disk %s", id)
 	}
-	table, err := s.call(ctx, "test-find-table", map[string]any{"Zone": zone, "Names": []string{name}})
+	output, err := s.call(ctx, "test-find-query", map[string]any{"Zone": zone, "Names": []string{name}})
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(string(table), id.String()) || !strings.Contains(string(table), namePrefix) {
-		return fmt.Errorf("Disk table output does not contain created Disk %s", id)
+	var projected []struct {
+		ID   types.ID
+		Name string
+	}
+	if err := json.Unmarshal(output, &projected); err != nil {
+		return fmt.Errorf("decode projected Disk list: %w", err)
+	}
+	if len(projected) != 1 || projected[0].ID != id || projected[0].Name != name {
+		return fmt.Errorf("projected Disk list does not match created Disk %s", id)
 	}
 	request := map[string]any{"Zone": zone, "ID": id}
 	read, err := s.item(ctx, "test-read", request)

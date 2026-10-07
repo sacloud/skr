@@ -34,8 +34,8 @@ type APIFactory func() (API, error)
 
 type Runtime struct {
 	DecodeRequest   func(string, any) error
-	OutputType      func(*kong.Context) (string, error)
-	WriteOutput     func(*kong.Context, string, any, ...[]string) error
+	ValidateOutput  func(*kong.Context) error
+	WriteOutput     func(*kong.Context, any) error
 	ValidateRequest func(string, any) error
 }
 
@@ -108,11 +108,10 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.ValidateRequest("validateDiskFindRequest", request); err != nil {
 		return err
 	}
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -123,16 +122,12 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 	if c.Request == nil && c.Zone != nil && *c.Zone == zones.All {
-		var tableZones []string
 		result, err := zones.FindInAll(context.Background(), c.zoneFactory, func(ctx context.Context, zone string) ([]*iaas.Disk, error) {
 			zoneRequest := *request
 			zoneRequest.Zone = zone
 			items, err := op.FindWithContext(ctx, &zoneRequest)
 			if err != nil {
 				return nil, err
-			}
-			for range items {
-				tableZones = append(tableZones, zone)
 			}
 			return items, nil
 		})
@@ -142,7 +137,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		if c.runtime.WriteOutput == nil {
 			return fmt.Errorf("API 出力処理が設定されていません")
 		}
-		return c.runtime.WriteOutput(ctx, format, result, tableZones)
+		return c.runtime.WriteOutput(ctx, result)
 	}
 	result, err := op.FindWithContext(context.Background(), request)
 	if err != nil {
@@ -151,7 +146,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type ReadCommand struct {
@@ -201,11 +196,10 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.ValidateRequest("validateDiskReadRequest", request); err != nil {
 		return err
 	}
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -222,7 +216,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type CreateCommand struct {
@@ -253,11 +247,10 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.ValidateRequest("validateDiskCreateRequest", request); err != nil {
 		return err
 	}
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -274,7 +267,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type UpdateCommand struct {
@@ -305,11 +298,10 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.ValidateRequest("validateDiskUpdateRequest", request); err != nil {
 		return err
 	}
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -326,7 +318,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type DeleteCommand struct {

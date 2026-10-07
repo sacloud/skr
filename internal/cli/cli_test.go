@@ -259,6 +259,21 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 		return stdout.Bytes()
 	}
 
+	checkProjection := func(resource, id, name string) {
+		t.Helper()
+		output := runCommand("eventbus-api", resource, "list", "--query", "map({ID,Name})")
+		var projected []struct {
+			ID   string
+			Name string
+		}
+		if err := json.Unmarshal(output, &projected); err != nil {
+			t.Fatal(err)
+		}
+		if len(projected) != 1 || projected[0].ID != id || projected[0].Name != name {
+			t.Fatalf("%s projection = %s, want ID %s and name %s", resource, output, id, name)
+		}
+	}
+
 	createJSON := `{"CommonServiceItem":{"Name":"sakumock-process-configuration","Settings":{"Destination":"simplemq","Parameters":"{\"queue_name\":\"sakumock\",\"content\":\"created\"}"}}}`
 	var created v1.CommonServiceItem
 	if err := json.Unmarshal(runCommand("eventbus-api", "process-configuration", "create", "--request", createJSON), &created); err != nil {
@@ -278,6 +293,7 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 	if len(items) != 1 || items[0].ID != created.ID {
 		t.Fatalf("list returned %#v, want the created process configuration", items)
 	}
+	checkProjection("process-configuration", created.ID, created.Name)
 
 	for _, resource := range []string{"schedule", "trigger"} {
 		items = nil
@@ -286,6 +302,9 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 		}
 		if len(items) != 0 {
 			t.Errorf("%s list returned %#v, want no resources", resource, items)
+		}
+		if got := string(runCommand("eventbus-api", resource, "list", "--query", "map({ID,Name})")); got != "[]\n" {
+			t.Errorf("%s empty projection = %q, want []", resource, got)
 		}
 	}
 
@@ -318,6 +337,7 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 		if len(listed) != 1 || listed[0].ID != item.ID {
 			t.Fatalf("%s list returned %#v, want created resource %q", resource, listed, item.ID)
 		}
+		checkProjection(resource, item.ID, item.Name)
 
 		var read v1.CommonServiceItem
 		if err := json.Unmarshal(runCommand("eventbus-api", resource, "read", item.ID), &read); err != nil {

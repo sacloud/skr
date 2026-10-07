@@ -160,15 +160,15 @@ func (s *scenario) list(ctx context.Context, step, kind string) ([]item, error) 
 	var args []string
 	switch kind {
 	case "queue":
-		args = []string{"simplemq-api", "queue", "list", "--output", "json"}
+		args = []string{"simplemq-api", "queue", "list"}
 	case "process-configuration", "trigger":
-		args = []string{"eventbus-api", kind, "list", "--output", "json"}
+		args = []string{"eventbus-api", kind, "list"}
 	case "switch":
 		request, err := json.Marshal(map[string]any{"Zone": zone})
 		if err != nil {
 			return nil, fmt.Errorf("%s: encode Switch search: %w", step, err)
 		}
-		args = []string{"iaas-api", "switch", "find", "--request", string(request), "--output", "json"}
+		args = []string{"iaas-api", "switch", "find", "--request", string(request)}
 	default:
 		return nil, fmt.Errorf("%s: unknown resource kind %q", step, kind)
 	}
@@ -245,7 +245,7 @@ func (s *scenario) preflight(ctx context.Context) error {
 func (s *scenario) createQueue(ctx context.Context) error {
 	s.queue.attempted = true
 	data, err := s.call(ctx, "create-queue", "simplemq-api", "queue", "create",
-		"--name", s.queue.name, "--description", s.queue.description, "--output", "json")
+		"--name", s.queue.name, "--description", s.queue.description)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func (s *scenario) createQueue(ctx context.Context) error {
 }
 
 func (s *scenario) rotateAPIKey(ctx context.Context) (string, error) {
-	data, err := s.call(ctx, "rotate-api-key", "simplemq-api", "queue", "rotate-api-key", s.queue.id, "--output", "json")
+	data, err := s.call(ctx, "rotate-api-key", "simplemq-api", "queue", "rotate-api-key", s.queue.id)
 	if err != nil {
 		return "", err
 	}
@@ -304,7 +304,7 @@ func (s *scenario) createConfiguration(ctx context.Context) error {
 	}
 	s.config.attempted = true
 	data, err := s.call(ctx, "create-process-configuration", "eventbus-api", "process-configuration", "create",
-		"--request", string(request), "--output", "json")
+		"--request", string(request))
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (s *scenario) createTrigger(ctx context.Context) error {
 	}
 	s.trigger.attempted = true
 	data, err := s.call(ctx, "create-trigger", "eventbus-api", "trigger", "create",
-		"--request", string(request), "--output", "json")
+		"--request", string(request))
 	if err != nil {
 		return err
 	}
@@ -374,7 +374,7 @@ func (s *scenario) createTrigger(ctx context.Context) error {
 func (s *scenario) createSwitch(ctx context.Context) error {
 	s.sw.attempted = true
 	data, err := s.call(ctx, "create-switch", "iaas-api", "switch", "create",
-		"--zone", zone, "--name", s.sw.name, "--description", s.sw.description, "--output", "json")
+		"--zone", zone, "--name", s.sw.name, "--description", s.sw.description)
 	if err != nil {
 		return err
 	}
@@ -401,7 +401,7 @@ func (s *scenario) waitForMessage(ctx context.Context) error {
 	for attempt := 0; ; attempt++ {
 		step := fmt.Sprintf("receive-event-message-%03d", attempt)
 		data, err := s.call(pollCtx, step, "simplemq-api", "message", "receive",
-			"--queue-name", s.queue.name, "--api-key-file", s.keyFile, "--output", "json")
+			"--queue-name", s.queue.name, "--api-key-file", s.keyFile)
 		if err != nil {
 			if pollCtx.Err() != nil {
 				return fmt.Errorf("no matching EventBus message received within %s: %w", eventWaitTimeout, pollCtx.Err())
@@ -432,11 +432,11 @@ func (s *scenario) read(ctx context.Context, step string, resource resource) (it
 	var args []string
 	switch resource.kind {
 	case "queue":
-		args = []string{"simplemq-api", "queue", "read", resource.id, "--output", "json"}
+		args = []string{"simplemq-api", "queue", "read", resource.id}
 	case "process-configuration", "trigger":
-		args = []string{"eventbus-api", resource.kind, "read", resource.id, "--output", "json"}
+		args = []string{"eventbus-api", resource.kind, "read", resource.id}
 	case "switch":
-		args = []string{"iaas-api", "switch", "read", "--zone", zone, "--id", resource.id, "--output", "json"}
+		args = []string{"iaas-api", "switch", "read", "--zone", zone, "--id", resource.id}
 	default:
 		return item{}, fmt.Errorf("%s: unknown resource kind %q", step, resource.kind)
 	}

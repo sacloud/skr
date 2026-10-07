@@ -31,6 +31,7 @@ type fakeCLI struct {
 	changeRead bool
 	deleted    []types.ID
 	calls      []string
+	queryOut   []byte
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, value any) ([]byte, error) {
@@ -48,6 +49,9 @@ func (f *fakeCLI) call(_ context.Context, step string, value any) ([]byte, error
 	if request["Zone"] != zone {
 		return nil, errors.New("unexpected zone")
 	}
+	if step == "test-find-query" && f.queryOut != nil {
+		return f.queryOut, nil
+	}
 	switch {
 	case strings.Contains("-"+step+"-", "-find-"):
 		if f.item == nil || request["Names"] == nil {
@@ -58,8 +62,6 @@ func (f *fakeCLI) call(_ context.Context, step string, value any) ([]byte, error
 			return []byte("[]"), nil
 		}
 		return json.Marshal([]diskItem{*f.item})
-	case step == "test-find-table":
-		return []byte("ID Name\n1234 " + f.item.Name + "\n"), nil
 	case step == "test-create":
 		f.item = &diskItem{
 			ID: types.ID(1234), Name: request["Name"].(string),
@@ -110,7 +112,7 @@ func TestScenarioDeletesDiskAndVerifiesAbsence(t *testing.T) {
 	if fake.item != nil || len(fake.deleted) != 1 || fake.deleted[0] != types.ID(1234) {
 		t.Fatalf("Disk state after E2E: item=%+v deleted=%v", fake.item, fake.deleted)
 	}
-	for _, step := range []string{"test-create", "test-find", "test-find-table", "test-read", "test-update", "test-read-updated", "test-delete", "test-find-original-after", "test-find-updated-after"} {
+	for _, step := range []string{"test-create", "test-find", "test-find-query", "test-read", "test-update", "test-read-updated", "test-delete", "test-find-original-after", "test-find-updated-after"} {
 		if !containsStep(fake.calls, step) {
 			t.Errorf("scenario did not call %s", step)
 		}
@@ -125,6 +127,20 @@ func TestScenarioCleansUpAfterUpdateFailure(t *testing.T) {
 	}
 	if fake.item != nil || len(fake.deleted) != 1 {
 		t.Fatalf("Disk was not cleaned up: item=%+v deleted=%v", fake.item, fake.deleted)
+	}
+}
+
+func TestScenarioRejectsInvalidProjectionAndCleansUp(t *testing.T) {
+	for _, output := range []string{"null", "[]", `{"ID":1234}`, `[{"ID":4321,"Name":"wrong"}]`} {
+		t.Run(output, func(t *testing.T) {
+			fake := &fakeCLI{queryOut: []byte(output)}
+			if err := testScenario(t, fake); err == nil {
+				t.Fatal("invalid projection accepted")
+			}
+			if fake.item != nil || len(fake.deleted) != 1 {
+				t.Fatal("created Disk not cleaned up")
+			}
+		})
 	}
 }
 
@@ -169,17 +185,21 @@ func TestDiskArgsUsesJSONForComplexRequestsAndFlagsForIDs(t *testing.T) {
 		request map[string]any
 		want    []string
 	}{
-		{"test-create", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "SizeGB": diskSizeGB}, []string{"--request", `"DiskPlanID":4`, "--output", "json"}},
-		{"test-update", map[string]any{"Zone": zone, "ID": types.ID(123), "Name": "renamed"}, []string{"--request", `"Name":"renamed"`, "--output", "json"}},
-		{"test-find", map[string]any{"Zone": zone, "Names": []string{"disk"}}, []string{"--request", `"Names":["disk"]`, "--output", "json"}},
-		{"test-read", map[string]any{"Zone": zone, "ID": types.ID(123)}, []string{"--zone", "is1b", "--id", "123", "--output", "json"}},
-		{"test-delete", map[string]any{"Zone": zone, "ID": types.ID(123)}, []string{"--zone", "is1b", "--id", "123", "--fail-if-not-found", "--output", "json"}},
+		{"test-create", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "SizeGB": diskSizeGB}, []string{"--request", `"DiskPlanID":4`}},
+		{"test-update", map[string]any{"Zone": zone, "ID": types.ID(123), "Name": "renamed"}, []string{"--request", `"Name":"renamed"`}},
+		{"test-find", map[string]any{"Zone": zone, "Names": []string{"disk"}}, []string{"--request", `"Names":["disk"]`}},
+		{"test-find-query", map[string]any{"Zone": zone, "Names": []string{"disk"}}, []string{"--request", `"Names":["disk"]`, "--query map({ID,Name})"}},
+		{"test-read", map[string]any{"Zone": zone, "ID": types.ID(123)}, []string{"--zone", "is1b", "--id", "123"}},
+		{"test-delete", map[string]any{"Zone": zone, "ID": types.ID(123)}, []string{"--zone", "is1b", "--id", "123", "--fail-if-not-found"}},
 	} {
 		args, err := diskArgs(test.step, test.request)
 		if err != nil {
 			t.Fatal(err)
 		}
 		joined := strings.Join(args, " ")
+		if strings.Contains(joined, "--output") {
+			t.Errorf("%s args contain removed flag: %v", test.step, args)
+		}
 		for _, want := range test.want {
 			if !strings.Contains(joined, want) {
 				t.Errorf("%s args = %v, want %q", test.step, args, want)

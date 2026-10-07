@@ -99,7 +99,7 @@ func TestIaaSZoneFindWithLocalMockAndQuery(t *testing.T) {
 		t.Fatalf("zone find returned %#v, want configured mock zones", zones)
 	}
 
-	queryOutput := runCommand("iaas-api", "zone", "find", "--query", "map(.Name)", "--output", "table")
+	queryOutput := runCommand("iaas-api", "zone", "find", "--query", "map(.Name)")
 	var names []string
 	if err := json.Unmarshal([]byte(queryOutput), &names); err != nil {
 		t.Fatalf("decode query output %q: %v", queryOutput, err)

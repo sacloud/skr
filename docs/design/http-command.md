@@ -28,7 +28,7 @@ HTTP コマンドのテストでは、偽の request doer によるメソッド�
 
 ## 読み取り専用 E2E
 
-`test/e2e/http` は、設備関連 API の `GET /zone` を `skr http` 経由で1回呼び出し、終了コードと JSON 本文を確認します。URL は API ドキュメントの例に合わせて `https://secure.sakura.ad.jp/cloud/zone/is1a/api/cloud/1.1/zone` とします。API のリクエスト／レスポンス形状を独自に再実装せず、生のレスポンスが空でなく有効な JSON であることだけを検証します。
+`test/e2e/http` は、設備関連 API の `GET /zone` を `skr http` 経由で1回呼び出し、終了コードと JSON 本文を確認します。ライブ E2E の対象ゾーンに合わせ、URL は `https://secure.sakura.ad.jp/cloud/zone/is1b/api/cloud/1.1/zone` とします。API のリクエスト／レスポンス形状を独自に再実装せず、生のレスポンスが空でなく有効な JSON であることだけを検証します。
 
 実行には選択中の SDK プロファイルと `--confirm-http-live` が必要です。テストはリソースを作成・変更・削除しませんが、選択中のプロファイルの認証情報を `secure.sakura.ad.jp` へ送信します。`test/e2e/internal/evidence` がコマンド、出力、エラーを `tmp/http-api/` 以下へ mode `0700` のディレクトリと mode `0600` のファイルで保存します。証跡は Git 管理外のままにし、共有しないでください。
 

@@ -68,7 +68,7 @@ func TestRunHTTPCommand(t *testing.T) {
 		"-H", "Content-Type: application/json",
 		"--header", "X-Feature: enabled",
 		"--data", "@" + requestBody,
-		"--output", "table",
+		"--query", ".id",
 	}
 	if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
 		t.Fatalf("runCLI() = %d; stderr: %s", code, stderr.String())
@@ -251,7 +251,7 @@ func TestRunHTTPCommandHelp(t *testing.T) {
 		"HTTPS",
 		"標準入力",
 		"SDK の認証情報",
-		"--output による変換は行いません",
+		"--query による加工は行いません",
 	} {
 		if !strings.Contains(stdout.String(), text) {
 			t.Errorf("http help does not contain %q", text)

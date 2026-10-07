@@ -40,25 +40,26 @@ $ skr simplemq-api message delete --help
 次のコマンドでキューを作成します。作成結果の `ID` を控え、以降の `QUEUE-ID` に指定してください。`QUEUE-NAME` は同じプロジェクト内で未使用の名前に置き換えます。
 
 ```console
-$ skr simplemq-api queue create --name QUEUE-NAME --description simplemq-tutorial/UNIQUE-SUFFIX --output json
-$ COLUMNS=200 skr simplemq-api queue list --output table
+$ skr simplemq-api queue create --name QUEUE-NAME --description simplemq-tutorial/UNIQUE-SUFFIX
+$ skr simplemq-api queue list --query 'map({ID,Name})'
 ```
 
-次は SimpleMQ の live E2E で取得した出力を編集した例です。ID、キュー名、説明、設定ハッシュ、時刻は置き換えています。列や値は端末幅とキューの内容によって省略される場合があります。
+一覧から ID と名前だけを取り出して確認します。次は CLI テストで確認した出力形式の例で、ID とキュー名は置き換えています。ほかのキューがある場合は、同じ配列に含まれます。
 
-```text
-+--------------+------------------------------+--------------------------+----------------+--------+--------------+--------------+-----------+------------+----------+----------+--------------+-------+
-| ID           | Name                         | Status                   | Description    | Tags   | Availability | ServiceClass | CreatedAt | ModifiedAt | Provider | Settings | SettingsHash | Icon  |
-+--------------+------------------------------+--------------------------+----------------+--------+--------------+--------------+-----------+------------+----------+----------+--------------+-------+
-| 123456789012 | QUEUE-NAME                   | {"QueueName":"QUEUE-...  | DESCRIPTION    |        | available    | cloud/sim... | 2026-1... | 2026-10... | {"Cla... | {"Exp... | ...          |       |
-+--------------+------------------------------+--------------------------+----------------+--------+--------------+--------------+-----------+------------+----------+----------+--------------+-------+
+```json
+[
+  {
+    "ID": "123456789012",
+    "Name": "QUEUE-NAME"
+  }
+]
 ```
 
 キューの可視性タイムアウトと未処理メッセージ保存期間を設定します。`VisibilityTimeoutSeconds` は5〜900秒、`ExpireSeconds` は60〜1209600秒です。どちらも必要なので、通常は対応する CLI フラグで指定します。
 
 ```console
-$ skr simplemq-api queue config QUEUE-ID --visibility-timeout-seconds 30 --expire-seconds 345600 --output json
-$ skr simplemq-api queue read QUEUE-ID --output json
+$ skr simplemq-api queue config QUEUE-ID --visibility-timeout-seconds 30 --expire-seconds 345600
+$ skr simplemq-api queue read QUEUE-ID
 ```
 
 `Description`、`Tags`、`Icon` も設定する場合は、ConfigQueueRequest の JSON を `--request` で指定します。個別フラグとは併用できません。
@@ -77,7 +78,7 @@ $ skr simplemq-api queue read QUEUE-ID --output json
 ```
 
 ```console
-$ skr simplemq-api queue config QUEUE-ID --request @queue-settings.json --output json
+$ skr simplemq-api queue config QUEUE-ID --request @queue-settings.json
 ```
 
 ## Step 3: API キーを用意してメッセージを送受信する
@@ -86,14 +87,14 @@ $ skr simplemq-api queue config QUEUE-ID --request @queue-settings.json --output
 
 ```console
 $ umask 077
-$ skr simplemq-api queue rotate-api-key QUEUE-ID --output json | jq -er .APIKey > simplemq.key
+$ skr simplemq-api queue rotate-api-key QUEUE-ID | jq -er .APIKey > simplemq.key
 ```
 
 キュー名は `QUEUE-NAME` の値に置き換えます。メッセージ本文は API 定義に従い、最大256000文字で、英数字と `+`、`/`、`=` のみを使います。次の例では `HelloSimpleMQ` を送信します。
 
 ```console
-$ skr simplemq-api message send --queue-name QUEUE-NAME --api-key-file simplemq.key --content HelloSimpleMQ --output json
-$ skr simplemq-api message receive --queue-name QUEUE-NAME --api-key-file simplemq.key --output json
+$ skr simplemq-api message send --queue-name QUEUE-NAME --api-key-file simplemq.key --content HelloSimpleMQ
+$ skr simplemq-api message receive --queue-name QUEUE-NAME --api-key-file simplemq.key
 ```
 
 送信結果の `id` と受信結果の `id` が一致し、受信結果の `content` が `HelloSimpleMQ` であることを確認してください。受信結果の `id` を続く操作の `MESSAGE-ID` に指定します。
@@ -103,9 +104,9 @@ $ skr simplemq-api message receive --queue-name QUEUE-NAME --api-key-file simple
 処理に可視性タイムアウトより長い時間がかかる場合は、受信したメッセージのタイムアウトを延長します。処理が終わったら、そのメッセージを削除します。
 
 ```console
-$ skr simplemq-api message extend-timeout --queue-name QUEUE-NAME --api-key-file simplemq.key MESSAGE-ID --output json
+$ skr simplemq-api message extend-timeout --queue-name QUEUE-NAME --api-key-file simplemq.key MESSAGE-ID
 $ skr simplemq-api message delete --queue-name QUEUE-NAME --api-key-file simplemq.key MESSAGE-ID
-$ skr simplemq-api queue count-messages QUEUE-ID --output json
+$ skr simplemq-api queue count-messages QUEUE-ID
 ```
 
 この例では作成直後のキューに送信したメッセージを削除するため、`count-messages` の `Count` が0であることを確認できます。
@@ -116,19 +117,17 @@ $ skr simplemq-api queue count-messages QUEUE-ID --output json
 削除前に `queue read` で ID、名前、説明がこの手順で作成したキューと一致することを確認します。続けてキュー内のメッセージを消去し、キューを削除します。既存のキューは削除しないでください。
 
 ```console
-$ skr simplemq-api queue read QUEUE-ID --output json
+$ skr simplemq-api queue read QUEUE-ID
 $ skr simplemq-api queue clear-messages QUEUE-ID
 $ skr simplemq-api queue delete QUEUE-ID
-$ skr simplemq-api queue list --output table
+$ skr simplemq-api queue list --query 'map({ID,Name})'
 $ rm simplemq.key
 ```
 
 `queue list` に対象キューが残っていないことを確認します。削除後に結果が空の場合の出力は次のとおりです。
 
-```text
-+------------+
-| No results |
-+------------+
+```json
+[]
 ```
 
 API キーを別の場所に保存した場合は、そのファイルもこの手順で作成したものだけを削除してください。

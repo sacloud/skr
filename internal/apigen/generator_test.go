@@ -91,7 +91,8 @@ func TestGenerate(t *testing.T) {
 		"request.Count = c.Count",
 		"if c.Zone == nil",
 		"request.Zone = *c.Zone",
-		"c.runtime.WriteOutput(ctx, format, result)",
+		"c.runtime.WriteOutput(ctx, result)",
+		"if err := c.runtime.ValidateOutput(ctx); err != nil",
 		"return op.DeleteWithContext(context.Background(), request)",
 		"ValidateRequest(\"validateSwitchDeleteRequest\", request)",
 		"switchFindCommand",
@@ -106,6 +107,11 @@ func TestGenerate(t *testing.T) {
 	}
 	if strings.Contains(string(source), "type switchFindCommand struct") {
 		t.Fatal("handwritten operation command was generated")
+	}
+	for _, removed := range []string{"OutputType", "tableZones", "format,"} {
+		if strings.Contains(string(source), removed) {
+			t.Errorf("generated source contains removed output machinery %q", removed)
+		}
 	}
 
 	second, err := Generate(config)

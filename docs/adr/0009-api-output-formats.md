@@ -5,6 +5,8 @@
 
 ## Context
 
+出力形式の選択は [ADR 0030](0030-remove-table-output.md) で置き換えました。以下は導入時の決定です。
+
 IaaS API と EventBus API の結果は JSON のみで出力されます。プロファイル共通仕様では CLI の既定出力形式として table、JSON、YAML を定義しており、特に一覧結果を見やすくする table と、設定ファイルでの既定値指定が必要です。
 
 ## Decision

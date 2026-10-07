@@ -29,8 +29,8 @@ type MessageAPIFactory func(QueueName string, APIKeyFile string) (MessageAPI, er
 
 type MessageRuntime struct {
 	DecodeRequest   func(string, any) error
-	OutputType      func(*kong.Context) (string, error)
-	WriteOutput     func(*kong.Context, string, any, ...[]string) error
+	ValidateOutput  func(*kong.Context) error
+	WriteOutput     func(*kong.Context, any) error
 	ValidateRequest func(string, any) error
 }
 
@@ -57,11 +57,10 @@ type MessageSendCommand struct {
 }
 
 func (c *MessageSendCommand) Run(ctx *kong.Context) error {
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -78,7 +77,7 @@ func (c *MessageSendCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type MessageReceiveCommand struct {
@@ -89,11 +88,10 @@ type MessageReceiveCommand struct {
 }
 
 func (c *MessageReceiveCommand) Run(ctx *kong.Context) error {
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -110,7 +108,7 @@ func (c *MessageReceiveCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type MessageExtendTimeoutCommand struct {
@@ -122,11 +120,10 @@ type MessageExtendTimeoutCommand struct {
 }
 
 func (c *MessageExtendTimeoutCommand) Run(ctx *kong.Context) error {
-	if c.runtime.OutputType == nil {
+	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := c.runtime.OutputType(ctx)
-	if err != nil {
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if c.factory == nil {
@@ -143,7 +140,7 @@ func (c *MessageExtendTimeoutCommand) Run(ctx *kong.Context) error {
 	if c.runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	return c.runtime.WriteOutput(ctx, format, result)
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 type MessageDeleteCommand struct {

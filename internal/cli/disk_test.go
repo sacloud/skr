@@ -17,6 +17,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -120,6 +121,22 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		}
 	}
 
+	output, stderr, code = run("find", "--zone", "test-zone", "--query", "map({ID,Name,SizeMB})")
+	if code != 0 || stderr != "" {
+		t.Fatalf("projected find: code %d, stderr %q", code, stderr)
+	}
+	var projected []struct {
+		ID     json.Number
+		Name   string
+		SizeMB int
+	}
+	if err := json.Unmarshal([]byte(output), &projected); err != nil {
+		t.Fatal(err)
+	}
+	if len(projected) != 1 || projected[0].ID.String() != "123" || projected[0].Name != "test-zone" || projected[0].SizeMB != 20480 {
+		t.Fatalf("projected Disk = %s, want ID, name and size", output)
+	}
+
 	output, stderr, code = run("read", "--zone", "test-zone", "--id", "123")
 	if code != 0 || stderr != "" || !strings.Contains(output, `"ID": 123`) {
 		t.Fatalf("read: code %d, stderr %q, output %q", code, stderr, output)
@@ -182,7 +199,7 @@ type diskAPITestDouble struct {
 
 func (api *diskAPITestDouble) FindWithContext(_ context.Context, request *disk.FindRequest) ([]*iaas.Disk, error) {
 	api.findRequests = append(api.findRequests, *request)
-	return []*iaas.Disk{{ID: 123, Name: request.Zone}}, nil
+	return []*iaas.Disk{{ID: 123, Name: request.Zone, SizeMB: 20480}}, nil
 }
 
 func (api *diskAPITestDouble) ReadWithContext(_ context.Context, request *disk.ReadRequest) (*iaas.Disk, error) {

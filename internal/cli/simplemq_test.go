@@ -144,10 +144,15 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	if len(listed) != 1 || simplemq.GetQueueID(&listed[0]) != queueID {
 		t.Fatalf("list returned %#v, want queue %s", listed, queueID)
 	}
-	t.Setenv("COLUMNS", "200")
-	table := string(runCommand("simplemq-api", "queue", "list", "--output", "table"))
-	if !strings.Contains(table, queueID) || !strings.Contains(table, "mock-queue") {
-		t.Fatalf("table output = %q, want created queue ID and name", table)
+	var projected []struct {
+		ID   string
+		Name string
+	}
+	if err := json.Unmarshal(runCommand("simplemq-api", "queue", "list", "--query", "map({ID,Name})"), &projected); err != nil {
+		t.Fatal(err)
+	}
+	if len(projected) != 1 || projected[0].ID != queueID || projected[0].Name != "mock-queue" {
+		t.Fatalf("projected output = %+v, want created queue ID and name", projected)
 	}
 
 	var jsonCreated queue.CommonServiceItem
@@ -181,7 +186,7 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	var rotated struct {
 		APIKey string
 	}
-	rotateOutput := runCommand("simplemq-api", "queue", "rotate-api-key", queueID, "--output", "json")
+	rotateOutput := runCommand("simplemq-api", "queue", "rotate-api-key", queueID)
 	if err := json.Unmarshal(rotateOutput, &rotated); err != nil {
 		t.Fatal(err)
 	}
@@ -251,9 +256,9 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	if len(listed) != 0 {
 		t.Errorf("list after delete returned %#v, want empty", listed)
 	}
-	emptyTable := string(runCommand("simplemq-api", "queue", "list", "--output", "table"))
-	if want := "+------------+\n| No results |\n+------------+\n"; emptyTable != want {
-		t.Errorf("empty table output = %q, want %q", emptyTable, want)
+	emptyJSON := string(runCommand("simplemq-api", "queue", "list", "--query", "map({ID,Name})"))
+	if want := "[]\n"; emptyJSON != want {
+		t.Errorf("empty projected output = %q, want %q", emptyJSON, want)
 	}
 }
 

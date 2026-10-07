@@ -125,7 +125,7 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 		`{"name":"mock-cluster","servicePrincipalID":"123456789012","ports":[{"port":443,"protocol":"https"}]}`), &createdCluster); err != nil {
 		t.Fatal(err)
 	}
-	clusterOutput := runCommand("apprun-dedicated-api", "cluster", "list", "--output", "json")
+	clusterOutput := runCommand("apprun-dedicated-api", "cluster", "list")
 	var clusters struct {
 		Items []struct {
 			ClusterID v1.ClusterID `json:"clusterID"`

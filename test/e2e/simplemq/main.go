@@ -102,9 +102,6 @@ func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byt
 	defer cancel()
 
 	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The caller provides a selected skr executable and structured arguments; no shell is used.
-	if hasTableOutput(args) {
-		command.Env = append(os.Environ(), "COLUMNS=200")
-	}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -122,15 +119,6 @@ func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byt
 	return stdout.Bytes(), nil
 }
 
-func hasTableOutput(args []string) bool {
-	for i := 0; i+1 < len(args); i++ {
-		if args[i] == "--output" && args[i+1] == "table" {
-			return true
-		}
-	}
-	return false
-}
-
 type scenario struct {
 	client  cli
 	keyFile string
@@ -143,7 +131,7 @@ func (s scenario) call(ctx context.Context, step, operation string, args ...stri
 }
 
 func (s scenario) list(ctx context.Context, step string) ([]queueItem, error) {
-	data, err := s.call(ctx, step, "queue list", "--output", "json")
+	data, err := s.call(ctx, step, "queue list")
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +146,7 @@ func (s scenario) list(ctx context.Context, step string) ([]queueItem, error) {
 }
 
 func (s scenario) item(ctx context.Context, step, id string) (queueItem, error) {
-	data, err := s.call(ctx, step, "queue read", id, "--output", "json")
+	data, err := s.call(ctx, step, "queue read", id)
 	if err != nil {
 		return queueItem{}, err
 	}
@@ -309,7 +297,7 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 
 	creationAttempted = true
 	data, err := s.call(ctx, "e2e-create", "queue create",
-		"--name", name, "--description", description, "--output", "json")
+		"--name", name, "--description", description)
 	if err != nil {
 		return err
 	}
@@ -341,16 +329,36 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 	if found != 1 {
 		return fmt.Errorf("queue list returned %d items named %q; want the created queue once", found, name)
 	}
-	table, err := s.call(ctx, "e2e-list-created-table", "queue list", "--output", "table")
+	output, err := s.call(ctx, "e2e-list-created-query", "queue list", "--query", "map({ID,Name})")
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(string(table), name) {
-		return fmt.Errorf("queue table output does not contain created queue %q", name)
+	var projected []queueItem
+	if err := json.Unmarshal(output, &projected); err != nil {
+		return fmt.Errorf("decode projected queue list: %w", err)
+	}
+	if projected == nil {
+		return errors.New("projected queue list is not a JSON array")
+	}
+	var projectedMatches int
+	for _, item := range projected {
+		itemID, err := item.id()
+		if err != nil {
+			return err
+		}
+		if item.Name == name {
+			if itemID != id {
+				return fmt.Errorf("projected queue %q has unexpected ID %s", name, itemID)
+			}
+			projectedMatches++
+		}
+	}
+	if projectedMatches != 1 {
+		return fmt.Errorf("projected queue list contains %d matches for %q; want one", projectedMatches, name)
 	}
 
 	data, err = s.call(ctx, "e2e-config", "queue config", id,
-		"--visibility-timeout-seconds", "30", "--expire-seconds", "345600", "--output", "json")
+		"--visibility-timeout-seconds", "30", "--expire-seconds", "345600")
 	if err != nil {
 		return err
 	}
@@ -366,7 +374,7 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 			configured.Settings.VisibilityTimeoutSeconds, configured.Settings.ExpireSeconds)
 	}
 
-	keyOutput, err := s.call(ctx, "e2e-rotate-api-key", "queue rotate-api-key", id, "--output", "json")
+	keyOutput, err := s.call(ctx, "e2e-rotate-api-key", "queue rotate-api-key", id)
 	if err != nil {
 		return err
 	}
@@ -385,7 +393,7 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 
 	data, err = s.call(ctx, "e2e-send", "message send",
 		"--queue-name", name, "--api-key-file", s.keyFile,
-		"--content", messageBody, "--output", "json")
+		"--content", messageBody)
 	if err != nil {
 		return err
 	}
@@ -398,7 +406,7 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 	}
 
 	data, err = s.call(ctx, "e2e-receive", "message receive",
-		"--queue-name", name, "--api-key-file", s.keyFile, "--output", "json")
+		"--queue-name", name, "--api-key-file", s.keyFile)
 	if err != nil {
 		return err
 	}
@@ -411,7 +419,7 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 	}
 
 	data, err = s.call(ctx, "e2e-extend-timeout", "message extend-timeout",
-		"--queue-name", name, "--api-key-file", s.keyFile, received[0].ID, "--output", "json")
+		"--queue-name", name, "--api-key-file", s.keyFile, received[0].ID)
 	if err != nil {
 		return err
 	}
@@ -427,7 +435,7 @@ func (s scenario) run(ctx context.Context, name, description string) (result err
 		"--queue-name", name, "--api-key-file", s.keyFile, sent.ID); err != nil {
 		return err
 	}
-	data, err = s.call(ctx, "e2e-count-messages", "queue count-messages", id, "--output", "json")
+	data, err = s.call(ctx, "e2e-count-messages", "queue count-messages", id)
 	if err != nil {
 		return err
 	}

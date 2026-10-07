@@ -141,10 +141,15 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 	if len(found) != 1 || found[0].ID != created.ID {
 		t.Fatalf("find returned %#v, want switch %d", found, created.ID)
 	}
-	t.Setenv("COLUMNS", "200")
-	table := string(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--output", "table"))
-	if !strings.Contains(table, created.ID.String()) || !strings.Contains(table, "TEST-SWITCH-NAME") {
-		t.Fatalf("table output = %q, want created switch ID and name", table)
+	var projected []struct {
+		ID   json.Number
+		Name string
+	}
+	if err := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--query", "map({ID,Name})"), &projected); err != nil {
+		t.Fatal(err)
+	}
+	if len(projected) != 1 || projected[0].ID.String() != created.ID.String() || projected[0].Name != created.Name {
+		t.Fatalf("projected output = %+v, want created switch ID and name", projected)
 	}
 
 	var read iaas.Switch
@@ -183,15 +188,14 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 	if len(found) != 0 {
 		t.Errorf("find after delete returned %#v, want no switches", found)
 	}
-	emptyTable := string(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--output", "table"))
-	if want := "+------------+\n| No results |\n+------------+\n"; emptyTable != want {
-		t.Errorf("empty table output = %q, want %q", emptyTable, want)
+	emptyJSON := string(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--query", "map({ID,Name})"))
+	if want := "[]\n"; emptyJSON != want {
+		t.Errorf("empty projected output = %q, want %q", emptyJSON, want)
 	}
 }
 
 func TestIaaSSwitchFindAllZones(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
-	t.Setenv("COLUMNS", "100")
 	server := iaasmock.NewTestServer(iaasmock.Config{Zones: []string{"test-zone-a", "test-zone-b"}})
 	t.Cleanup(server.Close)
 
@@ -231,17 +235,17 @@ func TestIaaSSwitchFindAllZones(t *testing.T) {
 	if len(found) != 2 || found[0].Name != "switch-a" || found[1].Name != "switch-b" {
 		t.Errorf("find all returned %#v, want one result from each configured zone", found)
 	}
-	t.Setenv("COLUMNS", "200")
-	table := string(runCommand("iaas-api", "switch", "find", "--zone", "all", "--output", "table"))
-	if headers := tableHeaderCells(table); len(headers) < 3 || strings.Join(headers[:3], " ") != "Zone ID Name" {
-		t.Errorf("table headers start with %v, want Zone ID Name", headers[:min(3, len(headers))])
+	var projected []map[string]json.RawMessage
+	if err := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--zone", "all", "--query", "map({ID,Name})"), &projected); err != nil {
+		t.Fatal(err)
 	}
-	rows := strings.Split(strings.TrimSpace(table), "\n")
-	if first := tableRowCells(rows[3]); len(first) == 0 || first[0] != "test-zone-a" {
-		t.Errorf("first table row starts with %v, want zone test-zone-a", first)
+	if len(projected) != 2 {
+		t.Fatalf("projected all-zone output = %+v, want two results", projected)
 	}
-	if second := tableRowCells(rows[4]); len(second) == 0 || second[0] != "test-zone-b" {
-		t.Errorf("second table row starts with %v, want zone test-zone-b", second)
+	for i, item := range projected {
+		if len(item) != 2 || string(item["Name"]) != `"`+found[i].Name+`"` {
+			t.Errorf("projected result %d = %+v, want only ID and Name", i, item)
+		}
 	}
 }
 
@@ -269,7 +273,6 @@ func TestGeneratedFindAllZonesAppliesFiltersAndAvoidsPartialOutput(t *testing.T)
 			return testIaaSZoneAPI{zones: []*iaas.Zone{{Name: "zone-a"}, {Name: "zone-b"}}}, nil
 		})
 		commandArgs := append([]string{"iaas-api", "switch", "find"}, args...)
-		commandArgs = append(commandArgs, "--output", "json")
 		exitCode := runCLI(commandArgs, &stdout, &stderr, commandLine)
 		return exitCode, stdout.String(), stderr.String()
 	}
@@ -350,14 +353,6 @@ func TestGeneratedFindRejectsEmptyZoneBeforeCallingAPI(t *testing.T) {
 			}
 		})
 	}
-}
-
-func tableRowCells(line string) []string {
-	cells := strings.Split(strings.Trim(line, "|"), "|")
-	for i, cell := range cells {
-		cells[i] = strings.TrimSpace(cell)
-	}
-	return cells
 }
 
 type testIaaSZoneAPI struct {

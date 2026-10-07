@@ -49,9 +49,9 @@ type Commands struct {
 }
 
 type Runtime struct {
-	NewClient   func() (*v1.Client, error)
-	OutputType  func(*kong.Context) (string, error)
-	WriteOutput func(*kong.Context, string, any, ...[]string) error
+	NewClient      func() (*v1.Client, error)
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *Commands) SetRuntime(runtime Runtime) {
@@ -79,11 +79,10 @@ type page[T any] struct {
 }
 
 func runValue[T any](ctx *kong.Context, runtime Runtime, call func(context.Context, *v1.Client) (T, error)) error {
-	if runtime.OutputType == nil || runtime.WriteOutput == nil {
+	if runtime.ValidateOutput == nil || runtime.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	format, err := runtime.OutputType(ctx)
-	if err != nil {
+	if err := runtime.ValidateOutput(ctx); err != nil {
 		return err
 	}
 	if runtime.NewClient == nil {
@@ -97,7 +96,7 @@ func runValue[T any](ctx *kong.Context, runtime Runtime, call func(context.Conte
 	if err != nil {
 		return err
 	}
-	return runtime.WriteOutput(ctx, format, result)
+	return runtime.WriteOutput(ctx, result)
 }
 
 func runNoOutput(ctx context.Context, runtime Runtime, call func(context.Context, *v1.Client) error) error {
