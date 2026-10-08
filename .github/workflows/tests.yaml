@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+permissions:
+  contents: read
 env:
   GOPROXY: https://proxy.golang.org
 jobs:
