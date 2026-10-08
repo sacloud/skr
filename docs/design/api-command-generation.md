@@ -97,7 +97,7 @@ $ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=int
 
 リクエストを持つ操作では `--request` にインライン JSON または `@path.json` を指定できます。個別フラグを設定した場合は `--request` と併用できません。JSON 経路では個別フラグの必須指定を要求せず、フラグ経路では必須フラグと、少なくとも 1 つのフラグの指定を確認してから SDK を呼び出します。配列、map、union、nullable 値、秘密情報など生成器の単純な型で表現しない入力は `--request` に残します。
 
-IaaS のゾーン横断検索には、操作の `zone_search` に `flag_field` と `request_field` を指定します。対象フラグを `--zone all` にした場合、生成コードは Zone API で取得した各ゾーンに同じ検索条件を適用し、結果を連結します。いずれかの検索が失敗した場合は部分結果を出力しません。表示用の Zone ラベルは集めず、JSON に追加しません。JSON の `--request` 経路では `all` を展開せず、入力された値をそのまま SDK に渡します。IaaS リソース初期化時には、生成された `setZoneFactory` に Zone API factory を設定します。
+IaaS の検索では、フラグと `--request` JSON のどちらでも対象ゾーンを明示します。`Zone` に `all` を指定したゾーン横断検索はサポートせず、生成コードにゾーン列挙や複数ゾーンの結果集約を含めません。
 
 リポジトリルートから実行し、生成先を明示します。
 
@@ -111,7 +111,7 @@ Switch コマンドは [`api/commands/iaas-switch.json`](../../api/commands/iaas
 $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=internal/iaas/switchapi/switch_api_generated.go
 ```
 
-同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型で受け付けず、出力は `go/format` で整形します。IaaS は `zone_search` などの固有機能を扱うため専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
+同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型で受け付けず、出力は `go/format` で整形します。IaaS と Ogen 系 API は生成対象の形が異なるため、IaaS は専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
 
 ## 手書きコードとの境界
 
@@ -121,8 +121,8 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 `request_validator` は、JSON／フラグから同じリクエストを構築した後、SDK 呼び出し前に行う明示的なサービス固有検証の関数名です。`handwritten: true` は、操作を親コマンドと型付き API インターフェースには登録しながら、そのコマンド構造体と `Run` ハンドラーを手書きにする指定です。これにより、標準操作と個別処理を同じコマンド階層に配置できます。
 
-Switch では `find`、`read`、`create`、`update`、`delete` を生成します。`find` の `zone_search` 設定が `--zone all` のゾーン取得、検索の反復、結果集約を共通処理として生成します。個別の Zone／ID 検証は `request_validator` で明示します。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
+Switch では `find`、`read`、`create`、`update`、`delete` を生成します。すべての操作で対象ゾーンを明示し、`Zone` が `all` の場合は `request_validator` で SDK 呼び出し前に拒否します。個別の Zone／ID 検証も `request_validator` で明示します。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
 
-Server では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-server.json`](../../api/commands/iaas-server.json)、生成先は `internal/iaas/serverapi/` です。`find` は Switch と同じ zone 横断検索を使い、Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー値をフラグで指定できます。CPU と MemoryGB のプラン組み合わせ、タグ、ディスク、ネットワークインターフェースなどを含む複雑な構成は JSON リクエストで渡し、JSON と個別フラグの併用を拒否します。ディスク作成の待機設定 `NoWait` はディスク構成や `BootAfterCreate` と関係するため JSON 経路に残します。更新では単純なスカラーを任意フラグにし、未指定値を保持します。指定項目がない更新リクエストは拒否します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。サービス固有の検証は `internal/iaas/server/` に置きます。これらの操作は `server_test.go` と `internal/iaas/server/validation_test.go` で検証します。
+Server では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-server.json`](../../api/commands/iaas-server.json)、生成先は `internal/iaas/serverapi/` です。`find` を含む各操作では対象ゾーンを明示し、フラグと JSON のどちらでも `Zone: "all"` を SDK 呼び出し前に拒否します。Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー値をフラグで指定できます。CPU と MemoryGB のプラン組み合わせ、タグ、ディスク、ネットワークインターフェースなどを含む複雑な構成は JSON リクエストで渡し、JSON と個別フラグの併用を拒否します。ディスク作成の待機設定 `NoWait` はディスク構成や `BootAfterCreate` と関係するため JSON 経路に残します。更新では単純なスカラーを任意フラグにし、未指定値を保持します。指定項目がない更新リクエストは拒否します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。サービス固有の検証は `internal/iaas/server/` に置きます。これらの操作は `server_test.go` と `internal/iaas/server/validation_test.go` で検証します。
 
-Disk では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-disk.json`](../../api/commands/iaas-disk.json)、生成先は `internal/iaas/diskapi/` です。検索は `--zone all` に対応します。作成ではディスクプラン、接続インターフェース、サイズなどの関連する値を同時に扱い、更新では SDK の optional 値を保持するため、どちらも JSON リクエストのみ受け付けます。サービス固有の入力検証は `internal/iaas/disk/` に置きます。
+Disk では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-disk.json`](../../api/commands/iaas-disk.json)、生成先は `internal/iaas/diskapi/` です。各検索では対象ゾーンを明示します。作成ではディスクプラン、接続インターフェース、サイズなどの関連する値を同時に扱い、更新では SDK の optional 値を保持するため、どちらも JSON リクエストのみ受け付けます。サービス固有の入力検証は `internal/iaas/disk/` に置きます。

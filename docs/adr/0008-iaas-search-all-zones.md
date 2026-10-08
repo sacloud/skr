@@ -1,6 +1,6 @@
 # ADR 0008: IaaS 検索で全ゾーンを指定する
 
-- Status: Accepted
+- Status: Superseded by [ADR 0031](0031-remove-iaas-all-zone-search.md)
 - Date: 2026-10-05
 
 ## Context

@@ -49,7 +49,6 @@ func TestGenerate(t *testing.T) {
 				Method:       "SearchWithContext",
 				RequestType:  "swytch.FindRequest",
 				ResponseType: "[]string",
-				ZoneSearch:   &ZoneSearch{FlagField: "Zone", RequestField: "Zone"},
 				Flags: []Flag{
 					{Name: "zone", Field: "Zone", Type: "string", Help: "Target `zone`.", Required: true},
 					{Name: "count", Field: "Count", Type: "int", Help: "Maximum results.", Pointer: true},
@@ -97,9 +96,7 @@ func TestGenerate(t *testing.T) {
 		"ValidateRequest(\"validateSwitchDeleteRequest\", request)",
 		"switchFindCommand",
 		"c.Find.runtime = runtime",
-		"zones.FindInAll(context.Background(), c.zoneFactory",
-		"zoneRequest.Zone = zone",
-		"c.Request == nil",
+		"op.SearchWithContext(context.Background(), request)",
 	} {
 		if !strings.Contains(string(source), want) {
 			t.Errorf("generated source does not contain %q", want)
@@ -108,7 +105,7 @@ func TestGenerate(t *testing.T) {
 	if strings.Contains(string(source), "type switchFindCommand struct") {
 		t.Fatal("handwritten operation command was generated")
 	}
-	for _, removed := range []string{"OutputType", "tableZones", "format,"} {
+	for _, removed := range []string{"OutputType", "tableZones", "format,", "SetZoneFactory", "zoneFactory", "zones."} {
 		if strings.Contains(string(source), removed) {
 			t.Errorf("generated source contains removed output machinery %q", removed)
 		}
@@ -254,6 +251,7 @@ func TestDecodeConfigRejectsUnknownFieldsAndTrailingJSON(t *testing.T) {
 	for _, input := range []string{
 		`{"package":"main","unexpected":true}`,
 		`{"package":"main"} {}`,
+		`{"operations":[{"zone_search":{"flag_field":"Zone","request_field":"Zone"}}]}`,
 	} {
 		if _, err := DecodeConfig([]byte(input)); err == nil {
 			t.Errorf("DecodeConfig(%q) succeeded; want error", input)
@@ -309,39 +307,5 @@ func TestValidateRejectsUnsupportedFlagsAndDuplicateNames(t *testing.T) {
 	config.Operations = append(config.Operations, config.Operations[0])
 	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "duplicate operation") {
 		t.Fatalf("Validate() error = %v, want duplicate operation error", err)
-	}
-}
-
-func TestValidateZoneSearchRequirements(t *testing.T) {
-	config := Config{
-		Package:     "main",
-		Resource:    "IaaS example",
-		CommandType: "exampleCommands",
-		APIType:     "exampleAPI",
-		FactoryType: "exampleAPIFactory",
-		RuntimeType: "exampleRuntime",
-		Operations: []Operation{
-			{
-				Name:         "Find",
-				CommandType:  "exampleFindCommand",
-				Help:         "Find.",
-				Method:       "FindWithContext",
-				RequestType:  "FindRequest",
-				ResponseType: "*Item",
-				ZoneSearch:   &ZoneSearch{FlagField: "Zone", RequestField: "Zone"},
-				Flags: []Flag{
-					{Name: "zone", Field: "Zone", Type: "string", Help: "Zone.", Required: true},
-				},
-			},
-		},
-	}
-	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "slice type") {
-		t.Fatalf("Validate() error = %v, want slice response error", err)
-	}
-
-	config.Operations[0].ResponseType = "[]*Item"
-	config.Operations[0].Flags[0].Required = false
-	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "required string flag") {
-		t.Fatalf("Validate() error = %v, want required zone flag error", err)
 	}
 }

@@ -29,7 +29,7 @@ func ValidateRequest(name string, request any) error {
 		if !ok {
 			return fmt.Errorf("Find API リクエストの型が不正です")
 		}
-		return validateZoneRequired(value.Zone)
+		return validateZone(value.Zone)
 	case "validateServerReadRequest":
 		value, ok := request.(*server.ReadRequest)
 		if !ok {

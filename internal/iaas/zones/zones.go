@@ -15,64 +15,14 @@
 package zones
 
 import (
-	"context"
 	"fmt"
-
-	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
-	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 )
 
-const All = "all"
-
-type API interface {
-	FindWithContext(context.Context, *zone.FindRequest) ([]*iaas.Zone, error)
-}
-
-type Factory func() (API, error)
-
-func New(trace bool) (API, error) {
-	client, err := iaasclient.New(trace)
-	if err != nil {
-		return nil, err
-	}
-	return zone.New(client), nil
-}
-
-func FindInAll[T any](
-	ctx context.Context,
-	newZoneAPI Factory,
-	find func(context.Context, string) ([]T, error),
-) ([]T, error) {
-	if newZoneAPI == nil {
-		return nil, fmt.Errorf("IaaS zone API factory is not configured")
-	}
-	zoneAPI, err := newZoneAPI()
-	if err != nil {
-		return nil, err
-	}
-	zones, err := zoneAPI.FindWithContext(ctx, &zone.FindRequest{})
-	if err != nil {
-		return nil, fmt.Errorf("list IaaS zones: %w", err)
-	}
-
-	result := make([]T, 0)
-	for _, item := range zones {
-		if item == nil || item.Name == "" {
-			return nil, fmt.Errorf("list IaaS zones: SDK returned a zone without a name")
-		}
-		items, err := find(ctx, item.Name)
-		if err != nil {
-			return nil, fmt.Errorf("find in IaaS zone %q: %w", item.Name, err)
-		}
-		result = append(result, items...)
-	}
-	return result, nil
-}
+const all = "all"
 
 func ValidateSingleZone(zone string) error {
-	if zone == All {
-		return fmt.Errorf("Zone が %q の場合は find のみ対応しています", All)
+	if zone == all {
+		return fmt.Errorf("Zone に %q は指定できません。検索対象のゾーン名を指定してください", all)
 	}
 	return nil
 }
