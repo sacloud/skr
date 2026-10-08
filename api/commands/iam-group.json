@@ -1,0 +1,142 @@
+{
+  "package": "iamapi",
+  "resource": "IAM group",
+  "command_type": "GroupCommands",
+  "api_type": "GroupAPI",
+  "factory_type": "GroupAPIFactory",
+  "runtime_type": "GroupRuntime",
+  "imports": {
+    "group": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/group",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "GroupListCommand",
+      "help": "IAM グループを一覧表示します。--user-id で指定したユーザーが所属するグループに絞り込めます。",
+      "method": "List",
+      "request_type": "group.ListParams",
+      "request_by_value": true,
+      "response_type": "[]v1.Group",
+      "handwritten": true
+    },
+    {
+      "name": "Create",
+      "command_type": "GroupCreateCommand",
+      "help": "IAM グループを作成します。作成後、update-memberships でユーザーを所属させてください。",
+      "method": "Create",
+      "response_type": "*v1.Group",
+      "arguments": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "flag": true,
+          "required": true,
+          "help": "必須: グループ名。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "flag": true,
+          "required": true,
+          "help": "必須: グループの説明。空文字列も指定できます。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "GroupReadCommand",
+      "help": "ID を指定して IAM グループを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.Group",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "list の出力にあるグループ ID。"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "command_type": "GroupUpdateCommand",
+      "help": "IAM グループの名前と説明を更新します。どちらも必須で、指定しない項目は空で上書きされます。",
+      "method": "Update",
+      "response_type": "*v1.Group",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "更新するグループ ID。"
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "flag": true,
+          "required": true,
+          "help": "必須: グループ名。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "flag": true,
+          "required": true,
+          "help": "必須: グループの説明。空文字列も指定できます。"
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "GroupDeleteCommand",
+      "help": "ID を指定して IAM グループを削除します。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "削除するグループ ID。"
+        }
+      ]
+    },
+    {
+      "name": "ReadMemberships",
+      "command_type": "GroupReadMembershipsCommand",
+      "help": "グループに所属するユーザーを一覧表示します。",
+      "method": "ReadMemberships",
+      "response_type": "[]v1.GroupMembershipsCompatUsersItem",
+      "arguments": [
+        {
+          "name": "group-id",
+          "field": "GroupID",
+          "type": "int",
+          "help": "所属ユーザーを確認するグループ ID。"
+        }
+      ]
+    },
+    {
+      "name": "UpdateMemberships",
+      "command_type": "GroupUpdateMembershipsCommand",
+      "help": "グループの所属ユーザーを置き換えます。現在の所属は保持されず、指定した配列で上書きされます。read-memberships で現在の所属を確認できます。",
+      "method": "UpdateMemberships",
+      "request_type": "[]int",
+      "request_by_value": true,
+      "request_help": "ユーザー ID の JSON 配列を直接または @path.json で指定します。例: --request '[1,2,3]'",
+      "response_type": "[]v1.GroupMembershipsCompatUsersItem",
+      "arguments": [
+        {
+          "name": "group-id",
+          "field": "GroupID",
+          "type": "int",
+          "help": "所属ユーザーを更新するグループ ID。"
+        }
+      ]
+    }
+  ]
+}

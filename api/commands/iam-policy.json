@@ -1,0 +1,96 @@
+{
+  "package": "iamapi",
+  "resource": "IAM policy bindings",
+  "command_type": "PolicyCommands",
+  "api_type": "PolicyAPI",
+  "factory_type": "PolicyAPIFactory",
+  "runtime_type": "PolicyRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "ReadOrganization",
+      "command_type": "PolicyReadOrganizationCommand",
+      "help": "組織の IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。",
+      "method": "ReadOrganizationPolicy",
+      "response_type": "[]v1.IamPolicy"
+    },
+    {
+      "name": "UpdateOrganization",
+      "command_type": "PolicyUpdateOrganizationCommand",
+      "help": "組織の IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-organization の出力を基に編集してください。",
+      "method": "UpdateOrganizationPolicy",
+      "request_type": "[]v1.IamPolicy",
+      "request_by_value": true,
+      "request_help": "現在の割り当ての JSON 配列を直接または @path.json で指定します。各要素は role と principals を持ち、role は type（preset）と id（IAM ロール ID）、principals は type（user など）と id（数値）を指定します。例: --request '[{\"role\":{\"type\":\"preset\",\"id\":\"IAM-ROLE-ID\"},\"principals\":[{\"type\":\"user\",\"id\":123}]}]'",
+      "response_type": "[]v1.IamPolicy"
+    },
+    {
+      "name": "ReadProject",
+      "command_type": "PolicyReadProjectCommand",
+      "help": "指定したプロジェクトの IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。",
+      "method": "ReadProjectPolicy",
+      "response_type": "[]v1.IamPolicy",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "int",
+          "help": "対象のプロジェクト ID。"
+        }
+      ]
+    },
+    {
+      "name": "UpdateProject",
+      "command_type": "PolicyUpdateProjectCommand",
+      "help": "指定したプロジェクトの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-project の出力を基に編集してください。",
+      "method": "UpdateProjectPolicy",
+      "request_type": "[]v1.IamPolicy",
+      "request_by_value": true,
+      "request_help": "現在の割り当ての JSON 配列を直接または @path.json で指定します。各要素は role と principals を持ち、role は type（preset）と id（IAM ロール ID）、principals は type（user など）と id（数値）を指定します。例: --request '[{\"role\":{\"type\":\"preset\",\"id\":\"IAM-ROLE-ID\"},\"principals\":[{\"type\":\"user\",\"id\":123}]}]'",
+      "response_type": "[]v1.IamPolicy",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "int",
+          "help": "対象のプロジェクト ID。"
+        }
+      ]
+    },
+    {
+      "name": "ReadFolder",
+      "command_type": "PolicyReadFolderCommand",
+      "help": "指定したフォルダの IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。",
+      "method": "ReadFolderPolicy",
+      "response_type": "[]v1.IamPolicy",
+      "arguments": [
+        {
+          "name": "folder-id",
+          "field": "FolderID",
+          "type": "int",
+          "help": "対象のフォルダ ID。"
+        }
+      ]
+    },
+    {
+      "name": "UpdateFolder",
+      "command_type": "PolicyUpdateFolderCommand",
+      "help": "指定したフォルダの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-folder の出力を基に編集してください。",
+      "method": "UpdateFolderPolicy",
+      "request_type": "[]v1.IamPolicy",
+      "request_by_value": true,
+      "request_help": "現在の割り当ての JSON 配列を直接または @path.json で指定します。各要素は role と principals を持ち、role は type（preset）と id（IAM ロール ID）、principals は type（user など）と id（数値）を指定します。例: --request '[{\"role\":{\"type\":\"preset\",\"id\":\"IAM-ROLE-ID\"},\"principals\":[{\"type\":\"user\",\"id\":123}]}]'",
+      "response_type": "[]v1.IamPolicy",
+      "arguments": [
+        {
+          "name": "folder-id",
+          "field": "FolderID",
+          "type": "int",
+          "help": "対象のフォルダ ID。"
+        }
+      ]
+    }
+  ]
+}
