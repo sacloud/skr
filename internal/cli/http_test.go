@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
+	skrSaclient "github.com/sacloud/skr/internal/saclient"
 )
 
 type authenticatedHTTPDoerFunc func(*http.Request) (*http.Response, error)
@@ -202,39 +203,62 @@ func TestReadHTTPData(t *testing.T) {
 	}
 }
 
-func TestHTTPCommandUsesSDKAuthentication(t *testing.T) {
+func TestHTTPCommandUsesSDKAuthenticationAndUserAgent(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	t.Setenv("SAKURA_ACCESS_TOKEN", "http-test-token")
 	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "http-test-secret")
 
-	var authorization string
-	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		authorization = request.Header.Get("Authorization")
-		writer.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(server.Close)
+	for _, test := range []struct {
+		name      string
+		args      []string
+		wantAgent string
+	}{
+		{
+			name:      "default",
+			wantAgent: skrSaclient.HTTPUserAgent(),
+		},
+		{
+			name:      "explicit override",
+			args:      []string{"--header", "User-Agent: custom-agent/1.0"},
+			wantAgent: "custom-agent/1.0",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var authorization, userAgent string
+			server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				authorization = request.Header.Get("Authorization")
+				userAgent = request.UserAgent()
+				writer.WriteHeader(http.StatusNoContent)
+			}))
+			t.Cleanup(server.Close)
 
-	commandLine := newCLI()
-	commandLine.HTTP.doerFactory = func() (authenticatedHTTPDoer, error) {
-		var client saclient.Client
-		if err := client.SetEnviron(os.Environ()); err != nil {
-			return nil, err
-		}
-		if err := client.SetWith(saclient.WithTestServer(server)); err != nil {
-			return nil, err
-		}
-		return &client, nil
-	}
+			commandLine := newCLI()
+			commandLine.HTTP.doerFactory = func() (authenticatedHTTPDoer, error) {
+				client, err := skrSaclient.NewHTTP(false)
+				if err != nil {
+					return nil, err
+				}
+				if err := client.SetWith(saclient.WithTestServer(server)); err != nil {
+					return nil, err
+				}
+				return client, nil
+			}
 
-	var stdout, stderr bytes.Buffer
-	if code := runCLI([]string{"http", server.URL}, &stdout, &stderr, commandLine); code != 0 {
-		t.Fatalf("runCLI() = %d; stderr: %s", code, stderr.String())
-	}
-	if authorization == "" {
-		t.Fatal("request has no Authorization header")
-	}
-	if strings.Contains(authorization, "http-test-secret") {
-		t.Fatal("request exposed the access token secret")
+			args := append([]string{"http", server.URL}, test.args...)
+			var stdout, stderr bytes.Buffer
+			if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
+				t.Fatalf("runCLI() = %d; stderr: %s", code, stderr.String())
+			}
+			if authorization == "" {
+				t.Fatal("request has no Authorization header")
+			}
+			if userAgent != test.wantAgent {
+				t.Errorf("User-Agent = %q, want %q", userAgent, test.wantAgent)
+			}
+			if strings.Contains(authorization, "http-test-secret") {
+				t.Fatal("request exposed the access token secret")
+			}
+		})
 	}
 }
 

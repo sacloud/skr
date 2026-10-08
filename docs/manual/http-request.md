@@ -25,6 +25,10 @@ $ skr http 'https://API-HOST/PATH' \
 $ cat request.json | skr http 'https://API-HOST/PATH' --method POST --data -
 ```
 
+`skr http` は、既定で `User-Agent: skr-http/v<version> (<os>/<arch>; sacloud-sdk-go/v<SDK version>)` を送信します。その他の API コマンドは `User-Agent: skr/v<version> (<os>/<arch>; sacloud-sdk-go/v<SDK version>)` を送信します。`<os>/<arch>` は実行ファイルのビルド対象 OS とアーキテクチャです。
+
+`--header 'User-Agent: ...'` を指定すると、`skr http` の既定値を上書きできます。
+
 コマンドライン引数はプロセス一覧やシェル履歴から見える場合があります。秘密情報を本文に含める場合は、保護したファイルまたは標準入力を使ってください。
 
 ## レスポンスとエラー

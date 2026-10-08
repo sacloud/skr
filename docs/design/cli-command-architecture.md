@@ -25,6 +25,8 @@ skr http <url> [--method ...] [--data ...]
 
 `iaas-api` と `eventbus-api` は、API を直接操作したい利用者やスクリプト向けです。`iaas` と `event` は、実施手順や複数リソース間の関係をコマンド側で扱いたい利用者向けです。同じリソースを扱う場合でも、低レベルコマンドは SDK 操作の薄い入口、高レベルコマンドは明示的に設計したワークフローとして責務を分けます。
 
+API コマンドのリクエストには `User-Agent: skr/v<version> (<os>/<arch>; sacloud-sdk-go/v<SDK version>)` を設定し、利用した CLI、バージョン、ビルド対象の OS・アーキテクチャ、SDK のバージョンを識別できるようにします。`skr http` は `skr-http/v<version> (<os>/<arch>; sacloud-sdk-go/v<SDK version>)` を使い、HTTP コマンド経由のリクエストを区別します。OS とアーキテクチャは実行時環境から収集せず、実行ファイルに含まれる Go の `runtime.GOOS` と `runtime.GOARCH` を使います。
+
 `http` は、SDK に対応する API 操作がまだない場合の低レベルな入口です。SDK の認証付き HTTP クライアントへ利用者が指定した HTTPS URL とリクエストを渡します。SDK 対応済みの操作には、サービス固有の型や検証を提供する低レベル API コマンドを優先します。詳細は[認証付き HTTP リクエストコマンドの設計](http-command.md)に記録します。
 
 ## 低レベル API コマンド
