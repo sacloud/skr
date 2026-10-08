@@ -17,6 +17,7 @@ package iamapi
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -37,5 +38,37 @@ func TestDecodeRequestFile(t *testing.T) {
 	}
 	if err := DecodeRequest("{invalid", &value); err == nil {
 		t.Error("DecodeRequest(invalid JSON) succeeded, want an error")
+	}
+}
+
+func TestReadTextInput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "assertion.txt")
+	if err := os.WriteFile(path, []byte("  assertion-value\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	value, err := readTextInput(path, "--assertion-file", "assertion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value != "assertion-value" {
+		t.Fatalf("readTextInput() = %q, want trimmed assertion", value)
+	}
+	for _, test := range []struct {
+		path string
+		want string
+	}{
+		{path: "", want: "--assertion-file が必要です"},
+		{path: filepath.Join(t.TempDir(), "missing.txt"), want: "read assertion file"},
+	} {
+		if _, err := readTextInput(test.path, "--assertion-file", "assertion"); err == nil || !strings.Contains(err.Error(), test.want) {
+			t.Errorf("readTextInput(%q) error = %v, want %q", test.path, err, test.want)
+		}
+	}
+	emptyPath := filepath.Join(t.TempDir(), "empty.txt")
+	if err := os.WriteFile(emptyPath, []byte(" \n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readTextInput(emptyPath, "--assertion-file", "assertion"); err == nil || err.Error() != "assertion is empty" {
+		t.Errorf("readTextInput(empty) error = %v, want assertion is empty", err)
 	}
 }

@@ -1,0 +1,83 @@
+{
+  "package": "iamapi",
+  "resource": "IAM folder",
+  "command_type": "FolderCommands",
+  "api_type": "FolderAPI",
+  "factory_type": "FolderAPIFactory",
+  "runtime_type": "FolderRuntime",
+  "imports": {
+    "folder": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/folder",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "FolderListCommand",
+      "help": "IAM フォルダを一覧表示します。ページングや絞り込みには --request または対応する個別フラグを指定します。",
+      "method": "List",
+      "request_type": "folder.ListParams",
+      "request_by_value": true,
+      "request_optional": true,
+      "request_help": "folder.ListParams の JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。",
+      "response_type": "*v1.ListFoldersOK",
+      "flags": [
+        {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
+        {"name":"per-page","field":"PerPage","type":"int","help":"任意: 1 ページあたりの取得件数。","pointer":true},
+        {"name":"name","field":"Name","type":"string","help":"任意: 名前で絞り込みます。","pointer":true},
+        {"name":"parent-id","field":"ParentID","type":"int","help":"任意: 親フォルダ ID で絞り込みます。","pointer":true}
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "FolderCreateCommand",
+      "help": "IAM フォルダを作成します。親フォルダを指定する場合は --parent-id を指定してください。",
+      "method": "Create",
+      "request_type": "folder.CreateParams",
+      "request_by_value": true,
+      "request_help": "folder.CreateParams の JSON。名前、説明、任意の親フォルダ ID を指定します。直接指定するか @path.json で読み込みます。",
+      "response_type": "*v1.Folder",
+      "flags": [
+        {"name":"name","field":"Name","type":"string","help":"必須: フォルダ名。","required":true},
+        {"name":"description","field":"Description","type":"string","help":"任意: フォルダの説明。","pointer":true},
+        {"name":"parent-id","field":"ParentID","type":"int","help":"任意: 親フォルダ ID。","pointer":true}
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "FolderReadCommand",
+      "help": "ID を指定して IAM フォルダを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.Folder",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"読み取るフォルダ ID。"}]
+    },
+    {
+      "name": "Update",
+      "command_type": "FolderUpdateCommand",
+      "help": "IAM フォルダの名前と説明を更新します。説明を変更しない場合は --description を省略します。",
+      "method": "Update",
+      "response_type": "*v1.Folder",
+      "arguments": [
+        {"name":"id","field":"ID","type":"int","help":"更新するフォルダ ID。"},
+        {"name":"name","field":"Name","type":"string","help":"必須: 更新後のフォルダ名。","flag":true,"required":true},
+        {"name":"description","field":"Description","type":"*string","help":"任意: 更新後の説明。","flag":true}
+      ]
+    },
+    {
+      "name": "Move",
+      "command_type": "FolderMoveCommand",
+      "help": "指定したフォルダを親フォルダへ移動します。移動先が有効な階層になることを確認してください。",
+      "method": "Move",
+      "arguments": [
+        {"name":"ids","field":"IDs","type":"[]int","help":"移動するフォルダ ID をカンマ区切りで指定します。","flag":true,"required":true},
+        {"name":"parent-id","field":"ParentID","type":"*int","help":"必須: 移動先の親フォルダ ID。","flag":true,"required":true}
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "FolderDeleteCommand",
+      "help": "ID を指定して IAM フォルダを削除します。",
+      "method": "Delete",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"削除するフォルダ ID。"}]
+    }
+  ]
+}

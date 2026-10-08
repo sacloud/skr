@@ -50,6 +50,7 @@ type Operation struct {
 	Method           string      `json:"method"`
 	RequestType      string      `json:"request_type,omitempty"`
 	RequestByValue   bool        `json:"request_by_value,omitempty"`
+	RequestOptional  bool        `json:"request_optional,omitempty"`
 	ResponseType     string      `json:"response_type,omitempty"`
 	RequestHelp      string      `json:"request_help,omitempty"`
 	RequestValidator string      `json:"request_validator,omitempty"`
@@ -211,10 +212,14 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 	} else {
 {{- if .Flags }}
 		if !flagsSet {
+{{- if not .RequestOptional }}
 			return fmt.Errorf("--request または個別フラグが必要です")
+{{- end }}
 		}
 {{- else }}
+{{- if not .RequestOptional }}
 		return fmt.Errorf("--request が必要です")
+{{- end }}
 {{- end }}
 {{- range .Flags }}
 {{- if .Required }}
@@ -410,6 +415,9 @@ func (c Config) Validate() error {
 		}
 		if operation.RequestByValue && operation.RequestType == "" {
 			return fmt.Errorf("operation %q request_by_value requires request_type", operation.Name)
+		}
+		if operation.RequestOptional && operation.RequestType == "" {
+			return fmt.Errorf("operation %q request_optional requires request_type", operation.Name)
 		}
 		if err := validateType(operation.ResponseType); err != nil {
 			return fmt.Errorf("operation %q response_type: %w", operation.Name, err)

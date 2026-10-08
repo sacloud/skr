@@ -1,0 +1,77 @@
+{
+  "package": "iamapi",
+  "resource": "SSO profile",
+  "command_type": "SSOCommands",
+  "api_type": "SSOAPI",
+  "factory_type": "SSOAPIFactory",
+  "runtime_type": "SSORuntime",
+  "imports": {
+    "sso": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/sso",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "SSOListCommand",
+      "help": "SSO プロファイルを一覧表示します。",
+      "method": "List",
+      "response_type": "*v1.ListSsoProfilesOK",
+      "arguments": [
+        {"name":"page","field":"Page","type":"*int","help":"任意: 取得するページ番号。","flag":true},
+        {"name":"per-page","field":"PerPage","type":"*int","help":"任意: 1 ページあたりの取得件数。","flag":true}
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "SSOCreateCommand",
+      "help": "SSO プロファイルを作成します。IdP の証明書など複数項目を JSON で指定してください。",
+      "method": "Create",
+      "request_type": "sso.CreateParams",
+      "request_by_value": true,
+      "request_help": "SSO プロファイル作成 JSON（name、description、IdP の entity ID、login/logout URL、X.509 certificate）。直接指定するか @path.json で読み込みます。",
+      "response_type": "*v1.SSOProfile"
+    },
+    {
+      "name": "Read",
+      "command_type": "SSOReadCommand",
+      "help": "ID を指定して SSO プロファイルを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.SSOProfile",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"読み取る SSO プロファイル ID。"}]
+    },
+    {
+      "name": "Update",
+      "command_type": "SSOUpdateCommand",
+      "help": "SSO プロファイルを更新します。必要な IdP 設定一式を JSON で指定してください。",
+      "method": "Update",
+      "request_type": "sso.UpdateParams",
+      "request_by_value": true,
+      "request_help": "SSO プロファイルの更新 JSON。直接指定するか @path.json で読み込みます。",
+      "response_type": "*v1.SSOProfile",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"更新する SSO プロファイル ID。"}]
+    },
+    {
+      "name": "Delete",
+      "command_type": "SSODeleteCommand",
+      "help": "ID を指定して SSO プロファイルを削除します。",
+      "method": "Delete",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"削除する SSO プロファイル ID。"}]
+    },
+    {
+      "name": "Link",
+      "command_type": "SSOLinkCommand",
+      "help": "SSO プロファイルを組織で有効にします。有効なプロファイルは一つで、ユーザーのログイン方法に影響するため、IdP 設定と対象ユーザーのメールアドレスを確認してください。",
+      "method": "Link",
+      "response_type": "*v1.SSOProfile",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"リンクする SSO プロファイル ID。"}]
+    },
+    {
+      "name": "Unlink",
+      "command_type": "SSOUnlinkCommand",
+      "help": "SSO プロファイルと組織のリンクを解除します。ユーザーのログイン方法に影響するため、実行前に対象プロファイルを確認してください。",
+      "method": "Unlink",
+      "response_type": "*v1.SSOProfile",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"リンクを解除する SSO プロファイル ID。"}]
+    }
+  ]
+}

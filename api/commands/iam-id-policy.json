@@ -1,0 +1,30 @@
+{
+  "package": "iamapi",
+  "resource": "ID policy",
+  "command_type": "IDPolicyCommands",
+  "api_type": "IDPolicyAPI",
+  "factory_type": "IDPolicyAPIFactory",
+  "runtime_type": "IDPolicyRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "ReadOrganization",
+      "command_type": "IDPolicyReadOrganizationCommand",
+      "help": "組織の ID ポリシーを参照します。",
+      "method": "ReadOrganizationIdPolicy",
+      "response_type": "[]v1.IdPolicy"
+    },
+    {
+      "name": "UpdateOrganization",
+      "command_type": "IDPolicyUpdateOrganizationCommand",
+      "help": "組織の ID ポリシー全体を置き換えます。変更前に read-organization で現在の設定を保存してください。",
+      "method": "UpdateOrganizationIdPolicy",
+      "request_type": "[]v1.IdPolicy",
+      "request_by_value": true,
+      "request_help": "組織の ID ポリシー全体を表す JSON 配列。直接指定するか @path.json で読み込みます。既存設定全体を置き換えるため、更新前に read-organization で確認してください。",
+      "response_type": "[]v1.IdPolicy"
+    }
+  ]
+}

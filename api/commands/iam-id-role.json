@@ -1,0 +1,32 @@
+{
+  "package": "iamapi",
+  "resource": "ID role",
+  "command_type": "IDRoleCommands",
+  "api_type": "IDRoleAPI",
+  "factory_type": "IDRoleAPIFactory",
+  "runtime_type": "IDRoleRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "IDRoleListCommand",
+      "help": "利用可能な ID ロールを一覧表示します。",
+      "method": "List",
+      "response_type": "*v1.ListIdRolesOK",
+      "arguments": [
+        {"name":"page","field":"Page","type":"*int","help":"任意: 取得するページ番号。","flag":true},
+        {"name":"per-page","field":"PerPage","type":"*int","help":"任意: 1 ページあたりの取得件数。","flag":true}
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "IDRoleReadCommand",
+      "help": "ID を指定して ID ロールを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.IdRole",
+      "arguments": [{"name":"id","field":"ID","type":"string","help":"読み取る ID ロール ID。"}]
+    }
+  ]
+}

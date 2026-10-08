@@ -123,6 +123,43 @@ func TestGenerate(t *testing.T) {
 	}
 }
 
+func TestGenerateOptionalRequest(t *testing.T) {
+	config := Config{
+		Package:     "exampleapi",
+		Resource:    "Example API",
+		CommandType: "Commands",
+		APIType:     "API",
+		FactoryType: "APIFactory",
+		RuntimeType: "Runtime",
+		Imports: map[string]string{
+			"example": "github.com/example/sdk/api/example",
+		},
+		Operations: []Operation{
+			{
+				Name:            "List",
+				CommandType:     "ListCommand",
+				Help:            "List resources.",
+				Method:          "List",
+				RequestType:     "example.ListParams",
+				RequestByValue:  true,
+				RequestOptional: true,
+				ResponseType:    "[]example.Resource",
+			},
+		},
+	}
+
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if !strings.Contains(string(source), "result, err := op.List(context.Background(), *request)") {
+		t.Fatalf("generated source does not invoke List with the zero-value request:\n%s", source)
+	}
+	if strings.Contains(string(source), "--request または個別フラグが必要です") {
+		t.Fatalf("generated source requires an optional request:\n%s", source)
+	}
+}
+
 func TestGenerateValueRequestAndPositionalArguments(t *testing.T) {
 	config := Config{
 		Package:     "exampleapi",

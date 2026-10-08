@@ -34,7 +34,7 @@ func TestRunIAMAPIHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"iam-api", "--help"},
-			want: []string{"user", "group", "policy", "SAKURA_ACCESS_TOKEN", "サービスプリンシパル"},
+			want: []string{"user", "group", "policy", "auth", "folder", "iam-role", "id-policy", "id-role", "organization", "project", "project-api-key", "scim", "service-policy", "service-principal", "sso", "user-2fa", "SAKURA_ACCESS_TOKEN", "サービスプリンシパル"},
 		},
 		{
 			args: []string{"iam-api", "user", "--help"},
@@ -68,6 +68,34 @@ func TestRunIAMAPIHelp(t *testing.T) {
 			args: []string{"iam-api", "policy", "update-organization", "--help"},
 			want: []string{"--request", "ポリシーバインディング", "read-organization", "置き換え"},
 		},
+		{
+			args: []string{"iam-api", "folder", "create", "--help"},
+			want: []string{"--name", "--description", "--parent-id", "JSON"},
+		},
+		{
+			args: []string{"iam-api", "folder", "move", "--help"},
+			want: []string{"--ids", "--parent-id", "カンマ区切り"},
+		},
+		{
+			args: []string{"iam-api", "project", "move", "--help"},
+			want: []string{"--ids", "--parent-folder-id", "カンマ区切り"},
+		},
+		{
+			args: []string{"iam-api", "auth", "update-auth-conditions", "--help"},
+			want: []string{"--request", "認証条件", "組織全体"},
+		},
+		{
+			args: []string{"iam-api", "service-principal", "issue-token", "--help"},
+			want: []string{"--assertion-file", "標準入力"},
+		},
+		{
+			args: []string{"iam-api", "project-api-key", "create", "--help"},
+			want: []string{"--project-id", "--request", "秘密情報", "JSON"},
+		},
+		{
+			args: []string{"iam-api", "user-2fa", "clear-trusted-devices", "--help"},
+			want: []string{"--user-id", "すべて削除"},
+		},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
@@ -82,6 +110,200 @@ func TestRunIAMAPIHelp(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIAMAPIExtendedReadOperationsWithSakumock(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	server := iammock.NewTestServer(iammock.Config{})
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_IAM", server.TestURL())
+
+	passwordFile := filepath.Join(t.TempDir(), "password.txt")
+	if err := os.WriteFile(passwordFile, []byte("Password-Test-1234"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var user struct {
+		ID int `json:"id"`
+	}
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{
+		"iam-api", "user", "create", "--name", "mock-2fa-user", "--code", "mock-2fa-user-code",
+		"--description", "test 2FA user", "--password-file", passwordFile,
+	}, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("create test user exit code = %d; stderr: %s", exitCode, stderr.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &user); err != nil {
+		t.Fatal(err)
+	}
+	if user.ID == 0 {
+		t.Fatal("created test user has no ID")
+	}
+	t.Cleanup(func() {
+		var cleanupOut, cleanupErr bytes.Buffer
+		if exitCode := run([]string{"iam-api", "user", "delete", strconv.Itoa(user.ID)}, &cleanupOut, &cleanupErr); exitCode != 0 {
+			t.Errorf("delete test user exit code = %d; stderr: %s", exitCode, cleanupErr.String())
+		}
+	})
+
+	for _, args := range [][]string{
+		{"iam-api", "auth", "read-password-policy"},
+		{"iam-api", "auth", "read-auth-context"},
+		{"iam-api", "folder", "list"},
+		{"iam-api", "iam-role", "list"},
+		{"iam-api", "id-policy", "read-organization"},
+		{"iam-api", "id-role", "list"},
+		{"iam-api", "organization", "read"},
+		{"iam-api", "organization", "read-service-policy"},
+		{"iam-api", "project", "list"},
+		{"iam-api", "project-api-key", "list"},
+		{"iam-api", "scim", "list"},
+		{"iam-api", "service-policy", "is-enabled"},
+		{"iam-api", "service-policy", "list-rule-templates"},
+		{"iam-api", "service-principal", "list"},
+		{"iam-api", "sso", "list"},
+		{"iam-api", "user-2fa", "list-trusted-devices", "--user-id", strconv.Itoa(user.ID)},
+		{"iam-api", "user-2fa", "list-security-keys", "--user-id", strconv.Itoa(user.ID)},
+	} {
+		var stdout, stderr bytes.Buffer
+		if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+			t.Errorf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
+		}
+	}
+}
+
+func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	server := iammock.NewTestServer(iammock.Config{})
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_IAM", server.TestURL())
+
+	runCommand := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+			t.Fatalf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
+		}
+		return stdout.Bytes()
+	}
+
+	var folder struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "folder", "create", "--name", "mock-folder", "--description", "test folder"), &folder); err != nil {
+		t.Fatal(err)
+	}
+	if folder.ID == 0 || folder.Name != "mock-folder" {
+		t.Fatalf("folder create returned %#v", folder)
+	}
+	var childFolder struct {
+		ID int `json:"id"`
+	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "folder", "create", "--name", "mock-child-folder", "--description", "child folder",
+	), &childFolder); err != nil {
+		t.Fatal(err)
+	}
+	runCommand(
+		"iam-api", "folder", "move", "--ids", strconv.Itoa(childFolder.ID), "--parent-id", strconv.Itoa(folder.ID),
+	)
+	var movedFolder struct {
+		ParentID *int `json:"parent_id"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "folder", "read", strconv.Itoa(childFolder.ID)), &movedFolder); err != nil {
+		t.Fatal(err)
+	}
+	if movedFolder.ParentID == nil || *movedFolder.ParentID != folder.ID {
+		t.Fatalf("moved folder parent ID = %v, want %d", movedFolder.ParentID, folder.ID)
+	}
+	var projectedFolders []struct {
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "folder", "list", "--page", "1", "--query",
+		".items | map({id,name,description})",
+	), &projectedFolders); err != nil {
+		t.Fatal(err)
+	}
+	foundRootFolder := false
+	for _, projected := range projectedFolders {
+		if projected.ID == folder.ID && projected.Description == "test folder" {
+			foundRootFolder = true
+			break
+		}
+	}
+	if len(projectedFolders) != 2 || !foundRootFolder {
+		t.Fatalf("projected folder list = %#v, want both created folders including %d", projectedFolders, folder.ID)
+	}
+	var folderList struct {
+		Items []struct {
+			ID int `json:"id"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "folder", "list", "--name", "mock-folder"), &folderList); err != nil {
+		t.Fatal(err)
+	}
+	foundListedFolder := false
+	for _, listed := range folderList.Items {
+		if listed.ID == folder.ID {
+			foundListedFolder = true
+			break
+		}
+	}
+	if !foundListedFolder {
+		t.Fatalf("folder list returned %#v, want folder %d", folderList, folder.ID)
+	}
+	runCommand("iam-api", "folder", "update", strconv.Itoa(folder.ID), "--name", "mock-folder-updated", "--description", "updated")
+
+	var project struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "project", "create", "--code", "mock-project-code", "--name", "mock-project", "--description", "test project",
+	), &project); err != nil {
+		t.Fatal(err)
+	}
+	if project.ID == 0 || project.Name != "mock-project" {
+		t.Fatalf("project create returned %#v", project)
+	}
+	runCommand(
+		"iam-api", "project", "move", "--ids", strconv.Itoa(project.ID), "--parent-folder-id", strconv.Itoa(folder.ID),
+	)
+	var movedProject struct {
+		ParentFolderID *int `json:"parent_folder_id"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "project", "read", strconv.Itoa(project.ID)), &movedProject); err != nil {
+		t.Fatal(err)
+	}
+	if movedProject.ParentFolderID == nil || *movedProject.ParentFolderID != folder.ID {
+		t.Fatalf("moved project parent folder ID = %v, want %d", movedProject.ParentFolderID, folder.ID)
+	}
+	var servicePrincipal struct {
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "service-principal", "create", "--project-id", strconv.Itoa(project.ID),
+		"--name", "mock-service-principal", "--description", "test principal",
+	), &servicePrincipal); err != nil {
+		t.Fatal(err)
+	}
+	if servicePrincipal.ID == 0 || servicePrincipal.Name != "mock-service-principal" {
+		t.Fatalf("service principal create returned %#v", servicePrincipal)
+	}
+
+	runCommand("iam-api", "service-principal", "delete", strconv.Itoa(servicePrincipal.ID))
+	runCommand("iam-api", "project", "delete", strconv.Itoa(project.ID))
+	runCommand("iam-api", "folder", "delete", strconv.Itoa(childFolder.ID))
+	runCommand("iam-api", "folder", "delete", strconv.Itoa(folder.ID))
 }
 
 func TestIAMAPIWithSakumock(t *testing.T) {
@@ -455,6 +677,15 @@ func TestIAMAPICommandInputErrors(t *testing.T) {
 		{"iam-api", "policy", "update-organization"},
 		{"iam-api", "policy", "update-project", "1"},
 		{"iam-api", "user", "register-email", "1"},
+		{"iam-api", "auth", "update-password-policy"},
+		{"iam-api", "auth", "update-auth-conditions"},
+		{"iam-api", "id-policy", "update-organization"},
+		{"iam-api", "folder", "list", "--request", "{}", "--page", "1"},
+		{"iam-api", "user-2fa", "list-trusted-devices"},
+		{"iam-api", "service-principal", "issue-token"},
+		{"iam-api", "service-principal", "issue-token", "--assertion-file", "/missing/assertion.txt"},
+		{"iam-api", "service-principal", "upload-key", "1"},
+		{"iam-api", "service-principal", "upload-key", "1", "--public-key-file", "/missing/key.pem"},
 	} {
 		var stdout, stderr bytes.Buffer
 		if exitCode := run(args, &stdout, &stderr); exitCode == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
