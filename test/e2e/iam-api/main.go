@@ -403,6 +403,7 @@ func (s *scenario) read(ctx context.Context, step string, target resource) (item
 }
 
 func (s *scenario) updateUser(ctx context.Context) error {
+	s.user.pendingName = s.renamed
 	data, err := s.call(ctx, "update-user", "iam-api", "user", "update", s.user.id,
 		"--name", s.renamed, "--description", s.user.description)
 	if err != nil {
@@ -422,6 +423,7 @@ func (s *scenario) updateUser(ctx context.Context) error {
 	}
 	// The renamed user keeps its code and description, so the run identity stays valid.
 	s.user.name = s.renamed
+	s.user.pendingName = ""
 	return nil
 }
 

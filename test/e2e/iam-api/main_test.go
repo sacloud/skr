@@ -146,6 +146,9 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		current.Name = argument(args, "--name")
 		current.Description = argument(args, "--description")
 		f.users[current.Code] = current
+		if step == f.failAfterApply {
+			return nil, errFail(step)
+		}
 		return json.Marshal(current)
 	case step == "update-folder":
 		current, ok := f.findByID(f.folders, args[3])
@@ -573,7 +576,7 @@ func TestScenarioRecoversResourcesWhenCreateReturnsError(t *testing.T) {
 }
 
 func TestScenarioCleansUpAfterRenameResponseIsLost(t *testing.T) {
-	for _, step := range []string{"update-folder", "update-project"} {
+	for _, step := range []string{"update-user", "update-folder", "update-project"} {
 		t.Run(step, func(t *testing.T) {
 			fake := newFakeCLI()
 			fake.failAfterApply = step
@@ -586,15 +589,29 @@ func TestScenarioCleansUpAfterRenameResponseIsLost(t *testing.T) {
 				t.Fatalf("renamed resources remain after cleanup: folders=%+v projects=%+v", fake.folders, fake.projects)
 			}
 			wantSteps := []string{"cleanup-delete-folder", "cleanup-delete-project"}
-			if step == "update-folder" {
+			switch step {
+			case "update-user":
+				wantSteps = append(wantSteps,
+					"cleanup-verify-folder-page-1",
+					"cleanup-verify-project-page-1",
+					"cleanup-verify-user-pending-name-page-1",
+					"cleanup-delete-user",
+				)
+			case "update-folder":
 				wantSteps = append(wantSteps, "cleanup-verify-folder-pending-name-page-1", "cleanup-verify-project-page-1")
-			} else {
+			case "update-project":
 				wantSteps = append(wantSteps, "cleanup-verify-folder-page-1", "cleanup-verify-project-pending-name-page-1")
 			}
 			for _, want := range wantSteps {
 				if !contains(fake.calls, want) {
 					t.Errorf("cleanup did not call %s after %s: %v", want, step, fake.calls)
 				}
+			}
+			if step == "update-user" && !contains(fake.calls, "cleanup-verify-user-page-1") {
+				t.Errorf("cleanup did not verify the original user name after %s: %v", step, fake.calls)
+			}
+			if len(fake.users) != 0 {
+				t.Errorf("renamed user remains after cleanup: %+v", fake.users)
 			}
 		})
 	}

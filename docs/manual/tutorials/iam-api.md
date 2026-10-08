@@ -47,6 +47,7 @@ $ skr iam-api project --help
 $ skr iam-api folder move --help
 $ skr iam-api project move --help
 $ skr iam-api service-principal --help
+$ skr iam-api service-principal list-keys --help
 $ skr iam-api auth --help
 $ skr iam-api id-policy --help
 $ skr iam-api project-api-key --help
@@ -339,7 +340,7 @@ $ skr iam-api auth update-password-policy --help
 $ skr iam-api auth update-auth-conditions --help
 $ skr iam-api id-policy read-organization
 $ skr iam-api organization read-service-policy
-$ skr iam-api organization read-service-policy --is-active true --name SERVICE_NAME
+$ skr iam-api organization read-service-policy --is-active=true --name SERVICE_NAME
 $ skr iam-api service-policy is-enabled
 $ skr iam-api service-policy list-rule-templates
 ```

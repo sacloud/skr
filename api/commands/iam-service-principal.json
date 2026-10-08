@@ -78,9 +78,14 @@
       "request_type": "serviceprincipal.ListKeysParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "キー一覧のページング条件 JSON。直接指定するか @path.json で読み込みます。",
+      "request_help": "キー一覧のページング・並び順条件 JSON。直接指定するか @path.json で読み込みます。--request と個別フラグは併用できません。",
       "response_type": "*v1.ListServicePrincipalKeysOK",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"キーを一覧表示するサービスプリンシパル ID。"}]
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"キーを一覧表示するサービスプリンシパル ID。"}],
+      "flags": [
+        {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
+        {"name":"per-page","field":"PerPage","type":"int","help":"任意: 1 ページあたりの取得件数。","pointer":true},
+        {"name":"ordering","field":"Ordering","type":"string","help":"任意: 並び順を API の ordering 値で指定します。","pointer":true,"conversion":"v1.ListServicePrincipalKeysOrdering"}
+      ]
     },
     {
       "name": "UploadKey",

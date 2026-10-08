@@ -107,6 +107,10 @@ func TestRunIAMAPIHelp(t *testing.T) {
 			want: []string{"--request", "--name", "description", "name は必須"},
 		},
 		{
+			args: []string{"iam-api", "service-principal", "list-keys", "--help"},
+			want: []string{"--request", "--page", "--per-page", "--ordering"},
+		},
+		{
 			args: []string{"iam-api", "service-principal", "issue-token", "--help"},
 			want: []string{"--assertion-file", "標準入力"},
 		},
@@ -655,6 +659,41 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 	if servicePrincipalKey.ID == "" {
 		t.Fatal("uploaded service principal key has no ID")
 	}
+	var listedKeys struct {
+		Items []struct {
+			ID string `json:"id"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "service-principal", "list-keys", servicePrincipalID,
+		"--page", "1", "--per-page", "10", "--ordering", "created_at",
+	), &listedKeys); err != nil {
+		t.Fatal(err)
+	}
+	foundKey := false
+	for _, key := range listedKeys.Items {
+		if key.ID == servicePrincipalKey.ID {
+			foundKey = true
+		}
+	}
+	if !foundKey {
+		t.Fatalf("service principal key list returned %#v, want key %s", listedKeys, servicePrincipalKey.ID)
+	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "service-principal", "list-keys", servicePrincipalID,
+		"--request", `{"page":1,"per_page":10,"ordering":"created_at"}`,
+	), &listedKeys); err != nil {
+		t.Fatal(err)
+	}
+	foundKey = false
+	for _, key := range listedKeys.Items {
+		if key.ID == servicePrincipalKey.ID {
+			foundKey = true
+		}
+	}
+	if !foundKey {
+		t.Fatalf("service principal key JSON list returned %#v, want key %s", listedKeys, servicePrincipalKey.ID)
+	}
 	runCommand("iam-api", "service-principal", "disable-key", servicePrincipalID, servicePrincipalKey.ID)
 	runCommand("iam-api", "service-principal", "enable-key", servicePrincipalID, servicePrincipalKey.ID)
 	runCommand("iam-api", "service-principal", "delete-key", servicePrincipalID, servicePrincipalKey.ID)
@@ -1040,6 +1079,7 @@ func TestIAMAPICommandInputErrors(t *testing.T) {
 		{"iam-api", "scim", "update", "1", "--request", `{"name":"from-json"}`, "--name", "from-flag"},
 		{"iam-api", "service-principal", "update", "1"},
 		{"iam-api", "service-principal", "update", "1", "--request", `{"name":"from-json"}`, "--name", "from-flag"},
+		{"iam-api", "service-principal", "list-keys", "1", "--request", "{}", "--page", "1"},
 		{"iam-api", "id-policy", "update-organization"},
 		{"iam-api", "folder", "list", "--request", "{}", "--page", "1"},
 		{"iam-api", "user-2fa", "list-trusted-devices"},
