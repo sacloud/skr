@@ -15,6 +15,8 @@
 package saclient
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"runtime"
 
@@ -28,7 +30,14 @@ func New(trace bool) (*saclient.Client, error) {
 }
 
 func NewHTTP(trace bool) (*saclient.Client, error) {
-	return newClient(trace, "")
+	client, err := newClient(trace, "")
+	if err != nil {
+		return nil, err
+	}
+	if err := client.SetWith(saclient.WithMiddleware(suppressEmptyUserAgent)); err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 func HTTPUserAgent() string {
@@ -55,4 +64,39 @@ func newClient(trace bool, userAgent string) (*saclient.Client, error) {
 
 func userAgent(product string) string {
 	return product + "/v" + version.Version + " (" + runtime.GOOS + "/" + runtime.GOARCH + "; sacloud-sdk-go/v" + sacloudsdk.Version + ")"
+}
+
+func suppressEmptyUserAgent(request *http.Request, pull func() (saclient.Middleware, bool)) (*http.Response, error) {
+	headerKey := http.CanonicalHeaderKey("User-Agent")
+	values, explicitlySet := request.Header[headerKey]
+	explicitlyEmpty := explicitlySet
+	for _, value := range values {
+		if value != "" {
+			explicitlyEmpty = false
+			break
+		}
+	}
+	if !explicitlyEmpty {
+		next, ok := pull()
+		if !ok {
+			return nil, fmt.Errorf("SDK HTTP middleware chain is empty")
+		}
+		return next(request, pull)
+	}
+
+	setHeader, ok := pull()
+	if !ok {
+		return nil, fmt.Errorf("SDK HTTP middleware chain is empty")
+	}
+	pullAfterSetHeader := func() (saclient.Middleware, bool) {
+		next, ok := pull()
+		if !ok {
+			return nil, false
+		}
+		return func(request *http.Request, pull func() (saclient.Middleware, bool)) (*http.Response, error) {
+			request.Header[headerKey] = []string{""}
+			return next(request, pull)
+		}, true
+	}
+	return setHeader(request, pullAfterSetHeader)
 }

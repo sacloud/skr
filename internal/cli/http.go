@@ -83,7 +83,7 @@ func (c *httpCommand) Run(ctx *kong.Context) error {
 	if err := addHTTPHeaders(request, c.Header); err != nil {
 		return err
 	}
-	if request.Header.Get("User-Agent") == "" {
+	if _, explicitlySet := request.Header[http.CanonicalHeaderKey("User-Agent")]; !explicitlySet {
 		request.Header.Set("User-Agent", skrSaclient.HTTPUserAgent())
 	}
 

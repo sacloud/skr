@@ -16,7 +16,7 @@ skr http <url> [--method <method>] [-H, --header "name: value"]... [--data <valu
 
 CLI は sacloud-sdk-go `v0.3.0` の `saclient.Client` を初期化し、その公開 `Do` メソッドに標準の `net/http.Request` を渡します。プロファイルまたは `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数による認証を再利用し、個別 API の SDK 型・操作・URL 組み立ては使用しません。
 
-既定の `User-Agent` は `skr-http/v<version> (<os>/<arch>; sacloud-sdk-go/v<SDK version>)` とします。CLI と SDK のバージョンに加え、`skr http` 経由のリクエストであることを識別できます。OS・アーキテクチャには実行時環境の情報ではなく、Go が実行ファイルに埋め込む `runtime.GOOS` と `runtime.GOARCH` を使います。利用者が `--header 'User-Agent: ...'` を指定した場合はその値を優先します。
+既定の `User-Agent` は `skr-http/v<version> (<os>/<arch>; sacloud-sdk-go/v<SDK version>)` とします。CLI と SDK のバージョンに加え、`skr http` 経由のリクエストであることを識別できます。OS・アーキテクチャには実行時環境の情報ではなく、Go が実行ファイルに埋め込む `runtime.GOOS` と `runtime.GOARCH` を使います。利用者が `--header 'User-Agent: ...'` を指定した場合はその値を優先し、空の値ならヘッダーを送信しません。
 
 このリクエスト経路は指定した HTTPS ホストに SDK の認証情報を送ります。HTTPS URL に限定しても、ホストの信頼性は保証できません。ヘルプとドキュメントで接続先確認を促し、利用者の明示したホストを自動書き換えしません。
 

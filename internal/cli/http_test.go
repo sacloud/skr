@@ -209,25 +209,35 @@ func TestHTTPCommandUsesSDKAuthenticationAndUserAgent(t *testing.T) {
 	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "http-test-secret")
 
 	for _, test := range []struct {
-		name      string
-		args      []string
-		wantAgent string
+		name             string
+		args             []string
+		wantAgent        string
+		wantAgentPresent bool
 	}{
 		{
-			name:      "default",
-			wantAgent: skrSaclient.HTTPUserAgent(),
+			name:             "default",
+			wantAgent:        skrSaclient.HTTPUserAgent(),
+			wantAgentPresent: true,
 		},
 		{
-			name:      "explicit override",
-			args:      []string{"--header", "User-Agent: custom-agent/1.0"},
-			wantAgent: "custom-agent/1.0",
+			name:             "explicit override",
+			args:             []string{"--header", "User-Agent: custom-agent/1.0"},
+			wantAgent:        "custom-agent/1.0",
+			wantAgentPresent: true,
+		},
+		{
+			name:      "empty override",
+			args:      []string{"--header", "User-Agent:"},
+			wantAgent: "",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var authorization, userAgent string
+			var userAgentPresent bool
 			server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				authorization = request.Header.Get("Authorization")
 				userAgent = request.UserAgent()
+				_, userAgentPresent = request.Header["User-Agent"]
 				writer.WriteHeader(http.StatusNoContent)
 			}))
 			t.Cleanup(server.Close)
@@ -254,6 +264,9 @@ func TestHTTPCommandUsesSDKAuthenticationAndUserAgent(t *testing.T) {
 			}
 			if userAgent != test.wantAgent {
 				t.Errorf("User-Agent = %q, want %q", userAgent, test.wantAgent)
+			}
+			if userAgentPresent != test.wantAgentPresent {
+				t.Errorf("User-Agent present = %t, want %t", userAgentPresent, test.wantAgentPresent)
 			}
 			if strings.Contains(authorization, "http-test-secret") {
 				t.Fatal("request exposed the access token secret")
