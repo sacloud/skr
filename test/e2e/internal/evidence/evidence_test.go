@@ -185,6 +185,15 @@ func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
 	}
 }
 
+func TestExitStatusUnavailableForSignalTermination(t *testing.T) {
+	if got := exitStatus(-1); got != nil {
+		t.Fatalf("exitStatus(-1) = %d, want unavailable", *got)
+	}
+	if got := exitStatus(0); got == nil || *got != 0 {
+		t.Fatalf("exitStatus(0) = %v, want 0", got)
+	}
+}
+
 func TestEvidenceExitStatusHelper(t *testing.T) {
 	if os.Getenv("EVIDENCE_EXIT_STATUS_HELPER") == "1" {
 		os.Exit(7)

@@ -120,8 +120,7 @@ func (r *Recorder) Record(step, binary string, args []string, request any, stdou
 		entry.Error = runErr.Error()
 		var exitErr *exec.ExitError
 		if errors.As(runErr, &exitErr) {
-			status := exitErr.ExitCode()
-			entry.ExitStatus = &status
+			entry.ExitStatus = exitStatus(exitErr.ExitCode())
 		}
 	} else {
 		status := 0
@@ -143,6 +142,13 @@ func (r *Recorder) Record(step, binary string, args []string, request any, stdou
 	}
 	r.records = append(r.records, entry)
 	return nil
+}
+
+func exitStatus(status int) *int {
+	if status < 0 {
+		return nil
+	}
+	return &status
 }
 
 func (r *Recorder) SetResult(result string, completed time.Time) error {
