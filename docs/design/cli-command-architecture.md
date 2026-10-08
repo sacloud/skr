@@ -84,7 +84,7 @@ Runtime は `ValidateOutput(ctx)` と `WriteOutput(ctx, value)` を受け取り�
 
 `sakumock v0.9.1` に IaaS mock がないため、Switch の CLI テストでは `internal/sakumock/iaas` のインメモリ実装を使用します。この実装は SDK の `api/iaas.APICaller` を満たし、Switch の API 操作をテストします。将来 sakumock に IaaS 対応が追加された場合は、テストで使う API caller を置き換え、CLI と SDK の操作テストを維持します。
 
-ライブの管理操作は `test/e2e/switch` の Go スクリプトで再現します。ビルド済みの skr CLI を起動し、単純な操作では個別フラグ、`Names` による検索では JSON 経路を使います。`tk1v` だけを対象とし、実行確認フラグを必須にします。実行前に `skr-e2e-` で始まるスイッチを全ページから探し、E2E 用の説明値が一致するものだけ ID と内容を再確認して削除します。その後、固定名 `skr-e2e-switch` で作成し、JSON で操作結果を検証するとともに、ID と名前を投影した JSON も証跡に記録します。確認後、ID と名前・説明を照合して削除します。コマンドの入出力は共通の `test/e2e/internal/evidence` を使い、`tmp/switch-api/<YYYYMMDDHHmm>/` に記録して異常終了後の調査に使います。
+ライブの管理操作は `test/e2e/switch` の Go スクリプトで再現します。ビルド済みの skr CLI を起動し、単純な操作では個別フラグ、`Names` による検索では JSON 経路を使います。`tk1v` だけを対象とし、実行確認フラグを必須にします。実行前に `skr-e2e-` で始まるスイッチを全ページから探し、E2E 用の説明値が一致するものだけ ID と内容を再確認して削除します。その後、固定名 `skr-e2e-switch` で作成し、JSON で操作結果を検証するとともに、ID と名前を投影した JSON も証跡に記録します。確認後、ID と名前・説明を照合して削除します。コマンドの入出力は共通の `test/e2e/internal/evidence` を使い、`tmp/switch-api/<YYYYMMDDHHmm>/` に記録して異常終了後の調査に使います。完了時には全 E2E 共通の `REPORT.md` を生成し、実行コマンド、標準出力、標準エラー、終了コード、最終結果を一覧します。
 
 Disk API のライブ操作は `test/e2e/disk` で検証します。対象は `is1b` の SSD プラン ID 4、20 GB のディスクです。ランダムな名前を使い、同名のディスクがあれば変更せず中止します。作成後は検索・参照・名前更新・再参照・削除し、削除後に対象が存在しないことを確認します。途中で失敗した場合も ID、名前、E2E 説明、サイズを照合してから作成済みのディスクだけを削除します。実行確認フラグを必須とし、コマンドの入出力は `test/e2e/internal/evidence` を使って `tmp/disk-api/<YYYYMMDDHHmm>/` に保存します。
 

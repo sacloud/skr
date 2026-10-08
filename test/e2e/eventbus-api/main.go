@@ -109,7 +109,7 @@ func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]by
 	command.Stderr = &stderr
 	runErr := command.Run()
 
-	if err := r.evidence.Record(step, args, nil, stdout.String(), stderr.String(), runErr, step == "rotate-api-key"); err != nil {
+	if err := r.evidence.Record(step, r.binary, args, nil, stdout.String(), stderr.String(), runErr, step == "rotate-api-key"); err != nil {
 		if runErr != nil {
 			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr), err)
 		}
