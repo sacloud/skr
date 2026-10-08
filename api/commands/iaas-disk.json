@@ -14,22 +14,18 @@
     {
       "name": "Find",
       "command_type": "FindCommand",
-      "help": "ディスクを検索して出力します。--zone all で全ゾーンを検索し、--count と --from は各ゾーンの検索に適用します。例: skr iaas-api disk find --zone ZONE",
+      "help": "ディスクを指定したゾーンで検索して出力します。例: skr iaas-api disk find --zone is1b",
       "method": "FindWithContext",
       "request_type": "disk.FindRequest",
       "response_type": "[]*iaas.Disk",
       "request_validator": "validateDiskFindRequest",
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数)、From (開始位置)。配列条件は JSON で指定します。例: --request='{\"Zone\":\"ZONE\",\"Names\":[\"example\"]}'",
-      "zone_search": {
-        "flag_field": "Zone",
-        "request_field": "Zone"
-      },
       "flags": [
         {
           "name": "zone",
           "field": "Zone",
           "type": "string",
-          "help": "必須: 対象ゾーン名。all を指定すると全ゾーンを検索します。JSON の --request では全ゾーン検索になりません。",
+          "help": "必須: 対象ゾーン名。例: --zone is1b",
           "required": true
         },
         {

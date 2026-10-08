@@ -24,10 +24,8 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	"github.com/sacloud/skr/internal/apigen"
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
-	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
 func TestDiskGeneratedCodeMatchesConfig(t *testing.T) {
@@ -54,12 +52,13 @@ func TestDiskGeneratedCodeMatchesConfig(t *testing.T) {
 
 func TestRunIaaSDiskHelp(t *testing.T) {
 	for _, test := range []struct {
-		args []string
-		want []string
+		args    []string
+		want    []string
+		notWant []string
 	}{
 		{args: []string{"iaas-api", "--help"}, want: []string{"disk", "server", "switch"}},
-		{args: []string{"iaas-api", "disk", "--help"}, want: []string{"find", "read", "create", "update", "delete", "全ゾーン"}},
-		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone all", "Count", "From", "Names", "併用不可"}},
+		{args: []string{"iaas-api", "disk", "--help"}, want: []string{"find", "read", "create", "update", "delete"}},
+		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "disk", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
 		{args: []string{"iaas-api", "disk", "create", "--help"}, want: []string{"JSON 専用", "DiskPlanID", "Connection", "SizeGB", "@path.json"}},
 		{args: []string{"iaas-api", "disk", "update", "--help"}, want: []string{"JSON 専用", "省略した項目", "EditParameter"}},
@@ -76,6 +75,11 @@ func TestRunIaaSDiskHelp(t *testing.T) {
 					t.Errorf("help output does not contain %q", text)
 				}
 			}
+			for _, text := range test.notWant {
+				if strings.Contains(help, text) {
+					t.Errorf("help output contains removed text %q", text)
+				}
+			}
 		})
 	}
 }
@@ -88,9 +92,6 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
 		commandLine.IaaSAPI.Disk.SetFactory(func() (diskapi.API, error) { return api, nil })
-		commandLine.IaaSAPI.Disk.SetZoneFactory(func() (zones.API, error) {
-			return diskTestZoneAPI{}, nil
-		})
 		code := runCLI(append([]string{"iaas-api", "disk"}, args...), &stdout, &stderr, commandLine)
 		return stdout.String(), stderr.String(), code
 	}
@@ -107,18 +108,15 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		t.Fatalf("Create request = %+v, want JSON values", api.createRequest)
 	}
 
-	_, stderr, code = run("find", "--zone", "all", "--count", "7", "--from", "2")
+	_, stderr, code = run("find", "--zone", "test-zone", "--count", "7", "--from", "2")
 	if code != 0 || stderr != "" {
-		t.Fatalf("find all: code %d, stderr %q", code, stderr)
+		t.Fatalf("find: code %d, stderr %q", code, stderr)
 	}
-	if len(api.findRequests) != 2 {
-		t.Fatalf("Find called %d times, want 2 zones", len(api.findRequests))
+	if len(api.findRequests) != 1 {
+		t.Fatalf("Find called %d times, want one zone", len(api.findRequests))
 	}
-	for i, name := range []string{"zone-a", "zone-b"} {
-		request := api.findRequests[i]
-		if request.Zone != name || request.Count != 7 || request.From != 2 {
-			t.Errorf("Find request %d = %+v, want zone %s, Count 7, From 2", i, request, name)
-		}
+	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 7 || request.From != 2 {
+		t.Errorf("Find request = %+v, want test-zone, Count 7, From 2", request)
 	}
 
 	output, stderr, code = run("find", "--zone", "test-zone", "--query", "map({ID,Name,SizeMB})")
@@ -169,6 +167,8 @@ func TestIaaSDiskRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 	api := &diskAPITestDouble{}
 	for _, args := range [][]string{
 		{"find"},
+		{"find", "--zone", "all"},
+		{"find", "--request", `{"Zone":"all"}`},
 		{"read", "--zone", "all", "--id", "123"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"disk","DiskPlanID":4,"Connection":"virtio","SizeGB":20}`, "--zone", "test-zone"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"disk","DiskPlanID":4,"Connection":"virtio"}`},
@@ -224,10 +224,4 @@ func (api *diskAPITestDouble) UpdateWithContext(_ context.Context, request *disk
 func (api *diskAPITestDouble) DeleteWithContext(_ context.Context, request *disk.DeleteRequest) error {
 	api.deleteRequest = request
 	return nil
-}
-
-type diskTestZoneAPI struct{}
-
-func (diskTestZoneAPI) FindWithContext(context.Context, *zone.FindRequest) ([]*iaas.Zone, error) {
-	return []*iaas.Zone{{Name: "zone-a"}, {Name: "zone-b"}}, nil
 }

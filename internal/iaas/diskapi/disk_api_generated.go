@@ -11,11 +11,10 @@ import (
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	disk "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
 type Commands struct {
-	Find   FindCommand   "cmd:\"\" help:\"ディスクを検索して出力します。--zone all で全ゾーンを検索し、--count と --from は各ゾーンの検索に適用します。例: skr iaas-api disk find --zone ZONE\""
+	Find   FindCommand   "cmd:\"\" help:\"ディスクを指定したゾーンで検索して出力します。例: skr iaas-api disk find --zone is1b\""
 	Read   ReadCommand   "cmd:\"\" help:\"ディスクを読み取って出力します。例: skr iaas-api disk read --zone ZONE --id 123456789012\""
 	Create CreateCommand "cmd:\"\" help:\"JSON リクエストでディスクを作成して出力します。ディスクプラン、接続インターフェース、サイズを対象ゾーンに合わせて指定してください。例: skr iaas-api disk create --request @disk-create.json\""
 	Update UpdateCommand "cmd:\"\" help:\"JSON リクエストでディスクの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api disk update --request @disk-update.json\""
@@ -55,18 +54,13 @@ func (c *Commands) SetFactory(factory APIFactory) {
 	c.Delete.factory = factory
 }
 
-func (c *Commands) SetZoneFactory(factory zones.Factory) {
-	c.Find.zoneFactory = factory
-}
-
 type FindCommand struct {
-	Request     *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数)、From (開始位置)。配列条件は JSON で指定します。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Names\\\":[\\\"example\\\"]}'\""
-	Zone        *string "name:\"zone\" help:\"必須: 対象ゾーン名。all を指定すると全ゾーンを検索します。JSON の --request では全ゾーン検索になりません。\""
-	Count       *int    "name:\"count\" help:\"任意: 取得件数 (整数)。\""
-	From        *int    "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
-	zoneFactory zones.Factory
-	factory     APIFactory
-	runtime     Runtime
+	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数)、From (開始位置)。配列条件は JSON で指定します。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Names\\\":[\\\"example\\\"]}'\""
+	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone is1b\""
+	Count   *int    "name:\"count\" help:\"任意: 取得件数 (整数)。\""
+	From    *int    "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
+	factory APIFactory
+	runtime Runtime
 }
 
 func (c *FindCommand) Run(ctx *kong.Context) error {
@@ -120,24 +114,6 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	op, err := c.factory()
 	if err != nil {
 		return err
-	}
-	if c.Request == nil && c.Zone != nil && *c.Zone == zones.All {
-		result, err := zones.FindInAll(context.Background(), c.zoneFactory, func(ctx context.Context, zone string) ([]*iaas.Disk, error) {
-			zoneRequest := *request
-			zoneRequest.Zone = zone
-			items, err := op.FindWithContext(ctx, &zoneRequest)
-			if err != nil {
-				return nil, err
-			}
-			return items, nil
-		})
-		if err != nil {
-			return err
-		}
-		if c.runtime.WriteOutput == nil {
-			return fmt.Errorf("API 出力処理が設定されていません")
-		}
-		return c.runtime.WriteOutput(ctx, result)
 	}
 	result, err := op.FindWithContext(context.Background(), request)
 	if err != nil {

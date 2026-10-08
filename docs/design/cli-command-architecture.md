@@ -62,15 +62,13 @@ skr http <url> [--method ...] [--data ...]
 
 実行可能ファイルの入口は `cmd/skr/main.go` に置き、CLI のコマンド構成、IaaS の登録、出力処理などの実装とテストは `internal/cli/` にまとめます。各 IaaS リソースのコマンドと SDK クライアントはリソース専用パッケージに分け、別リソースを追加するときも Switch や EventBus のファイルを編集せずに登録できます。
 
-#### IaaS zone の共通仕様
+#### IaaS のゾーン指定
 
-ゾーンを指定する IaaS の検索操作では、個別フラグの `--zone all` を指定すると SDK の Zone API で取得したゾーン一覧を順に検索し、各結果を連結して返します。個別ゾーンの検索に失敗した場合は部分結果を返さず、エラーにします。`--request` の JSON は従来どおり単一ゾーンのリクエストとして扱い、`all` の展開は行いません。`Count` や `From` など SDK の検索条件はゾーンごとの API 呼び出しに適用します。
-
-`all` は検索操作のフラグ経路だけで使えます。`read`、作成、更新、削除では `--zone all` を API 呼び出し前に拒否します。新しい IaaS 検索コマンドを追加する場合は、この仕様を共通ヘルパーで実装し、ヘルプとテストに反映します。
+IaaS の各操作で対象ゾーンを指定します。フラグまたは JSON で `all` を指定すると、API を呼ぶ前に拒否します。ゾーン名の一覧は `skr iaas-api zone find` で取得できます。CLI は複数ゾーンを横断した検索や結果の合成をしません。
 
 #### Switch API
 
-`skr iaas-api switch` は `sacloud-sdk-go/service/iaas/swytch` の公開操作に合わせて `find`、`read`、`create`、`update`、`delete` を提供します。各操作は SDK の request 型を `--request` の JSON か個別フラグで受け取り、SDK が返す Switch を共通の出力形式で出力します。`find` は上記の共通 zone 仕様に従い、個別フラグの `--zone all` をサポートします。フラグ経路では必須の `Zone`、操作ごとの `Name` や `ID`、独立した任意スカラーを設定します。`Names`、`Tags`、`Sort` などの配列は JSON 経路に残します。ポインタ型の任意フラグで更新時の未指定と明示的な空文字列・ゼロ値を区別し、両経路の併用を拒否します。
+`skr iaas-api switch` は `sacloud-sdk-go/service/iaas/swytch` の公開操作に合わせて `find`、`read`、`create`、`update`、`delete` を提供します。各操作は SDK の request 型を `--request` の JSON か個別フラグで受け取り、SDK が返す Switch を共通の出力形式で出力します。各操作で対象の `Zone` を明示し、`all` は拒否します。フラグ経路では操作ごとの `Name` や `ID`、独立した任意スカラーを設定します。`Names`、`Tags`、`Sort` などの配列は JSON 経路に残します。ポインタ型の任意フラグで更新時の未指定と明示的な空文字列・ゼロ値を区別し、両経路の併用を拒否します。
 
 #### Zone API
 
@@ -78,7 +76,7 @@ skr http <url> [--method ...] [--data ...]
 
 ### API コマンドの出力形式
 
-API コマンドの結果は JSON のみで出力し、SDK が返すデータ形状とインデントを維持します。[ADR 0030](../adr/0030-remove-table-output.md) に従い、`--output` と出力形式の選択処理を廃止します。プロファイルの `cli.default_output_type` と `DefaultOutputType` は参照しません。全ゾーン検索でも表示用の Zone フィールドは追加しません。
+API コマンドの結果は JSON のみで出力し、SDK が返すデータ形状とインデントを維持します。[ADR 0030](../adr/0030-remove-table-output.md) に従い、`--output` と出力形式の選択処理を廃止します。プロファイルの `cli.default_output_type` と `DefaultOutputType` は参照しません。
 
 API コマンドではグローバル `--query` に jq 式を指定できます。クエリは API の結果全体に適用し、複数の結果値は JSON として順に出力します。評価には Go 実装の gojq を使い、外部 jq バイナリには依存しません。`skr http` の生レスポンスには適用しません。
 

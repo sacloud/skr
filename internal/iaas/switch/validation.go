@@ -60,7 +60,7 @@ func ValidateRequest(name string, request any) error {
 }
 
 func validateFindRequest(request *swytch.FindRequest) error {
-	return validateZoneRequired(request.Zone)
+	return validateZone(request.Zone)
 }
 
 func validateReadRequest(request *swytch.ReadRequest) error {

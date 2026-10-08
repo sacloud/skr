@@ -27,13 +27,12 @@ import (
 	switchresource "github.com/sacloud/skr/internal/iaas/switch"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	zoneapi "github.com/sacloud/skr/internal/iaas/zoneapi"
-	iaaszones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
 type iaasAPICommand struct {
-	Disk   diskapi.Commands   `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。find は --zone all で全ゾーンを検索できます。"`
-	Switch switchapi.Commands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。find は --zone all で全ゾーンを検索できます。両経路は併用できません。"`
-	Server serverapi.Commands `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、削除します。作成や複雑な構成には --request JSON を使用します。find は --zone all で全ゾーンを検索できます。"`
+	Disk   diskapi.Commands   `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
+	Switch switchapi.Commands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
+	Server serverapi.Commands `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、削除します。作成や複雑な構成には --request JSON を使用します。"`
 	Zone   zoneapi.Commands   `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
 }
 
@@ -64,10 +63,6 @@ func (c *cli) initIaaSAPI() {
 		}
 		return diskSDK.New(client), nil
 	})
-	c.IaaSAPI.Disk.SetZoneFactory(func() (iaaszones.API, error) {
-		return iaaszones.New(c.Trace)
-	})
-
 	c.IaaSAPI.Switch.SetRuntime(switchapi.Runtime{
 		DecodeRequest:   decodeRequest,
 		ValidateOutput:  validateOutput,
@@ -81,10 +76,6 @@ func (c *cli) initIaaSAPI() {
 		}
 		return swytch.New(client), nil
 	})
-	c.IaaSAPI.Switch.SetZoneFactory(func() (iaaszones.API, error) {
-		return iaaszones.New(c.Trace)
-	})
-
 	c.IaaSAPI.Server.SetRuntime(serverapi.Runtime{
 		DecodeRequest:   decodeRequest,
 		ValidateOutput:  validateOutput,
@@ -97,8 +88,5 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return serverSDK.New(client), nil
-	})
-	c.IaaSAPI.Server.SetZoneFactory(func() (iaaszones.API, error) {
-		return iaaszones.New(c.Trace)
 	})
 }
