@@ -112,6 +112,7 @@ type resource struct {
 	projectID   int
 	id          string
 	attempted   bool
+	pendingName string
 }
 
 type scenario struct {
@@ -240,12 +241,21 @@ func (s *scenario) findByName(ctx context.Context, step string, target resource)
 	return matches[0], true, nil
 }
 
-func checkIdentity(candidate item, target resource) error {
+func checkIdentity(candidate item, target resource, allowedNames ...string) error {
 	if target.id != "" && candidate.id() != target.id {
 		return fmt.Errorf("%s ID mismatch: got %s, want %s", target.kind, candidate.id(), target.id)
 	}
 	if candidate.Name != target.name {
-		return fmt.Errorf("%s name mismatch: got %q, want %q", target.kind, candidate.Name, target.name)
+		allowed := false
+		for _, name := range allowedNames {
+			if name != "" && candidate.Name == name {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("%s name mismatch: got %q, want %q", target.kind, candidate.Name, target.name)
+		}
 	}
 	if candidate.Description != target.description || !strings.HasPrefix(candidate.Description, resourceDescription) {
 		return fmt.Errorf("%s description mismatch for %q", target.kind, target.name)
@@ -417,6 +427,7 @@ func (s *scenario) updateUser(ctx context.Context) error {
 
 func (s *scenario) updateFolder(ctx context.Context) error {
 	renamed := s.folder.name + "-renamed"
+	s.folder.pendingName = renamed
 	data, err := s.call(ctx, "update-folder", "iam-api", "folder", "update", s.folder.id,
 		"--name", renamed, "--description", s.folder.description)
 	if err != nil {
@@ -435,11 +446,13 @@ func (s *scenario) updateFolder(ctx context.Context) error {
 		return fmt.Errorf("update-folder: %w", err)
 	}
 	s.folder.name = renamed
+	s.folder.pendingName = ""
 	return nil
 }
 
 func (s *scenario) updateProject(ctx context.Context) error {
 	renamed := s.project.name + "-renamed"
+	s.project.pendingName = renamed
 	data, err := s.call(ctx, "update-project", "iam-api", "project", "update", s.project.id,
 		"--name", renamed, "--description", s.project.description)
 	if err != nil {
@@ -458,6 +471,7 @@ func (s *scenario) updateProject(ctx context.Context) error {
 		return fmt.Errorf("update-project: %w", err)
 	}
 	s.project.name = renamed
+	s.project.pendingName = ""
 	return nil
 }
 
@@ -567,18 +581,30 @@ func (s *scenario) cleanupResource(ctx context.Context, target *resource) error 
 	if err != nil {
 		return fmt.Errorf("cannot verify %s before cleanup: %w", target.kind, err)
 	}
-	if err := checkIdentity(current, resourceWithID(*target, id)); err != nil {
+	if err := checkIdentity(current, resourceWithID(*target, id), target.pendingName); err != nil {
 		return fmt.Errorf("cleanup refused: %w", err)
 	}
 	if _, err := s.call(ctx, "cleanup-delete-"+target.kind, "iam-api", target.kind, "delete", id); err != nil {
 		return fmt.Errorf("delete E2E %s: %w", target.kind, err)
 	}
-	remaining, ok, err := s.findByName(ctx, "cleanup-verify-"+target.kind, *target)
-	if err != nil {
-		return fmt.Errorf("verify E2E %s deletion: %w", target.kind, err)
+	names := []string{target.name}
+	if target.pendingName != "" && target.pendingName != target.name {
+		names = append(names, target.pendingName)
 	}
-	if ok {
-		return fmt.Errorf("E2E %s %s remains after delete", target.kind, remaining.id())
+	for index, name := range names {
+		verifyTarget := *target
+		verifyTarget.name = name
+		step := "cleanup-verify-" + target.kind
+		if index > 0 {
+			step += "-pending-name"
+		}
+		remaining, ok, err := s.findByName(ctx, step, verifyTarget)
+		if err != nil {
+			return fmt.Errorf("verify E2E %s deletion: %w", target.kind, err)
+		}
+		if ok {
+			return fmt.Errorf("E2E %s %s remains after delete", target.kind, remaining.id())
+		}
 	}
 	return nil
 }

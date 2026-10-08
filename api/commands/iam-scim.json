@@ -47,13 +47,14 @@
     {
       "name": "Update",
       "command_type": "SCIMUpdateCommand",
-      "help": "ユーザープロビジョニング設定を更新します。",
+      "help": "ユーザープロビジョニング設定を更新します。更新後の設定名を --name または --request JSON の name に指定してください。",
       "method": "Update",
       "request_type": "scim.UpdateParams",
       "request_by_value": true,
-      "request_help": "変更後のユーザープロビジョニング設定を含む JSON。直接指定するか @path.json で読み込みます。",
+      "request_help": "更新後の設定名を含む JSON。name は必須です。直接指定するか @path.json で読み込みます。--request と --name は併用できません。",
       "response_type": "*v1.ScimConfigurationBase",
-      "arguments": [{"name":"id","field":"ID","type":"string","help":"更新する設定 ID。"}]
+      "arguments": [{"name":"id","field":"ID","type":"string","help":"更新する設定 ID。"}],
+      "flags": [{"name":"name","field":"Name","type":"string","help":"必須: 更新後の設定名。","required":true}]
     },
     {
       "name": "Delete",

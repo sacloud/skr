@@ -37,6 +37,7 @@ type fakeCLI struct {
 	calls             []string
 	argsByStep        map[string][]string
 	failAt            string
+	failAfterApply    string
 }
 
 func newFakeCLI() *fakeCLI {
@@ -155,6 +156,9 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		current.Name = argument(args, "--name")
 		current.Description = argument(args, "--description")
 		f.folders[current.Name] = current
+		if step == f.failAfterApply {
+			return nil, errFail(step)
+		}
 		return json.Marshal(current)
 	case step == "update-project":
 		current, ok := f.findByID(f.projects, args[3])
@@ -165,6 +169,9 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		current.Name = argument(args, "--name")
 		current.Description = argument(args, "--description")
 		f.projects[current.Name] = current
+		if step == f.failAfterApply {
+			return nil, errFail(step)
+		}
 		return json.Marshal(current)
 	case step == "register-email":
 		email := argument(args, "--email")
@@ -562,6 +569,34 @@ func TestScenarioRecoversResourcesWhenCreateReturnsError(t *testing.T) {
 	}
 	if len(fake.users) != 0 {
 		t.Fatalf("user remains after cleanup: %+v", fake.users)
+	}
+}
+
+func TestScenarioCleansUpAfterRenameResponseIsLost(t *testing.T) {
+	for _, step := range []string{"update-folder", "update-project"} {
+		t.Run(step, func(t *testing.T) {
+			fake := newFakeCLI()
+			fake.failAfterApply = step
+			s := testScenario(t, fake)
+			err := s.run(context.Background())
+			if err == nil || !strings.Contains(err.Error(), "injected CLI failure at "+step) {
+				t.Fatalf("scenario error = %v, want simulated %s response loss", err, step)
+			}
+			if len(fake.folders) != 0 || len(fake.projects) != 0 {
+				t.Fatalf("renamed resources remain after cleanup: folders=%+v projects=%+v", fake.folders, fake.projects)
+			}
+			wantSteps := []string{"cleanup-delete-folder", "cleanup-delete-project"}
+			if step == "update-folder" {
+				wantSteps = append(wantSteps, "cleanup-verify-folder-pending-name-page-1", "cleanup-verify-project-page-1")
+			} else {
+				wantSteps = append(wantSteps, "cleanup-verify-folder-page-1", "cleanup-verify-project-pending-name-page-1")
+			}
+			for _, want := range wantSteps {
+				if !contains(fake.calls, want) {
+					t.Errorf("cleanup did not call %s after %s: %v", want, step, fake.calls)
+				}
+			}
+		})
 	}
 }
 

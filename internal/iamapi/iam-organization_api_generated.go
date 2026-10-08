@@ -109,13 +109,23 @@ func (c *OrganizationUpdateCommand) Run(ctx *kong.Context) error {
 }
 
 type OrganizationReadServicePolicyCommand struct {
-	Request *string "help:\"サービス利用ポリシーの絞り込み条件 JSON。省略すると既定の条件で取得します。直接指定するか @path.json で読み込みます。\""
-	factory OrganizationAPIFactory
-	runtime OrganizationRuntime
+	Request  *string "help:\"サービス利用ポリシーの絞り込み条件 JSON。省略すると既定の条件で取得します。直接指定するか @path.json で読み込みます。--request と個別フラグは併用できません。\""
+	IsActive *bool   "name:\"is-active\" help:\"任意: 有効状態で絞り込みます。\""
+	IsDryRun *bool   "name:\"is-dry-run\" help:\"任意: ドライラン状態で絞り込みます。\""
+	Name     *string "name:\"name\" help:\"任意: サービス名で絞り込みます。\""
+	Code     *string "name:\"code\" help:\"任意: サービスコードで絞り込みます。\""
+	Type     *string "name:\"type\" help:\"任意: サービスポリシーの型で絞り込みます。\""
+	factory  OrganizationAPIFactory
+	runtime  OrganizationRuntime
 }
 
 func (c *OrganizationReadServicePolicyCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
+	flagsSet = flagsSet || c.IsActive != nil
+	flagsSet = flagsSet || c.IsDryRun != nil
+	flagsSet = flagsSet || c.Name != nil
+	flagsSet = flagsSet || c.Code != nil
+	flagsSet = flagsSet || c.Type != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -128,6 +138,24 @@ func (c *OrganizationReadServicePolicyCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
+		if !flagsSet {
+		}
+		if c.IsActive != nil {
+			request.IsActive = c.IsActive
+		}
+		if c.IsDryRun != nil {
+			request.IsDryRun = c.IsDryRun
+		}
+		if c.Name != nil {
+			request.Name = c.Name
+		}
+		if c.Code != nil {
+			request.Code = c.Code
+		}
+		if c.Type != nil {
+			value := v1.ReadOrganizationServicePolicyType(*c.Type)
+			request.Type = &value
+		}
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

@@ -25,6 +25,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iam"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/group"
+	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/organization"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/projectapikey"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
@@ -505,6 +506,25 @@ func DecodeRequest(input string, destination any) error {
 		data = []byte(input)
 	}
 	switch request := destination.(type) {
+	case *organization.GetServicePolicyParams:
+		var apiRequest struct {
+			IsActive *bool                                 `json:"is_active"`
+			IsDryRun *bool                                 `json:"is_dry_run"`
+			Name     *string                               `json:"name"`
+			Code     *string                               `json:"code"`
+			Type     *v1.ReadOrganizationServicePolicyType `json:"type"`
+		}
+		if err := json.Unmarshal(data, &apiRequest); err != nil {
+			return fmt.Errorf("decode request JSON: %w", err)
+		}
+		*request = organization.GetServicePolicyParams{
+			IsActive: apiRequest.IsActive,
+			IsDryRun: apiRequest.IsDryRun,
+			Name:     apiRequest.Name,
+			Code:     apiRequest.Code,
+			Type:     apiRequest.Type,
+		}
+		return nil
 	case *projectapikey.CreateParams:
 		var apiRequest struct {
 			ProjectID        int      `json:"project_id"`

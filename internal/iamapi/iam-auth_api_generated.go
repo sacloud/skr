@@ -13,7 +13,7 @@ import (
 
 type AuthCommands struct {
 	ReadPasswordPolicy   AuthReadPasswordPolicyCommand   "cmd:\"\" help:\"組織のパスワードポリシーを参照します。\""
-	UpdatePasswordPolicy AuthUpdatePasswordPolicyCommand "cmd:\"\" help:\"組織のパスワードポリシーを更新します。現在の設定を read-password-policy で確認し、すべての項目を含む JSON を指定してください。\""
+	UpdatePasswordPolicy AuthUpdatePasswordPolicyCommand "cmd:\"\" help:\"組織のパスワードポリシーを更新します。--request ではすべての項目を含む JSON を指定します。フラグを使う場合も4項目すべてを指定してください。\""
 	ReadAuthConditions   AuthReadConditionsCommand       "cmd:\"\" help:\"組織の認証条件を参照します。\""
 	UpdateAuthConditions AuthUpdateConditionsCommand     "cmd:\"\" help:\"組織の認証条件を更新します。現在の設定を read-auth-conditions で確認し、すべての項目を含む JSON を指定してください。\""
 	ReadAuthContext      AuthReadContextCommand          "cmd:\"\" help:\"現在の認証情報に対応する IAM 認証コンテキストを参照します。\""
@@ -82,13 +82,21 @@ func (c *AuthReadPasswordPolicyCommand) Run(ctx *kong.Context) error {
 }
 
 type AuthUpdatePasswordPolicyCommand struct {
-	Request *string "help:\"パスワードポリシー全体の JSON。直接指定するか @path.json で読み込みます。組織全体の設定を変更するため、更新前に read-password-policy で確認してください。\""
-	factory AuthAPIFactory
-	runtime AuthRuntime
+	Request          *string "help:\"パスワードポリシー全体の JSON。直接指定するか @path.json で読み込みます。組織全体の設定を変更するため、更新前に read-password-policy で確認してください。--request と個別フラグは併用できません。\""
+	MinLength        *int    "name:\"min-length\" help:\"必須: パスワードの最小文字数。\""
+	RequireUppercase *bool   "name:\"require-uppercase\" help:\"必須: 大文字を必須にします。\""
+	RequireLowercase *bool   "name:\"require-lowercase\" help:\"必須: 小文字を必須にします。\""
+	RequireSymbols   *bool   "name:\"require-symbols\" help:\"必須: 記号を必須にします。\""
+	factory          AuthAPIFactory
+	runtime          AuthRuntime
 }
 
 func (c *AuthUpdatePasswordPolicyCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
+	flagsSet = flagsSet || c.MinLength != nil
+	flagsSet = flagsSet || c.RequireUppercase != nil
+	flagsSet = flagsSet || c.RequireLowercase != nil
+	flagsSet = flagsSet || c.RequireSymbols != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -101,7 +109,33 @@ func (c *AuthUpdatePasswordPolicyCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
-		return fmt.Errorf("--request が必要です")
+		if !flagsSet {
+			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.MinLength == nil {
+			return fmt.Errorf("--min-length が必要です")
+		}
+		if c.MinLength != nil {
+			request.MinLength = *c.MinLength
+		}
+		if c.RequireUppercase == nil {
+			return fmt.Errorf("--require-uppercase が必要です")
+		}
+		if c.RequireUppercase != nil {
+			request.RequireUppercase = *c.RequireUppercase
+		}
+		if c.RequireLowercase == nil {
+			return fmt.Errorf("--require-lowercase が必要です")
+		}
+		if c.RequireLowercase != nil {
+			request.RequireLowercase = *c.RequireLowercase
+		}
+		if c.RequireSymbols == nil {
+			return fmt.Errorf("--require-symbols が必要です")
+		}
+		if c.RequireSymbols != nil {
+			request.RequireSymbols = *c.RequireSymbols
+		}
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

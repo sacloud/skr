@@ -16,7 +16,7 @@ type SCIMCommands struct {
 	List            SCIMListCommand            "cmd:\"\" help:\"ユーザープロビジョニング設定を一覧表示します。\""
 	Create          SCIMCreateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を作成します。\""
 	Read            SCIMReadCommand            "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を読み取ります。\""
-	Update          SCIMUpdateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を更新します。\""
+	Update          SCIMUpdateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を更新します。更新後の設定名を --name または --request JSON の name に指定してください。\""
 	Delete          SCIMDeleteCommand          "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を削除します。プロビジョニングされたユーザーとグループをすべて削除してから実行してください。\""
 	RegenerateToken SCIMRegenerateTokenCommand "cmd:\"\" help:\"ユーザープロビジョニング設定の秘密トークンを再発行します。再発行後は古いトークンが使えなくなるため、連携先を更新できる場合にのみ実行してください。\""
 }
@@ -200,13 +200,15 @@ func (c *SCIMReadCommand) Run(ctx *kong.Context) error {
 
 type SCIMUpdateCommand struct {
 	ID      string  "arg:\"\" name:\"id\" help:\"更新する設定 ID。\""
-	Request *string "help:\"変更後のユーザープロビジョニング設定を含む JSON。直接指定するか @path.json で読み込みます。\""
+	Request *string "help:\"更新後の設定名を含む JSON。name は必須です。直接指定するか @path.json で読み込みます。--request と --name は併用できません。\""
+	Name    *string "name:\"name\" help:\"必須: 更新後の設定名。\""
 	factory ScimAPIFactory
 	runtime ScimRuntime
 }
 
 func (c *SCIMUpdateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
+	flagsSet = flagsSet || c.Name != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -219,7 +221,15 @@ func (c *SCIMUpdateCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
-		return fmt.Errorf("--request が必要です")
+		if !flagsSet {
+			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.Name == nil {
+			return fmt.Errorf("--name が必要です")
+		}
+		if c.Name != nil {
+			request.Name = *c.Name
+		}
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

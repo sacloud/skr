@@ -19,12 +19,18 @@
     {
       "name": "UpdatePasswordPolicy",
       "command_type": "AuthUpdatePasswordPolicyCommand",
-      "help": "組織のパスワードポリシーを更新します。現在の設定を read-password-policy で確認し、すべての項目を含む JSON を指定してください。",
+      "help": "組織のパスワードポリシーを更新します。--request ではすべての項目を含む JSON を指定します。フラグを使う場合も4項目すべてを指定してください。",
       "method": "UpdatePasswordPolicy",
       "request_type": "v1.PasswordPolicy",
       "request_by_value": true,
-      "request_help": "パスワードポリシー全体の JSON。直接指定するか @path.json で読み込みます。組織全体の設定を変更するため、更新前に read-password-policy で確認してください。",
-      "response_type": "*v1.PasswordPolicy"
+      "request_help": "パスワードポリシー全体の JSON。直接指定するか @path.json で読み込みます。組織全体の設定を変更するため、更新前に read-password-policy で確認してください。--request と個別フラグは併用できません。",
+      "response_type": "*v1.PasswordPolicy",
+      "flags": [
+        {"name":"min-length","field":"MinLength","type":"int","help":"必須: パスワードの最小文字数。","required":true},
+        {"name":"require-uppercase","field":"RequireUppercase","type":"bool","help":"必須: 大文字を必須にします。","required":true},
+        {"name":"require-lowercase","field":"RequireLowercase","type":"bool","help":"必須: 小文字を必須にします。","required":true},
+        {"name":"require-symbols","field":"RequireSymbols","type":"bool","help":"必須: 記号を必須にします。","required":true}
+      ]
     },
     {
       "name": "ReadAuthConditions",

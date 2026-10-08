@@ -54,13 +54,14 @@
     {
       "name": "Update",
       "command_type": "ServicePrincipalUpdateCommand",
-      "help": "サービスプリンシパルを更新します。変更するフィールドを JSON で指定してください。",
+      "help": "サービスプリンシパルを更新します。更新後の名前は --name または --request JSON の name に指定してください。",
       "method": "Update",
       "request_type": "serviceprincipal.UpdateParams",
       "request_by_value": true,
-      "request_help": "変更するフィールドを含む JSON。直接指定するか @path.json で読み込みます。省略値と null の意味を確認し、部分更新する項目だけを含めてください。",
+      "request_help": "更新後の名前を含む JSON。name は必須です。任意の description は JSON で指定できます。直接指定するか @path.json で読み込みます。--request と --name は併用できません。",
       "response_type": "*v1.ServicePrincipal",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"更新するサービスプリンシパル ID。"}]
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"更新するサービスプリンシパル ID。"}],
+      "flags": [{"name":"name","field":"Name","type":"string","help":"必須: 更新後のサービスプリンシパル名。","required":true}]
     },
     {
       "name": "Delete",

@@ -301,17 +301,45 @@ $ skr iam-api project move --ids PROJECT-ID --parent-folder-id FOLDER-ID
 
 サービスプリンシパルに公開鍵を登録する場合は、公開鍵を `--public-key-file` から渡します。トークン発行で使うアサーションも `--assertion-file` または標準入力から渡し、秘密情報をコマンドライン引数に含めないでください。API キーを作成する場合は、必須の IAM ロール配列を含む JSON リクエストを `--request @path.json` で指定してください。作成結果にはアクセストークンとシークレットが含まれるため、出力をアクセス制限したファイルへ保存してください（[APIキー](https://manual.sakura.ad.jp/cloud/api/apikey.html)）。
 
+サービスプリンシパルを更新するときは、更新後の名前が必須です。`--name` を使うか、`--request` の JSON に `name` を含めてください。`description` を指定する場合は JSON リクエストに含めます。
+
+```console
+$ skr iam-api service-principal update "$PRINCIPAL_ID" --name iam-tutorial-principal-renamed
+```
+
+JSON リクエストの例です。`name` を更新後の名前に置き換えてファイルに保存します。
+
+```json
+{
+  "name": "iam-tutorial-principal-renamed",
+  "description": "IAM tutorial service principal"
+}
+```
+
+```console
+$ skr iam-api service-principal update "$PRINCIPAL_ID" --request @service-principal.json
+```
+
+SCIM 設定の更新も新しい設定名が必要です。名前だけを更新する場合は `--name` を使えます。JSON リクエストを使う場合も `name` を含めてください。
+
+```console
+$ skr iam-api scim update SCIM_ID --name iam-tutorial-scim-renamed
+```
+
 ## 組織全体に影響する設定と認証情報
 
-パスワードポリシーと認証条件は組織全体の設定です。`read-*` で現在値をファイルに保存し、完全な JSON を編集してから `update-* --request @ファイル名` で更新してください。認証条件の IP 制限や二要素認証設定は、ログインに影響する可能性があります（[認証設定](https://manual.sakura.ad.jp/cloud/controlpanel/settings/index.html)）。
+パスワードポリシーと認証条件は組織全体の設定です。更新前に `read-*` で現在値を確認してください。パスワードポリシーは4項目すべてをフラグで指定するか、全項目を含む JSON を `--request @ファイル名` で渡します。認証条件は現在値をファイルに保存し、完全な JSON を編集してから `update-auth-conditions --request @ファイル名` で更新してください。認証条件の IP 制限や二要素認証設定は、ログインに影響する可能性があります（[認証設定](https://manual.sakura.ad.jp/cloud/controlpanel/settings/index.html)）。
 
 ```console
 $ skr iam-api auth read-password-policy
+$ skr iam-api auth update-password-policy --min-length 12 --require-uppercase \
+  --require-lowercase --require-symbols=false
 $ skr iam-api auth read-auth-conditions
 $ skr iam-api auth update-password-policy --help
 $ skr iam-api auth update-auth-conditions --help
 $ skr iam-api id-policy read-organization
 $ skr iam-api organization read-service-policy
+$ skr iam-api organization read-service-policy --is-active true --name SERVICE_NAME
 $ skr iam-api service-policy is-enabled
 $ skr iam-api service-policy list-rule-templates
 ```

@@ -91,6 +91,22 @@ func TestRunIAMAPIHelp(t *testing.T) {
 			want: []string{"--request", "認証条件", "組織全体"},
 		},
 		{
+			args: []string{"iam-api", "auth", "update-password-policy", "--help"},
+			want: []string{"--request", "--min-length", "--require-uppercase", "--require-lowercase", "--require-symbols", "4項目すべて"},
+		},
+		{
+			args: []string{"iam-api", "organization", "read-service-policy", "--help"},
+			want: []string{"--request", "--is-active", "--is-dry-run", "--name", "--code", "--type"},
+		},
+		{
+			args: []string{"iam-api", "scim", "update", "--help"},
+			want: []string{"--request", "--name", "name は必須"},
+		},
+		{
+			args: []string{"iam-api", "service-principal", "update", "--help"},
+			want: []string{"--request", "--name", "description", "name は必須"},
+		},
+		{
 			args: []string{"iam-api", "service-principal", "issue-token", "--help"},
 			want: []string{"--assertion-file", "標準入力"},
 		},
@@ -355,6 +371,24 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 	if servicePrincipal.ID == 0 || servicePrincipal.Name != "mock-service-principal" {
 		t.Fatalf("service principal create returned %#v", servicePrincipal)
 	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "service-principal", "update", strconv.Itoa(servicePrincipal.ID),
+		"--name", "mock-service-principal-flag-updated",
+	), &servicePrincipal); err != nil {
+		t.Fatal(err)
+	}
+	if servicePrincipal.Name != "mock-service-principal-flag-updated" {
+		t.Fatalf("service principal flag update returned %#v", servicePrincipal)
+	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "service-principal", "update", strconv.Itoa(servicePrincipal.ID), "--request",
+		`{"name":"mock-service-principal-json-updated","description":"updated principal"}`,
+	), &servicePrincipal); err != nil {
+		t.Fatal(err)
+	}
+	if servicePrincipal.Name != "mock-service-principal-json-updated" || servicePrincipal.Description != "updated principal" {
+		t.Fatalf("service principal JSON update returned %#v", servicePrincipal)
+	}
 
 	runCommand("iam-api", "service-principal", "delete", strconv.Itoa(servicePrincipal.ID))
 	runCommand("iam-api", "project", "delete", strconv.Itoa(project.ID))
@@ -403,14 +437,26 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 	}
 
 	var passwordPolicy struct {
-		MinLength int `json:"min_length"`
+		MinLength        int  `json:"min_length"`
+		RequireUppercase bool `json:"require_uppercase"`
+		RequireLowercase bool `json:"require_lowercase"`
+		RequireSymbols   bool `json:"require_symbols"`
 	}
 	if err := json.Unmarshal(runCommand("iam-api", "auth", "update-password-policy", "--request",
 		`{"min_length":12,"require_uppercase":true,"require_lowercase":true,"require_symbols":false}`), &passwordPolicy); err != nil {
 		t.Fatal(err)
 	}
-	if passwordPolicy.MinLength != 12 {
+	if passwordPolicy.MinLength != 12 || !passwordPolicy.RequireUppercase || !passwordPolicy.RequireLowercase || passwordPolicy.RequireSymbols {
 		t.Fatalf("updated password policy = %#v, want minimum length 12", passwordPolicy)
+	}
+	if err := json.Unmarshal(runCommand(
+		"iam-api", "auth", "update-password-policy", "--min-length", "14",
+		"--require-uppercase", "--require-lowercase=false", "--require-symbols=false",
+	), &passwordPolicy); err != nil {
+		t.Fatal(err)
+	}
+	if passwordPolicy.MinLength != 14 || !passwordPolicy.RequireUppercase || passwordPolicy.RequireLowercase || passwordPolicy.RequireSymbols {
+		t.Fatalf("flag-updated password policy = %#v", passwordPolicy)
 	}
 	authConditions := `{"datetime_restriction":{"after":"2025-09-01T00:00:00+09:00","before":"2025-10-01T00:00:00+09:00"},"ip_restriction":{"mode":"allow_all"},"require_two_factor_auth":{"enabled":false}}`
 	if got := runCommand("iam-api", "auth", "update-auth-conditions", "--request", authConditions); len(got) == 0 {
@@ -431,6 +477,8 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 	if got := runCommand("iam-api", "organization", "update-service-policy", "--request", "[]"); len(got) == 0 {
 		t.Fatal("update-service-policy returned an empty response")
 	}
+	runCommand("iam-api", "organization", "read-service-policy",
+		"--is-active=false", "--is-dry-run=true", "--name", "mock-service", "--code", "mock-code", "--type", "bool")
 
 	var apiKey struct {
 		ID                int      `json:"id"`
@@ -478,6 +526,12 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 	}
 	if scim.Name != "mock-scim-updated" {
 		t.Fatalf("SCIM update returned %#v", scim)
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "scim", "update", scim.ID, "--name", "mock-scim-flag-updated"), &scim); err != nil {
+		t.Fatal(err)
+	}
+	if scim.Name != "mock-scim-flag-updated" {
+		t.Fatalf("SCIM flag update returned %#v", scim)
 	}
 	var regeneratedToken struct {
 		SecretToken string `json:"secret_token"`
@@ -979,7 +1033,13 @@ func TestIAMAPICommandInputErrors(t *testing.T) {
 		{"iam-api", "policy", "update-project", "1"},
 		{"iam-api", "user", "register-email", "1"},
 		{"iam-api", "auth", "update-password-policy"},
+		{"iam-api", "auth", "update-password-policy", "--min-length", "12", "--require-uppercase", "--require-lowercase"},
 		{"iam-api", "auth", "update-auth-conditions"},
+		{"iam-api", "organization", "read-service-policy", "--request", "{}", "--name", "service"},
+		{"iam-api", "scim", "update", "1"},
+		{"iam-api", "scim", "update", "1", "--request", `{"name":"from-json"}`, "--name", "from-flag"},
+		{"iam-api", "service-principal", "update", "1"},
+		{"iam-api", "service-principal", "update", "1", "--request", `{"name":"from-json"}`, "--name", "from-flag"},
 		{"iam-api", "id-policy", "update-organization"},
 		{"iam-api", "folder", "list", "--request", "{}", "--page", "1"},
 		{"iam-api", "user-2fa", "list-trusted-devices"},
