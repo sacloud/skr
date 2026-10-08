@@ -84,7 +84,7 @@ $ go run ./test/e2e/simplemq --skr ./skr --confirm-simplemq-live
 照合してから、メッセージを消去してキューを削除し、一覧から消えたことを確認します。識別情報の不一致、
 読み取り失敗、または削除後の残存を検知した場合は推測で削除せず、エラーを返します。
 
-操作ごとの引数、出力、エラーは共通の `test/e2e/internal/evidence` を使い、`tmp/simplemq-api/<YYYYMMDDHHmm>/` に記録します。同じ分に
+操作ごとの引数、出力、エラーは共通の `test/e2e/internal/evidence` を使い、`tmp/simplemq-api/<YYYYMMDDHHmm>/` に記録します。`REPORT.md` には各実行コマンド、stdout、stderr、終了コードと最終結果をまとめます。同じ分に
 複数回実行した場合は `-02` 以降を付け、実行ごとのディレクトリは mode `0700`、証跡ファイルは
 `0600` にします。API キー出力は証跡で redact し、メッセージ操作用のキーは別の一時ディレクトリに
 mode `0600` で保存して実行終了時に削除します。証跡にはプロジェクト ID やリソース ID を含むため、

@@ -28,10 +28,8 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	"github.com/sacloud/skr/internal/apigen"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
-	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
 func TestServerGeneratedCodeMatchesConfig(t *testing.T) {
@@ -58,12 +56,13 @@ func TestServerGeneratedCodeMatchesConfig(t *testing.T) {
 
 func TestRunIaaSServerHelp(t *testing.T) {
 	for _, test := range []struct {
-		args []string
-		want []string
+		args    []string
+		want    []string
+		notWant []string
 	}{
 		{args: []string{"iaas-api", "--help"}, want: []string{"server", "switch"}},
-		{args: []string{"iaas-api", "server", "--help"}, want: []string{"find", "read", "create", "update", "delete", "全ゾーン"}},
-		{args: []string{"iaas-api", "server", "find", "--help"}, want: []string{"--zone all", "Count", "From", "Names", "併用不可"}},
+		{args: []string{"iaas-api", "server", "--help"}, want: []string{"find", "read", "create", "update", "delete"}},
+		{args: []string{"iaas-api", "server", "find", "--help"}, want: []string{"--zone", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "server", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
 		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--request", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可"}},
 		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--cpu", "--memory-gb", "省略", "併用不可"}},
@@ -80,6 +79,11 @@ func TestRunIaaSServerHelp(t *testing.T) {
 					t.Errorf("help output does not contain %q", text)
 				}
 			}
+			for _, text := range test.notWant {
+				if strings.Contains(help, text) {
+					t.Errorf("help output contains removed text %q", text)
+				}
+			}
 		})
 	}
 }
@@ -92,9 +96,6 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
 		commandLine.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) { return api, nil })
-		commandLine.IaaSAPI.Server.SetZoneFactory(func() (zones.API, error) {
-			return serverTestZoneAPI{}, nil
-		})
 		code := runCLI(append([]string{"iaas-api", "server"}, args...), &stdout, &stderr, commandLine)
 		return stdout.String(), stderr.String(), code
 	}
@@ -143,18 +144,15 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		t.Fatalf("Create flag request = %+v, want JSON request %+v", api.createRequest, jsonCreateRequest)
 	}
 
-	_, stderr, code = run("find", "--zone", "all", "--count", "4", "--from", "2")
+	_, stderr, code = run("find", "--zone", "test-zone", "--count", "4", "--from", "2")
 	if code != 0 || stderr != "" {
-		t.Fatalf("find all: code %d, stderr %q", code, stderr)
+		t.Fatalf("find: code %d, stderr %q", code, stderr)
 	}
-	if len(api.findRequests) != 2 {
-		t.Fatalf("Find called %d times, want 2 zones", len(api.findRequests))
+	if len(api.findRequests) != 1 {
+		t.Fatalf("Find called %d times, want one zone", len(api.findRequests))
 	}
-	for i, name := range []string{"zone-a", "zone-b"} {
-		request := api.findRequests[i]
-		if request.Zone != name || request.Count != 4 || request.From != 2 {
-			t.Errorf("Find request %d = %+v, want zone %s, Count 4, From 2", i, request, name)
-		}
+	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 4 || request.From != 2 {
+		t.Errorf("Find request = %+v, want test-zone, Count 4, From 2", request)
 	}
 
 	output, stderr, code = run("read", "--zone", "test-zone", "--id", "123")
@@ -187,6 +185,8 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 	api := &serverAPITestDouble{}
 	for _, args := range [][]string{
 		{"find"},
+		{"find", "--zone", "all"},
+		{"find", "--request", `{"Zone":"all"}`},
 		{"read", "--zone", "all", "--id", "123"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"server"}`, "--zone", "test-zone"},
 		{"create", "--zone", "test-zone", "--name", "server", "--memory-gb", "1"},
@@ -266,12 +266,6 @@ func (api *serverAPITestDouble) UpdateWithContext(_ context.Context, request *se
 func (api *serverAPITestDouble) DeleteWithContext(_ context.Context, request *server.DeleteRequest) error {
 	api.deleteRequest = request
 	return nil
-}
-
-type serverTestZoneAPI struct{}
-
-func (serverTestZoneAPI) FindWithContext(context.Context, *zone.FindRequest) ([]*iaas.Zone, error) {
-	return []*iaas.Zone{{Name: "zone-a"}, {Name: "zone-b"}}, nil
 }
 
 type serverAPICaller struct {

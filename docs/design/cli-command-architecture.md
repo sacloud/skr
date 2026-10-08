@@ -62,15 +62,13 @@ skr http <url> [--method ...] [--data ...]
 
 実行可能ファイルの入口は `cmd/skr/main.go` に置き、CLI のコマンド構成、IaaS の登録、出力処理などの実装とテストは `internal/cli/` にまとめます。各 IaaS リソースのコマンドと SDK クライアントはリソース専用パッケージに分け、別リソースを追加するときも Switch や EventBus のファイルを編集せずに登録できます。
 
-#### IaaS zone の共通仕様
+#### IaaS のゾーン指定
 
-ゾーンを指定する IaaS の検索操作では、個別フラグの `--zone all` を指定すると SDK の Zone API で取得したゾーン一覧を順に検索し、各結果を連結して返します。個別ゾーンの検索に失敗した場合は部分結果を返さず、エラーにします。`--request` の JSON は従来どおり単一ゾーンのリクエストとして扱い、`all` の展開は行いません。`Count` や `From` など SDK の検索条件はゾーンごとの API 呼び出しに適用します。
-
-`all` は検索操作のフラグ経路だけで使えます。`read`、作成、更新、削除では `--zone all` を API 呼び出し前に拒否します。新しい IaaS 検索コマンドを追加する場合は、この仕様を共通ヘルパーで実装し、ヘルプとテストに反映します。
+IaaS の各操作で対象ゾーンを指定します。フラグまたは JSON で `all` を指定すると、API を呼ぶ前に拒否します。ゾーン名の一覧は `skr iaas-api zone find` で取得できます。CLI は複数ゾーンを横断した検索や結果の合成をしません。
 
 #### Switch API
 
-`skr iaas-api switch` は `sacloud-sdk-go/service/iaas/swytch` の公開操作に合わせて `find`、`read`、`create`、`update`、`delete` を提供します。各操作は SDK の request 型を `--request` の JSON か個別フラグで受け取り、SDK が返す Switch を共通の出力形式で出力します。`find` は上記の共通 zone 仕様に従い、個別フラグの `--zone all` をサポートします。フラグ経路では必須の `Zone`、操作ごとの `Name` や `ID`、独立した任意スカラーを設定します。`Names`、`Tags`、`Sort` などの配列は JSON 経路に残します。ポインタ型の任意フラグで更新時の未指定と明示的な空文字列・ゼロ値を区別し、両経路の併用を拒否します。
+`skr iaas-api switch` は `sacloud-sdk-go/service/iaas/swytch` の公開操作に合わせて `find`、`read`、`create`、`update`、`delete` を提供します。各操作は SDK の request 型を `--request` の JSON か個別フラグで受け取り、SDK が返す Switch を共通の出力形式で出力します。各操作で対象の `Zone` を明示し、`all` は拒否します。フラグ経路では操作ごとの `Name` や `ID`、独立した任意スカラーを設定します。`Names`、`Tags`、`Sort` などの配列は JSON 経路に残します。ポインタ型の任意フラグで更新時の未指定と明示的な空文字列・ゼロ値を区別し、両経路の併用を拒否します。
 
 #### Zone API
 
@@ -78,7 +76,7 @@ skr http <url> [--method ...] [--data ...]
 
 ### API コマンドの出力形式
 
-API コマンドの結果は JSON のみで出力し、SDK が返すデータ形状とインデントを維持します。[ADR 0030](../adr/0030-remove-table-output.md) に従い、`--output` と出力形式の選択処理を廃止します。プロファイルの `cli.default_output_type` と `DefaultOutputType` は参照しません。全ゾーン検索でも表示用の Zone フィールドは追加しません。
+API コマンドの結果は JSON のみで出力し、SDK が返すデータ形状とインデントを維持します。[ADR 0030](../adr/0030-remove-table-output.md) に従い、`--output` と出力形式の選択処理を廃止します。プロファイルの `cli.default_output_type` と `DefaultOutputType` は参照しません。
 
 API コマンドではグローバル `--query` に jq 式を指定できます。クエリは API の結果全体に適用し、複数の結果値は JSON として順に出力します。評価には Go 実装の gojq を使い、外部 jq バイナリには依存しません。`skr http` の生レスポンスには適用しません。
 
@@ -86,7 +84,7 @@ Runtime は `ValidateOutput(ctx)` と `WriteOutput(ctx, value)` を受け取り�
 
 `sakumock v0.9.1` に IaaS mock がないため、Switch の CLI テストでは `internal/sakumock/iaas` のインメモリ実装を使用します。この実装は SDK の `api/iaas.APICaller` を満たし、Switch の API 操作をテストします。将来 sakumock に IaaS 対応が追加された場合は、テストで使う API caller を置き換え、CLI と SDK の操作テストを維持します。
 
-ライブの管理操作は `test/e2e/switch` の Go スクリプトで再現します。ビルド済みの skr CLI を起動し、単純な操作では個別フラグ、`Names` による検索では JSON 経路を使います。`tk1v` だけを対象とし、実行確認フラグを必須にします。実行前に `skr-e2e-` で始まるスイッチを全ページから探し、E2E 用の説明値が一致するものだけ ID と内容を再確認して削除します。その後、固定名 `skr-e2e-switch` で作成し、JSON で操作結果を検証するとともに、ID と名前を投影した JSON も証跡に記録します。確認後、ID と名前・説明を照合して削除します。コマンドの入出力は共通の `test/e2e/internal/evidence` を使い、`tmp/switch-api/<YYYYMMDDHHmm>/` に記録して異常終了後の調査に使います。
+ライブの管理操作は `test/e2e/switch` の Go スクリプトで再現します。ビルド済みの skr CLI を起動し、単純な操作では個別フラグ、`Names` による検索では JSON 経路を使います。`tk1v` だけを対象とし、実行確認フラグを必須にします。実行前に `skr-e2e-` で始まるスイッチを全ページから探し、E2E 用の説明値が一致するものだけ ID と内容を再確認して削除します。その後、固定名 `skr-e2e-switch` で作成し、JSON で操作結果を検証するとともに、ID と名前を投影した JSON も証跡に記録します。確認後、ID と名前・説明を照合して削除します。コマンドの入出力は共通の `test/e2e/internal/evidence` を使い、`tmp/switch-api/<YYYYMMDDHHmm>/` に記録して異常終了後の調査に使います。完了時には全 E2E 共通の `REPORT.md` を生成し、実行コマンド、標準出力、標準エラー、終了コード、最終結果を一覧します。
 
 Disk API のライブ操作は `test/e2e/disk` で検証します。対象は `is1b` の SSD プラン ID 4、20 GB のディスクです。ランダムな名前を使い、同名のディスクがあれば変更せず中止します。作成後は検索・参照・名前更新・再参照・削除し、削除後に対象が存在しないことを確認します。途中で失敗した場合も ID、名前、E2E 説明、サイズを照合してから作成済みのディスクだけを削除します。実行確認フラグを必須とし、コマンドの入出力は `test/e2e/internal/evidence` を使って `tmp/disk-api/<YYYYMMDDHHmm>/` に保存します。
 

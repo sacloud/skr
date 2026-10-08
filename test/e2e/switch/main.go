@@ -86,7 +86,7 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	runErr := command.Run()
-	if err := r.evidence.Record(step, args, request, stdout.String(), stderr.String(), runErr, false); err != nil {
+	if err := r.evidence.Record(step, r.binary, args, request, stdout.String(), stderr.String(), runErr, false); err != nil {
 		if runErr != nil {
 			return nil, errors.Join(fmt.Errorf("%s: CLI failed: %w (see evidence for stderr)", step, runErr), err)
 		}

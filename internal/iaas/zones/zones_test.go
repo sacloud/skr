@@ -15,37 +15,30 @@
 package zones
 
 import (
-	"context"
-	"errors"
 	"strings"
 	"testing"
-
-	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 )
 
-func TestFindInAllReturnsErrorWithoutPartialResults(t *testing.T) {
-	newZoneAPI := func() (API, error) {
-		return testAPI{zones: []*iaas.Zone{{Name: "zone-a"}, {Name: "zone-b"}}}, nil
+func TestValidateSingleZone(t *testing.T) {
+	for _, test := range []struct {
+		zone      string
+		wantError bool
+	}{
+		{zone: "tk1v"},
+		{zone: "is1b"},
+		{zone: "all", wantError: true},
+	} {
+		t.Run(test.zone, func(t *testing.T) {
+			err := ValidateSingleZone(test.zone)
+			if test.wantError {
+				if err == nil || !strings.Contains(err.Error(), `Zone に "all"`) {
+					t.Fatalf("ValidateSingleZone(%q) error = %v, want retired all-zones error", test.zone, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ValidateSingleZone(%q) error = %v", test.zone, err)
+			}
+		})
 	}
-	result, err := FindInAll(context.Background(), newZoneAPI, func(_ context.Context, zone string) ([]string, error) {
-		if zone == "zone-b" {
-			return []string{"partial"}, errors.New("mock search failure")
-		}
-		return []string{"first"}, nil
-	})
-	if err == nil || !strings.Contains(err.Error(), `zone "zone-b"`) {
-		t.Fatalf("FindInAll error = %v, want zone-specific error", err)
-	}
-	if result != nil {
-		t.Fatalf("FindInAll returned partial results %#v, want nil", result)
-	}
-}
-
-type testAPI struct {
-	zones []*iaas.Zone
-}
-
-func (api testAPI) FindWithContext(context.Context, *zone.FindRequest) ([]*iaas.Zone, error) {
-	return api.zones, nil
 }

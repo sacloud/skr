@@ -31,9 +31,9 @@ func TestValidateRequest(t *testing.T) {
 	}{
 		{name: "find", validator: "validateDiskFindRequest", request: &disk.FindRequest{Zone: "tk1v"}},
 		{name: "find missing zone", validator: "validateDiskFindRequest", request: &disk.FindRequest{}, wantError: "Zone が必要"},
-		{name: "find all request zone", validator: "validateDiskFindRequest", request: &disk.FindRequest{Zone: zonesAll}},
+		{name: "find rejects all zone", validator: "validateDiskFindRequest", request: &disk.FindRequest{Zone: zonesAll}, wantError: `Zone に "all"`},
 		{name: "read", validator: "validateDiskReadRequest", request: &disk.ReadRequest{Zone: "tk1v", ID: 123}},
-		{name: "read all", validator: "validateDiskReadRequest", request: &disk.ReadRequest{Zone: zonesAll, ID: 123}, wantError: "find のみ"},
+		{name: "read rejects all", validator: "validateDiskReadRequest", request: &disk.ReadRequest{Zone: zonesAll, ID: 123}, wantError: `Zone に "all"`},
 		{name: "create", validator: "validateDiskCreateRequest", request: &disk.CreateRequest{
 			Zone: "tk1v", Name: "disk", DiskPlanID: 4, Connection: types.EDiskConnection("virtio"), SizeGB: 20,
 		}},

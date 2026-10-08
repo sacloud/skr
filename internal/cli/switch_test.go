@@ -18,17 +18,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	"github.com/sacloud/skr/internal/apigen"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
-	"github.com/sacloud/skr/internal/iaas/zones"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
 )
 
@@ -56,8 +53,9 @@ func TestSwitchGeneratedCodeMatchesConfig(t *testing.T) {
 
 func TestRunIaaSAPIHelp(t *testing.T) {
 	for _, test := range []struct {
-		args []string
-		want []string
+		args    []string
+		want    []string
+		notWant []string
 	}{
 		{
 			args: []string{"iaas-api", "--help"},
@@ -65,11 +63,12 @@ func TestRunIaaSAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"iaas-api", "switch", "--help"},
-			want: []string{"find", "read", "create", "update", "delete", "Zone", "全ゾーン"},
+			want: []string{"find", "read", "create", "update", "delete", "Zone"},
 		},
 		{
-			args: []string{"iaas-api", "switch", "find", "--help"},
-			want: []string{`"Zone":"tk1v"`, `"Names":["example"]`, "Tags", "Sort", "有効な Key", "取得件数", "--zone all", "併用不可"},
+			args:    []string{"iaas-api", "switch", "find", "--help"},
+			want:    []string{`"Zone":"tk1v"`, `"Names":["example"]`, "Tags", "Sort", "有効な Key", "取得件数", "--zone", "併用不可"},
+			notWant: []string{"--zone all"},
 		},
 		{
 			args: []string{"iaas-api", "switch", "read", "--help"},
@@ -98,6 +97,11 @@ func TestRunIaaSAPIHelp(t *testing.T) {
 			for _, text := range test.want {
 				if !strings.Contains(help, text) {
 					t.Errorf("help output does not contain %q", text)
+				}
+			}
+			for _, text := range test.notWant {
+				if strings.Contains(help, text) {
+					t.Errorf("help output contains removed text %q", text)
 				}
 			}
 		})
@@ -194,143 +198,25 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 	}
 }
 
-func TestIaaSSwitchFindAllZones(t *testing.T) {
-	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
-	server := iaasmock.NewTestServer(iaasmock.Config{Zones: []string{"test-zone-a", "test-zone-b"}})
-	t.Cleanup(server.Close)
-
-	runCommand := func(args ...string) []byte {
-		t.Helper()
-		var stdout, stderr bytes.Buffer
-		commandLine := newCLI()
-		commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
-			return swytch.New(server), nil
-		})
-		commandLine.IaaSAPI.Switch.SetZoneFactory(func() (zones.API, error) {
-			return zone.New(server), nil
-		})
-		if exitCode := runCLI(args, &stdout, &stderr, commandLine); exitCode != 0 {
-			t.Fatalf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Errorf("run(%v) stderr = %q, want empty", args, stderr.String())
-		}
-		return stdout.Bytes()
-	}
-
-	for _, entry := range []struct {
-		zone string
-		name string
-	}{
-		{zone: "test-zone-a", name: "switch-a"},
-		{zone: "test-zone-b", name: "switch-b"},
-	} {
-		runCommand("iaas-api", "switch", "create", "--zone", entry.zone, "--name", entry.name)
-	}
-
-	var found []*iaas.Switch
-	if err := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--zone", "all"), &found); err != nil {
-		t.Fatal(err)
-	}
-	if len(found) != 2 || found[0].Name != "switch-a" || found[1].Name != "switch-b" {
-		t.Errorf("find all returned %#v, want one result from each configured zone", found)
-	}
-	var projected []map[string]json.RawMessage
-	if err := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--zone", "all", "--query", "map({ID,Name})"), &projected); err != nil {
-		t.Fatal(err)
-	}
-	if len(projected) != 2 {
-		t.Fatalf("projected all-zone output = %+v, want two results", projected)
-	}
-	for i, item := range projected {
-		if len(item) != 2 || string(item["Name"]) != `"`+found[i].Name+`"` {
-			t.Errorf("projected result %d = %+v, want only ID and Name", i, item)
-		}
-	}
-}
-
 type switchFindRecordAPI struct {
 	switchapi.API
 	requests []swytch.FindRequest
-	failZone string
 }
 
 func (api *switchFindRecordAPI) FindWithContext(_ context.Context, request *swytch.FindRequest) ([]*iaas.Switch, error) {
 	api.requests = append(api.requests, *request)
-	if request.Zone == api.failZone {
-		return nil, errors.New("mock search failure")
-	}
 	return []*iaas.Switch{{Name: request.Zone}}, nil
 }
 
-func TestGeneratedFindAllZonesAppliesFiltersAndAvoidsPartialOutput(t *testing.T) {
-	run := func(api *switchFindRecordAPI, args ...string) (int, string, string) {
-		t.Helper()
-		var stdout, stderr bytes.Buffer
-		commandLine := newCLI()
-		commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) { return api, nil })
-		commandLine.IaaSAPI.Switch.SetZoneFactory(func() (zones.API, error) {
-			return testIaaSZoneAPI{zones: []*iaas.Zone{{Name: "zone-a"}, {Name: "zone-b"}}}, nil
-		})
-		commandArgs := append([]string{"iaas-api", "switch", "find"}, args...)
-		exitCode := runCLI(commandArgs, &stdout, &stderr, commandLine)
-		return exitCode, stdout.String(), stderr.String()
-	}
-
-	api := &switchFindRecordAPI{}
-	exitCode, stdout, stderr := run(api, "--zone", "all", "--count", "3", "--from", "2")
-	if exitCode != 0 || stderr != "" {
-		t.Fatalf("all-zone search exit code = %d, stderr = %q", exitCode, stderr)
-	}
-	if len(api.requests) != 2 {
-		t.Fatalf("all-zone search made %d requests, want 2", len(api.requests))
-	}
-	for i, zone := range []string{"zone-a", "zone-b"} {
-		request := api.requests[i]
-		if request.Zone != zone || request.Count != 3 || request.From != 2 {
-			t.Errorf("request %d = %+v, want zone %s, count 3, from 2", i, request, zone)
-		}
-	}
-	if !strings.Contains(stdout, `"Name": "zone-a"`) || !strings.Contains(stdout, `"Name": "zone-b"`) {
-		t.Errorf("all-zone output = %s, want results from both zones", stdout)
-	}
-
-	api = &switchFindRecordAPI{failZone: "zone-b"}
-	exitCode, stdout, stderr = run(api, "--zone", "all")
-	if exitCode == 0 || stdout != "" || !strings.Contains(stderr, `zone "zone-b"`) {
-		t.Fatalf("failed all-zone search: code %d, stdout %q, stderr %q; want error without partial output", exitCode, stdout, stderr)
-	}
-}
-
-func TestGeneratedFindJSONDoesNotExpandAllZones(t *testing.T) {
-	api := &switchFindRecordAPI{}
-	zoneFactoryCalled := false
-	var stdout, stderr bytes.Buffer
-	commandLine := newCLI()
-	commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) { return api, nil })
-	commandLine.IaaSAPI.Switch.SetZoneFactory(func() (zones.API, error) {
-		zoneFactoryCalled = true
-		return testIaaSZoneAPI{zones: []*iaas.Zone{{Name: "zone-a"}}}, nil
-	})
-	exitCode := runCLI(
-		[]string{"iaas-api", "switch", "find", "--request", `{"Zone":"all"}`},
-		&stdout, &stderr, commandLine,
-	)
-	if exitCode != 0 || stderr.Len() != 0 {
-		t.Fatalf("JSON search exit code = %d, stderr = %q", exitCode, stderr.String())
-	}
-	if zoneFactoryCalled || len(api.requests) != 1 || api.requests[0].Zone != "all" {
-		t.Fatalf("JSON request was altered: zone factory called=%t, requests=%+v", zoneFactoryCalled, api.requests)
-	}
-}
-
-func TestGeneratedFindRejectsEmptyZoneBeforeCallingAPI(t *testing.T) {
+func TestGeneratedFindRejectsInvalidZoneBeforeCallingAPI(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		args []string
 	}{
 		{name: "flag", args: []string{"--zone", ""}},
+		{name: "all flag", args: []string{"--zone", "all"}},
 		{name: "request", args: []string{"--request", `{"Zone":""}`}},
+		{name: "all request", args: []string{"--request", `{"Zone":"all"}`}},
 		{name: "missing JSON zone", args: []string{"--request", `{}`}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -346,21 +232,13 @@ func TestGeneratedFindRejectsEmptyZoneBeforeCallingAPI(t *testing.T) {
 			args := append([]string{"iaas-api", "switch", "find"}, test.args...)
 			exitCode := runCLI(args, &stdout, &stderr, commandLine)
 			if exitCode == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-				t.Fatalf("find with empty zone: code %d, stdout %q, stderr %q; want validation error", exitCode, stdout.String(), stderr.String())
+				t.Fatalf("find with invalid zone: code %d, stdout %q, stderr %q; want validation error", exitCode, stdout.String(), stderr.String())
 			}
 			if factoryCalled || len(api.requests) != 0 {
 				t.Fatalf("invalid zone reached API setup: factory called=%t, requests=%+v", factoryCalled, api.requests)
 			}
 		})
 	}
-}
-
-type testIaaSZoneAPI struct {
-	zones []*iaas.Zone
-}
-
-func (api testIaaSZoneAPI) FindWithContext(context.Context, *zone.FindRequest) ([]*iaas.Zone, error) {
-	return api.zones, nil
 }
 
 func TestSwitchFlagInputs(t *testing.T) {
@@ -439,6 +317,8 @@ func TestSwitchFlagInputs(t *testing.T) {
 		{"read", "--zone", "test-zone", "--id", "0"},
 		{"delete", "--zone", "test-zone", "--id", "not-a-number"},
 		{"find"},
+		{"find", "--zone", "all"},
+		{"find", "--request", `{"Zone":"all"}`},
 		{"find", "--request", `{"Zone":"test-zone"}`, "--count", "0"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"json"}`, "--description", ""},
 		{"update", "--request", `{"Zone":"test-zone","ID":123}`, "--network-mask-len", "0"},

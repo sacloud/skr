@@ -30,9 +30,9 @@ func TestValidateRequest(t *testing.T) {
 	}{
 		{name: "find", validator: "validateServerFindRequest", request: &server.FindRequest{Zone: "tk1v"}},
 		{name: "find missing zone", validator: "validateServerFindRequest", request: &server.FindRequest{}, wantErr: "Zone が必要"},
-		{name: "find all zones", validator: "validateServerFindRequest", request: &server.FindRequest{Zone: "all"}},
+		{name: "find rejects all zones", validator: "validateServerFindRequest", request: &server.FindRequest{Zone: "all"}, wantErr: `Zone に "all"`},
 		{name: "read", validator: "validateServerReadRequest", request: &server.ReadRequest{Zone: "tk1v", ID: 123}},
-		{name: "read rejects all", validator: "validateServerReadRequest", request: &server.ReadRequest{Zone: "all", ID: 123}, wantErr: "find のみ"},
+		{name: "read rejects all", validator: "validateServerReadRequest", request: &server.ReadRequest{Zone: "all", ID: 123}, wantErr: `Zone に "all"`},
 		{name: "create", validator: "validateServerCreateRequest", request: &server.CreateRequest{Zone: "tk1v", Name: "server", CPU: 1, MemoryGB: 1}},
 		{name: "create missing name", validator: "validateServerCreateRequest", request: &server.CreateRequest{Zone: "tk1v"}, wantErr: "Name が必要"},
 		{name: "create missing plan", validator: "validateServerCreateRequest", request: &server.CreateRequest{Zone: "tk1v", Name: "server"}, wantErr: "CPU と MemoryGB"},
@@ -53,12 +53,6 @@ func TestValidateRequest(t *testing.T) {
 				t.Fatalf("ValidateRequest() error = %v, want containing %q", err, test.wantErr)
 			}
 		})
-	}
-}
-
-func TestValidateServerFindRequestAllowsZoneAll(t *testing.T) {
-	if err := ValidateRequest("validateServerFindRequest", &server.FindRequest{Zone: "all"}); err != nil {
-		t.Fatalf("ValidateRequest() error = %v, want nil", err)
 	}
 }
 
