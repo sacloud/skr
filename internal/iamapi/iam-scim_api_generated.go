@@ -17,7 +17,7 @@ type SCIMCommands struct {
 	Create          SCIMCreateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を作成します。\""
 	Read            SCIMReadCommand            "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を読み取ります。\""
 	Update          SCIMUpdateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を更新します。\""
-	Delete          SCIMDeleteCommand          "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を削除します。\""
+	Delete          SCIMDeleteCommand          "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を削除します。プロビジョニングされたユーザーとグループをすべて削除してから実行してください。\""
 	RegenerateToken SCIMRegenerateTokenCommand "cmd:\"\" help:\"ユーザープロビジョニング設定の秘密トークンを再発行します。再発行後は古いトークンが使えなくなるため、連携先を更新できる場合にのみ実行してください。\""
 }
 
@@ -58,7 +58,7 @@ func (c *SCIMCommands) SetFactory(factory ScimAPIFactory) {
 }
 
 type SCIMListCommand struct {
-	Request *string "help:\"scim.ListParams の JSON。直接指定するか @path.json で読み込みます。\""
+	Request *string "help:\"ユーザープロビジョニング設定一覧のページング条件を含む JSON。直接指定するか @path.json で読み込みます。\""
 	Page    *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	factory ScimAPIFactory
@@ -200,7 +200,7 @@ func (c *SCIMReadCommand) Run(ctx *kong.Context) error {
 
 type SCIMUpdateCommand struct {
 	ID      string  "arg:\"\" name:\"id\" help:\"更新する設定 ID。\""
-	Request *string "help:\"scim.UpdateParams の JSON。直接指定するか @path.json で読み込みます。\""
+	Request *string "help:\"変更後のユーザープロビジョニング設定を含む JSON。直接指定するか @path.json で読み込みます。\""
 	factory ScimAPIFactory
 	runtime ScimRuntime
 }

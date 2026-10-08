@@ -18,7 +18,7 @@
       "request_type": "scim.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "scim.ListParams の JSON。直接指定するか @path.json で読み込みます。",
+      "request_help": "ユーザープロビジョニング設定一覧のページング条件を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListScimConfigurationsOK",
       "flags": [
         {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
@@ -51,7 +51,7 @@
       "method": "Update",
       "request_type": "scim.UpdateParams",
       "request_by_value": true,
-      "request_help": "scim.UpdateParams の JSON。直接指定するか @path.json で読み込みます。",
+      "request_help": "変更後のユーザープロビジョニング設定を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ScimConfigurationBase",
       "arguments": [{"name":"id","field":"ID","type":"string","help":"更新する設定 ID。"}]
     },

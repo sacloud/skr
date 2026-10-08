@@ -58,7 +58,7 @@ func (c *ProjectCommands) SetFactory(factory ProjectAPIFactory) {
 }
 
 type ProjectListCommand struct {
-	Request        *string "help:\"project.ListParams の JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。\""
+	Request        *string "help:\"プロジェクト一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。\""
 	Page           *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage        *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	Ordering       *string "name:\"ordering\" help:\"任意: 並び順を API の ordering 値で指定します。\""
@@ -130,7 +130,7 @@ func (c *ProjectListCommand) Run(ctx *kong.Context) error {
 }
 
 type ProjectCreateCommand struct {
-	Request        *string "help:\"project.CreateParams の JSON。直接指定するか @path.json で読み込みます。コード、名前、説明は必須です。\""
+	Request        *string "help:\"プロジェクトコード、名前、説明を含む JSON。直接指定するか @path.json で読み込みます。コード、名前、説明は必須です。\""
 	Code           *string "name:\"code\" help:\"必須: プロジェクトコード。\""
 	Name           *string "name:\"name\" help:\"必須: プロジェクト名。\""
 	Description    *string "name:\"description\" help:\"必須: プロジェクトの説明。\""

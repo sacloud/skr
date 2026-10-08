@@ -19,7 +19,7 @@
       "request_type": "serviceprincipal.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "serviceprincipal.ListParams の JSON。直接指定するか @path.json で読み込みます。",
+      "request_help": "サービスプリンシパル一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListServicePrincipalsOK",
       "flags": [
         {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
@@ -58,7 +58,7 @@
       "method": "Update",
       "request_type": "serviceprincipal.UpdateParams",
       "request_by_value": true,
-      "request_help": "変更するフィールドを含む UpdateParams JSON。直接指定するか @path.json で読み込みます。省略値と null の意味を確認し、部分更新する項目だけを含めてください。",
+      "request_help": "変更するフィールドを含む JSON。直接指定するか @path.json で読み込みます。省略値と null の意味を確認し、部分更新する項目だけを含めてください。",
       "response_type": "*v1.ServicePrincipal",
       "arguments": [{"name":"id","field":"ID","type":"int","help":"更新するサービスプリンシパル ID。"}]
     },

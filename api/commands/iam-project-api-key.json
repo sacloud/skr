@@ -18,7 +18,7 @@
       "request_type": "projectapikey.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "projectapikey.ListParams の JSON。直接指定するか @path.json で読み込みます。",
+      "request_help": "API キー一覧のページング・並び順条件を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListApiKeysOK",
       "flags": [
         {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
@@ -33,15 +33,8 @@
       "method": "Create",
       "request_type": "projectapikey.CreateParams",
       "request_by_value": true,
-      "request_help": "projectapikey.CreateParams の JSON。直接指定するか @path.json で読み込みます。プロジェクト ID、名前、説明を指定し、権限や対象サービスなどの複雑な値も JSON で指定してください。",
-      "response_type": "*v1.ProjectApiKeyWithSecret",
-      "flags": [
-        {"name":"project-id","field":"ProjectID","type":"int","help":"必須: 対象のプロジェクト ID。","required":true},
-        {"name":"name","field":"Name","type":"string","help":"必須: API キー名。","required":true},
-        {"name":"description","field":"Description","type":"string","help":"必須: API キーの説明。","required":true},
-        {"name":"server-resource-id","field":"ServerResourceID","type":"string","help":"任意: サーバリソース ID。","pointer":true},
-        {"name":"zone","field":"Zone","type":"string","help":"任意: ゾーン。","pointer":true}
-      ]
+      "request_help": "API キー作成リクエスト全体を JSON で指定します。必須の project_id、name、description、IAM ロール配列 iam_roles を含めてください。シングルサーバコントロールパネルで使うキーは server_resource_id と zone_id も指定します（https://manual.sakura.ad.jp/cloud/api/apikey.html）。直接指定するか @path.json で読み込みます。レスポンスには秘密情報（アクセストークンとシークレット）が含まれるため、出力を安全に保管してください。",
+      "response_type": "*v1.ProjectApiKeyWithSecret"
     },
     {
       "name": "Read",
@@ -58,7 +51,7 @@
       "method": "Update",
       "request_type": "projectapikey.UpdateParams",
       "request_by_value": true,
-      "request_help": "変更後の projectapikey.UpdateParams JSON。直接指定するか @path.json で読み込みます。",
+      "request_help": "変更後の API キー設定全体を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ProjectApiKey",
       "arguments": [{"name":"id","field":"ID","type":"int","help":"更新する API キー ID。"}]
     },

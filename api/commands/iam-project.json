@@ -18,7 +18,7 @@
       "request_type": "project.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "project.ListParams の JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。",
+      "request_help": "プロジェクト一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。",
       "response_type": "*v1.ListProjectsOK",
       "flags": [
         {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
@@ -35,7 +35,7 @@
       "method": "Create",
       "request_type": "project.CreateParams",
       "request_by_value": true,
-      "request_help": "project.CreateParams の JSON。直接指定するか @path.json で読み込みます。コード、名前、説明は必須です。",
+      "request_help": "プロジェクトコード、名前、説明を含む JSON。直接指定するか @path.json で読み込みます。コード、名前、説明は必須です。",
       "response_type": "*v1.Project",
       "flags": [
         {"name":"code","field":"Code","type":"string","help":"必須: プロジェクトコード。","required":true},

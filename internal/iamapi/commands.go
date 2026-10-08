@@ -25,6 +25,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iam"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/group"
+	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/projectapikey"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	clientconfig "github.com/sacloud/skr/internal/saclient"
@@ -493,17 +494,59 @@ func readTextInput(path, flag, subject string) (string, error) {
 
 // DecodeRequest decodes --request JSON, supporting the @path.json form.
 func DecodeRequest(input string, destination any) error {
+	var data []byte
 	if strings.HasPrefix(input, "@") {
-		data, err := os.ReadFile(strings.TrimPrefix(input, "@"))
+		var err error
+		data, err = os.ReadFile(strings.TrimPrefix(input, "@"))
 		if err != nil {
 			return fmt.Errorf("read request file: %w", err)
 		}
-		if err := json.Unmarshal(data, destination); err != nil {
+	} else {
+		data = []byte(input)
+	}
+	switch request := destination.(type) {
+	case *projectapikey.CreateParams:
+		var apiRequest struct {
+			ProjectID        int      `json:"project_id"`
+			Name             string   `json:"name"`
+			Description      string   `json:"description"`
+			ServerResourceID *string  `json:"server_resource_id"`
+			IamRoles         []string `json:"iam_roles"`
+			Zone             *string  `json:"zone_id"`
+		}
+		if err := json.Unmarshal(data, &apiRequest); err != nil {
 			return fmt.Errorf("decode request JSON: %w", err)
+		}
+		*request = projectapikey.CreateParams{
+			ProjectID:        apiRequest.ProjectID,
+			Name:             apiRequest.Name,
+			Description:      apiRequest.Description,
+			ServerResourceID: apiRequest.ServerResourceID,
+			IamRoles:         apiRequest.IamRoles,
+			Zone:             apiRequest.Zone,
+		}
+		return nil
+	case *projectapikey.UpdateParams:
+		var apiRequest struct {
+			Name             string   `json:"name"`
+			Description      string   `json:"description"`
+			ServerResourceID *string  `json:"server_resource_id"`
+			IamRoles         []string `json:"iam_roles"`
+			Zone             *string  `json:"zone_id"`
+		}
+		if err := json.Unmarshal(data, &apiRequest); err != nil {
+			return fmt.Errorf("decode request JSON: %w", err)
+		}
+		*request = projectapikey.UpdateParams{
+			Name:             apiRequest.Name,
+			Description:      apiRequest.Description,
+			ServerResourceID: apiRequest.ServerResourceID,
+			IamRoles:         apiRequest.IamRoles,
+			Zone:             apiRequest.Zone,
 		}
 		return nil
 	}
-	if err := json.Unmarshal([]byte(input), destination); err != nil {
+	if err := json.Unmarshal(data, destination); err != nil {
 		return fmt.Errorf("decode request JSON: %w", err)
 	}
 	return nil

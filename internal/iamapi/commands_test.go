@@ -19,7 +19,35 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/projectapikey"
 )
+
+func TestDecodeProjectAPIKeyRequestUsesAPIFieldNames(t *testing.T) {
+	createJSON := `{"project_id":7,"name":"test-key","description":"test","server_resource_id":"srv-1","iam_roles":["resource-viewer"],"zone_id":"is1a"}`
+	var create projectapikey.CreateParams
+	if err := DecodeRequest(createJSON, &create); err != nil {
+		t.Fatal(err)
+	}
+	if create.ProjectID != 7 || create.Name != "test-key" || len(create.IamRoles) != 1 || create.IamRoles[0] != "resource-viewer" {
+		t.Fatalf("decoded create request = %#v", create)
+	}
+	if create.ServerResourceID == nil || *create.ServerResourceID != "srv-1" || create.Zone == nil || *create.Zone != "is1a" {
+		t.Fatalf("decoded optional create fields = %#v", create)
+	}
+
+	updatePath := filepath.Join(t.TempDir(), "api-key-update.json")
+	if err := os.WriteFile(updatePath, []byte(`{"name":"updated-key","description":"updated","iam_roles":["resource-editor"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var update projectapikey.UpdateParams
+	if err := DecodeRequest("@"+updatePath, &update); err != nil {
+		t.Fatal(err)
+	}
+	if update.Name != "updated-key" || len(update.IamRoles) != 1 || update.IamRoles[0] != "resource-editor" {
+		t.Fatalf("decoded update request = %#v", update)
+	}
+}
 
 func TestDecodeRequestFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memberships.json")

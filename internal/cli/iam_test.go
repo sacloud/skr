@@ -16,7 +16,11 @@ package cli
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,12 +29,14 @@ import (
 	"testing"
 
 	iammock "github.com/sacloud/sakumock/iam"
+	"github.com/sacloud/skr/internal/apigen"
 )
 
 func TestRunIAMAPIHelp(t *testing.T) {
 	for _, test := range []struct {
-		args []string
-		want []string
+		args    []string
+		want    []string
+		notWant []string
 	}{
 		{
 			args: []string{"iam-api", "--help"},
@@ -89,8 +95,9 @@ func TestRunIAMAPIHelp(t *testing.T) {
 			want: []string{"--assertion-file", "標準入力"},
 		},
 		{
-			args: []string{"iam-api", "project-api-key", "create", "--help"},
-			want: []string{"--project-id", "--request", "秘密情報", "JSON"},
+			args:    []string{"iam-api", "project-api-key", "create", "--help"},
+			want:    []string{"--request", "IAM ロール配列", "iam_roles", "@path.json", "秘密情報"},
+			notWant: []string{"--project-id", "--name"},
 		},
 		{
 			args: []string{"iam-api", "user-2fa", "clear-trusted-devices", "--help"},
@@ -108,7 +115,56 @@ func TestRunIAMAPIHelp(t *testing.T) {
 					t.Errorf("help output does not contain %q", text)
 				}
 			}
+			for _, text := range test.notWant {
+				if strings.Contains(help, text) {
+					t.Errorf("help output unexpectedly contains %q", text)
+				}
+			}
 		})
+	}
+}
+
+func TestIAMGeneratedCodeMatchesConfigs(t *testing.T) {
+	for _, test := range []struct {
+		config string
+		output string
+	}{
+		{"api/commands/iam-auth.json", "internal/iamapi/iam-auth_api_generated.go"},
+		{"api/commands/iam-folder.json", "internal/iamapi/iam-folder_api_generated.go"},
+		{"api/commands/iam-group.json", "internal/iamapi/iam_group_api_generated.go"},
+		{"api/commands/iam-id-policy.json", "internal/iamapi/iam-id-policy_api_generated.go"},
+		{"api/commands/iam-id-role.json", "internal/iamapi/iam-id-role_api_generated.go"},
+		{"api/commands/iam-organization.json", "internal/iamapi/iam-organization_api_generated.go"},
+		{"api/commands/iam-policy.json", "internal/iamapi/iam_policy_api_generated.go"},
+		{"api/commands/iam-project-api-key.json", "internal/iamapi/iam-project-api-key_api_generated.go"},
+		{"api/commands/iam-project.json", "internal/iamapi/iam-project_api_generated.go"},
+		{"api/commands/iam-role.json", "internal/iamapi/iam-role_api_generated.go"},
+		{"api/commands/iam-scim.json", "internal/iamapi/iam-scim_api_generated.go"},
+		{"api/commands/iam-service-policy.json", "internal/iamapi/iam-service-policy_api_generated.go"},
+		{"api/commands/iam-service-principal.json", "internal/iamapi/iam-service-principal_api_generated.go"},
+		{"api/commands/iam-sso.json", "internal/iamapi/iam-sso_api_generated.go"},
+		{"api/commands/iam-user-2fa.json", "internal/iamapi/iam-user-2fa_api_generated.go"},
+		{"api/commands/iam-user.json", "internal/iamapi/iam_user_api_generated.go"},
+	} {
+		configData, err := os.ReadFile(repositoryPath(test.config))
+		if err != nil {
+			t.Fatal(err)
+		}
+		config, err := apigen.DecodeConfig(configData)
+		if err != nil {
+			t.Fatalf("decode %s: %v", test.config, err)
+		}
+		want, err := apigen.Generate(config)
+		if err != nil {
+			t.Fatalf("generate %s: %v", test.config, err)
+		}
+		got, err := os.ReadFile(repositoryPath(test.output))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("generated IAM API command is stale; run make generate-api API_CONFIG=%s API_OUTPUT=%s", test.config, test.output)
+		}
 	}
 }
 
@@ -304,6 +360,251 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 	runCommand("iam-api", "project", "delete", strconv.Itoa(project.ID))
 	runCommand("iam-api", "folder", "delete", strconv.Itoa(childFolder.ID))
 	runCommand("iam-api", "folder", "delete", strconv.Itoa(folder.ID))
+}
+
+func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	server := iammock.NewTestServer(iammock.Config{})
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_IAM", server.TestURL())
+
+	runCommand := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
+			t.Fatalf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
+		}
+		if stderr.Len() != 0 {
+			t.Errorf("run(%v) stderr = %q, want empty", args, stderr.String())
+		}
+		return stdout.Bytes()
+	}
+	postMock := func(path, body string) []byte {
+		t.Helper()
+		response, err := http.Post(server.TestURL()+path, "application/json", strings.NewReader(body)) //nolint:noctx // Test setup against the local mock server.
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := response.Body.Close(); err != nil {
+				t.Errorf("close mock response body: %v", err)
+			}
+		}()
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			t.Fatalf("POST %s status = %d", path, response.StatusCode)
+		}
+		var result bytes.Buffer
+		if _, err := result.ReadFrom(response.Body); err != nil {
+			t.Fatal(err)
+		}
+		return result.Bytes()
+	}
+
+	var passwordPolicy struct {
+		MinLength int `json:"min_length"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "auth", "update-password-policy", "--request",
+		`{"min_length":12,"require_uppercase":true,"require_lowercase":true,"require_symbols":false}`), &passwordPolicy); err != nil {
+		t.Fatal(err)
+	}
+	if passwordPolicy.MinLength != 12 {
+		t.Fatalf("updated password policy = %#v, want minimum length 12", passwordPolicy)
+	}
+	authConditions := `{"datetime_restriction":{"after":"2025-09-01T00:00:00+09:00","before":"2025-10-01T00:00:00+09:00"},"ip_restriction":{"mode":"allow_all"},"require_two_factor_auth":{"enabled":false}}`
+	if got := runCommand("iam-api", "auth", "update-auth-conditions", "--request", authConditions); len(got) == 0 {
+		t.Fatal("update-auth-conditions returned an empty response")
+	}
+	if got := runCommand("iam-api", "id-policy", "update-organization", "--request", "[]"); len(got) == 0 {
+		t.Fatal("update-organization ID policy returned an empty response")
+	}
+	var organization struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "organization", "update", "--name", "mock-organization-updated"), &organization); err != nil {
+		t.Fatal(err)
+	}
+	if organization.Name != "mock-organization-updated" {
+		t.Fatalf("organization update returned %#v", organization)
+	}
+	if got := runCommand("iam-api", "organization", "update-service-policy", "--request", "[]"); len(got) == 0 {
+		t.Fatal("update-service-policy returned an empty response")
+	}
+
+	var apiKey struct {
+		ID                int      `json:"id"`
+		Name              string   `json:"name"`
+		IAMRoles          []string `json:"iam_roles"`
+		AccessTokenSecret string   `json:"access_token_secret"`
+	}
+	var invalidKeyOut, invalidKeyErr bytes.Buffer
+	if exitCode := run([]string{"iam-api", "project-api-key", "create", "--request",
+		`{"project_id":1,"name":"invalid-key","description":"missing roles"}`}, &invalidKeyOut, &invalidKeyErr); exitCode == 0 || !strings.Contains(invalidKeyErr.String(), "iam_roles") {
+		t.Fatalf("API key create without IAM roles exit = %d, stderr = %q; want IAM role validation error", exitCode, invalidKeyErr.String())
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "project-api-key", "create", "--request",
+		`{"project_id":1,"name":"mock-api-key","description":"test key","iam_roles":["role-1"]}`), &apiKey); err != nil {
+		t.Fatal(err)
+	}
+	if apiKey.ID == 0 || apiKey.AccessTokenSecret == "" || len(apiKey.IAMRoles) != 1 || apiKey.IAMRoles[0] != "role-1" {
+		t.Fatalf("API key create returned %#v; expected ID, secret, and required IAM role", apiKey)
+	}
+	var updatedAPIKey struct {
+		Name     string   `json:"name"`
+		IAMRoles []string `json:"iam_roles"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "project-api-key", "update", strconv.Itoa(apiKey.ID), "--request",
+		`{"name":"mock-api-key-updated","description":"updated key","iam_roles":["role-2"]}`), &updatedAPIKey); err != nil {
+		t.Fatal(err)
+	}
+	if updatedAPIKey.Name != "mock-api-key-updated" || len(updatedAPIKey.IAMRoles) != 1 || updatedAPIKey.IAMRoles[0] != "role-2" {
+		t.Fatalf("API key update returned %#v", updatedAPIKey)
+	}
+	runCommand("iam-api", "project-api-key", "delete", strconv.Itoa(apiKey.ID))
+
+	var scim struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "scim", "create", "--name", "mock-scim"), &scim); err != nil {
+		t.Fatal(err)
+	}
+	if scim.ID == "" || scim.Name != "mock-scim" {
+		t.Fatalf("SCIM create returned %#v", scim)
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "scim", "update", scim.ID, "--request", `{"name":"mock-scim-updated"}`), &scim); err != nil {
+		t.Fatal(err)
+	}
+	if scim.Name != "mock-scim-updated" {
+		t.Fatalf("SCIM update returned %#v", scim)
+	}
+	var regeneratedToken struct {
+		SecretToken string `json:"secret_token"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "scim", "regenerate-token", scim.ID), &regeneratedToken); err != nil {
+		t.Fatal(err)
+	}
+	if regeneratedToken.SecretToken == "" {
+		t.Fatal("SCIM token regeneration returned an empty secret")
+	}
+	runCommand("iam-api", "scim", "delete", scim.ID)
+
+	if got := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "enable"))); got != "" {
+		t.Fatalf("service-policy enable output = %q, want empty", got)
+	}
+	if got := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "is-enabled"))); got != "true" {
+		t.Fatalf("service-policy enabled status = %q, want true", got)
+	}
+	runCommand("iam-api", "service-policy", "disable")
+	if got := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "is-enabled"))); got != "false" {
+		t.Fatalf("service-policy enabled status after disable = %q, want false", got)
+	}
+
+	ssoRequest := `{"name":"mock-sso","description":"test","idp_entity_id":"https://idp.example.test/entity","idp_login_url":"https://idp.example.test/login","idp_logout_url":"https://idp.example.test/logout","idp_certificate":"test-certificate"}`
+	var ssoProfile struct {
+		ID       int    `json:"id"`
+		Name     string `json:"name"`
+		Assigned bool   `json:"assigned"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "sso", "create", "--request", ssoRequest), &ssoProfile); err != nil {
+		t.Fatal(err)
+	}
+	if ssoProfile.ID == 0 || ssoProfile.Name != "mock-sso" {
+		t.Fatalf("SSO create returned %#v", ssoProfile)
+	}
+	ssoID := strconv.Itoa(ssoProfile.ID)
+	ssoUpdate := `{"name":"mock-sso-updated","description":"updated","idp_entity_id":"https://idp.example.test/entity","idp_login_url":"https://idp.example.test/login","idp_logout_url":"https://idp.example.test/logout","idp_certificate":"test-certificate"}`
+	if err := json.Unmarshal(runCommand("iam-api", "sso", "update", ssoID, "--request", ssoUpdate), &ssoProfile); err != nil {
+		t.Fatal(err)
+	}
+	runCommand("iam-api", "sso", "link", ssoID)
+	if err := json.Unmarshal(runCommand("iam-api", "sso", "read", ssoID), &ssoProfile); err != nil {
+		t.Fatal(err)
+	}
+	if !ssoProfile.Assigned {
+		t.Fatal("SSO profile was not linked")
+	}
+	runCommand("iam-api", "sso", "unlink", ssoID)
+	if err := json.Unmarshal(runCommand("iam-api", "sso", "read", ssoID), &ssoProfile); err != nil {
+		t.Fatal(err)
+	}
+	if ssoProfile.Assigned {
+		t.Fatal("SSO profile remained linked after unlink")
+	}
+	runCommand("iam-api", "sso", "delete", ssoID)
+
+	passwordFile := filepath.Join(t.TempDir(), "password.txt")
+	if err := os.WriteFile(passwordFile, []byte("Password-Test-2FA-1234"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var user struct {
+		ID int `json:"id"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "user", "create",
+		"--name", "mock-2fa-mutation-user", "--code", "mock-2fa-mutation-user",
+		"--description", "test", "--password-file", passwordFile), &user); err != nil {
+		t.Fatal(err)
+	}
+	if user.ID == 0 {
+		t.Fatal("created test user has no ID")
+	}
+	userID := strconv.Itoa(user.ID)
+	var trustedDevice struct {
+		ID int `json:"id"`
+	}
+	if err := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/trusted-devices", `{"name":"test-device"}`), &trustedDevice); err != nil {
+		t.Fatal(err)
+	}
+	runCommand("iam-api", "user-2fa", "delete-trusted-device", "--user-id", userID, strconv.Itoa(trustedDevice.ID))
+	if err := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/trusted-devices", `{"name":"test-device-to-clear"}`), &trustedDevice); err != nil {
+		t.Fatal(err)
+	}
+	runCommand("iam-api", "user-2fa", "clear-trusted-devices", "--user-id", userID)
+	var securityKey struct {
+		ID int `json:"id"`
+	}
+	if err := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/security-keys", `{"name":"test-security-key"}`), &securityKey); err != nil {
+		t.Fatal(err)
+	}
+	runCommand("iam-api", "user-2fa", "delete-security-key", "--user-id", userID, strconv.Itoa(securityKey.ID))
+	runCommand("iam-api", "user-2fa", "deactivate-otp", "--user-id", userID)
+	runCommand("iam-api", "user", "delete", userID)
+
+	project, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKeyDER, err := x509.MarshalPKIXPublicKey(&project.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKeyFile := filepath.Join(t.TempDir(), "public-key.pem")
+	if err := os.WriteFile(publicKeyFile, pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKeyDER}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var servicePrincipal struct {
+		ID int `json:"id"`
+	}
+	if err := json.Unmarshal(runCommand("iam-api", "service-principal", "create", "--project-id", "1",
+		"--name", "mock-key-operations", "--description", "test"), &servicePrincipal); err != nil {
+		t.Fatal(err)
+	}
+	var servicePrincipalKey struct {
+		ID string `json:"id"`
+	}
+	servicePrincipalID := strconv.Itoa(servicePrincipal.ID)
+	if err := json.Unmarshal(runCommand("iam-api", "service-principal", "upload-key", servicePrincipalID,
+		"--public-key-file", publicKeyFile), &servicePrincipalKey); err != nil {
+		t.Fatal(err)
+	}
+	if servicePrincipalKey.ID == "" {
+		t.Fatal("uploaded service principal key has no ID")
+	}
+	runCommand("iam-api", "service-principal", "disable-key", servicePrincipalID, servicePrincipalKey.ID)
+	runCommand("iam-api", "service-principal", "enable-key", servicePrincipalID, servicePrincipalKey.ID)
+	runCommand("iam-api", "service-principal", "delete-key", servicePrincipalID, servicePrincipalKey.ID)
+	runCommand("iam-api", "service-principal", "delete", servicePrincipalID)
 }
 
 func TestIAMAPIWithSakumock(t *testing.T) {

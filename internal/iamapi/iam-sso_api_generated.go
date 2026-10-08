@@ -18,8 +18,8 @@ type SSOCommands struct {
 	Read   SSOReadCommand   "cmd:\"\" help:\"ID を指定して SSO プロファイルを読み取ります。\""
 	Update SSOUpdateCommand "cmd:\"\" help:\"SSO プロファイルを更新します。必要な IdP 設定一式を JSON で指定してください。\""
 	Delete SSODeleteCommand "cmd:\"\" help:\"ID を指定して SSO プロファイルを削除します。\""
-	Link   SSOLinkCommand   "cmd:\"\" help:\"SSO プロファイルを組織にリンクします。\""
-	Unlink SSOUnlinkCommand "cmd:\"\" help:\"SSO プロファイルと組織のリンクを解除します。\""
+	Link   SSOLinkCommand   "cmd:\"\" help:\"SSO プロファイルを組織で有効にします。有効なプロファイルは一つで、ユーザーのログイン方法に影響するため、IdP 設定と対象ユーザーのメールアドレスを確認してください。\""
+	Unlink SSOUnlinkCommand "cmd:\"\" help:\"SSO プロファイルと組織のリンクを解除します。ユーザーのログイン方法に影響するため、実行前に対象プロファイルを確認してください。\""
 }
 
 type SSOAPI interface {

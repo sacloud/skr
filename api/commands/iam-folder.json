@@ -18,7 +18,7 @@
       "request_type": "folder.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "folder.ListParams の JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。",
+      "request_help": "フォルダ一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。",
       "response_type": "*v1.ListFoldersOK",
       "flags": [
         {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
@@ -34,7 +34,7 @@
       "method": "Create",
       "request_type": "folder.CreateParams",
       "request_by_value": true,
-      "request_help": "folder.CreateParams の JSON。名前、説明、任意の親フォルダ ID を指定します。直接指定するか @path.json で読み込みます。",
+      "request_help": "フォルダ名、説明、任意の親フォルダ ID を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.Folder",
       "flags": [
         {"name":"name","field":"Name","type":"string","help":"必須: フォルダ名。","required":true},

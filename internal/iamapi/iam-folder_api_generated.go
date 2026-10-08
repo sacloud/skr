@@ -58,7 +58,7 @@ func (c *FolderCommands) SetFactory(factory FolderAPIFactory) {
 }
 
 type FolderListCommand struct {
-	Request  *string "help:\"folder.ListParams の JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。\""
+	Request  *string "help:\"フォルダ一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。\""
 	Page     *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage  *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	Name     *string "name:\"name\" help:\"任意: 名前で絞り込みます。\""
@@ -124,7 +124,7 @@ func (c *FolderListCommand) Run(ctx *kong.Context) error {
 }
 
 type FolderCreateCommand struct {
-	Request     *string "help:\"folder.CreateParams の JSON。名前、説明、任意の親フォルダ ID を指定します。直接指定するか @path.json で読み込みます。\""
+	Request     *string "help:\"フォルダ名、説明、任意の親フォルダ ID を含む JSON。直接指定するか @path.json で読み込みます。\""
 	Name        *string "name:\"name\" help:\"必須: フォルダ名。\""
 	Description *string "name:\"description\" help:\"任意: フォルダの説明。\""
 	ParentID    *int    "name:\"parent-id\" help:\"任意: 親フォルダ ID。\""

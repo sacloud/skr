@@ -14,7 +14,7 @@ import (
 
 type ProjectAPIKeyCommands struct {
 	List   ProjectAPIKeyListCommand   "cmd:\"\" help:\"プロジェクト API キーを一覧表示します。\""
-	Create ProjectAPIKeyCreateCommand "cmd:\"\" help:\"プロジェクト API キーを作成します。レスポンスには秘密情報が含まれる場合があるため、出力を安全に保管してください。\""
+	Create ProjectAPIKeyCreateCommand "cmd:\"\" help:\"プロジェクト API キーを作成します。レスポンスにアクセストークンとシークレットが含まれるため、出力を安全に保管してください。\""
 	Read   ProjectAPIKeyReadCommand   "cmd:\"\" help:\"ID を指定してプロジェクト API キーを読み取ります。\""
 	Update ProjectAPIKeyUpdateCommand "cmd:\"\" help:\"プロジェクト API キーを更新します。現在の設定を read で確認し、変更後の設定を JSON で指定してください。\""
 	Delete ProjectAPIKeyDeleteCommand "cmd:\"\" help:\"ID を指定してプロジェクト API キーを削除します。\""
@@ -54,7 +54,7 @@ func (c *ProjectAPIKeyCommands) SetFactory(factory ProjectAPIKeyAPIFactory) {
 }
 
 type ProjectAPIKeyListCommand struct {
-	Request  *string "help:\"projectapikey.ListParams の JSON。直接指定するか @path.json で読み込みます。\""
+	Request  *string "help:\"API キー一覧のページング・並び順条件を含む JSON。直接指定するか @path.json で読み込みます。\""
 	Page     *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage  *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	Ordering *string "name:\"ordering\" help:\"任意: 並び順を API の ordering 値で指定します。\""
@@ -116,23 +116,13 @@ func (c *ProjectAPIKeyListCommand) Run(ctx *kong.Context) error {
 }
 
 type ProjectAPIKeyCreateCommand struct {
-	Request          *string "help:\"projectapikey.CreateParams の JSON。直接指定するか @path.json で読み込みます。プロジェクト ID、名前、説明を指定し、権限や対象サービスなどの複雑な値も JSON で指定してください。\""
-	ProjectID        *int    "name:\"project-id\" help:\"必須: 対象のプロジェクト ID。\""
-	Name             *string "name:\"name\" help:\"必須: API キー名。\""
-	Description      *string "name:\"description\" help:\"必須: API キーの説明。\""
-	ServerResourceID *string "name:\"server-resource-id\" help:\"任意: サーバリソース ID。\""
-	Zone             *string "name:\"zone\" help:\"任意: ゾーン。\""
-	factory          ProjectAPIKeyAPIFactory
-	runtime          ProjectAPIKeyRuntime
+	Request *string "help:\"API キー作成リクエスト全体を JSON で指定します。必須の project_id、name、description、IAM ロール配列 iam_roles を含めてください。シングルサーバコントロールパネルで使うキーは server_resource_id と zone_id も指定します（https://manual.sakura.ad.jp/cloud/api/apikey.html）。直接指定するか @path.json で読み込みます。レスポンスには秘密情報（アクセストークンとシークレット）が含まれるため、出力を安全に保管してください。\""
+	factory ProjectAPIKeyAPIFactory
+	runtime ProjectAPIKeyRuntime
 }
 
 func (c *ProjectAPIKeyCreateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
-	flagsSet = flagsSet || c.ProjectID != nil
-	flagsSet = flagsSet || c.Name != nil
-	flagsSet = flagsSet || c.Description != nil
-	flagsSet = flagsSet || c.ServerResourceID != nil
-	flagsSet = flagsSet || c.Zone != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -145,33 +135,7 @@ func (c *ProjectAPIKeyCreateCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
-		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
-		}
-		if c.ProjectID == nil {
-			return fmt.Errorf("--project-id が必要です")
-		}
-		if c.ProjectID != nil {
-			request.ProjectID = *c.ProjectID
-		}
-		if c.Name == nil {
-			return fmt.Errorf("--name が必要です")
-		}
-		if c.Name != nil {
-			request.Name = *c.Name
-		}
-		if c.Description == nil {
-			return fmt.Errorf("--description が必要です")
-		}
-		if c.Description != nil {
-			request.Description = *c.Description
-		}
-		if c.ServerResourceID != nil {
-			request.ServerResourceID = c.ServerResourceID
-		}
-		if c.Zone != nil {
-			request.Zone = c.Zone
-		}
+		return fmt.Errorf("--request が必要です")
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
@@ -228,7 +192,7 @@ func (c *ProjectAPIKeyReadCommand) Run(ctx *kong.Context) error {
 
 type ProjectAPIKeyUpdateCommand struct {
 	ID      int     "arg:\"\" name:\"id\" help:\"更新する API キー ID。\""
-	Request *string "help:\"変更後の projectapikey.UpdateParams JSON。直接指定するか @path.json で読み込みます。\""
+	Request *string "help:\"変更後の API キー設定全体を含む JSON。直接指定するか @path.json で読み込みます。\""
 	factory ProjectAPIKeyAPIFactory
 	runtime ProjectAPIKeyRuntime
 }

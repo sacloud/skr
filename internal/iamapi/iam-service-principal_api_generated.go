@@ -79,7 +79,7 @@ func (c *ServicePrincipalCommands) SetFactory(factory ServicePrincipalAPIFactory
 }
 
 type ServicePrincipalListCommand struct {
-	Request   *string "help:\"serviceprincipal.ListParams の JSON。直接指定するか @path.json で読み込みます。\""
+	Request   *string "help:\"サービスプリンシパル一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。\""
 	Page      *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage   *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	ProjectID *int    "name:\"project-id\" help:\"任意: プロジェクト ID で絞り込みます。\""
@@ -248,7 +248,7 @@ func (c *ServicePrincipalReadCommand) Run(ctx *kong.Context) error {
 
 type ServicePrincipalUpdateCommand struct {
 	ID      int     "arg:\"\" name:\"id\" help:\"更新するサービスプリンシパル ID。\""
-	Request *string "help:\"変更するフィールドを含む UpdateParams JSON。直接指定するか @path.json で読み込みます。省略値と null の意味を確認し、部分更新する項目だけを含めてください。\""
+	Request *string "help:\"変更するフィールドを含む JSON。直接指定するか @path.json で読み込みます。省略値と null の意味を確認し、部分更新する項目だけを含めてください。\""
 	factory ServicePrincipalAPIFactory
 	runtime ServicePrincipalRuntime
 }
