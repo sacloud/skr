@@ -48,6 +48,7 @@ type item struct {
 	Name        string `json:"name"`
 	Code        string `json:"code"`
 	Description string `json:"description"`
+	Email       string `json:"email"`
 }
 
 func (i item) id() string {
@@ -149,11 +150,23 @@ func (s *scenario) list(ctx context.Context, step, kind string) ([]item, error) 
 	default:
 		return nil, fmt.Errorf("%s: unknown resource kind %q", step, kind)
 	}
-	data, err := s.call(ctx, step, args...)
-	if err != nil {
-		return nil, err
+	var all []item
+	for page := 1; ; page++ {
+		pageStep := fmt.Sprintf("%s-page-%d", step, page)
+		pageArgs := append(append([]string(nil), args...), "--page", strconv.Itoa(page))
+		data, err := s.call(ctx, pageStep, pageArgs...)
+		if err != nil {
+			return nil, err
+		}
+		items, err := decodeItems(pageStep, data)
+		if err != nil {
+			return nil, err
+		}
+		if len(items) == 0 {
+			return all, nil
+		}
+		all = append(all, items...)
 	}
-	return decodeItems(step, data)
 }
 
 func (s *scenario) findByName(ctx context.Context, step string, target resource) (item, bool, error) {
@@ -285,12 +298,27 @@ func (s *scenario) registerEmail(ctx context.Context) error {
 	if !read.markedForThisRun(s.suffix) {
 		return fmt.Errorf("verify-email: identity mismatch for user %s", s.user.id)
 	}
+	if read.Email != s.email {
+		return fmt.Errorf("verify-email: email = %q, want %q", read.Email, s.email)
+	}
 	return nil
 }
 
 func (s *scenario) unregisterEmail(ctx context.Context) error {
-	_, err := s.call(ctx, "unregister-email", "iam-api", "user", "unregister-email", s.user.id)
-	return err
+	if _, err := s.call(ctx, "unregister-email", "iam-api", "user", "unregister-email", s.user.id); err != nil {
+		return err
+	}
+	read, err := s.read(ctx, "verify-email-unregistered", s.user)
+	if err != nil {
+		return err
+	}
+	if !read.markedForThisRun(s.suffix) {
+		return fmt.Errorf("verify-email-unregistered: identity mismatch for user %s", s.user.id)
+	}
+	if read.Email != "" {
+		return fmt.Errorf("verify-email-unregistered: email = %q, want empty", read.Email)
+	}
+	return nil
 }
 
 func (s *scenario) createGroup(ctx context.Context) error {

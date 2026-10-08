@@ -24,10 +24,11 @@ import (
 )
 
 type fakeCLI struct {
-	users  map[string]item
-	groups map[string]item
-	calls  []string
-	failAt string
+	users     map[string]item
+	groups    map[string]item
+	listPages map[string][][]item
+	calls     []string
+	failAt    string
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
@@ -35,17 +36,21 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 	if step == "profile-current" {
 		return []byte("test-profile\n"), nil
 	}
-	if step == f.failAt {
+	if step == f.failAt && step != "create-group" {
 		return nil, errFail(step)
 	}
+	if len(args) >= 3 && args[0] == "iam-api" && args[2] == "list" {
+		page := 1
+		if value := argument(args, "--page"); value != "" {
+			var err error
+			page, err = strconv.Atoi(value)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return f.list(args[1], page)
+	}
 	switch {
-	case step == "verify-user-list":
-		return f.list("user")
-	case strings.HasPrefix(step, "preflight-"), strings.HasPrefix(step, "cleanup-verify-"):
-		kind := strings.TrimPrefix(step, "preflight-")
-		kind = strings.TrimPrefix(kind, "cleanup-verify-")
-		kind = strings.TrimSuffix(kind, "s")
-		return f.list(kind)
 	case step == "create-user":
 		name := argument(args, "--name")
 		code := argument(args, "--code")
@@ -70,8 +75,11 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 	case step == "create-group":
 		created := item{ID: 2001, Name: argument(args, "--name"), Description: argument(args, "--description")}
 		f.groups[created.Name] = created
+		if step == f.failAt {
+			return nil, errFail(step)
+		}
 		return json.Marshal(created)
-	case step == "read-user", step == "verify-email", step == "unregister-email":
+	case step == "read-user", step == "verify-email", step == "verify-email-unregistered":
 		return f.readOne(f.users, lastArg(args))
 	case step == "read-group":
 		return f.readOne(f.groups, lastArg(args))
@@ -85,9 +93,24 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		f.users[current.Code] = current
 		return json.Marshal(current)
 	case step == "register-email":
-		if argument(args, "--email") == "" {
+		email := argument(args, "--email")
+		if email == "" {
 			return nil, errInvalid("register-email requires --email")
 		}
+		current, ok := f.findByID(f.users, args[3])
+		if !ok {
+			return nil, errInvalid("user not found: " + args[3])
+		}
+		current.Email = email
+		f.users[current.Code] = current
+		return nil, nil
+	case step == "unregister-email":
+		current, ok := f.findByID(f.users, args[3])
+		if !ok {
+			return nil, errInvalid("user not found: " + args[3])
+		}
+		current.Email = ""
+		f.users[current.Code] = current
 		return nil, nil
 	case step == "update-memberships", step == "read-memberships":
 		return json.Marshal([]map[string]int{{"id": 1001}})
@@ -119,7 +142,20 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 	}
 }
 
-func (f *fakeCLI) list(kind string) ([]byte, error) {
+func (f *fakeCLI) list(kind string, page int) ([]byte, error) {
+	if pages, ok := f.listPages[kind]; ok {
+		if page > 0 && page <= len(pages) {
+			items := pages[page-1]
+			if items == nil {
+				items = []item{}
+			}
+			return json.Marshal(items)
+		}
+		return json.Marshal([]item{})
+	}
+	if page != 1 {
+		return json.Marshal([]item{})
+	}
 	switch kind {
 	case "user":
 		return json.Marshal(mapValues(f.users))
@@ -208,22 +244,24 @@ func TestScenarioCreatesAndCleansUpResources(t *testing.T) {
 		t.Fatalf("resources remain after E2E: users=%+v groups=%+v", fake.users, fake.groups)
 	}
 	for _, want := range []string{
-		"preflight-users",
-		"preflight-groups",
+		"preflight-users-page-1",
+		"preflight-groups-page-1",
 		"create-user",
-		"verify-user-list",
+		"verify-user-list-page-1",
+		"verify-user-list-page-2",
 		"read-user",
 		"update-user",
 		"register-email",
 		"verify-email",
 		"unregister-email",
+		"verify-email-unregistered",
 		"create-group",
 		"update-memberships",
 		"read-memberships",
 		"cleanup-delete-group",
-		"cleanup-verify-group",
+		"cleanup-verify-group-page-1",
 		"cleanup-delete-user",
-		"cleanup-verify-user",
+		"cleanup-verify-user-page-1",
 	} {
 		if !contains(fake.calls, want) {
 			t.Errorf("scenario did not call %s: %v", want, fake.calls)
@@ -231,6 +269,32 @@ func TestScenarioCreatesAndCleansUpResources(t *testing.T) {
 	}
 	if got := strings.Join(fake.calls, ","); strings.Index(got, "cleanup-delete-user") < strings.Index(got, "cleanup-delete-group") {
 		t.Fatal("the group must be deleted before its member user")
+	}
+}
+
+func TestListReadsEveryPage(t *testing.T) {
+	fake := &fakeCLI{
+		users:  make(map[string]item),
+		groups: make(map[string]item),
+		listPages: map[string][][]item{
+			"user": {
+				{{ID: 1001, Name: "first"}},
+				{{ID: 1002, Name: "second"}},
+			},
+		},
+	}
+	s := testScenario(t, fake)
+	items, err := s.list(context.Background(), "preflight-users", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].ID != 1001 || items[1].ID != 1002 {
+		t.Fatalf("list returned %#v, want items from both pages", items)
+	}
+	for _, want := range []string{"preflight-users-page-1", "preflight-users-page-2", "preflight-users-page-3"} {
+		if !contains(fake.calls, want) {
+			t.Errorf("list did not fetch %s: %v", want, fake.calls)
+		}
 	}
 }
 
@@ -244,7 +308,16 @@ func TestScenarioRecoversResourcesWhenCreateReturnsError(t *testing.T) {
 	if len(fake.groups) != 0 {
 		t.Fatalf("group remains after failure: %+v", fake.groups)
 	}
-	if !contains(fake.calls, "cleanup-delete-user") || !contains(fake.calls, "cleanup-verify-user") {
+	for _, want := range []string{
+		"cleanup-find-group-page-1",
+		"cleanup-delete-group",
+		"cleanup-verify-group-page-1",
+	} {
+		if !contains(fake.calls, want) {
+			t.Errorf("uncertain group create was not recovered via %s: %v", want, fake.calls)
+		}
+	}
+	if !contains(fake.calls, "cleanup-delete-user") || !contains(fake.calls, "cleanup-verify-user-page-1") {
 		t.Fatalf("created user was not cleaned up: %v", fake.calls)
 	}
 	if len(fake.users) != 0 {
@@ -263,7 +336,7 @@ func TestScenarioRefusesExistingResource(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("scenario error = %v, want existing resource refusal", err)
 	}
-	if len(fake.calls) != 2 || len(fake.users) != 1 {
+	if len(fake.calls) != 3 || len(fake.users) != 1 {
 		t.Fatalf("scenario modified an existing resource: calls=%v users=%+v", fake.calls, fake.users)
 	}
 }

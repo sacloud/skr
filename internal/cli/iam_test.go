@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	iammock "github.com/sacloud/sakumock/iam"
-	"github.com/sacloud/skr/internal/iamapi"
 )
 
 func TestRunIAMAPIHelp(t *testing.T) {
@@ -464,22 +463,15 @@ func TestIAMAPICommandInputErrors(t *testing.T) {
 	}
 }
 
-func TestIAMAPIDecodeRequestFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "memberships.json")
-	if err := os.WriteFile(path, []byte("[1,2,3]"), 0o600); err != nil {
-		t.Fatal(err)
+func TestIAMAPIUserCreateRequiresPasswordFile(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{
+		"iam-api", "user", "create",
+		"--name", "mock-user", "--code", "mock-user-code", "--description", "test",
+	}, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("user create without --password-file succeeded")
 	}
-	var value []int
-	if err := iamapi.DecodeRequest("@"+path, &value); err != nil {
-		t.Fatal(err)
-	}
-	if len(value) != 3 || value[0] != 1 || value[2] != 3 {
-		t.Fatalf("decoded %#v, want [1 2 3]", value)
-	}
-	if err := iamapi.DecodeRequest("@/missing/memberships.json", &value); err == nil {
-		t.Error("DecodeRequest(@missing) succeeded, want an error")
-	}
-	if err := iamapi.DecodeRequest("{invalid", &value); err == nil {
-		t.Error("DecodeRequest(invalid JSON) succeeded, want an error")
+	if stdout.Len() != 0 || !strings.Contains(stderr.String(), "--password-file が必要です") {
+		t.Fatalf("user create output = %q, error = %q; want an explicit --password-file error", stdout.String(), stderr.String())
 	}
 }

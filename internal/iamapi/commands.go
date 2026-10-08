@@ -37,9 +37,9 @@ type Commands struct {
 }
 
 type UserListCommand struct {
-	Page     *int    `name:"page" help:"任意: 取得するページ番号（1 開始）。API の ListParams.Page に対応します。"`
-	PerPage  *int    `name:"per-page" help:"任意: 1 ページあたりの取得件数。API の ListParams.PerPage に対応します。"`
-	Ordering *string `name:"ordering" help:"任意: 並び順。code または -code を指定します。API の ListParams.Ordering に対応します。"`
+	Page     *int    `name:"page" help:"任意: 取得するページ番号（1 開始）。"`
+	PerPage  *int    `name:"per-page" help:"任意: 1 ページあたりの取得件数。"`
+	Ordering *string `name:"ordering" help:"任意: 並び順。code または -code を指定します。"`
 	factory  UserAPIFactory
 	runtime  UserRuntime
 }
@@ -157,10 +157,10 @@ func (c *UserUpdateCommand) Run(ctx *kong.Context) error {
 }
 
 type GroupListCommand struct {
-	Page     *int    `name:"page" help:"任意: 取得するページ番号（1 開始）。API の ListParams.Page に対応します。"`
-	PerPage  *int    `name:"per-page" help:"任意: 1 ページあたりの取得件数。API の ListParams.PerPage に対応します。"`
-	Ordering *string `name:"ordering" help:"任意: 並び順。name または -name を指定します。API の ListParams.Ordering に対応します。"`
-	UserID   *int    `name:"user-id" help:"任意: 指定したユーザーが所属するグループに絞り込みます。API の ListParams.User.ID に対応します。"`
+	Page     *int    `name:"page" help:"任意: 取得するページ番号（1 開始）。"`
+	PerPage  *int    `name:"per-page" help:"任意: 1 ページあたりの取得件数。"`
+	Ordering *string `name:"ordering" help:"任意: 並び順。name または -name を指定します。"`
+	UserID   *int    `name:"user-id" help:"任意: 指定したユーザーが所属するグループに絞り込みます。"`
 	factory  GroupAPIFactory
 	runtime  GroupRuntime
 }
@@ -295,6 +295,9 @@ func DecodeRequest(input string, destination any) error {
 
 // readPassword reads a password from a file or standard input.
 func readPassword(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("--password-file が必要です（標準入力を使う場合は - を指定します）")
+	}
 	var data []byte
 	if path == "-" {
 		var err error
