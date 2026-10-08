@@ -18,9 +18,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -28,6 +30,19 @@ import (
 type Recorder struct {
 	dir      string
 	sequence int
+	records  []record
+}
+
+type record struct {
+	Sequence   int      `json:"sequence"`
+	Step       string   `json:"step"`
+	Command    string   `json:"command"`
+	Args       []string `json:"args,omitempty"`
+	Request    any      `json:"request,omitempty"`
+	Stdout     string   `json:"stdout"`
+	Stderr     string   `json:"stderr"`
+	ExitStatus *int     `json:"exit_status"`
+	Error      string   `json:"error,omitempty"`
 }
 
 func New(service string) (*Recorder, error) {
@@ -82,36 +97,37 @@ func ValidateStep(step string) error {
 	return nil
 }
 
-func (r *Recorder) Record(step string, args []string, request any, stdout, stderr string, runErr error, redactStdout bool) error {
+func (r *Recorder) Record(step, binary string, args []string, request any, stdout, stderr string, runErr error, redactStdout bool) error {
 	if err := ValidateStep(step); err != nil {
 		return err
 	}
 	r.sequence++
 	sequence := r.sequence
 	filename := fmt.Sprintf("%03d-%s.json", sequence, step)
-	record := struct {
-		Sequence int      `json:"sequence"`
-		Step     string   `json:"step"`
-		Args     []string `json:"args,omitempty"`
-		Request  any      `json:"request,omitempty"`
-		Stdout   string   `json:"stdout"`
-		Stderr   string   `json:"stderr"`
-		Error    string   `json:"error,omitempty"`
-	}{
+	entry := record{
 		Sequence: sequence,
 		Step:     step,
+		Command:  commandLine(binary, args),
 		Args:     args,
 		Request:  request,
 		Stdout:   stdout,
 		Stderr:   stderr,
 	}
 	if redactStdout {
-		record.Stdout = "[REDACTED: APIKey]"
+		entry.Stdout = "[REDACTED: APIKey]"
 	}
 	if runErr != nil {
-		record.Error = runErr.Error()
+		entry.Error = runErr.Error()
+		var exitErr *exec.ExitError
+		if errors.As(runErr, &exitErr) {
+			status := exitErr.ExitCode()
+			entry.ExitStatus = &status
+		}
+	} else {
+		status := 0
+		entry.ExitStatus = &status
 	}
-	data, err := json.MarshalIndent(record, "", "  ")
+	data, err := json.MarshalIndent(entry, "", "  ")
 	if err != nil {
 		return fmt.Errorf("%s: encode evidence: %w", step, err)
 	}
@@ -122,7 +138,11 @@ func (r *Recorder) Record(step string, args []string, request any, stdout, stder
 	if runErr != nil {
 		result = "failed"
 	}
-	return r.appendOrder(sequence, step, result, filename)
+	if err := r.appendOrder(sequence, step, result, filename); err != nil {
+		return err
+	}
+	r.records = append(r.records, entry)
+	return nil
 }
 
 func (r *Recorder) SetResult(result string, completed time.Time) error {
@@ -133,7 +153,91 @@ func (r *Recorder) SetResult(result string, completed time.Time) error {
 	if err := os.WriteFile(filepath.Join(r.dir, "RESULT.txt"), []byte(content), 0o600); err != nil {
 		return fmt.Errorf("write E2E result in %s: %w", r.dir, err)
 	}
+	report := r.renderReport(result, completed)
+	if err := os.WriteFile(filepath.Join(r.dir, "REPORT.md"), []byte(report), 0o600); err != nil {
+		return fmt.Errorf("write E2E report in %s: %w", r.dir, err)
+	}
 	return nil
+}
+
+func (r *Recorder) renderReport(result string, completed time.Time) string {
+	var report strings.Builder
+	fmt.Fprintf(&report, "# E2E 実行レポート\n\n- 結果: **%s**\n- 完了日時: `%s`\n- 実行コマンド数: %d\n\n", result, completed.Format(time.RFC3339), len(r.records))
+	report.WriteString("| # | ステップ | 結果 | Exit status |\n|---:|---|---|---:|\n")
+	for _, entry := range r.records {
+		stepResult, status := "成功", "取得できません"
+		if entry.Error != "" {
+			stepResult = "失敗"
+		}
+		if entry.ExitStatus != nil {
+			status = strconv.Itoa(*entry.ExitStatus)
+		}
+		fmt.Fprintf(&report, "| %03d | `%s` | %s | %s |\n", entry.Sequence, entry.Step, stepResult, status)
+	}
+	report.WriteString("\n")
+	for _, entry := range r.records {
+		stepResult, status := "成功", "取得できません"
+		if entry.Error != "" {
+			stepResult = "失敗"
+		}
+		if entry.ExitStatus != nil {
+			status = strconv.Itoa(*entry.ExitStatus)
+		}
+		fmt.Fprintf(&report, "## %03d %s — %s (exit status %s)\n\n", entry.Sequence, html.EscapeString(entry.Step), stepResult, status)
+		report.WriteString("**実行コマンド**\n\n")
+		writeCodeBlock(&report, entry.Command)
+		report.WriteString("**stdout**\n\n")
+		writeCodeBlock(&report, entry.Stdout)
+		report.WriteString("**stderr**\n\n")
+		writeCodeBlock(&report, entry.Stderr)
+		if entry.Error != "" {
+			report.WriteString("**実行エラー**\n\n")
+			writeCodeBlock(&report, entry.Error)
+		}
+	}
+	return report.String()
+}
+
+func writeCodeBlock(builder *strings.Builder, content string) {
+	maxRun := 0
+	for _, line := range strings.Split(content, "\n") {
+		run := 0
+		for _, char := range line {
+			if char == '`' {
+				run++
+				if run > maxRun {
+					maxRun = run
+				}
+			} else {
+				run = 0
+			}
+		}
+	}
+	fence := strings.Repeat("`", max(3, maxRun+1))
+	fmt.Fprintf(builder, "%stext\n%s", fence, content)
+	if !strings.HasSuffix(content, "\n") {
+		builder.WriteByte('\n')
+	}
+	fmt.Fprintf(builder, "%s\n\n", fence)
+}
+
+func commandLine(binary string, args []string) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, shellQuote(binary))
+	for _, arg := range args {
+		parts = append(parts, shellQuote(arg))
+	}
+	return strings.Join(parts, " ")
+}
+
+func shellQuote(value string) string {
+	if value != "" && strings.IndexFunc(value, func(char rune) bool {
+		return !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') || strings.ContainsRune("_@%+=:,./-", char))
+	}) == -1 {
+		return value
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func (r *Recorder) appendOrder(sequence int, step, result, filename string) error {

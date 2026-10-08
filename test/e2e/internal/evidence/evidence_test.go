@@ -15,7 +15,9 @@
 package evidence
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -56,10 +58,10 @@ func TestRecorderOrdersAndRedactsEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := recorder.Record("profile-current", []string{"config", "current"}, nil, "test-profile\n", "", nil, false); err != nil {
+	if err := recorder.Record("profile-current", "./skr", []string{"config", "current"}, nil, "test-profile\n", "", nil, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := recorder.Record("rotate-api-key", []string{"rotate-api-key"}, nil, `{"APIKey":"secret"}`, "", nil, true); err != nil {
+	if err := recorder.Record("rotate-api-key", "./skr", []string{"rotate-api-key"}, nil, `{"APIKey":"secret"}`, "", nil, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,6 +92,16 @@ func TestRecorderOrdersAndRedactsEvidence(t *testing.T) {
 			t.Errorf("evidence order is missing %q:\n%s", want, order)
 		}
 	}
+	if err := recorder.SetResult("passed", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	report, err := os.ReadFile(filepath.Join(recorder.Dir(), "REPORT.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(report), "secret") || !strings.Contains(string(report), "[REDACTED: APIKey]") {
+		t.Fatalf("report did not preserve API key redaction: %s", report)
+	}
 }
 
 func TestSetResultWritesPrivateResult(t *testing.T) {
@@ -115,5 +127,66 @@ func TestSetResultWritesPrivateResult(t *testing.T) {
 	}
 	if got := info.Mode().Perm(); got != 0o600 {
 		t.Errorf("result file permissions = %o, want 600", got)
+	}
+	reportInfo, err := os.Stat(filepath.Join(recorder.Dir(), "REPORT.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := reportInfo.Mode().Perm(); got != 0o600 {
+		t.Errorf("report file permissions = %o, want 600", got)
+	}
+}
+
+func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
+	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "http-api"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Record("http-get", "/path/to/skr", []string{"http", "--query", "map({ID,Name})"}, nil, "line 1\n```\n", "", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	failure := exec.Command(os.Args[0], "-test.run=TestEvidenceExitStatusHelper")
+	failure.Env = append(os.Environ(), "EVIDENCE_EXIT_STATUS_HELPER=1")
+	runErr := failure.Run()
+	if runErr == nil {
+		t.Fatal("helper process succeeded, want exit status 7")
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(runErr, &exitErr) || exitErr.ExitCode() != 7 {
+		t.Fatalf("helper error = %T, want *exec.ExitError", runErr)
+	}
+	if err := recorder.Record("http-failure", "/path/to/skr", []string{"http", "url with spaces"}, nil, "partial output", "request failed\n", runErr, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.SetResult("failed", time.Date(2026, 10, 5, 17, 1, 0, 0, time.Local)); err != nil {
+		t.Fatal(err)
+	}
+	report, err := os.ReadFile(filepath.Join(recorder.Dir(), "REPORT.md")) //nolint:gosec // The path is created under t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"| 001 | `http-get` | 成功 | 0 |",
+		"| 002 | `http-failure` | 失敗 | 7 |",
+		"/path/to/skr http --query 'map({ID,Name})'",
+		"/path/to/skr http 'url with spaces'",
+		"````text\nline 1\n```\n````",
+		"partial output",
+		"request failed",
+		"exit status 7",
+		"## 001 http-get — 成功 (exit status 0)",
+	} {
+		if !strings.Contains(string(report), want) {
+			t.Errorf("report is missing %q:\n%s", want, report)
+		}
+	}
+	if strings.Contains(string(report), "<details>") || strings.Contains(string(report), "<summary>") {
+		t.Fatalf("report should display all command details without expansion: %s", report)
+	}
+}
+
+func TestEvidenceExitStatusHelper(t *testing.T) {
+	if os.Getenv("EVIDENCE_EXIT_STATUS_HELPER") == "1" {
+		os.Exit(7)
 	}
 }
