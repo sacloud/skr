@@ -35,6 +35,9 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr eventbus-api schedule` | スケジュールの管理 |
 | `skr eventbus-api trigger` | イベントトリガーの管理 |
 | `skr apprun-dedicated-api` | AppRun 専有型のクラスタ、アプリケーション、ワーカノードなどの管理 |
+| `skr iam-api user` | IAM ユーザーの作成、参照、更新、削除、メールアドレスの登録と解除 |
+| `skr iam-api group` | IAM グループの管理とメンバーシップの更新 |
+| `skr iam-api policy` | 組織・プロジェクト・フォルダの IAM ポリシーバインディングの参照と更新 |
 | `skr http <url>` | SDK の認証情報を使った任意の HTTPS エンドポイントへのリクエスト |
 | `skr config current` | 現在選択されているプロファイル名の確認 |
 
@@ -58,10 +61,13 @@ $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 
 
 ## 認証と出力
 
-IaaS API、EventBus API、SimpleMQ のキュー管理 API、AppRun Dedicated API は、SDK のプロファイル、または
+IaaS API、EventBus API、SimpleMQ のキュー管理 API、AppRun Dedicated API、IAM API は、SDK のプロファイルか
 `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で認証します。SimpleMQ の
 メッセージ API では対象キューの API キーが必要です。キーは `--api-key-file` でファイルから
-読み込み、コマンドライン引数に直接含めないでください。
+読み込み、コマンドライン引数に直接含めないでください。IAM のユーザー作成・更新で指定する
+パスワードも `--password-file` でファイルまたは標準入力から読み込み、引数に直接含めないでください。
+IAM の各機能を利用するには、対象機能の権限を付与したサービスプリンシパルが必要です
+（[サービスプリンシパル](https://manual.sakura.ad.jp/cloud/controlpanel/service-principal.html)、[IAM ポリシー](https://manual.sakura.ad.jp/cloud/controlpanel/iam-policy.html)）。
 
 API コマンドの結果は JSON で出力します。
 `--query` に jq 式を指定すると、API の結果を加工して JSON で出力できます。詳細は
