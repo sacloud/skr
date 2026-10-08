@@ -51,7 +51,7 @@ func (c *cli) initHTTP() {
 }
 
 func newAuthenticatedHTTPDoer(trace bool) (authenticatedHTTPDoer, error) {
-	client, err := skrSaclient.New(trace)
+	client, err := skrSaclient.NewHTTP(trace)
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +82,9 @@ func (c *httpCommand) Run(ctx *kong.Context) error {
 	}
 	if err := addHTTPHeaders(request, c.Header); err != nil {
 		return err
+	}
+	if _, explicitlySet := request.Header[http.CanonicalHeaderKey("User-Agent")]; !explicitlySet {
+		request.Header.Set("User-Agent", skrSaclient.HTTPUserAgent())
 	}
 
 	if c.doerFactory == nil {
