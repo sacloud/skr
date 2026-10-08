@@ -145,7 +145,7 @@ func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
 	if err := recorder.Record("http-get", "/path/to/skr", []string{"http", "--query", "map({ID,Name})"}, nil, "line 1\n```\n", "", nil, false); err != nil {
 		t.Fatal(err)
 	}
-	failure := exec.Command(os.Args[0], "-test.run=TestEvidenceExitStatusHelper")
+	failure := exec.Command(os.Args[0], "-test.run=TestEvidenceExitStatusHelper") //nolint:gosec // The test binary is invoked with a fixed test selector; no user input reaches the command.
 	failure.Env = append(os.Environ(), "EVIDENCE_EXIT_STATUS_HELPER=1")
 	runErr := failure.Run()
 	if runErr == nil {
@@ -161,7 +161,7 @@ func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
 	if err := recorder.SetResult("failed", time.Date(2026, 10, 5, 17, 1, 0, 0, time.Local)); err != nil {
 		t.Fatal(err)
 	}
-	report, err := os.ReadFile(filepath.Join(recorder.Dir(), "REPORT.md")) //nolint:gosec // The path is created under t.TempDir.
+	report, err := os.ReadFile(filepath.Join(recorder.Dir(), "REPORT.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
