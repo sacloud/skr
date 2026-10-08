@@ -38,6 +38,17 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr iam-api user` | IAM ユーザーの作成、参照、更新、削除、メールアドレスの登録と解除 |
 | `skr iam-api group` | IAM グループの管理とメンバーシップの更新 |
 | `skr iam-api policy` | 組織・プロジェクト・フォルダの IAM ポリシーバインディングの参照と更新 |
+| `skr iam-api auth` | 組織の認証条件とパスワードポリシーの参照・更新 |
+| `skr iam-api folder` / `project` | IAM フォルダとプロジェクトの管理・移動 |
+| `skr iam-api organization` | 組織情報とサービス利用ポリシーの管理 |
+| `skr iam-api iam-role` / `id-role` | IAM ロールと ID ロールの参照 |
+| `skr iam-api id-policy` | 組織の ID ポリシーの参照・更新 |
+| `skr iam-api project-api-key` | プロジェクト API キーの管理 |
+| `skr iam-api service-principal` | サービスプリンシパルと公開鍵の管理、アクセストークンの発行 |
+| `skr iam-api service-policy` | サービス利用ポリシーの状態とルールテンプレートの操作 |
+| `skr iam-api scim` | ユーザープロビジョニング設定の管理 |
+| `skr iam-api sso` | SSO プロファイルの管理 |
+| `skr iam-api user-2fa` | ユーザーの OTP、信頼済みデバイス、セキュリティキーの管理 |
 | `skr http <url>` | SDK の認証情報を使った任意の HTTPS エンドポイントへのリクエスト |
 | `skr config current` | 現在選択されているプロファイル名の確認 |
 
@@ -68,6 +79,7 @@ IaaS API、EventBus API、SimpleMQ のキュー管理 API、AppRun Dedicated API
 パスワードも `--password-file` でファイルまたは標準入力から読み込み、引数に直接含めないでください。
 IAM の各機能を利用するには、対象機能の権限を付与したサービスプリンシパルが必要です
 （[サービスプリンシパル](https://manual.sakura.ad.jp/cloud/controlpanel/service-principal.html)、[IAM ポリシー](https://manual.sakura.ad.jp/cloud/controlpanel/iam-policy.html)）。
+IAM の認証条件、SSO、ユーザープロビジョニング、サービス利用ポリシー、ID ポリシーは組織やユーザーの認証・操作に影響します。ポリシー更新は対象範囲の設定全体を置き換える操作があるため、更新前に現在値を読み取り、内容を確認してください。プロジェクト API キーや SCIM トークン、サービスプリンシパルのアクセストークンなどの秘密情報は、作成・再発行時の出力を安全に保管してください。詳しくは [IAM API チュートリアル](docs/manual/tutorials/iam-api.md)を参照してください。
 
 API コマンドの結果は JSON で出力します。
 `--query` に jq 式を指定すると、API の結果を加工して JSON で出力できます。詳細は

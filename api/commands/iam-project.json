@@ -1,0 +1,85 @@
+{
+  "package": "iamapi",
+  "resource": "IAM project",
+  "command_type": "ProjectCommands",
+  "api_type": "ProjectAPI",
+  "factory_type": "ProjectAPIFactory",
+  "runtime_type": "ProjectRuntime",
+  "imports": {
+    "project": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/project",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "ProjectListCommand",
+      "help": "IAM プロジェクトを一覧表示します。",
+      "method": "List",
+      "request_type": "project.ListParams",
+      "request_by_value": true,
+      "request_optional": true,
+      "request_help": "プロジェクト一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。",
+      "response_type": "*v1.ListProjectsOK",
+      "flags": [
+        {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
+        {"name":"per-page","field":"PerPage","type":"int","help":"任意: 1 ページあたりの取得件数。","pointer":true},
+        {"name":"ordering","field":"Ordering","type":"string","help":"任意: 並び順を API の ordering 値で指定します。","pointer":true,"conversion":"v1.ListProjectsOrdering"},
+        {"name":"iam-role","field":"IamRole","type":"string","help":"任意: IAM ロール ID で絞り込みます。","pointer":true},
+        {"name":"parent-folder-id","field":"ParentFolderID","type":"int","help":"任意: 親フォルダ ID で絞り込みます。","pointer":true}
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "ProjectCreateCommand",
+      "help": "IAM プロジェクトを作成します。既存のフォルダ内に作成する場合は --parent-folder-id を指定してください。",
+      "method": "Create",
+      "request_type": "project.CreateParams",
+      "request_by_value": true,
+      "request_help": "プロジェクトコード、名前、説明を含む JSON。直接指定するか @path.json で読み込みます。コード、名前、説明は必須です。",
+      "response_type": "*v1.Project",
+      "flags": [
+        {"name":"code","field":"Code","type":"string","help":"必須: プロジェクトコード。","required":true},
+        {"name":"name","field":"Name","type":"string","help":"必須: プロジェクト名。","required":true},
+        {"name":"description","field":"Description","type":"string","help":"必須: プロジェクトの説明。","required":true},
+        {"name":"parent-folder-id","field":"ParentFolderID","type":"int","help":"任意: 親フォルダ ID。","pointer":true}
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "ProjectReadCommand",
+      "help": "ID を指定して IAM プロジェクトを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.Project",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"読み取るプロジェクト ID。"}]
+    },
+    {
+      "name": "Update",
+      "command_type": "ProjectUpdateCommand",
+      "help": "IAM プロジェクトの名前と説明を更新します。両方の値を指定してください。",
+      "method": "Update",
+      "response_type": "*v1.Project",
+      "arguments": [
+        {"name":"id","field":"ID","type":"int","help":"更新するプロジェクト ID。"},
+        {"name":"name","field":"Name","type":"string","help":"更新後のプロジェクト名。","flag":true,"required":true},
+        {"name":"description","field":"Description","type":"string","help":"更新後の説明。","flag":true,"required":true}
+      ]
+    },
+    {
+      "name": "Move",
+      "command_type": "ProjectMoveCommand",
+      "help": "指定したプロジェクトをフォルダへ移動します。",
+      "method": "Move",
+      "arguments": [
+        {"name":"ids","field":"IDs","type":"[]int","help":"移動するプロジェクト ID をカンマ区切りで指定します。","flag":true,"required":true},
+        {"name":"parent-folder-id","field":"ParentFolderID","type":"*int","help":"必須: 移動先フォルダ ID。","flag":true,"required":true}
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "ProjectDeleteCommand",
+      "help": "ID を指定して IAM プロジェクトを削除します。",
+      "method": "Delete",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"削除するプロジェクト ID。"}]
+    }
+  ]
+}

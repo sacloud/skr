@@ -1,0 +1,66 @@
+{
+  "package": "iamapi",
+  "resource": "IAM project API key",
+  "command_type": "ProjectAPIKeyCommands",
+  "api_type": "ProjectAPIKeyAPI",
+  "factory_type": "ProjectAPIKeyAPIFactory",
+  "runtime_type": "ProjectAPIKeyRuntime",
+  "imports": {
+    "projectapikey": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/projectapikey",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "ProjectAPIKeyListCommand",
+      "help": "プロジェクト API キーを一覧表示します。",
+      "method": "List",
+      "request_type": "projectapikey.ListParams",
+      "request_by_value": true,
+      "request_optional": true,
+      "request_help": "API キー一覧のページング・並び順条件を含む JSON。直接指定するか @path.json で読み込みます。",
+      "response_type": "*v1.ListApiKeysOK",
+      "flags": [
+        {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
+        {"name":"per-page","field":"PerPage","type":"int","help":"任意: 1 ページあたりの取得件数。","pointer":true},
+        {"name":"ordering","field":"Ordering","type":"string","help":"任意: 並び順を API の ordering 値で指定します。","pointer":true,"conversion":"v1.ListApiKeysOrdering"}
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "ProjectAPIKeyCreateCommand",
+      "help": "プロジェクト API キーを作成します。レスポンスにアクセストークンとシークレットが含まれるため、出力を安全に保管してください。",
+      "method": "Create",
+      "request_type": "projectapikey.CreateParams",
+      "request_by_value": true,
+      "request_help": "API キー作成リクエスト全体を JSON で指定します。必須の project_id、name、description、IAM ロール配列 iam_roles を含めてください。シングルサーバコントロールパネルで使うキーは server_resource_id と zone_id も指定します（https://manual.sakura.ad.jp/cloud/api/apikey.html）。直接指定するか @path.json で読み込みます。レスポンスには秘密情報（アクセストークンとシークレット）が含まれるため、出力を安全に保管してください。",
+      "response_type": "*v1.ProjectApiKeyWithSecret"
+    },
+    {
+      "name": "Read",
+      "command_type": "ProjectAPIKeyReadCommand",
+      "help": "ID を指定してプロジェクト API キーを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.ProjectApiKey",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"読み取る API キー ID。"}]
+    },
+    {
+      "name": "Update",
+      "command_type": "ProjectAPIKeyUpdateCommand",
+      "help": "プロジェクト API キーを更新します。現在の設定を read で確認し、変更後の設定を JSON で指定してください。",
+      "method": "Update",
+      "request_type": "projectapikey.UpdateParams",
+      "request_by_value": true,
+      "request_help": "変更後の API キー設定全体を含む JSON。直接指定するか @path.json で読み込みます。",
+      "response_type": "*v1.ProjectApiKey",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"更新する API キー ID。"}]
+    },
+    {
+      "name": "Delete",
+      "command_type": "ProjectAPIKeyDeleteCommand",
+      "help": "ID を指定してプロジェクト API キーを削除します。",
+      "method": "Delete",
+      "arguments": [{"name":"id","field":"ID","type":"int","help":"削除する API キー ID。"}]
+    }
+  ]
+}

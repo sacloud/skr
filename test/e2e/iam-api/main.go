@@ -39,6 +39,7 @@ import (
 const (
 	resourceNamePrefix  = "skr-e2e-iam-"
 	resourceDescription = "skr-e2e-iam/"
+	userGroupPageSize   = 1000
 	commandTimeout      = 60 * time.Second
 	cleanupTimeout      = 3 * time.Minute
 )
@@ -49,6 +50,13 @@ type item struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 	Email       string `json:"email"`
+	ProjectID   int    `json:"project_id"`
+}
+
+type projectedPage struct {
+	Items     []item `json:"items"`
+	PageCount int    `json:"page_count"`
+	HasNext   *bool  `json:"has_next,omitempty"`
 }
 
 func (i item) id() string {
@@ -99,34 +107,43 @@ func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]by
 type resource struct {
 	kind        string
 	name        string
+	code        string
 	description string
+	projectID   int
 	id          string
 	attempted   bool
+	pendingName string
 }
 
 type scenario struct {
-	client   cli
-	password string
-	suffix   string
-	user     resource
-	group    resource
-	email    string
-	renamed  string
+	client           cli
+	password         string
+	suffix           string
+	user             resource
+	group            resource
+	folder           resource
+	project          resource
+	servicePrincipal resource
+	email            string
+	renamed          string
 }
 
 func (s *scenario) call(ctx context.Context, step string, args ...string) ([]byte, error) {
 	return s.client.call(ctx, step, args...)
 }
 
-func decodeItems(step string, data []byte) ([]item, error) {
-	var items []item
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, fmt.Errorf("%s: decode resource list: %w", step, err)
+func decodePage(step string, data []byte) (projectedPage, error) {
+	var page projectedPage
+	if err := json.Unmarshal(data, &page); err != nil {
+		return projectedPage{}, fmt.Errorf("%s: decode projected list: %w", step, err)
 	}
-	if items == nil {
-		return nil, fmt.Errorf("%s: expected a JSON array", step)
+	if page.Items == nil {
+		return projectedPage{}, fmt.Errorf("%s: projected items must be a JSON array", step)
 	}
-	return items, nil
+	if page.PageCount < 0 {
+		return projectedPage{}, fmt.Errorf("%s: page count is negative", step)
+	}
+	return page, nil
 }
 
 func decodeItem(step string, data []byte) (item, error) {
@@ -140,37 +157,66 @@ func decodeItem(step string, data []byte) (item, error) {
 	return result, nil
 }
 
-func (s *scenario) list(ctx context.Context, step, kind string) ([]item, error) {
-	var args []string
-	switch kind {
-	case "user":
-		args = []string{"iam-api", "user", "list"}
-	case "group":
-		args = []string{"iam-api", "group", "list"}
-	default:
+func (s *scenario) list(ctx context.Context, step, kind string, targetNames ...string) ([]item, error) {
+	if kind != "user" && kind != "group" && kind != "folder" && kind != "project" && kind != "service-principal" {
 		return nil, fmt.Errorf("%s: unknown resource kind %q", step, kind)
 	}
+	if len(targetNames) > 1 {
+		return nil, fmt.Errorf("%s: at most one resource name can be matched", step)
+	}
+	args := []string{"iam-api", kind, "list"}
+
+	query := listQuery(kind, targetNames...)
 	var all []item
-	for page := 1; ; page++ {
-		pageStep := fmt.Sprintf("%s-page-%d", step, page)
-		pageArgs := append(append([]string(nil), args...), "--page", strconv.Itoa(page))
+	for pageNumber := 1; ; pageNumber++ {
+		pageStep := fmt.Sprintf("%s-page-%d", step, pageNumber)
+		pageArgs := append(append([]string(nil), args...), "--page", strconv.Itoa(pageNumber), "--query", query)
+		if kind == "user" || kind == "group" {
+			pageArgs = append(pageArgs, "--per-page", strconv.Itoa(userGroupPageSize))
+		}
 		data, err := s.call(ctx, pageStep, pageArgs...)
 		if err != nil {
 			return nil, err
 		}
-		items, err := decodeItems(pageStep, data)
+		page, err := decodePage(pageStep, data)
 		if err != nil {
 			return nil, err
 		}
-		if len(items) == 0 {
+		all = append(all, page.Items...)
+		if page.HasNext != nil && !*page.HasNext {
 			return all, nil
 		}
-		all = append(all, items...)
+		if page.HasNext == nil && (page.PageCount == 0 ||
+			(kind != "user" && kind != "group") || page.PageCount < userGroupPageSize) {
+			return all, nil
+		}
 	}
 }
 
+func listQuery(kind string, targetNames ...string) string {
+	fields := "{id,name,code,description}"
+	pageItems := "map(" + fields + ")"
+	pageCount := "length"
+	hasNext := ""
+	if kind == "folder" || kind == "project" || kind == "service-principal" {
+		fields = "{id,name,code,description,project_id}"
+		pageItems = ".items | map(" + fields + ")"
+		pageCount = "(.items | length)"
+		hasNext = ", has_next: (.next != null)"
+	}
+	if len(targetNames) == 1 {
+		selection := "map(select(.name == " + strconv.Quote(targetNames[0]) + ") | " + fields + ")"
+		if kind == "folder" || kind == "project" || kind == "service-principal" {
+			pageItems = ".items | " + selection
+		} else {
+			pageItems = selection
+		}
+	}
+	return "{items: (" + pageItems + "), page_count: " + pageCount + hasNext + "}"
+}
+
 func (s *scenario) findByName(ctx context.Context, step string, target resource) (item, bool, error) {
-	items, err := s.list(ctx, step, target.kind)
+	items, err := s.list(ctx, step, target.kind, target.name)
 	if err != nil {
 		return item{}, false, err
 	}
@@ -186,12 +232,39 @@ func (s *scenario) findByName(ctx context.Context, step string, target resource)
 	if len(matches) != 1 || !matches[0].markedForThisRun(s.suffix) {
 		return item{}, false, fmt.Errorf("%s: refusing to use %q: resource identity is not unique and marked for this E2E", step, target.name)
 	}
+	if target.code != "" && matches[0].Code != target.code {
+		return item{}, false, fmt.Errorf("%s: refusing to use %q: resource code does not match this E2E", step, target.name)
+	}
+	if target.projectID != 0 && matches[0].ProjectID != target.projectID {
+		return item{}, false, fmt.Errorf("%s: refusing to use %q: project ID does not match this E2E", step, target.name)
+	}
 	return matches[0], true, nil
 }
 
-func checkIdentity(candidate item, target resource) error {
-	if !candidate.markedForThisRun(strings.TrimPrefix(target.description, resourceDescription)) {
-		return fmt.Errorf("%s identity mismatch for %q", target.kind, target.name)
+func checkIdentity(candidate item, target resource, allowedNames ...string) error {
+	if target.id != "" && candidate.id() != target.id {
+		return fmt.Errorf("%s ID mismatch: got %s, want %s", target.kind, candidate.id(), target.id)
+	}
+	if candidate.Name != target.name {
+		allowed := false
+		for _, name := range allowedNames {
+			if name != "" && candidate.Name == name {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("%s name mismatch: got %q, want %q", target.kind, candidate.Name, target.name)
+		}
+	}
+	if candidate.Description != target.description || !strings.HasPrefix(candidate.Description, resourceDescription) {
+		return fmt.Errorf("%s description mismatch for %q", target.kind, target.name)
+	}
+	if target.code != "" && candidate.Code != target.code {
+		return fmt.Errorf("%s code mismatch for %q", target.kind, target.name)
+	}
+	if target.projectID != 0 && candidate.ProjectID != target.projectID {
+		return fmt.Errorf("%s project ID mismatch for %q", target.kind, target.name)
 	}
 	return nil
 }
@@ -204,8 +277,8 @@ func (s *scenario) preflight(ctx context.Context) error {
 	if strings.TrimSpace(string(profile)) == "" {
 		return errors.New("selected SDK profile name is empty")
 	}
-	for _, target := range []resource{s.user, s.group} {
-		items, err := s.list(ctx, "preflight-"+target.kind+"s", target.kind)
+	for _, target := range []resource{s.user, s.group, s.folder, s.project, s.servicePrincipal} {
+		items, err := s.list(ctx, "preflight-"+target.kind+"s", target.kind, target.name)
 		if err != nil {
 			return err
 		}
@@ -215,6 +288,44 @@ func (s *scenario) preflight(ctx context.Context) error {
 			}
 		}
 	}
+	return nil
+}
+
+func (s *scenario) createFolder(ctx context.Context) error {
+	s.folder.attempted = true
+	data, err := s.call(ctx, "create-folder", "iam-api", "folder", "create",
+		"--name", s.folder.name, "--description", s.folder.description)
+	if err != nil {
+		return err
+	}
+	created, err := decodeItem("create-folder", data)
+	if err != nil {
+		return err
+	}
+	if err := checkIdentity(created, s.folder); err != nil {
+		return err
+	}
+	s.folder.id = created.id()
+	return nil
+}
+
+func (s *scenario) createProject(ctx context.Context) error {
+	s.project.attempted = true
+	data, err := s.call(ctx, "create-project", "iam-api", "project", "create",
+		"--code", s.project.code, "--name", s.project.name, "--description", s.project.description,
+		"--parent-folder-id", s.folder.id)
+	if err != nil {
+		return err
+	}
+	created, err := decodeItem("create-project", data)
+	if err != nil {
+		return err
+	}
+	if err := checkIdentity(created, s.project); err != nil {
+		return err
+	}
+	s.project.id = created.id()
+	s.servicePrincipal.projectID = created.ID
 	return nil
 }
 
@@ -231,7 +342,7 @@ func (s *scenario) createUser(ctx context.Context) error {
 		}
 	}()
 	data, err := s.call(ctx, "create-user", "iam-api", "user", "create",
-		"--name", s.user.name, "--code", s.user.name, "--description", s.user.description,
+		"--name", s.user.name, "--code", s.user.code, "--description", s.user.description,
 		"--password-file", passwordFile)
 	if err != nil {
 		return err
@@ -247,8 +358,30 @@ func (s *scenario) createUser(ctx context.Context) error {
 	return nil
 }
 
+func (s *scenario) createServicePrincipal(ctx context.Context) error {
+	s.servicePrincipal.attempted = true
+	data, err := s.call(ctx, "create-service-principal", "iam-api", "service-principal", "create",
+		"--project-id", s.project.id, "--name", s.servicePrincipal.name,
+		"--description", s.servicePrincipal.description)
+	if err != nil {
+		return err
+	}
+	created, err := decodeItem("create-service-principal", data)
+	if err != nil {
+		return err
+	}
+	if err := checkIdentity(created, s.servicePrincipal); err != nil {
+		return err
+	}
+	if strconv.Itoa(created.ProjectID) != s.project.id {
+		return fmt.Errorf("create-service-principal: project ID = %d, want %s", created.ProjectID, s.project.id)
+	}
+	s.servicePrincipal.id = created.id()
+	return nil
+}
+
 func (s *scenario) verifyUser(ctx context.Context) error {
-	items, err := s.list(ctx, "verify-user-list", "user")
+	items, err := s.list(ctx, "verify-user-list", "user", s.user.name)
 	if err != nil {
 		return err
 	}
@@ -270,6 +403,7 @@ func (s *scenario) read(ctx context.Context, step string, target resource) (item
 }
 
 func (s *scenario) updateUser(ctx context.Context) error {
+	s.user.pendingName = s.renamed
 	data, err := s.call(ctx, "update-user", "iam-api", "user", "update", s.user.id,
 		"--name", s.renamed, "--description", s.user.description)
 	if err != nil {
@@ -282,8 +416,64 @@ func (s *scenario) updateUser(ctx context.Context) error {
 	if updated.Name != s.renamed {
 		return fmt.Errorf("update-user: name = %q, want %q", updated.Name, s.renamed)
 	}
+	expected := s.user
+	expected.name = s.renamed
+	if err := checkIdentity(updated, expected); err != nil {
+		return fmt.Errorf("update-user: %w", err)
+	}
 	// The renamed user keeps its code and description, so the run identity stays valid.
 	s.user.name = s.renamed
+	s.user.pendingName = ""
+	return nil
+}
+
+func (s *scenario) updateFolder(ctx context.Context) error {
+	renamed := s.folder.name + "-renamed"
+	s.folder.pendingName = renamed
+	data, err := s.call(ctx, "update-folder", "iam-api", "folder", "update", s.folder.id,
+		"--name", renamed, "--description", s.folder.description)
+	if err != nil {
+		return err
+	}
+	updated, err := decodeItem("update-folder", data)
+	if err != nil {
+		return err
+	}
+	if updated.Name != renamed {
+		return fmt.Errorf("update-folder: name = %q, want %q", updated.Name, renamed)
+	}
+	expected := s.folder
+	expected.name = renamed
+	if err := checkIdentity(updated, expected); err != nil {
+		return fmt.Errorf("update-folder: %w", err)
+	}
+	s.folder.name = renamed
+	s.folder.pendingName = ""
+	return nil
+}
+
+func (s *scenario) updateProject(ctx context.Context) error {
+	renamed := s.project.name + "-renamed"
+	s.project.pendingName = renamed
+	data, err := s.call(ctx, "update-project", "iam-api", "project", "update", s.project.id,
+		"--name", renamed, "--description", s.project.description)
+	if err != nil {
+		return err
+	}
+	updated, err := decodeItem("update-project", data)
+	if err != nil {
+		return err
+	}
+	if updated.Name != renamed {
+		return fmt.Errorf("update-project: name = %q, want %q", updated.Name, renamed)
+	}
+	expected := s.project
+	expected.name = renamed
+	if err := checkIdentity(updated, expected); err != nil {
+		return fmt.Errorf("update-project: %w", err)
+	}
+	s.project.name = renamed
+	s.project.pendingName = ""
 	return nil
 }
 
@@ -295,8 +485,8 @@ func (s *scenario) registerEmail(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if !read.markedForThisRun(s.suffix) {
-		return fmt.Errorf("verify-email: identity mismatch for user %s", s.user.id)
+	if err := checkIdentity(read, s.user); err != nil {
+		return fmt.Errorf("verify-email: %w", err)
 	}
 	if read.Email != s.email {
 		return fmt.Errorf("verify-email: email = %q, want %q", read.Email, s.email)
@@ -312,8 +502,8 @@ func (s *scenario) unregisterEmail(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if !read.markedForThisRun(s.suffix) {
-		return fmt.Errorf("verify-email-unregistered: identity mismatch for user %s", s.user.id)
+	if err := checkIdentity(read, s.user); err != nil {
+		return fmt.Errorf("verify-email-unregistered: %w", err)
 	}
 	if read.Email != "" {
 		return fmt.Errorf("verify-email-unregistered: email = %q, want empty", read.Email)
@@ -393,18 +583,30 @@ func (s *scenario) cleanupResource(ctx context.Context, target *resource) error 
 	if err != nil {
 		return fmt.Errorf("cannot verify %s before cleanup: %w", target.kind, err)
 	}
-	if err := checkIdentity(current, resourceWithID(*target, id)); err != nil {
+	if err := checkIdentity(current, resourceWithID(*target, id), target.pendingName); err != nil {
 		return fmt.Errorf("cleanup refused: %w", err)
 	}
 	if _, err := s.call(ctx, "cleanup-delete-"+target.kind, "iam-api", target.kind, "delete", id); err != nil {
 		return fmt.Errorf("delete E2E %s: %w", target.kind, err)
 	}
-	remaining, ok, err := s.findByName(ctx, "cleanup-verify-"+target.kind, *target)
-	if err != nil {
-		return fmt.Errorf("verify E2E %s deletion: %w", target.kind, err)
+	names := []string{target.name}
+	if target.pendingName != "" && target.pendingName != target.name {
+		names = append(names, target.pendingName)
 	}
-	if ok {
-		return fmt.Errorf("E2E %s %s remains after delete", target.kind, remaining.id())
+	for index, name := range names {
+		verifyTarget := *target
+		verifyTarget.name = name
+		step := "cleanup-verify-" + target.kind
+		if index > 0 {
+			step += "-pending-name"
+		}
+		remaining, ok, err := s.findByName(ctx, step, verifyTarget)
+		if err != nil {
+			return fmt.Errorf("verify E2E %s deletion: %w", target.kind, err)
+		}
+		if ok {
+			return fmt.Errorf("E2E %s %s remains after delete", target.kind, remaining.id())
+		}
 	}
 	return nil
 }
@@ -418,7 +620,7 @@ func (s *scenario) cleanup() error {
 	ctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer cancel()
 	var result error
-	for _, target := range []*resource{&s.group, &s.user} {
+	for _, target := range []*resource{&s.servicePrincipal, &s.group, &s.user, &s.project, &s.folder} {
 		if err := s.cleanupResource(ctx, target); err != nil {
 			result = errors.Join(result, err)
 		}
@@ -436,7 +638,16 @@ func (s *scenario) run(ctx context.Context) (result error) {
 		}
 	}()
 
+	if err := s.createFolder(ctx); err != nil {
+		return err
+	}
+	if err := s.createProject(ctx); err != nil {
+		return err
+	}
 	if err := s.createUser(ctx); err != nil {
+		return err
+	}
+	if err := s.createServicePrincipal(ctx); err != nil {
 		return err
 	}
 	if err := s.verifyUser(ctx); err != nil {
@@ -452,6 +663,12 @@ func (s *scenario) run(ctx context.Context) (result error) {
 		return err
 	}
 	if err := s.unregisterEmail(ctx); err != nil {
+		return err
+	}
+	if err := s.updateFolder(ctx); err != nil {
+		return err
+	}
+	if err := s.updateProject(ctx); err != nil {
 		return err
 	}
 	if err := s.createGroup(ctx); err != nil {
@@ -490,7 +707,7 @@ func randomPassword() (string, error) {
 
 func runMain() (exitCode int) {
 	binary := flag.String("skr", "./skr", "Path to a built skr binary")
-	confirmed := flag.Bool("confirm-iam-live", false, "Confirm creating and deleting a test IAM user and group in the authenticated organization")
+	confirmed := flag.Bool("confirm-iam-live", false, "Confirm creating, updating, and deleting a test IAM user, group, folder, project, and service principal in the authenticated organization")
 	flag.Parse()
 	if flag.NArg() != 0 || !*confirmed {
 		fmt.Fprintln(os.Stderr, "usage: go run ./test/e2e/iam-api --skr ./skr --confirm-iam-live")
@@ -538,9 +755,9 @@ func runMain() (exitCode int) {
 	}
 	name := resourceNamePrefix + suffix
 	desc := resourceDescription + suffix
-	fmt.Println("IAM user and group:", name)
+	fmt.Println("IAM folder, project, service principal, user and group:", name)
 	fmt.Println("Check `skr config current` before running; this command uses the selected SDK profile.")
-	fmt.Println("This command creates a test IAM user and group, then deletes them after verification.")
+	fmt.Println("This command creates test IAM resources in the selected organization, verifies them, then deletes only those resources.")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -549,17 +766,22 @@ func runMain() (exitCode int) {
 		client:   runner,
 		password: password,
 		suffix:   suffix,
-		user:     resource{kind: "user", name: name, description: desc},
+		user:     resource{kind: "user", name: name, code: "e2e_" + suffix, description: desc},
 		group:    resource{kind: "group", name: name, description: desc},
-		email:    "skr-e2e-iam@example.com",
-		renamed:  name + "-renamed",
+		folder:   resource{kind: "folder", name: name, description: desc},
+		project:  resource{kind: "project", name: name, code: "e2e" + suffix, description: desc},
+		servicePrincipal: resource{
+			kind: "service-principal", name: name, description: desc,
+		},
+		email:   "skr-e2e-iam@example.com",
+		renamed: name + "-renamed",
 	}
 	if err := s.run(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "IAM E2E failed:", err)
 		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
 	}
-	fmt.Println("IAM E2E passed; the test IAM user and group were deleted.")
+	fmt.Println("IAM E2E passed; the test IAM resources were deleted.")
 	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
 }

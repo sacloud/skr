@@ -1,0 +1,51 @@
+{
+  "package": "iamapi",
+  "resource": "service policy",
+  "command_type": "ServicePolicyCommands",
+  "api_type": "ServicePolicyAPI",
+  "factory_type": "ServicePolicyAPIFactory",
+  "runtime_type": "ServicePolicyRuntime",
+  "imports": {
+    "servicepolicy": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/servicepolicy",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "Enable",
+      "command_type": "ServicePolicyEnableCommand",
+      "help": "サービス利用ポリシーを有効化します。サービス操作の制限に影響するため、実行前に設定内容を確認してください。",
+      "method": "Enable"
+    },
+    {
+      "name": "Disable",
+      "command_type": "ServicePolicyDisableCommand",
+      "help": "サービス利用ポリシーを無効化します。サービス操作の制限に影響するため、実行前に設定内容を確認してください。",
+      "method": "Disable"
+    },
+    {
+      "name": "IsEnabled",
+      "command_type": "ServicePolicyIsEnabledCommand",
+      "help": "サービス利用ポリシーが有効かどうかを確認します。",
+      "method": "IsEnabled",
+      "response_type": "bool"
+    },
+    {
+      "name": "ListRuleTemplates",
+      "command_type": "ServicePolicyListRuleTemplatesCommand",
+      "help": "サービス利用ポリシーのルールテンプレートを一覧表示します。",
+      "method": "ListRuleTemplates",
+      "request_type": "servicepolicy.ListRuleTemplatesParams",
+      "request_by_value": true,
+      "request_optional": true,
+      "request_help": "ルールテンプレートの絞り込み条件 JSON。直接指定するか @path.json で読み込みます。",
+      "response_type": "*v1.ListServicePolicyRuleTemplatesOK",
+      "flags": [
+        {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
+        {"name":"per-page","field":"PerPage","type":"int","help":"任意: 1 ページあたりの取得件数。","pointer":true},
+        {"name":"name","field":"Name","type":"string","help":"任意: 名前で絞り込みます。","pointer":true},
+        {"name":"code","field":"Code","type":"string","help":"任意: コードで絞り込みます。","pointer":true},
+        {"name":"type","field":"Type","type":"string","help":"任意: 種別で絞り込みます。","pointer":true,"conversion":"v1.ListServicePolicyRuleTemplatesType"}
+      ]
+    }
+  ]
+}
