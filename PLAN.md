@@ -2,7 +2,7 @@
 
 ## 対象と方針
 
-対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.3.0](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.0) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。
+対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.3.0](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.0) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。`service/iaas` に含まれる API でも、CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
 
 一覧は SDK の提供範囲を把握するためのもので、すべてのパッケージをそのまま CLI コマンドにすることを決めるものではありません。各パッケージで公開操作、入力、出力、固有の検証を確認し、対応範囲を明示して段階的に実装します。コマンドの階層は `<domain>-api <resource>` とし、SDK の型だけから公開操作や入力の意味を推測しません。詳細は [ADR 0016](docs/adr/0016-generate-low-level-api-commands.md) に従います。
 
@@ -12,90 +12,90 @@ SimpleMQ のキュー／メッセージ API コマンドは [`api/commands/simpl
 
 ## IaaS リソース候補
 
-SDK のサービスパッケージごとに対応状況を管理します。`swytch` は `skr iaas-api switch` の入口が実装済みです。その他は未対応候補です。
+SDK のサービスパッケージごとに対応状況を管理します。
 
-| 状況 | SDK サービスパッケージ |
-| --- | --- |
-| 未対応 | `archive` |
-| 未対応 | `autobackup` |
-| 未対応 | `autoscale` |
-| 未対応 | `bridge` |
-| 未対応 | `cdrom` |
-| 未対応 | `certificateauthority` |
-| 未対応 | `containerregistry` |
-| 未対応 | `coupon` |
-| 未対応 | `database` |
-| 未対応 | `disk` |
-| 未対応 | `dns` |
-| 未対応 | `enhanceddb` |
-| 未対応 | `esme` |
-| 未対応 | `gslb` |
-| 未対応 | `icon` |
-| 未対応 | `iface` |
-| 未対応 | `internet` |
-| 未対応 | `ipaddress` |
-| 未対応 | `ipv6addr` |
-| 未対応 | `ipv6net` |
-| 未対応 | `license` |
-| 未対応 | `loadbalancer` |
-| 未対応 | `localrouter` |
-| 未対応 | `mobilegateway` |
-| 未対応 | `nfs` |
-| 未対応 | `note` |
-| 未対応 | `packetfilter` |
-| 未対応 | `privatehost` |
-| 未対応 | `proxylb` |
-| 未対応 | `server` |
-| 未対応 | `sim` |
-| 未対応 | `simplemonitor` |
-| 未対応 | `sshkey` |
-| 未対応 | `subnet` |
-| 入口あり | `swytch` — `switch` |
-| 未対応 | `vpcrouter` |
+- [ ] `archive`
+- [ ] `bridge`
+- [ ] `cdrom`
+- [ ] `coupon`
+- [ ] `database`
+- [ ] `disk`
+- [ ] `icon`
+- [ ] `iface`
+- [ ] `internet`
+- [ ] `ipaddress`
+- [ ] `ipv6addr`
+- [ ] `ipv6net`
+- [ ] `license`
+- [ ] `loadbalancer`
+- [ ] `mobilegateway`
+- [ ] `nfs`
+- [ ] `note`
+- [ ] `packetfilter`
+- [ ] `privatehost`
+- [ ] `server`
+- [ ] `sshkey`
+- [ ] `subnet`
+- [ ] `vpcrouter`
+
+## CommonServiceItem 系 API 候補
+
+SDK の `service/iaas` にありますが、CommonServiceItem を使う API は通常の `iaas-api <resource>` 候補と分けます。CLI では `containerregistry` の例のように、`container-registry-api` などサービスごとの API コマンドにすることを想定します。
+Simple Notification の group／destination API も CommonServiceItem を使いますが、候補一覧では非 IaaS API ドメイン欄の `simple-notification` にまとめます。
+
+- [ ] `autobackup`
+- [ ] `autoscale`
+- [ ] `certificateauthority`
+- [ ] `containerregistry`
+- [ ] `dns`
+- [ ] `enhanceddb`
+- [ ] `esme`
+- [ ] `gslb`
+- [ ] `localrouter`
+- [ ] `proxylb`
+- [ ] `simplemonitor`
+- [ ] `sim`
 
 ## IaaS の補助・プラン系サービス候補
 
 これらも SDK にサービスパッケージがあります。リソース操作コマンドと同じ形にせず、公開する操作と適切な CLI の配置を個別に確認します。
 
-| 状況 | SDK サービスパッケージ |
-| --- | --- |
-| 未対応 | `authstatus` |
-| 未対応 | `bill` |
-| 未対応 | `diskplan` |
-| 未対応 | `internetplan` |
-| 未対応 | `licenseinfo` |
-| 未対応 | `privatehostplan` |
-| 未対応 | `region` |
-| 未対応 | `serverplan` |
-| 未対応 | `serviceclass` |
-| 未対応 | `zone` |
+- [ ] `authstatus`
+- [ ] `bill`
+- [ ] `diskplan`
+- [ ] `internetplan`
+- [ ] `licenseinfo`
+- [ ] `privatehostplan`
+- [ ] `region`
+- [ ] `serverplan`
+- [ ] `serviceclass`
+- [ ] `zone`
 
 ## IaaS 以外の API ドメイン候補
 
-SDK の `api` 直下には、IaaS 以外に次の API ドメインがあります。`eventbus-api` と `simplemq-api` はコマンドの入口が実装済みです。入口の実装は、そのドメインの SDK 操作すべてへの対応を意味しません。
+SDK の `api` 直下には、IaaS 以外に次の API ドメインがあります。CLI コマンドの実装、ライブ E2E、チュートリアルの対応状況は分けて記載します。コマンドの入口があることは、そのドメインの SDK 操作すべてへの対応を意味しません。
 
-| 状況 | SDK API ドメイン |
-| --- | --- |
-| 未対応 | `addon` |
-| 未対応 | `apigw` |
-| 未対応 | `apprun` |
-| 入口あり | `apprun-dedicated` — `apprun-dedicated-api` |
-| 未対応 | `cloudhsm` |
-| 未対応 | `dedicated-storage` |
-| 入口あり | `eventbus` — `eventbus-api` |
-| 未対応 | `iam` |
-| 未対応 | `kms` |
-| 未対応 | `monitoring-suite` |
-| 未対応 | `networking-suite` |
-| 未対応 | `nosql` |
-| 未対応 | `object-storage` |
-| 未対応 | `secretmanager` |
-| 未対応 | `security-control` |
-| 未対応 | `service-endpoint-gateway` |
-| 未対応 | `simple-notification` |
-| 入口あり | `simplemq` — `simplemq-api` (queue / message commands use `apigen-api`) |
-| 未対応 | `webaccel` |
-| 未対応 | `workflows` |
+- [x] `iam` — `iam-api` コマンド、ライブ E2E、[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。
+- [x] `eventbus` — `eventbus-api`。
+- [x] `simplemq` — `simplemq-api`。キュー／メッセージコマンドは `apigen-api` を使います。
+- [ ] `apprun-dedicated` — `apprun-dedicated-api`
+  - CLI 実装済み、ライブ E2E とチュートリアルは未対応。不足分は [#59](https://github.com/sacloud/skr/issues/59) で対応予定
+- [ ] `addon`
+- [ ] `apigw`
+- [ ] `apprun`
+- [ ] `cloudhsm`
+- [ ] `dedicated-storage`
+- [ ] `kms`
+- [ ] `monitoring-suite`
+- [ ] `networking-suite`
+- [ ] `nosql`
+- [ ] `object-storage`
+- [ ] `secretmanager`
+- [ ] `security-control`
+- [ ] `service-endpoint-gateway`
+- [ ] `simple-notification`
+- [ ] `webaccel`
+- [ ] `workflows`
 
 ## 進め方
 
