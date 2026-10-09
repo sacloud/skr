@@ -49,6 +49,57 @@ func TestRunVersion(t *testing.T) {
 	}
 }
 
+func TestRunWithoutArgumentsShowsHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if exitCode := run(nil, &stdout, &stderr); exitCode != 0 {
+		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
+	}
+	for _, text := range []string{"Usage: skr <command> [flags]", "Commands:", "version", "config"} {
+		if !strings.Contains(stdout.String(), text) {
+			t.Errorf("help output does not contain %q", text)
+		}
+	}
+	if got := stderr.String(); got != "" {
+		t.Errorf("stderr = %q, want empty", got)
+	}
+}
+
+func TestRunIncompleteCommandShowsHelp(t *testing.T) {
+	for _, test := range []struct {
+		args []string
+		want []string
+	}{
+		{args: []string{"iam-api"}, want: []string{"Usage: skr iam-api", "user", "group"}},
+		{args: []string{"iaas-api"}, want: []string{"Usage: skr iaas-api", "switch", "server"}},
+		{args: []string{"iaas-api", "switch"}, want: []string{"Usage: skr iaas-api switch", "find", "create"}},
+	} {
+		t.Run(strings.Join(test.args, "_"), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
+				t.Fatalf("run(%v) exit code = %d, want 0; stderr: %s", test.args, exitCode, stderr.String())
+			}
+			for _, text := range test.want {
+				if !strings.Contains(stdout.String(), text) {
+					t.Errorf("help output does not contain %q", text)
+				}
+			}
+			if got := stderr.String(); got != "" {
+				t.Errorf("stderr = %q, want empty", got)
+			}
+		})
+	}
+}
+
+func TestRunUnknownCommandDoesNotShowHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if exitCode := run([]string{"iam-api", "unknown"}, &stdout, &stderr); exitCode == 0 {
+		t.Fatal("run() exit code = 0, want non-zero")
+	}
+	if strings.Contains(stdout.String(), "Usage:") || stderr.Len() == 0 {
+		t.Errorf("stdout = %q, stderr = %q; want an unknown-command error without help", stdout.String(), stderr.String())
+	}
+}
+
 func TestRunConfigCurrent(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
