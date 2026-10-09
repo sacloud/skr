@@ -6,16 +6,18 @@
 
 ## コマンド構成
 
+以下のコマンドは `skr container-registry-api` に続けて指定します。`<id>`、`<registry-id>`、`<user-name>` は位置引数であり、`--registry-id` などのフラグではありません。角括弧は任意の入力を示します。
+
 | コマンド | SDK 操作 | 入力・出力 |
 | --- | --- | --- |
-| `registry list` | `FindWithContext` | 任意の `FindRequest` JSON。結果はレジストリ配列です |
-| `registry create` | `CreateWithContext` | 限定した作成 JSON。結果はレジストリです |
+| `registry list [--request JSON]` | `FindWithContext` | 任意の検索条件 JSON。結果はレジストリ配列です |
+| `registry create --name NAME` または `registry create --request JSON` | `CreateWithContext` | 個別フラグまたは限定した作成 JSON。結果はレジストリです |
 | `registry read <id>` | `ReadWithContext` | レジストリ ID。結果はレジストリです |
-| `registry update <id>` | `ContainerRegistryAPI.Read` / `Update` | 現在値と SettingsHash を保持する部分更新です。ユーザー同期は行いません |
+| `registry update <id> --request JSON` | `ContainerRegistryAPI.Read` / `Update` | 現在値と SettingsHash を保持する部分更新です。ユーザー同期は行いません |
 | `registry delete <id>` | `DeleteWithContext` | レジストリ ID。成功時の出力はありません |
 | `registry user list <registry-id>` | `ContainerRegistryAPI.ListUsers` | ユーザー名と権限の配列。パスワードは出力しません |
-| `registry user add <registry-id>` | `ContainerRegistryAPI.AddUser` | ユーザー名、権限、`--password-file` |
-| `registry user update <registry-id> <user-name>` | `ContainerRegistryAPI.UpdateUser` | `--permission` および／または `--password-file` |
+| `registry user add <registry-id> --user-name NAME --permission PERMISSION --password-file PATH` | `ContainerRegistryAPI.AddUser` | レジストリ ID は位置引数です。ユーザー名、権限、パスワードファイルは必須フラグです |
+| `registry user update <registry-id> <user-name> [--permission PERMISSION] [--password-file PATH]` | `ContainerRegistryAPI.UpdateUser` | `--permission` および／または `--password-file` が必要です |
 | `registry user delete <registry-id> <user-name>` | `ContainerRegistryAPI.DeleteUser` | 識別子。成功時の出力はありません |
 
 ## リクエストと秘密情報
