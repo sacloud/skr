@@ -83,6 +83,7 @@ IAM のユーザー作成・更新で指定するパスワードは `--password-
 
 Container Registry のユーザーパスワードも `--password-file` で保護されたファイルまたは標準入力から読み込み、引数に直接含めないでください。
 Container Registry API の手順は[チュートリアル](docs/manual/tutorials/container-registry-api.md)を参照してください。
+レジストリは `skr container-registry-api registry create --name REGISTRY-NAME` で作成できます。タグなどを指定する場合は `--request @registry.json` を使います。個別フラグと JSON 入力は併用できません。
 IAM の各機能を利用するには、対象機能の権限を付与したサービスプリンシパルが必要です
 （[サービスプリンシパル](https://manual.sakura.ad.jp/cloud/controlpanel/service-principal.html)、[IAM ポリシー](https://manual.sakura.ad.jp/cloud/controlpanel/iam-policy.html)）。
 IAM の認証条件、SSO、ユーザープロビジョニング、サービス利用ポリシー、ID ポリシーは組織やユーザーの認証・操作に影響します。ポリシー更新は対象範囲の設定全体を置き換える操作があるため、更新前に現在値を読み取り、内容を確認してください。プロジェクト API キーや SCIM トークン、サービスプリンシパルのアクセストークンなどの秘密情報は、作成・再発行時の出力を安全に保管してください。詳しくは [IAM API チュートリアル](docs/manual/tutorials/iam-api.md)を参照してください。

@@ -90,7 +90,7 @@ func (c *RegistryCommands) setFactory(factory APIFactory) {
 }
 
 type RegistryListCommand struct {
-	Request *string `name:"request" help:"任意: FindRequest JSON を直接または @path.json で指定します。Names、Tags、Sort、Count、From で検索条件を指定できます。例: --request='{\"Names\":[\"example-registry\"]}'"`
+	Request *string `name:"request" help:"任意: 検索条件の JSON を直接または @path.json で指定します。Names、Tags、Sort、Count、From で検索条件を指定できます。例: --request='{\"Names\":[\"example-registry\"]}'"`
 	factory APIFactory
 	runtime Runtime
 }
@@ -125,9 +125,13 @@ type RegistryCreateInput struct {
 }
 
 type RegistryCreateCommand struct {
-	Request string `name:"request" required:"" help:"必須: JSON を直接または @path.json で指定します。Name は必須で、小文字英字から始まり英数字で終わる小文字英数字・ハイフンの名前です。レジストリ接続名にも使われ、他ユーザーと重複できず、作成後は変更できません。Description は最大512文字です。Tags、IconID、VirtualDomain も指定できます。VirtualDomain を使う場合は対応する CNAME を設定します。Users、パスワード、廃止された公開設定は指定できません。例: --request @registry.json"`
-	factory APIFactory
-	runtime Runtime
+	Request       *string   `name:"request" help:"JSON を直接または @path.json で指定します。個別フラグとは相互排他です。Name は必須で、レジストリ接続名にも使われます。Description、Tags、IconID、VirtualDomain を指定できます。Tags は JSON 専用です。Users、パスワード、廃止された公開設定は指定できません。例: --request @registry.json"`
+	Name          *string   `name:"name" help:"フラグ入力では必須: API の Name とレジストリ接続名です。小文字英字から始まり英数字で終わる小文字英数字・ハイフンの名前です。他ユーザーと重複できず、作成後は変更できません。例: --name example-registry"`
+	Description   *string   `name:"description" help:"任意: API の Description。最大512文字です。--request とは相互排他です。"`
+	IconID        *types.ID `name:"icon-id" help:"任意: API の IconID。--request とは相互排他です。"`
+	VirtualDomain *string   `name:"virtual-domain" help:"任意: API の VirtualDomain。対応する CNAME を設定してください。--request とは相互排他です。"`
+	factory       APIFactory
+	runtime       Runtime
 }
 
 func (c *RegistryCreateCommand) Run(ctx *kong.Context) error {
@@ -135,13 +139,31 @@ func (c *RegistryCreateCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 	var input RegistryCreateInput
-	if err := DecodeRequest(c.Request, &input); err != nil {
-		return err
-	}
-	if input.Name != "" {
-		if err := validateRegistryName(input.Name); err != nil {
+	hasFlags := c.Name != nil || c.Description != nil || c.IconID != nil || c.VirtualDomain != nil
+	if c.Request != nil {
+		if hasFlags {
+			return fmt.Errorf("--request と個別フラグは同時に指定できません")
+		}
+		if err := DecodeRequest(*c.Request, &input); err != nil {
 			return err
 		}
+	} else {
+		if c.Name == nil {
+			return fmt.Errorf("--name または --request が必要です")
+		}
+		input.Name = *c.Name
+		if c.Description != nil {
+			input.Description = *c.Description
+		}
+		if c.IconID != nil {
+			input.IconID = *c.IconID
+		}
+		if c.VirtualDomain != nil {
+			input.VirtualDomain = *c.VirtualDomain
+		}
+	}
+	if err := validateRegistryName(input.Name); err != nil {
+		return err
 	}
 	request := &sdk.CreateRequest{
 		Name:           input.Name,
@@ -361,6 +383,30 @@ func (c *UserUpdateCommand) Run(ctx *kong.Context) error {
 	api, err := c.newAPI()
 	if err != nil {
 		return err
+	}
+	if c.Permission == nil {
+		users, err := api.ListUsers(context.Background(), c.RegistryID)
+		if err != nil {
+			return err
+		}
+		found := false
+		for _, user := range users {
+			if user.UserName != c.UserName {
+				continue
+			}
+			if found {
+				return fmt.Errorf("対象ユーザーが重複しています")
+			}
+			permission, err := parsePermission(string(user.Permission))
+			if err != nil {
+				return err
+			}
+			request.Permission = permission
+			found = true
+		}
+		if !found {
+			return fmt.Errorf("対象ユーザーが見つかりません")
+		}
 	}
 	return api.UpdateUser(context.Background(), c.RegistryID, c.UserName, request)
 }

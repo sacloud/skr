@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -158,6 +159,17 @@ func TestContainerRegistryCommandOperations(t *testing.T) {
 		api.createRequest.SubDomainLabel != "registry" || api.createRequest.Description != "test" {
 		t.Fatalf("Create result/request = %+v / %+v", createResult, api.createRequest)
 	}
+	jsonRequest := *api.createRequest
+	run("container-registry-api", "registry", "create", "--name", "registry", "--description", "test")
+	if !reflect.DeepEqual(jsonRequest, *api.createRequest) {
+		t.Fatalf("flag and JSON requests differ: %+v / %+v", jsonRequest, api.createRequest)
+	}
+	run("container-registry-api", "registry", "create", "--request", `{"Name":"registry","Description":"","IconID":0,"VirtualDomain":""}`)
+	jsonRequest = *api.createRequest
+	run("container-registry-api", "registry", "create", "--name", "registry", "--description", "", "--icon-id", "0", "--virtual-domain", "")
+	if !reflect.DeepEqual(jsonRequest, *api.createRequest) {
+		t.Fatalf("explicit zero-value requests differ: %+v / %+v", jsonRequest, api.createRequest)
+	}
 
 	run("container-registry-api", "registry", "read", "123")
 	if api.readRequest == nil || api.readRequest.ID != 123 {
@@ -197,6 +209,10 @@ func TestContainerRegistryCommandOperations(t *testing.T) {
 	if api.updateUser == nil || api.updateUser.Permission != types.ContainerRegistryPermissions.All || api.updateUser.Password != password {
 		t.Fatalf("UpdateUser password request = %+v", api.updateUser)
 	}
+	run("container-registry-api", "registry", "user", "update", "123", "builder", "--password-file", passwordFile)
+	if api.updateUser.Permission != types.ContainerRegistryPermissions.ReadWrite || api.updateUser.Password != password {
+		t.Fatalf("password-only update did not preserve permission: %+v", api.updateUser)
+	}
 
 	run("container-registry-api", "registry", "user", "delete", "123", "builder")
 	if api.deleteUser != "builder" {
@@ -217,6 +233,15 @@ func TestContainerRegistryRequestAndUserValidationBeforeAPICall(t *testing.T) {
 	})
 
 	for _, args := range [][]string{
+		{"container-registry-api", "registry", "create"},
+		{"container-registry-api", "registry", "create", "--request", `{}`},
+		{"container-registry-api", "registry", "create", "--request", `{"Name":""}`},
+		{"container-registry-api", "registry", "create", "--name", ""},
+		{"container-registry-api", "registry", "create", "--description", "test"},
+		{"container-registry-api", "registry", "create", "--request", `{"Name":"registry"}`, "--name", "registry"},
+		{"container-registry-api", "registry", "create", "--request", `{"Name":"registry"}`, "--description", ""},
+		{"container-registry-api", "registry", "create", "--request", `{"Name":"registry"}`, "--icon-id", "0"},
+		{"container-registry-api", "registry", "create", "--request", `{"Name":"registry"}`, "--virtual-domain", ""},
 		{"container-registry-api", "registry", "create", "--request", `{"Name":"registry","Users":[{"Password":"secret"}]}`},
 		{"container-registry-api", "registry", "create", "--request", `{"Name":"Invalid_Name"}`},
 		{"container-registry-api", "registry", "user", "add", "123", "--user-name", "builder", "--password-file", "missing", "--permission", "invalid"},
@@ -225,6 +250,27 @@ func TestContainerRegistryRequestAndUserValidationBeforeAPICall(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		if code := runCLI(args, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 {
 			t.Fatalf("run(%v) = code %d, stdout %q, want validation error", args, code, stdout.String())
+		}
+	}
+}
+
+func TestContainerRegistryPasswordUpdateRejectsMissingOrInvalidUser(t *testing.T) {
+	for _, users := range [][]containerregistryapi.User{
+		nil,
+		{{UserName: "builder", Permission: ""}},
+		{{UserName: "builder", Permission: "readonly"}, {UserName: "builder", Permission: "readonly"}},
+	} {
+		api := &containerRegistryAPIMock{users: users}
+		commandLine := newCLI()
+		commandLine.ContainerRegistryAPI.SetFactory(func() (containerregistryapi.API, error) { return api, nil })
+		commandLine.ContainerRegistryAPI.SetRuntime(containerregistryapi.Runtime{
+			ReadPassword: func(string) (string, error) { return "test-password", nil },
+		})
+		var stdout, stderr bytes.Buffer
+		if code := runCLI([]string{
+			"container-registry-api", "registry", "user", "update", "123", "builder", "--password-file", "password",
+		}, &stdout, &stderr, commandLine); code == 0 || api.updateUser != nil {
+			t.Fatalf("invalid user allowed update: code=%d request=%+v stderr=%s", code, api.updateUser, stderr.String())
 		}
 	}
 }

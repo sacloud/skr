@@ -31,6 +31,14 @@ $ skr container-registry-api registry user add --help
 
 ## Step 2: コンテナレジストリを作成する
 
+名前と説明だけを指定する場合は、個別フラグで作成できます。`REGISTRY-NAME` は今回作成する一意の名前に置き換えてください。
+
+```console
+$ skr container-registry-api registry create --name REGISTRY-NAME --description "Example container registry"
+```
+
+任意の `--icon-id` と `--virtual-domain` も指定できます。タグを指定する場合は、以下の JSON ファイル入力を使います。個別フラグと `--request` は相互排他です。どちらか一方の方法で作成してください。
+
 `registry.json` を作成します。`Name` はレジストリ接続名として `sakuracr.jp` のサブドメインに使われます。小文字の英字で始まり、小文字英数字またはハイフンで構成し、英数字で終わる名前にします。他ユーザーがすでに使っている名前は指定できません。レジストリ名は作成後に変更できません。
 
 以下の `skr-example-registry` は例示用の名前です。JSON と後続の検索コマンド内の名前を、今回作成する一意の名前に置き換えてください。
@@ -95,6 +103,8 @@ $ skr container-registry-api registry user list REGISTRY-ID --query 'map({UserNa
 ```
 
 一覧にはユーザー名と権限が表示されます。パスワードは出力しません。ユーザーを更新するときは `--permission` と `--password-file` のどちらか、または両方を指定できます。
+
+`--password-file` だけを指定した場合は、現在の権限を読み取って保持します。対象ユーザーを確認できない場合は更新しません。
 
 ```console
 $ skr container-registry-api registry user update REGISTRY-ID REGISTRY-USER --permission readonly
