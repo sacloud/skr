@@ -1,5 +1,38 @@
 # Changelog
 
+## [v0.0.2](https://github.com/sacloud/skr/compare/v0.0.1...v0.0.2) - 2026-10-09
+
+### 🚀 Changes
+- build: Docker ビルドを簡素化し実行用を Distroless に変更 by @tokuhirom in https://github.com/sacloud/skr/pull/46
+- feat: add IaaS Disk API commands by @tokuhirom in https://github.com/sacloud/skr/pull/53
+- docs: require live E2E and tutorials for IaaS commands by @tokuhirom in https://github.com/sacloud/skr/pull/54
+- feat: add version command by @tokuhirom in https://github.com/sacloud/skr/pull/55
+- Add jq query filtering and IaaS zone listing by @tokuhirom in https://github.com/sacloud/skr/pull/57
+- fix: make default checks work for module layout by @tokuhirom in https://github.com/sacloud/skr/pull/56
+- Add AppRun Dedicated API commands by @tokuhirom in https://github.com/sacloud/skr/pull/58
+- Add config profile list and show commands by @tokuhirom in https://github.com/sacloud/skr/pull/63
+- Remove YAML API output by @tokuhirom in https://github.com/sacloud/skr/pull/64
+- Add service principal authentication profile management by @tokuhirom in https://github.com/sacloud/skr/pull/65
+- config use コマンドを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/66
+- table 出力を廃止し JSON と --query に統一する by @tokuhirom in https://github.com/sacloud/skr/pull/67
+- IAM API の中核3リソースを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/69
+- IaaS の全ゾーン検索を廃止する by @tokuhirom in https://github.com/sacloud/skr/pull/68
+- E2E 実行レポートを Markdown で生成 by @tokuhirom in https://github.com/sacloud/skr/pull/71
+- Potential fix for code scanning alert no. 6: Workflow does not contain permissions by @tokuhirom in https://github.com/sacloud/skr/pull/72
+- Add remaining IAM API commands by @tokuhirom in https://github.com/sacloud/skr/pull/70
+- Set identifiable User-Agent headers by @tokuhirom in https://github.com/sacloud/skr/pull/74
+- Document command argument guidelines by @tokuhirom in https://github.com/sacloud/skr/pull/76
+- docs: API コマンド対応計画を更新 by @tokuhirom in https://github.com/sacloud/skr/pull/77
+- Container Registry API コマンドとライブ E2E を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/78
+- Show help for incomplete commands by @tokuhirom in https://github.com/sacloud/skr/pull/79
+- Add --tags flags to IaaS API commands by @tokuhirom in https://github.com/sacloud/skr/pull/80
+- Simplify README authentication and output sections by @tokuhirom in https://github.com/sacloud/skr/pull/81
+- AGENTS.md にレビュー指摘の再発防止方針を追加する by @tokuhirom in https://github.com/sacloud/skr/pull/94
+### 📦 Dependency Updates
+- ci: bump actions/deploy-pages from 4.0.5 to 5.0.1 by @dependabot[bot] in https://github.com/sacloud/skr/pull/62
+- ci: bump actions/configure-pages from 5.0.0 to 6.0.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/61
+- ci: bump actions/upload-pages-artifact from 4.0.0 to 5.0.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/60
+
 ## [v0.0.1](https://github.com/sacloud/skr/commits/v0.0.1) - 2026-10-06
 
 ### 🚀 Changes
