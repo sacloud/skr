@@ -72,32 +72,23 @@ Server creation requires a CPU/memory combination available in the target zone. 
 $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1 --tags production,web
 ```
 
-## 認証と出力
+## 認証
 
-IaaS API、EventBus API、SimpleMQ のキュー管理 API、AppRun Dedicated API は SDK のプロファイルか
-`SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で認証します。Container Registry API と IAM API も同じ認証方法です。
+サービスプリンシパルキーを基本の認証方式としています。API キー認証も引き続き利用できます。プロファイルの設定方法は[プロファイルの管理](docs/manual/c0nfig.md)、API キーの設定方法は[API キーを使う場合](docs/manual/c0nfig.md#api-キーを使う場合)を参照してください。
 
-SimpleMQ のメッセージ API では対象キューの API キーが必要です。キーは `--api-key-file` でファイルから読み込みます。コマンドライン引数に直接含めないでください。
+コマンドによっては API キーやパスワードなど、追加の認証情報が必要です。指定方法は各コマンドの `--help` と関連ドキュメントを確認してください。
 
-IAM のユーザー作成・更新で指定するパスワードは `--password-file` でファイルまたは標準入力から読み込みます。値をコマンドライン引数に直接含めないでください。
-
-Container Registry のユーザーパスワードも `--password-file` で保護されたファイルまたは標準入力から読み込み、引数に直接含めないでください。
-Container Registry API の手順は[チュートリアル](docs/manual/tutorials/container-registry-api.md)を参照してください。
-レジストリは `skr container-registry-api registry create --name REGISTRY-NAME` で作成できます。タグなどを指定する場合は `--request @registry.json` を使います。個別フラグと JSON 入力は併用できません。
-IAM の各機能を利用するには、対象機能の権限を付与したサービスプリンシパルが必要です
-（[サービスプリンシパル](https://manual.sakura.ad.jp/cloud/controlpanel/service-principal.html)、[IAM ポリシー](https://manual.sakura.ad.jp/cloud/controlpanel/iam-policy.html)）。
-IAM の認証条件、SSO、ユーザープロビジョニング、サービス利用ポリシー、ID ポリシーは組織やユーザーの認証・操作に影響します。ポリシー更新は対象範囲の設定全体を置き換える操作があるため、更新前に現在値を読み取り、内容を確認してください。プロジェクト API キーや SCIM トークン、サービスプリンシパルのアクセストークンなどの秘密情報は、作成・再発行時の出力を安全に保管してください。詳しくは [IAM API チュートリアル](docs/manual/tutorials/iam-api.md)を参照してください。
+## 出力
 
 API コマンドの結果は JSON で出力します。
-`--query` に jq 式を指定すると、API の結果を加工して JSON で出力できます。詳細は
-[API 出力の jq 加工ガイド](docs/manual/query.md)を参照してください。
+`--query` に jq 式を指定すると、API の結果を加工できます。詳しくは[API 出力の jq 加工ガイド](docs/manual/query.md)を参照してください。
 
-SDK の HTTP リクエストとレスポンスは、コマンドの前に `--trace` を指定するとトレースできます。
-トレースには認証情報などが含まれる場合があるため、出力の取り扱いに注意してください。
+`--trace` では HTTP リクエストとレスポンスを出力します。認証情報などが含まれる場合があるため、取り扱いに注意してください。
+`skr http` の使い方は[HTTP リクエストのガイド](docs/manual/http-request.md)を参照してください。
 
-`skr http` は SDK のプロファイルまたは同じ環境変数を使って認証し、指定 URL のホストへリクエストを送ります。
-HTTPS URL のみ指定でき、レスポンス本文は加工せずに出力します。認証情報を送るため、信頼できる接続先だけを指定してください。
-使い方は[HTTP リクエストのガイド](docs/manual/http-request.md)を参照してください。
+## usacloud との違い
+
+`skr` は、AI からも扱いやすい CLI を目指し、コマンド体系や入出力を一貫した形に再設計しています。そのため、従来の `usacloud` との互換性は保証しません。移行時に既存のスクリプトや設定の変更が必要になる場合があります。利用前に各コマンドの `--help` と関連ドキュメントを確認してください。
 
 ## 利用者向けドキュメント
 
