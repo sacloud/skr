@@ -70,7 +70,7 @@ IaaS の各操作で対象ゾーンを指定します。フラグまたは JSON 
 
 #### Switch API
 
-`skr iaas-api switch` は `sacloud-sdk-go/service/iaas/swytch` の公開操作に合わせて `find`、`read`、`create`、`update`、`delete` を提供します。各操作は SDK の request 型を `--request` の JSON か個別フラグで受け取り、SDK が返す Switch を共通の出力形式で出力します。各操作で対象の `Zone` を明示し、`all` は拒否します。フラグ経路では操作ごとの `Name` や `ID`、独立した任意スカラーを設定します。`Names`、`Tags`、`Sort` などの配列は JSON 経路に残します。ポインタ型の任意フラグで更新時の未指定と明示的な空文字列・ゼロ値を区別し、両経路の併用を拒否します。
+`skr iaas-api switch` は `sacloud-sdk-go/service/iaas/swytch` の公開操作に合わせて `find`、`read`、`create`、`update`、`delete` を提供します。各操作は SDK の request 型を `--request` の JSON か個別フラグで受け取り、SDK が返す Switch を共通の出力形式で出力します。各操作で対象の `Zone` を明示し、`all` は拒否します。フラグ経路では操作ごとの `Name` や `ID`、独立した任意スカラーを設定します。IaaS の `Tags` 配列は共通の `--tags` フラグでカンマ区切りに指定でき、JSON 経路でも `Tags` 配列を指定できます。`Names`、`Sort` などの配列は JSON 経路に残します。ポインタ型の任意フラグで更新時の未指定と明示的な空文字列・ゼロ値を区別し、`--request` と個別フラグの併用を拒否します。タグフラグの対象範囲は [ADR 0035](../adr/0035-iaas-tags-flag.md) に記録します。
 
 #### Zone API
 

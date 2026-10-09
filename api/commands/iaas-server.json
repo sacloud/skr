@@ -19,7 +19,7 @@
       "request_type": "server.FindRequest",
       "response_type": "[]*iaas.Server",
       "request_validator": "validateServerFindRequest",
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数)、From (開始位置)。配列条件は JSON で指定します。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'。フラグ例: skr iaas-api server find --zone tk1v --tags production,web",
       "flags": [
         {
           "name": "zone",
@@ -27,6 +27,14 @@
           "type": "string",
           "help": "必須: 対象ゾーン名。例: --zone tk1v",
           "required": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
+          "conversion": "types.Tags",
+          "separator": ","
         },
         {
           "name": "count",
@@ -72,12 +80,12 @@
     {
       "name": "Create",
       "command_type": "CreateCommand",
-      "help": "サーバを作成して出力します。--zone、--name、--cpu、--memory-gb のフラグ、または --request JSON で指定します。CPU とメモリは対象ゾーンで利用可能な組み合わせを指定してください。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1",
+      "help": "サーバを作成して出力します。--zone、--name、--cpu、--memory-gb のフラグ、または --request JSON で指定します。CPU とメモリは対象ゾーンで利用可能な組み合わせを指定してください。タグは --tags にカンマ区切りで指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --tags production,web",
       "method": "CreateWithContext",
       "request_type": "server.CreateRequest",
       "response_type": "*iaas.Server",
       "request_validator": "validateServerCreateRequest",
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、CPU と MemoryGB (対象ゾーンで利用できるプランの組み合わせ)。任意フラグは Description、IconID、GPU、GPUModel、CPUModel、Commitment、Generation、ConfidentialVM、InterfaceDriver、CDROMID、PrivateHostID、BootAfterCreate です。Tags (文字列配列)、Disks、NetworkInterfaces、NoWait は JSON で指定します。NoWait はディスク作成時の待機設定で、BootAfterCreate が true の場合は指定できません。ディスクレス構成では Disks と NetworkInterfaces を省略できます。BootAfterCreate を true にすると作成後に起動します。CPU と MemoryGB の数値は例です。対象ゾーンで利用可能な組み合わせに置き換えてください。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"SERVER-NAME\",\"CPU\":1,\"MemoryGB\":1,\"Tags\":[\"example\"]}",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、CPU と MemoryGB (対象ゾーンで利用できるプランの組み合わせ)。任意フラグは Description、IconID、GPU、GPUModel、CPUModel、Commitment、Generation、ConfidentialVM、InterfaceDriver、CDROMID、PrivateHostID、BootAfterCreate、Tags (--tags でカンマ区切り) です。JSON 経路では Tags を文字列配列で指定できます。Disks、NetworkInterfaces、NoWait は JSON で指定します。NoWait はディスク作成時の待機設定で、BootAfterCreate が true の場合は指定できません。ディスクレス構成では Disks と NetworkInterfaces を省略できます。BootAfterCreate を true にすると作成後にサーバを起動します。CPU と MemoryGB の数値は例です。対象ゾーンで利用可能な組み合わせに置き換えてください。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"SERVER-NAME\",\"CPU\":1,\"MemoryGB\":1,\"Tags\":[\"example\"]}",
       "flags": [
         {
           "name": "zone",
@@ -106,6 +114,14 @@
           "type": "int",
           "help": "必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。",
           "required": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
+          "conversion": "types.Tags",
+          "separator": ","
         },
         {
           "name": "description",
@@ -195,7 +211,7 @@
       "request_type": "server.UpdateRequest",
       "response_type": "*iaas.Server",
       "request_validator": "validateServerUpdateRequest",
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)、変更するフィールドを1つ以上。任意: Name、Description、Tags、IconID、CPU、MemoryGB、GPU、GPUModel、CPUModel、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID、NetworkInterfaces、Disks、NoWait、ForceShutdown。Tags、各 ID のクリア、列挙値、ディスク／ネットワーク設定には JSON を使用します。省略した項目は変更しません。CPU または MemoryGB を指定するとプランを変更します。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"Name\":\"updated\"}'。ID は実際の値に置き換えます。",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)、変更するフィールドを1つ以上。任意フラグは Name、Description、Tags (--tags でカンマ区切り)、IconID、CPU、MemoryGB、GPU、GPUModel、CPUModel、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID です。JSON 経路では Tags を文字列配列で指定できます。各 ID のクリア、列挙値、ディスク／ネットワーク設定には JSON を使用します。省略した項目は変更しません。CPU または MemoryGB を指定するとプランを変更します。例: skr iaas-api server update --zone ZONE --id 123456789012 --tags production,web。ID は実際の値に置き換えます。",
       "flags": [
         {
           "name": "zone",
@@ -211,6 +227,15 @@
           "help": "必須: 更新対象のサーバ ID (数値)。",
           "required": true,
           "conversion": "types.ID"
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。",
+          "pointer": true,
+          "conversion": "types.Tags",
+          "separator": ","
         },
         {
           "name": "name",

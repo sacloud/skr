@@ -55,10 +55,11 @@ func (c *Commands) SetFactory(factory APIFactory) {
 }
 
 type FindCommand struct {
-	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数の整数)、From (開始位置の整数)。Sort の要素は Key (API のソート対象フィールド名) と Order (0: 昇順、1: 降順) を持つオブジェクトです。有効な Key は対象 API の仕様で確認してください。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"Names\\\":[\\\"example\\\"]}'\""
-	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone tk1v\""
-	Count   *int    "name:\"count\" help:\"任意: 取得件数 (整数)。\""
-	From    *int    "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
+	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。Sort の要素は Key (API のソート対象フィールド名) と Order (0: 昇順、1: 降順) を持つオブジェクトです。有効な Key は対象 API の仕様で確認してください。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"Names\\\":[\\\"example\\\"]}'。フラグ例: skr iaas-api switch find --zone tk1v --tags production,web\""
+	Zone    *string   "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone tk1v\""
+	Tags    *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
+	Count   *int      "name:\"count\" help:\"任意: 取得件数 (整数)。\""
+	From    *int      "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
 	factory APIFactory
 	runtime Runtime
 }
@@ -66,6 +67,7 @@ type FindCommand struct {
 func (c *FindCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
+	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Count != nil
 	flagsSet = flagsSet || c.From != nil
 	if c.Request != nil && flagsSet {
@@ -88,6 +90,10 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		}
 		if c.Zone != nil {
 			request.Zone = *c.Zone
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = value
 		}
 		if c.Count != nil {
 			request.Count = *c.Count
@@ -196,13 +202,14 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request        *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)。任意: Description (説明、最大512文字)、Tags (タグの文字列配列、フラグでは指定不可)、IconID (数値)、NetworkMaskLen (整数)、DefaultRoute (文字列)。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"Name\\\":\\\"example\\\",\\\"Tags\\\":[\\\"test\\\"]}'\""
-	Zone           *string "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
-	Name           *string "name:\"name\" help:\"必須: スイッチの名前。\""
-	Description    *string "name:\"description\" help:\"任意: 説明 (最大512文字)。\""
-	IconID         *int64  "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
-	NetworkMaskLen *int    "name:\"network-mask-len\" help:\"任意: ネットワークマスク長 (整数)。\""
-	DefaultRoute   *string "name:\"default-route\" help:\"任意: デフォルトルート (文字列)。\""
+	Request        *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)。任意: Description (説明、最大512文字)、Tags (--tags でカンマ区切り、JSON 経路では文字列配列)、IconID (数値)、NetworkMaskLen (整数)、DefaultRoute (文字列)。JSON 例: {\\\"Zone\\\":\\\"tk1v\\\",\\\"Name\\\":\\\"example\\\",\\\"Tags\\\":[\\\"test\\\"]}。フラグ例: skr iaas-api switch create --zone tk1v --name example --tags production,web\""
+	Zone           *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
+	Name           *string   "name:\"name\" help:\"必須: スイッチの名前。\""
+	Tags           *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
+	Description    *string   "name:\"description\" help:\"任意: 説明 (最大512文字)。\""
+	IconID         *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
+	NetworkMaskLen *int      "name:\"network-mask-len\" help:\"任意: ネットワークマスク長 (整数)。\""
+	DefaultRoute   *string   "name:\"default-route\" help:\"任意: デフォルトルート (文字列)。\""
 	factory        APIFactory
 	runtime        Runtime
 }
@@ -211,6 +218,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.Name != nil
+	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Description != nil
 	flagsSet = flagsSet || c.IconID != nil
 	flagsSet = flagsSet || c.NetworkMaskLen != nil
@@ -241,6 +249,10 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 		}
 		if c.Name != nil {
 			request.Name = *c.Name
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = value
 		}
 		if c.Description != nil {
 			request.Description = *c.Description
@@ -286,14 +298,15 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request        *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Name (名前)、Description (説明、最大512文字)、Tags (タグの文字列配列、フラグでは指定不可)、IconID (数値)、NetworkMaskLen (整数)、DefaultRoute (文字列)。省略した項目は変更しません。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"ID\\\":123456789012,\\\"Tags\\\":[\\\"test\\\"]}'。ID は実際の値に置き換えます。\""
-	Zone           *string "name:\"zone\" help:\"必須: 対象ゾーン名。\""
-	ID             *int64  "name:\"id\" help:\"必須: 更新対象の ID (数値)。\""
-	Name           *string "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
-	Description    *string "name:\"description\" help:\"任意: 新しい説明 (最大512文字)。空文字列も指定できます。\""
-	IconID         *int64  "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
-	NetworkMaskLen *int    "name:\"network-mask-len\" help:\"任意: ネットワークマスク長 (整数)。0 も明示できます。\""
-	DefaultRoute   *string "name:\"default-route\" help:\"任意: デフォルトルート (文字列)。空文字列も指定できます。\""
+	Request        *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Name (名前)、Description (説明、最大512文字)、Tags (--tags でカンマ区切り、JSON 経路では文字列配列)、IconID (数値)、NetworkMaskLen (整数)、DefaultRoute (文字列)。省略した項目は変更しません。JSON 例: {\\\"Zone\\\":\\\"tk1v\\\",\\\"ID\\\":123456789012,\\\"Tags\\\":[\\\"test\\\"]}。フラグ例: skr iaas-api switch update --zone tk1v --id 123456789012 --tags production,web。ID は実際の値に置き換えます。\""
+	Zone           *string   "name:\"zone\" help:\"必須: 対象ゾーン名。\""
+	ID             *int64    "name:\"id\" help:\"必須: 更新対象の ID (数値)。\""
+	Tags           *[]string "name:\"tags\" help:\"任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。\" sep:\",\""
+	Name           *string   "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
+	Description    *string   "name:\"description\" help:\"任意: 新しい説明 (最大512文字)。空文字列も指定できます。\""
+	IconID         *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
+	NetworkMaskLen *int      "name:\"network-mask-len\" help:\"任意: ネットワークマスク長 (整数)。0 も明示できます。\""
+	DefaultRoute   *string   "name:\"default-route\" help:\"任意: デフォルトルート (文字列)。空文字列も指定できます。\""
 	factory        APIFactory
 	runtime        Runtime
 }
@@ -302,6 +315,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.ID != nil
+	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Name != nil
 	flagsSet = flagsSet || c.Description != nil
 	flagsSet = flagsSet || c.IconID != nil
@@ -334,6 +348,10 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 		if c.ID != nil {
 			value := types.ID(*c.ID)
 			request.ID = value
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = &value
 		}
 		if c.Name != nil {
 			request.Name = c.Name

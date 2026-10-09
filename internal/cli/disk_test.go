@@ -58,7 +58,7 @@ func TestRunIaaSDiskHelp(t *testing.T) {
 	}{
 		{args: []string{"iaas-api", "--help"}, want: []string{"disk", "server", "switch"}},
 		{args: []string{"iaas-api", "disk", "--help"}, want: []string{"find", "read", "create", "update", "delete"}},
-		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
+		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "--request", "JSON 例", `"Names":["example"]`, "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "disk", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
 		{args: []string{"iaas-api", "disk", "create", "--help"}, want: []string{"JSON 専用", "DiskPlanID", "Connection", "SizeGB", "@path.json"}},
 		{args: []string{"iaas-api", "disk", "update", "--help"}, want: []string{"JSON 専用", "省略した項目", "EditParameter"}},
@@ -108,14 +108,15 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		t.Fatalf("Create request = %+v, want JSON values", api.createRequest)
 	}
 
-	_, stderr, code = run("find", "--zone", "test-zone", "--count", "7", "--from", "2")
+	_, stderr, code = run("find", "--zone", "test-zone", "--tags", "production,web", "--count", "7", "--from", "2")
 	if code != 0 || stderr != "" {
 		t.Fatalf("find: code %d, stderr %q", code, stderr)
 	}
 	if len(api.findRequests) != 1 {
 		t.Fatalf("Find called %d times, want one zone", len(api.findRequests))
 	}
-	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 7 || request.From != 2 {
+	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 7 || request.From != 2 ||
+		len(request.Tags) != 2 || request.Tags[0] != "production" || request.Tags[1] != "web" {
 		t.Errorf("Find request = %+v, want test-zone, Count 7, From 2", request)
 	}
 

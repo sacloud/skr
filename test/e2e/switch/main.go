@@ -48,6 +48,7 @@ type switchItem struct {
 	ID          types.ID
 	Name        string
 	Description string
+	Tags        []string
 }
 
 type cliRunner struct {
@@ -116,15 +117,23 @@ func switchArgs(step string, value any) ([]string, error) {
 		queryArgs = []string{"--query", "map({ID,Name})"}
 	}
 	args := []string{"iaas-api", "switch", op, "--zone", zone}
-	fields := map[string]string{"ID": "--id", "Name": "--name", "Description": "--description", "Count": "--count", "From": "--from", "FailIfNotFound": "--fail-if-not-found"}
+	fields := map[string]string{"ID": "--id", "Name": "--name", "Description": "--description", "Tags": "--tags", "Count": "--count", "From": "--from", "FailIfNotFound": "--fail-if-not-found"}
 	for field := range request {
 		if field != "Zone" && field != "Names" && fields[field] == "" {
 			return nil, fmt.Errorf("%s: unsupported request field %s", step, field)
 		}
 	}
-	for _, field := range []string{"ID", "Name", "Description", "Count", "From", "FailIfNotFound"} {
+	for _, field := range []string{"ID", "Name", "Description", "Tags", "Count", "From", "FailIfNotFound"} {
 		value, exists := request[field]
 		if !exists {
+			continue
+		}
+		if field == "Tags" {
+			tags, ok := value.([]string)
+			if !ok {
+				return nil, fmt.Errorf("%s: expected Tags string array", step)
+			}
+			args = append(args, fields[field], strings.Join(tags, ","))
 			continue
 		}
 		if field == "FailIfNotFound" {
@@ -201,6 +210,23 @@ func checkItem(item switchItem, id types.ID, name string) error {
 		return fmt.Errorf("Switch identity mismatch for ID %s (expected name %q and test description)", id, name)
 	}
 	return nil
+}
+
+func sameTags(actual, expected []string) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	remaining := make(map[string]int, len(expected))
+	for _, tag := range expected {
+		remaining[tag]++
+	}
+	for _, tag := range actual {
+		if remaining[tag] == 0 {
+			return false
+		}
+		remaining[tag]--
+	}
+	return true
 }
 
 func (s scenario) list(ctx context.Context, phase string) ([]switchItem, error) {
@@ -353,13 +379,17 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 			result = errors.Join(result, fmt.Errorf("cleanup failed: %w", cleanupErr))
 		}
 	}()
-	created, err := s.item(ctx, "test-create", map[string]any{"Zone": s.targetZone(), "Name": name, "Description": description})
+	createdTags := []string{"tutorial", "managed"}
+	created, err := s.item(ctx, "test-create", map[string]any{"Zone": s.targetZone(), "Name": name, "Description": description, "Tags": createdTags})
 	if err != nil {
 		return err
 	}
 	id = created.ID
 	if err := checkItem(created, id, name); err != nil {
 		return err
+	}
+	if !sameTags(created.Tags, createdTags) {
+		return fmt.Errorf("create did not return the requested tags for Switch %s", id)
 	}
 	found, err := s.find(ctx, "test-find", name)
 	if err != nil {
@@ -390,18 +420,28 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := checkItem(read, id, name); err != nil {
 		return err
 	}
-	updated, err := s.item(ctx, "test-update", map[string]any{"Zone": s.targetZone(), "ID": id, "Name": updatedName})
+	updatedTags := []string{"tutorial", "updated"}
+	updated, err := s.item(ctx, "test-update", map[string]any{"Zone": s.targetZone(), "ID": id, "Name": updatedName, "Tags": updatedTags})
 	if err != nil {
 		return err
 	}
 	if err := checkItem(updated, id, updatedName); err != nil {
 		return err
 	}
+	if !sameTags(updated.Tags, updatedTags) {
+		return fmt.Errorf("update did not return the requested tags for Switch %s", id)
+	}
 	read, err = s.item(ctx, "test-read-updated", request)
 	if err != nil {
 		return err
 	}
-	return checkItem(read, id, updatedName)
+	if err := checkItem(read, id, updatedName); err != nil {
+		return err
+	}
+	if !sameTags(read.Tags, updatedTags) {
+		return fmt.Errorf("read did not return updated tags for Switch %s", id)
+	}
+	return nil
 }
 
 func runMain() (exitCode int) {

@@ -62,10 +62,10 @@ func TestRunIaaSServerHelp(t *testing.T) {
 	}{
 		{args: []string{"iaas-api", "--help"}, want: []string{"server", "switch"}},
 		{args: []string{"iaas-api", "server", "--help"}, want: []string{"find", "read", "create", "update", "delete"}},
-		{args: []string{"iaas-api", "server", "find", "--help"}, want: []string{"--zone", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
+		{args: []string{"iaas-api", "server", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "server", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
-		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--request", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可"}},
-		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--cpu", "--memory-gb", "省略", "併用不可"}},
+		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "カンマ区切り", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可"}},
+		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--tags", "--cpu", "--memory-gb", "省略", "併用不可"}},
 		{args: []string{"iaas-api", "server", "delete", "--help"}, want: []string{"--with-disks", "--force", "ディスク", "強制停止", "併用不可"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -124,6 +124,7 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		"--name", "server",
 		"--cpu", "1",
 		"--memory-gb", "1",
+		"--tags", "production,web",
 		"--description", "test description",
 		"--icon-id", "41",
 		"--gpu", "0",
@@ -140,18 +141,27 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("create flags: code %d, stderr %q", code, stderr)
 	}
-	if api.createRequest == nil || !reflect.DeepEqual(*api.createRequest, jsonCreateRequest) {
+	if api.createRequest == nil {
+		t.Fatal("Create flag request is nil")
+	}
+	wantTags := []string{"production", "web"}
+	if !reflect.DeepEqual([]string(api.createRequest.Tags), wantTags) {
+		t.Fatalf("Create flag Tags = %v, want %v", api.createRequest.Tags, wantTags)
+	}
+	api.createRequest.Tags = nil
+	if !reflect.DeepEqual(*api.createRequest, jsonCreateRequest) {
 		t.Fatalf("Create flag request = %+v, want JSON request %+v", api.createRequest, jsonCreateRequest)
 	}
 
-	_, stderr, code = run("find", "--zone", "test-zone", "--count", "4", "--from", "2")
+	_, stderr, code = run("find", "--zone", "test-zone", "--tags", "production,web", "--count", "4", "--from", "2")
 	if code != 0 || stderr != "" {
 		t.Fatalf("find: code %d, stderr %q", code, stderr)
 	}
 	if len(api.findRequests) != 1 {
 		t.Fatalf("Find called %d times, want one zone", len(api.findRequests))
 	}
-	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 4 || request.From != 2 {
+	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 4 || request.From != 2 ||
+		!reflect.DeepEqual(request.Tags, wantTags) {
 		t.Errorf("Find request = %+v, want test-zone, Count 4, From 2", request)
 	}
 
@@ -163,12 +173,13 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		t.Fatalf("Read request = %+v, want zone and ID flags", api.readRequest)
 	}
 
-	_, stderr, code = run("update", "--zone", "test-zone", "--id", "123", "--name", "renamed", "--memory-gb", "0")
+	_, stderr, code = run("update", "--zone", "test-zone", "--id", "123", "--name", "renamed", "--tags", "production,web", "--memory-gb", "0")
 	if code != 0 || stderr != "" {
 		t.Fatalf("update: code %d, stderr %q", code, stderr)
 	}
 	if api.updateRequest == nil || api.updateRequest.Name == nil || *api.updateRequest.Name != "renamed" ||
-		api.updateRequest.MemoryGB == nil || *api.updateRequest.MemoryGB != 0 {
+		api.updateRequest.MemoryGB == nil || *api.updateRequest.MemoryGB != 0 ||
+		api.updateRequest.Tags == nil || !reflect.DeepEqual([]string(*api.updateRequest.Tags), wantTags) {
 		t.Fatalf("Update request = %+v, want explicit name and zero memory", api.updateRequest)
 	}
 

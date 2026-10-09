@@ -66,10 +66,10 @@ $ skr container-registry-api --help
 $ skr http --help
 ```
 
-Server creation requires a CPU/memory combination available in the target zone. Use a JSON `--request` file for array-based configuration. Confirm the target environment and pricing before creating a server ([server creation and deletion](https://manual.sakura.ad.jp/cloud/server/create-delete.html)).
+Server creation requires a CPU/memory combination available in the target zone. Specify tags with the comma-separated `--tags` flag; use a JSON `--request` file for other array-based configuration. Confirm the target environment and pricing before creating a server ([server creation and deletion](https://manual.sakura.ad.jp/cloud/server/create-delete.html)).
 
 ```console
-$ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1
+$ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1 --tags production,web
 ```
 
 ## 認証と出力

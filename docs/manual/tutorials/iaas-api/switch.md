@@ -33,13 +33,13 @@ $ skr iaas-api switch delete --help
 
 ## Step 2: テスト用スイッチを作成する
 
-`TEST-SWITCH-NAME` は自分のテスト専用の一意な名前に置き換えてください。`create` には作成先ゾーン `--zone` とスイッチ名 `--name` が必要です。スイッチのみを作成するため、この例では他のリソースの ID は渡しません。
+`TEST-SWITCH-NAME` は自分のテスト専用の一意な名前に置き換えてください。`create` には作成先ゾーン `--zone` とスイッチ名 `--name` が必要です。タグは `--tags` にカンマ区切りで指定できます。スイッチのみを作成するため、この例では他のリソースの ID は渡しません。
 
 ```console
-$ skr iaas-api switch create --zone tk1v --name TEST-SWITCH-NAME --description "Temporary switch for skr API tutorial"
+$ skr iaas-api switch create --zone tk1v --name TEST-SWITCH-NAME --description "Temporary switch for skr API tutorial" --tags tutorial,managed
 ```
 
-`Tags` のような配列を指定するときは、`create --help` に記載されたキー名を使って JSON ファイルを作り、`--request @switch-create.json` で渡します。例えば次の内容を `switch-create.json` として保存し、名前を置き換えてください。こちらを使用する場合は、上のフラグを使った作成コマンドは実行しません。
+複雑な値を指定するときや JSON 入力を使うときは、`create --help` に記載されたキー名を使って JSON ファイルを作り、`--request @switch-create.json` で渡します。JSON 経路でタグを設定する場合は `Tags` 配列を含めます。例えば次の内容を `switch-create.json` として保存し、名前を置き換えてください。JSON と個別フラグは併用できないため、こちらを使用する場合は上のフラグを使った作成コマンドは実行しません。
 
 ```json
 {
@@ -79,14 +79,14 @@ $ skr iaas-api switch find --request='{"Zone":"tk1v","Names":["TEST-SWITCH-NAME"
 $ skr iaas-api switch read --zone tk1v --id 123456789012
 ```
 
-出力の `Name` と `ID` が作成したスイッチの値に一致することを確認します。次に、同じ `ID` で名前だけを更新します。`UPDATED-TEST-SWITCH-NAME` も一意なテスト専用名に置き換えてください。`update` で省略した項目は変更されないため、`Description` は指定しません。
+出力の `Name`、`ID`、`Tags` が作成したスイッチの値に一致することを確認します。次に、同じ `ID` で名前とタグを更新します。`UPDATED-TEST-SWITCH-NAME` も一意なテスト専用名に置き換えてください。`update` で省略した項目は変更されないため、`Description` は指定しません。
 
 ```console
-$ skr iaas-api switch update --zone tk1v --id 123456789012 --name UPDATED-TEST-SWITCH-NAME
+$ skr iaas-api switch update --zone tk1v --id 123456789012 --name UPDATED-TEST-SWITCH-NAME --tags tutorial,updated
 $ skr iaas-api switch read --zone tk1v --id 123456789012
 ```
 
-読み取った `Name` が更新後の名前、`Description` が作成時の値であることを確認してください。これはスイッチの **設定の管理** を確認する手順です。Sandbox ではインターネットに接続できず、スイッチのネットワーク通信やサーバ間の接続性までは検証できません（[Sandbox の制限](https://manual.sakura.ad.jp/cloud/server/sandbox.html)）。
+読み取った `Name` と `Tags` が更新後の値、`Description` が作成時の値であることを確認してください。これはスイッチの **設定の管理** を確認する手順です。Sandbox ではインターネットに接続できず、スイッチのネットワーク通信やサーバ間の接続性までは検証できません（[Sandbox の制限](https://manual.sakura.ad.jp/cloud/server/sandbox.html)）。
 
 ## Step 4: 作成したスイッチを削除する
 
