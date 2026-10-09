@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -34,7 +35,8 @@ type apiCall struct {
 }
 
 type apiCaller struct {
-	calls []apiCall
+	calls  []apiCall
+	onCall func(apiCall)
 }
 
 func (c *apiCaller) Do(_ context.Context, method, uri string, body any) ([]byte, error) {
@@ -44,6 +46,9 @@ func (c *apiCaller) Do(_ context.Context, method, uri string, body any) ([]byte,
 	}
 	call := apiCall{method: method, path: parsed.Path, body: body}
 	c.calls = append(c.calls, call)
+	if c.onCall != nil {
+		c.onCall(call)
+	}
 
 	switch {
 	case strings.HasSuffix(parsed.Path, "/containerregistry/users") && method == "GET":
@@ -59,13 +64,53 @@ func (c *apiCaller) Do(_ context.Context, method, uri string, body any) ([]byte,
 	case strings.HasSuffix(parsed.Path, "/commonserviceitem") && method == "POST":
 		return []byte(`{"CommonServiceItem":{"ID":123,"Name":"registry","Description":"test"}}`), nil
 	case strings.HasSuffix(parsed.Path, "/commonserviceitem/123") && method == "GET":
-		return []byte(`{"CommonServiceItem":{"ID":123,"Name":"registry","Description":"test"}}`), nil
+		return []byte(`{"CommonServiceItem":{"ID":123,"Name":"registry","Description":"test","Tags":["keep"],"Icon":{"ID":456},"SettingsHash":"current-hash","Settings":{"ContainerRegistry":{"public":"none","virtual_domain":"registry.example.test"}}}}`), nil
 	case strings.HasSuffix(parsed.Path, "/commonserviceitem/123") && method == "PUT":
 		return []byte(`{"CommonServiceItem":{"ID":123,"Name":"registry","Description":"updated"}}`), nil
 	case strings.HasSuffix(parsed.Path, "/commonserviceitem/123") && method == "DELETE":
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("unexpected request %s %s", method, parsed.Path)
+	}
+}
+
+func TestMetadataUpdatePreservesConcurrentUsersAndCurrentFields(t *testing.T) {
+	users := map[string]bool{"builder": true}
+	caller := &apiCaller{onCall: func(call apiCall) {
+		if call.method == "GET" && strings.HasSuffix(call.path, "/commonserviceitem/123") {
+			users["concurrent-user"] = true
+		}
+		if strings.Contains(call.path, "/containerregistry/users") {
+			t.Errorf("metadata update accessed user API: %s %s", call.method, call.path)
+			if call.method == "DELETE" {
+				delete(users, filepath.Base(call.path))
+			}
+		}
+	}}
+	description := "updated"
+	if _, err := newSDKAPI(caller).Update(context.Background(), &sdk.UpdateRequest{
+		ID: 123, Description: &description,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !users["builder"] || !users["concurrent-user"] {
+		t.Fatalf("metadata update removed users: %v", users)
+	}
+	if len(caller.calls) != 2 || caller.calls[1].method != "PUT" {
+		t.Fatalf("metadata update calls = %+v", caller.calls)
+	}
+	body, err := json.Marshal(caller.calls[1].body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{
+		`"Name":"registry"`, `"Description":"updated"`, `"Tags":["keep"]`,
+		`"ID":456`, `"SettingsHash":"current-hash"`,
+		`"public":"none"`, `"virtual_domain":"registry.example.test"`,
+	} {
+		if !strings.Contains(string(body), field) {
+			t.Errorf("update body missing %s: %s", field, body)
+		}
 	}
 }
 
@@ -150,8 +195,8 @@ func TestSDKAPIUsesPublicSDKAndSanitizesUsers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(caller.calls) != 14 {
-		t.Fatalf("API calls = %d; want 14: %+v", len(caller.calls), caller.calls)
+	if len(caller.calls) != 10 {
+		t.Fatalf("API calls = %d; want 10: %+v", len(caller.calls), caller.calls)
 	}
 	if !strings.HasSuffix(caller.calls[0].path, "/commonserviceitem") || caller.calls[0].method != "GET" {
 		t.Fatalf("Find request = %+v", caller.calls[0])

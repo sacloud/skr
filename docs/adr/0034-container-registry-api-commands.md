@@ -9,6 +9,8 @@
 
 ## Decision
 
+- メタデータ更新は公開 `ContainerRegistryAPI.Read` / `Update` を使い、現在値と `SettingsHash` に指定項目だけを反映します。高水準の更新処理はユーザー同期も行うため使いません。並行して追加されたユーザーを削除しないよう、ユーザー API は呼び出しません。
+
 - 作成では `--name` と任意のスカラーフラグを JSON 入力と排他的に提供します。タグなどの複雑な値は JSON 入力に残します。パスワード単独更新は現在の権限を読み取って保持し、対象ユーザーを一意に確認できない場合は更新しません。
 
 - `skr container-registry-api registry` を専用コマンドとして追加し、レジストリの検索、作成、参照、更新、削除と、レジストリ配下のユーザー一覧・追加・更新・削除を公開します。実装は `internal/containerregistryapi` に置き、SDK の `containerregistry.Service` と `iaas.ContainerRegistryAPI` を利用します。

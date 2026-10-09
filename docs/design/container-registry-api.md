@@ -11,7 +11,7 @@
 | `registry list` | `FindWithContext` | 任意の `FindRequest` JSON。結果はレジストリ配列です |
 | `registry create` | `CreateWithContext` | 限定した作成 JSON。結果はレジストリです |
 | `registry read <id>` | `ReadWithContext` | レジストリ ID。結果はレジストリです |
-| `registry update <id>` | `UpdateWithContext` | 限定した部分更新 JSON。結果はレジストリです |
+| `registry update <id>` | `ContainerRegistryAPI.Read` / `Update` | 現在値と SettingsHash を保持する部分更新です。ユーザー同期は行いません |
 | `registry delete <id>` | `DeleteWithContext` | レジストリ ID。成功時の出力はありません |
 | `registry user list <registry-id>` | `ContainerRegistryAPI.ListUsers` | ユーザー名と権限の配列。パスワードは出力しません |
 | `registry user add <registry-id>` | `ContainerRegistryAPI.AddUser` | ユーザー名、権限、`--password-file` |

@@ -64,7 +64,38 @@ func (a *sdkAPI) Create(ctx context.Context, request *sdk.CreateRequest) (*iaas.
 }
 
 func (a *sdkAPI) Update(ctx context.Context, request *sdk.UpdateRequest) (*iaas.ContainerRegistry, error) {
-	return a.registries.UpdateWithContext(ctx, request)
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	current, err := a.users.Read(ctx, request.ID)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, fmt.Errorf("API returned an empty container registry")
+	}
+	update := &iaas.ContainerRegistryUpdateRequest{
+		Name:          current.Name,
+		Description:   current.Description,
+		Tags:          current.Tags,
+		IconID:        current.IconID,
+		AccessLevel:   current.AccessLevel,
+		VirtualDomain: current.VirtualDomain,
+		SettingsHash:  current.SettingsHash,
+	}
+	if request.Description != nil {
+		update.Description = *request.Description
+	}
+	if request.Tags != nil {
+		update.Tags = *request.Tags
+	}
+	if request.IconID != nil {
+		update.IconID = *request.IconID
+	}
+	if request.VirtualDomain != nil {
+		update.VirtualDomain = *request.VirtualDomain
+	}
+	return a.users.Update(ctx, request.ID, update)
 }
 
 func (a *sdkAPI) Delete(ctx context.Context, request *sdk.DeleteRequest) error {
