@@ -46,7 +46,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `autobackup`
 - [ ] `autoscale`
 - [ ] `certificateauthority`
-- [ ] `containerregistry`
+- [x] `containerregistry` — `container-registry-api` でレジストリと認証ユーザーを管理します。ライブ E2E runner と[チュートリアル](docs/manual/tutorials/container-registry-api.md)を追加済み
 - [ ] `dns`
 - [ ] `enhanceddb`
 - [ ] `esme`

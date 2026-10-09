@@ -9,6 +9,7 @@
 - [IaaS Switch API: Sandbox でスイッチの管理手順を確認する](tutorials/iaas-api/switch.md)
 - [IaaS Zone API: ゾーン一覧を jq で加工する](tutorials/iaas-api/zone.md)
 - [SimpleMQ API: キューを作成してメッセージを送受信する](tutorials/simplemq-api.md)
+- [Container Registry API: レジストリと認証ユーザーを管理する](tutorials/container-registry-api.md)
 - [EventBus API: スイッチ作成イベントを SimpleMQ で受信する](tutorials/eventbus-api.md)
 - [IAM API: 組織と IAM リソースを管理する](tutorials/iam-api.md)
 - [HTTP API: `get_zone` でゾーン一覧を取得する](tutorials/http-request.md)
