@@ -350,6 +350,7 @@ func TestValidateRejectsUnsupportedFlagsAndDuplicateNames(t *testing.T) {
 		t.Fatalf("Validate() error = %v, want separator type error", err)
 	}
 	config.Operations[0].Flags[0].Separator = ""
+	// Tags 以外の配列フラグを追加する場合は、カンマを要素値に使えない根拠を確認して ADR に記録するか、同一フラグの複数指定方式を検討します。
 	config.Operations[0].Flags[0] = Flag{
 		Name:      "names",
 		Field:     "Names",
