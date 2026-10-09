@@ -15,6 +15,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -114,7 +115,14 @@ func runCLI(args []string, stdout, stderr io.Writer, commandLine *cli) int {
 		return 1
 	}
 
+	if len(args) == 0 {
+		args = []string{"--help"}
+	}
+
 	ctx, err := parser.Parse(args)
+	if shouldShowCommandHelp(args, err) {
+		ctx, err = parser.Parse(append(args, "--help"))
+	}
 	if exitCode >= 0 {
 		return exitCode
 	}
@@ -128,4 +136,18 @@ func runCLI(args []string, stdout, stderr io.Writer, commandLine *cli) int {
 		return 1
 	}
 	return 0
+}
+
+func shouldShowCommandHelp(args []string, err error) bool {
+	if len(args) == 0 || err == nil || args[len(args)-1] == "" {
+		return false
+	}
+
+	var parseErr *kong.ParseError
+	if !errors.As(err, &parseErr) || parseErr.Context == nil {
+		return false
+	}
+
+	selected := parseErr.Context.Selected()
+	return selected != nil && len(selected.Children) > 0 && args[len(args)-1] == selected.Name
 }
