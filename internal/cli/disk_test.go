@@ -58,7 +58,7 @@ func TestRunIaaSDiskHelp(t *testing.T) {
 	}{
 		{args: []string{"iaas-api", "--help"}, want: []string{"disk", "server", "switch"}},
 		{args: []string{"iaas-api", "disk", "--help"}, want: []string{"find", "read", "create", "update", "delete"}},
-		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
+		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "--request", "JSON 例", `"Names":["example"]`, "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "disk", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
 		{args: []string{"iaas-api", "disk", "create", "--help"}, want: []string{"JSON 専用", "DiskPlanID", "Connection", "SizeGB", "@path.json"}},
 		{args: []string{"iaas-api", "disk", "update", "--help"}, want: []string{"JSON 専用", "省略した項目", "EditParameter"}},

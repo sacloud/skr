@@ -19,7 +19,7 @@ description: cmd/apigen-iaas を使って IaaS API コマンドの設定を更�
 1. リポジトリルートから [`api-command-generation.md`](../../../docs/design/api-command-generation.md)、[ADR 0016](../../../docs/adr/0016-generate-low-level-api-commands.md)、`cmd/apigen-iaas`、`internal/apigen` と対象の設定 JSON、生成コードを確認します。関連するコマンド登録・手書きコード・テストも読みます。
 2. 対象 SDK のバージョン、公開 API メソッド、リクエスト／レスポンス型、SDK の検証動作を確認します。コマンド名、フラグ、必須値、例、サービス固有の制約は型から推測せず、根拠を確認して設定します。
 3. 既存のリソース設定を最小限変更します。設定のルートには `package`、`resource`、コマンド／API／factory／runtime の型名、`imports`、`operations` を指定します。操作ごとに API メソッド、必要なリクエスト／レスポンス型、ヘルプ、リクエスト説明、必要なフラグを明記します。
-4. フラグは SDK リクエストのフィールドと対応させます。生成器が扱う型は `string`、`bool`、`int`、`int64` です。明示指定の有無を保持する必要がある任意値では `pointer: true` を使い、必要な型変換は `conversion` に指定します。配列、map、union、nullable 値、秘密情報、複雑な入力は JSON リクエストに残します。
+4. フラグは SDK リクエストのフィールドと対応させます。生成器が扱うスカラー型は `string`、`bool`、`int`、`int64` です。IaaS API のトップレベル `Tags` 配列に限り、`type: "[]string"` と `separator: ","` を設定してカンマ区切りの `--tags` フラグを生成できます。SDK の `Tags` 型に変換する場合は `conversion: "types.Tags"` を指定します。更新時に明示指定の有無を保持する必要がある任意値では `pointer: true` を使い、`Tags` がポインター型の場合も同様に設定します。必要な型変換は `conversion` に指定します。その他の配列、map、union、nullable 値、秘密情報、複雑な入力は JSON リクエストに残します。JSON 入力では `Tags` 配列を引き続き使えますが、`--request` と個別フラグの併用・マージは認めません。詳細は [ADR 0035](../../../docs/adr/0035-iaas-tags-flag.md) を参照してください。
 5. SDK 呼び出し前に追加検証が必要な場合は `request_validator` を指定し、検証関数を手書きコードに実装します。IaaS の検索操作では単一の対象ゾーンを必須とし、`Zone` に `all` が渡された場合はフラグ経路と JSON 経路の両方で API 呼び出し前に拒否します。特殊な操作は `handwritten: true` とし、そのハンドラーは手書きで実装します。
 6. リポジトリの設定と出力先を明示して生成します。Switch の設定と出力先は次のとおりです。
 

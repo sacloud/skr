@@ -19,7 +19,7 @@
       "request_type": "disk.FindRequest",
       "response_type": "[]*iaas.Disk",
       "request_validator": "validateDiskFindRequest",
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。例: skr iaas-api disk find --zone ZONE --tags production,web",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。JSON 例: --request='{\"Zone\":\"ZONE\",\"Names\":[\"example\"]}'。タグのフラグ例: skr iaas-api disk find --zone ZONE --tags production,web",
       "flags": [
         {
           "name": "zone",
