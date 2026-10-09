@@ -93,7 +93,12 @@ func (f *fakeCLI) call(_ context.Context, step string, value any) ([]byte, error
 		end := min(from+count, len(items))
 		return json.Marshal(items[from:end])
 	case "create":
-		f.item = &switchItem{ID: types.ID(1234), Name: request["Name"].(string), Description: request["Description"].(string)}
+		f.item = &switchItem{
+			ID:          types.ID(1234),
+			Name:        request["Name"].(string),
+			Description: request["Description"].(string),
+			Tags:        request["Tags"].([]string),
+		}
 		if f.badCreate {
 			return []byte("{"), nil
 		}
@@ -110,6 +115,7 @@ func (f *fakeCLI) call(_ context.Context, step string, value any) ([]byte, error
 		return nil, errors.New("missing switch")
 	case "update":
 		f.item.Name = request["Name"].(string)
+		f.item.Tags = request["Tags"].([]string)
 		return json.Marshal(f.item)
 	case "delete":
 		if request["FailIfNotFound"] != true {
@@ -295,7 +301,7 @@ func TestSwitchArgsUsesFlagsAndJSONForNames(t *testing.T) {
 		request map[string]any
 		want    string
 	}{
-		{"test-create", map[string]any{"Zone": zone, "Name": name, "Description": description}, "--zone tk1v --name skr-e2e-switch --description Temporary switch for skr API tutorial"},
+		{"test-create", map[string]any{"Zone": zone, "Name": name, "Description": description, "Tags": []string{"tutorial", "managed"}}, "--zone tk1v --name skr-e2e-switch --description Temporary switch for skr API tutorial --tags tutorial,managed"},
 		{"test-find", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
 		{"test-find-query", map[string]any{"Zone": zone, "Names": []string{name}}, "--request {"},
 		{"preflight-find-page-000", map[string]any{"Zone": zone, "Count": pageSize, "From": 0}, "--zone tk1v --count 100 --from 0"},

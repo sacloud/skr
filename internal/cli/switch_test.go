@@ -67,7 +67,7 @@ func TestRunIaaSAPIHelp(t *testing.T) {
 		},
 		{
 			args:    []string{"iaas-api", "switch", "find", "--help"},
-			want:    []string{`"Zone":"tk1v"`, `"Names":["example"]`, "Tags", "Sort", "有効な Key", "取得件数", "--zone", "併用不可"},
+			want:    []string{`"Zone":"tk1v"`, `"Names":["example"]`, "--tags", "カンマ区切り", "Sort", "有効な Key", "取得件数", "--zone", "併用不可"},
 			notWant: []string{"--zone all"},
 		},
 		{
@@ -76,11 +76,11 @@ func TestRunIaaSAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"iaas-api", "switch", "create", "--help"},
-			want: []string{`"Zone":"tk1v"`, `"Name":"example"`, `"Tags":["test"]`, "必須", "NetworkMaskLen", "@path.json", "併用不可"},
+			want: []string{`"Zone":"tk1v"`, `"Name":"example"`, "--tags", "カンマ区切り", "必須", "NetworkMaskLen", "@path.json", "併用不可"},
 		},
 		{
 			args: []string{"iaas-api", "switch", "update", "--help"},
-			want: []string{`"Zone":"tk1v"`, `"ID":123456789012`, `"Tags":["test"]`, "省略した項目は変更しません", "NetworkMaskLen", "--zone", "--id", "--name", "併用不可"},
+			want: []string{`"Zone":"tk1v"`, `"ID":123456789012`, "--tags", "カンマ区切り", "省略した項目は変更しません", "NetworkMaskLen", "--zone", "--id", "--name", "併用不可"},
 		},
 		{
 			args: []string{"iaas-api", "switch", "delete", "--help"},
@@ -262,15 +262,16 @@ func TestSwitchFlagInputs(t *testing.T) {
 		return out
 	}
 	var created iaas.Switch
-	if err := json.Unmarshal(mustRun("create", "--zone", "test-zone", "--name", "flag-switch", "--description", "created"), &created); err != nil {
+	if err := json.Unmarshal(mustRun("create", "--zone", "test-zone", "--name", "flag-switch", "--description", "created", "--tags", "production,web"), &created); err != nil {
 		t.Fatal(err)
 	}
-	if created.Name != "flag-switch" || created.Description != "created" {
+	if created.Name != "flag-switch" || created.Description != "created" ||
+		len(created.Tags) != 2 || created.Tags[0] != "production" || created.Tags[1] != "web" {
 		t.Fatalf("unexpected create result: %+v", created)
 	}
 	id := created.ID.String()
 	var found []*iaas.Switch
-	if err := json.Unmarshal(mustRun("find", "--zone", "test-zone", "--count", "0", "--from", "0"), &found); err != nil {
+	if err := json.Unmarshal(mustRun("find", "--zone", "test-zone", "--tags", "production,web", "--count", "0", "--from", "0"), &found); err != nil {
 		t.Fatal(err)
 	}
 	if len(found) != 1 || found[0].ID != created.ID {
@@ -284,22 +285,25 @@ func TestSwitchFlagInputs(t *testing.T) {
 		t.Fatalf("unexpected read result: %+v", read)
 	}
 	var updated iaas.Switch
-	if err := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--name", "renamed"), &updated); err != nil {
+	if err := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--name", "renamed", "--tags", "updated,cli"), &updated); err != nil {
 		t.Fatal(err)
 	}
-	if updated.Name != "renamed" || updated.Description != "created" {
+	if updated.Name != "renamed" || updated.Description != "created" ||
+		len(updated.Tags) != 2 || updated.Tags[0] != "cli" || updated.Tags[1] != "updated" {
 		t.Fatalf("update lost an omitted value: %+v", updated)
 	}
 	if err := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--description", ""), &updated); err != nil {
 		t.Fatal(err)
 	}
-	if updated.Description != "" || updated.Name != "renamed" {
+	if updated.Description != "" || updated.Name != "renamed" ||
+		len(updated.Tags) != 2 || updated.Tags[0] != "cli" || updated.Tags[1] != "updated" {
 		t.Fatalf("explicit empty description not applied: %+v", updated)
 	}
 	if err := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--network-mask-len", "0"), &updated); err != nil {
 		t.Fatal(err)
 	}
-	if updated.NetworkMaskLen != 0 || updated.Name != "renamed" || updated.Description != "" {
+	if updated.NetworkMaskLen != 0 || updated.Name != "renamed" || updated.Description != "" ||
+		len(updated.Tags) != 2 || updated.Tags[0] != "cli" || updated.Tags[1] != "updated" {
 		t.Fatalf("explicit zero network mask or omitted fields were not preserved: %+v", updated)
 	}
 	mustRun("delete", "--zone", "test-zone", "--id", id, "--fail-if-not-found")
@@ -320,8 +324,11 @@ func TestSwitchFlagInputs(t *testing.T) {
 		{"find", "--zone", "all"},
 		{"find", "--request", `{"Zone":"all"}`},
 		{"find", "--request", `{"Zone":"test-zone"}`, "--count", "0"},
+		{"find", "--request", `{"Zone":"test-zone"}`, "--tags", "test"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"json"}`, "--description", ""},
+		{"create", "--request", `{"Zone":"test-zone","Name":"json"}`, "--tags", "test"},
 		{"update", "--request", `{"Zone":"test-zone","ID":123}`, "--network-mask-len", "0"},
+		{"update", "--request", `{"Zone":"test-zone","ID":123}`, "--tags", "test"},
 		{"delete", "--request", `{"Zone":"test-zone","ID":123}`, "--fail-if-not-found=false"},
 		{"read", "--zone", "all", "--id", "123"},
 		{"create", "--zone", "all", "--name", "switch"},

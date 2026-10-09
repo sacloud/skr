@@ -16,7 +16,7 @@ import (
 type Commands struct {
 	Find   FindCommand   "cmd:\"\" help:\"サーバを指定したゾーンで検索して出力します。例: skr iaas-api server find --zone tk1v\""
 	Read   ReadCommand   "cmd:\"\" help:\"サーバを読み取って出力します。例: skr iaas-api server read --zone ZONE --id 123456789012\""
-	Create CreateCommand "cmd:\"\" help:\"サーバを作成して出力します。--zone、--name、--cpu、--memory-gb のフラグ、または --request JSON で指定します。CPU とメモリは対象ゾーンで利用可能な組み合わせを指定してください。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1\""
+	Create CreateCommand "cmd:\"\" help:\"サーバを作成して出力します。--zone、--name、--cpu、--memory-gb のフラグ、または --request JSON で指定します。CPU とメモリは対象ゾーンで利用可能な組み合わせを指定してください。タグは --tags にカンマ区切りで指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --tags production,web\""
 	Update UpdateCommand "cmd:\"\" help:\"サーバの指定項目を更新して出力します。省略した項目は変更しません。CPU または MemoryGB の変更はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated\""
 	Delete DeleteCommand "cmd:\"\" help:\"サーバを削除します。成功時は出力しません。ディスクも削除する場合は --with-disks を指定します。例: skr iaas-api server delete --zone ZONE --id 123456789012\""
 }
@@ -55,10 +55,11 @@ func (c *Commands) SetFactory(factory APIFactory) {
 }
 
 type FindCommand struct {
-	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数)、From (開始位置)。配列条件は JSON で指定します。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"Names\\\":[\\\"example\\\"]}'\""
-	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone tk1v\""
-	Count   *int    "name:\"count\" help:\"任意: 取得件数 (整数)。\""
-	From    *int    "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
+	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"Names\\\":[\\\"example\\\"]}'。フラグ例: skr iaas-api server find --zone tk1v --tags production,web\""
+	Zone    *string   "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone tk1v\""
+	Tags    *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
+	Count   *int      "name:\"count\" help:\"任意: 取得件数 (整数)。\""
+	From    *int      "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
 	factory APIFactory
 	runtime Runtime
 }
@@ -66,6 +67,7 @@ type FindCommand struct {
 func (c *FindCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
+	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Count != nil
 	flagsSet = flagsSet || c.From != nil
 	if c.Request != nil && flagsSet {
@@ -88,6 +90,10 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		}
 		if c.Zone != nil {
 			request.Zone = *c.Zone
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = value
 		}
 		if c.Count != nil {
 			request.Count = *c.Count
@@ -196,23 +202,24 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request         *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、CPU と MemoryGB (対象ゾーンで利用できるプランの組み合わせ)。任意フラグは Description、IconID、GPU、GPUModel、CPUModel、Commitment、Generation、ConfidentialVM、InterfaceDriver、CDROMID、PrivateHostID、BootAfterCreate です。Tags (文字列配列)、Disks、NetworkInterfaces、NoWait は JSON で指定します。NoWait はディスク作成時の待機設定で、BootAfterCreate が true の場合は指定できません。ディスクレス構成では Disks と NetworkInterfaces を省略できます。BootAfterCreate を true にすると作成後に起動します。CPU と MemoryGB の数値は例です。対象ゾーンで利用可能な組み合わせに置き換えてください。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"SERVER-NAME\\\",\\\"CPU\\\":1,\\\"MemoryGB\\\":1,\\\"Tags\\\":[\\\"example\\\"]}\""
-	Zone            *string "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
-	Name            *string "name:\"name\" help:\"必須: サーバ名。\""
-	CPU             *int    "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
-	MemoryGB        *int    "name:\"memory-gb\" help:\"必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
-	Description     *string "name:\"description\" help:\"任意: サーバの説明 (最大512文字)。\""
-	IconID          *int64  "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
-	GPU             *int    "name:\"gpu\" help:\"任意: GPU 数。\""
-	GPUModel        *string "name:\"gpu-model\" help:\"任意: GPU モデル。\""
-	CPUModel        *string "name:\"cpu-model\" help:\"任意: CPU モデル。\""
-	Commitment      *string "name:\"commitment\" help:\"任意: CPU プランのコミットメント。standard または dedicatedcpu を指定します。\""
-	Generation      *int    "name:\"generation\" help:\"任意: サーバプラン世代 (0: 既定、100、200)。\""
-	ConfidentialVM  *bool   "name:\"confidential-vm\" help:\"任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください (https://manual.sakura.ad.jp/cloud/server/confidential-vm-plan/about.html)。\""
-	InterfaceDriver *string "name:\"interface-driver\" help:\"任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。\""
-	BootAfterCreate *bool   "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。\""
-	CDROMID         *int64  "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
-	PrivateHostID   *int64  "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
+	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、CPU と MemoryGB (対象ゾーンで利用できるプランの組み合わせ)。任意フラグは Description、IconID、GPU、GPUModel、CPUModel、Commitment、Generation、ConfidentialVM、InterfaceDriver、CDROMID、PrivateHostID、BootAfterCreate、Tags (--tags でカンマ区切り) です。JSON 経路では Tags を文字列配列で指定できます。Disks、NetworkInterfaces、NoWait は JSON で指定します。NoWait はディスク作成時の待機設定で、BootAfterCreate が true の場合は指定できません。ディスクレス構成では Disks と NetworkInterfaces を省略できます。BootAfterCreate を true にすると作成後にサーバを起動します。CPU と MemoryGB の数値は例です。対象ゾーンで利用可能な組み合わせに置き換えてください。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"SERVER-NAME\\\",\\\"CPU\\\":1,\\\"MemoryGB\\\":1,\\\"Tags\\\":[\\\"example\\\"]}\""
+	Zone            *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
+	Name            *string   "name:\"name\" help:\"必須: サーバ名。\""
+	CPU             *int      "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
+	MemoryGB        *int      "name:\"memory-gb\" help:\"必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
+	Tags            *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
+	Description     *string   "name:\"description\" help:\"任意: サーバの説明 (最大512文字)。\""
+	IconID          *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
+	GPU             *int      "name:\"gpu\" help:\"任意: GPU 数。\""
+	GPUModel        *string   "name:\"gpu-model\" help:\"任意: GPU モデル。\""
+	CPUModel        *string   "name:\"cpu-model\" help:\"任意: CPU モデル。\""
+	Commitment      *string   "name:\"commitment\" help:\"任意: CPU プランのコミットメント。standard または dedicatedcpu を指定します。\""
+	Generation      *int      "name:\"generation\" help:\"任意: サーバプラン世代 (0: 既定、100、200)。\""
+	ConfidentialVM  *bool     "name:\"confidential-vm\" help:\"任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください (https://manual.sakura.ad.jp/cloud/server/confidential-vm-plan/about.html)。\""
+	InterfaceDriver *string   "name:\"interface-driver\" help:\"任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。\""
+	BootAfterCreate *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。\""
+	CDROMID         *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
+	PrivateHostID   *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
 	factory         APIFactory
 	runtime         Runtime
 }
@@ -223,6 +230,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	flagsSet = flagsSet || c.Name != nil
 	flagsSet = flagsSet || c.CPU != nil
 	flagsSet = flagsSet || c.MemoryGB != nil
+	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Description != nil
 	flagsSet = flagsSet || c.IconID != nil
 	flagsSet = flagsSet || c.GPU != nil
@@ -273,6 +281,10 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 		}
 		if c.MemoryGB != nil {
 			request.MemoryGB = *c.MemoryGB
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = value
 		}
 		if c.Description != nil {
 			request.Description = *c.Description
@@ -347,16 +359,17 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request     *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)、変更するフィールドを1つ以上。任意: Name、Description、Tags、IconID、CPU、MemoryGB、GPU、GPUModel、CPUModel、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID、NetworkInterfaces、Disks、NoWait、ForceShutdown。Tags、各 ID のクリア、列挙値、ディスク／ネットワーク設定には JSON を使用します。省略した項目は変更しません。CPU または MemoryGB を指定するとプランを変更します。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"updated\\\"}'。ID は実際の値に置き換えます。\""
-	Zone        *string "name:\"zone\" help:\"必須: 対象ゾーン名。\""
-	ID          *int64  "name:\"id\" help:\"必須: 更新対象のサーバ ID (数値)。\""
-	Name        *string "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
-	Description *string "name:\"description\" help:\"任意: 新しい説明。未指定なら変更しません。\""
-	CPU         *int    "name:\"cpu\" help:\"任意: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。\""
-	MemoryGB    *int    "name:\"memory-gb\" help:\"任意: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。\""
-	GPU         *int    "name:\"gpu\" help:\"任意: GPU 数。未指定なら変更しません。\""
-	GPUModel    *string "name:\"gpu-model\" help:\"任意: GPU モデル。未指定なら変更しません。\""
-	CPUModel    *string "name:\"cpu-model\" help:\"任意: CPU モデル。未指定なら変更しません。\""
+	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)、変更するフィールドを1つ以上。任意フラグは Name、Description、Tags (--tags でカンマ区切り)、IconID、CPU、MemoryGB、GPU、GPUModel、CPUModel、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID です。JSON 経路では Tags を文字列配列で指定できます。各 ID のクリア、列挙値、ディスク／ネットワーク設定には JSON を使用します。省略した項目は変更しません。CPU または MemoryGB を指定するとプランを変更します。例: skr iaas-api server update --zone ZONE --id 123456789012 --tags production,web。ID は実際の値に置き換えます。\""
+	Zone        *string   "name:\"zone\" help:\"必須: 対象ゾーン名。\""
+	ID          *int64    "name:\"id\" help:\"必須: 更新対象のサーバ ID (数値)。\""
+	Tags        *[]string "name:\"tags\" help:\"任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。\" sep:\",\""
+	Name        *string   "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
+	Description *string   "name:\"description\" help:\"任意: 新しい説明。未指定なら変更しません。\""
+	CPU         *int      "name:\"cpu\" help:\"任意: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。\""
+	MemoryGB    *int      "name:\"memory-gb\" help:\"任意: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。\""
+	GPU         *int      "name:\"gpu\" help:\"任意: GPU 数。未指定なら変更しません。\""
+	GPUModel    *string   "name:\"gpu-model\" help:\"任意: GPU モデル。未指定なら変更しません。\""
+	CPUModel    *string   "name:\"cpu-model\" help:\"任意: CPU モデル。未指定なら変更しません。\""
 	factory     APIFactory
 	runtime     Runtime
 }
@@ -365,6 +378,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.ID != nil
+	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Name != nil
 	flagsSet = flagsSet || c.Description != nil
 	flagsSet = flagsSet || c.CPU != nil
@@ -399,6 +413,10 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 		if c.ID != nil {
 			value := types.ID(*c.ID)
 			request.ID = value
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = &value
 		}
 		if c.Name != nil {
 			request.Name = c.Name

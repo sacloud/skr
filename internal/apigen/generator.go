@@ -75,6 +75,7 @@ type Flag struct {
 	Required   bool   `json:"required,omitempty"`
 	Pointer    bool   `json:"pointer,omitempty"`
 	Conversion string `json:"conversion,omitempty"`
+	Separator  string `json:"separator,omitempty"`
 }
 
 type importSpec struct {
@@ -155,7 +156,7 @@ type {{.CommandType}} struct {
 {{- if .RequestType }}
 	Request *string {{if .RequestHelp}}{{helpTag .RequestHelp}}{{else}}{{helpTag "API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。"}}{{end}}
 {{- range .Flags }}
-	{{.Field}} *{{.Type}} {{flagTag .Name .Help}}
+	{{.Field}} *{{.Type}} {{flagTag .Name .Help .Separator}}
 {{- end }}
 {{- end }}
 	factory {{$.FactoryType}}
@@ -434,9 +435,12 @@ func (c Config) Validate() error {
 			cliNames[flag.Name] = true
 			fields[flag.Field] = true
 			switch flag.Type {
-			case "string", "bool", "int", "int64":
+			case "string", "bool", "int", "int64", "[]string":
 			default:
 				return fmt.Errorf("operation %q flag %q has unsupported type %q", operation.Name, flag.Name, flag.Type)
+			}
+			if flag.Separator != "" && flag.Type != "[]string" {
+				return fmt.Errorf("operation %q flag %q separator requires []string type", operation.Name, flag.Name)
 			}
 			if strings.TrimSpace(flag.Help) == "" {
 				return fmt.Errorf("operation %q flag %q help must not be empty", operation.Name, flag.Name)
@@ -501,8 +505,12 @@ func Generate(config Config) ([]byte, error) {
 		"commandTag": func(help string) string {
 			return strconv.Quote("cmd:\"\" help:" + strconv.Quote(help))
 		},
-		"flagTag": func(name, help string) string {
-			return strconv.Quote("name:" + strconv.Quote(name) + " help:" + strconv.Quote(help))
+		"flagTag": func(name, help, separator string) string {
+			tag := "name:" + strconv.Quote(name) + " help:" + strconv.Quote(help)
+			if separator != "" {
+				tag += " sep:" + strconv.Quote(separator)
+			}
+			return strconv.Quote(tag)
 		},
 		"argumentTag": func(name, help string) string {
 			return strconv.Quote("arg:\"\" name:" + strconv.Quote(name) + " help:" + strconv.Quote(help))

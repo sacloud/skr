@@ -55,10 +55,11 @@ func (c *Commands) SetFactory(factory APIFactory) {
 }
 
 type FindCommand struct {
-	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Names (名前の文字列配列)、Tags (タグの文字列配列)、Sort (ソートキーの配列)、Count (取得件数)、From (開始位置)。配列条件は JSON で指定します。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Names\\\":[\\\"example\\\"]}'\""
-	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone is1b\""
-	Count   *int    "name:\"count\" help:\"任意: 取得件数 (整数)。\""
-	From    *int    "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
+	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。例: skr iaas-api disk find --zone ZONE --tags production,web\""
+	Zone    *string   "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone is1b\""
+	Tags    *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
+	Count   *int      "name:\"count\" help:\"任意: 取得件数 (整数)。\""
+	From    *int      "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
 	factory APIFactory
 	runtime Runtime
 }
@@ -66,6 +67,7 @@ type FindCommand struct {
 func (c *FindCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
+	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Count != nil
 	flagsSet = flagsSet || c.From != nil
 	if c.Request != nil && flagsSet {
@@ -88,6 +90,10 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		}
 		if c.Zone != nil {
 			request.Zone = *c.Zone
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = value
 		}
 		if c.Count != nil {
 			request.Count = *c.Count

@@ -29,7 +29,7 @@ $ skr iaas-api server update --help
 $ skr iaas-api server delete --help
 ```
 
-意図したプロファイルが選択されていることを確認してください。環境変数で認証する場合も、対象プロジェクトと権限を別途確認します。検索・参照・更新・削除では `--zone` などの個別フラグか、`--request` の JSON オブジェクトを指定します。両方は併用できません。作成では複雑な構成に対応するため `--request` を使います。JSON はコマンドラインに直接指定するか、`@ファイル名` で読み込めます。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
+意図したプロファイルが選択されていることを確認してください。環境変数で認証する場合も、対象プロジェクトと権限を別途確認します。検索・参照・更新・削除では `--zone` などの個別フラグか、`--request` の JSON オブジェクトを指定します。両方は併用できません。タグは個別フラグ経路では `--tags` にカンマ区切りで指定でき、JSON 経路では `Tags` 配列で指定できます。`--tags` と `--request` は併用できません。JSON はコマンドラインに直接指定するか、`@ファイル名` で読み込めます。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
 
 検索では対象のゾーンを明示してください。
 
@@ -37,13 +37,13 @@ $ skr iaas-api server delete --help
 
 `Zone` と `Name` を環境に合わせて置き換えます。`CPU` と `MemoryGB` は数値の例です。対象ゾーンで利用可能な組み合わせに置き換えてください。料金の内訳は構成によって異なります。コントロールパネルでは作成前に料金内訳を表示できます（[サーバの作成・削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)）。
 
-基本的な構成は `--zone`、`--name`、`--cpu`、`--memory-gb` で指定できます。作成後に起動しないよう `--boot-after-create=false` を指定します。
+基本的な構成は `--zone`、`--name`、`--cpu`、`--memory-gb` で指定できます。タグは `--tags` にカンマ区切りで渡します。作成後に起動しないよう `--boot-after-create=false` を指定します。
 
 ```console
-$ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1 --boot-after-create=false
+$ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1 --boot-after-create=false --tags tutorial,managed
 ```
 
-配列などの複雑な値を渡す場合は JSON を使います。次の例では `Tags` を追加します。JSON と個別フラグは併用できません。フラグで作成した場合はこの JSON コマンドを実行せず、JSON を使う場合は上のフラグコマンドを実行しないでください。
+配列などの複雑な値を渡す場合は JSON を使います。JSON 経路でタグも設定するときは `Tags` 配列を含めます。JSON と個別フラグは併用できません。フラグで作成した場合はこの JSON コマンドを実行せず、JSON を使う場合は上のフラグコマンドを実行しないでください。
 
 ```json
 {
@@ -62,7 +62,7 @@ $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 
 $ skr iaas-api server create --request @server-create.json
 ```
 
-成功するとサーバ情報が出力されます。以降の操作で使う `ID` を控えてください。任意のスカラー値は `server create --help` にある対応フラグでも指定できます。`Tags`、`Disks`、`NetworkInterfaces` などの配列や複雑な値は JSON に残します。
+成功するとサーバ情報が出力されます。以降の操作で使う `ID` を控えてください。`Tags` は `--tags` にカンマ区切りで指定できます。`Disks`、`NetworkInterfaces` などの配列や複雑な値は JSON に残します。
 
 ## Step 3: サーバを参照して名前を更新する
 
@@ -72,10 +72,10 @@ $ skr iaas-api server create --request @server-create.json
 $ skr iaas-api server read --zone ZONE --id 123456789012
 ```
 
-名前だけを更新します。`update` で省略した項目は変更されません。
+名前とタグを更新します。`update` で省略した項目は変更されません。タグを指定する場合は `--tags` にカンマ区切りで渡します。
 
 ```console
-$ skr iaas-api server update --zone ZONE --id 123456789012 --name UPDATED-SERVER-NAME
+$ skr iaas-api server update --zone ZONE --id 123456789012 --name UPDATED-SERVER-NAME --tags tutorial,managed
 $ skr iaas-api server read --zone ZONE --id 123456789012
 ```
 
