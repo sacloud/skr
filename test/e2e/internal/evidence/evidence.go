@@ -45,6 +45,11 @@ type record struct {
 	Error      string   `json:"error,omitempty"`
 }
 
+type RequestFileInput struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
 func New(service string) (*Recorder, error) {
 	if filepath.Base(service) != service || service == "" {
 		return nil, fmt.Errorf("invalid E2E evidence service %q", service)
@@ -192,6 +197,10 @@ func (r *Recorder) renderReport(result string, completed time.Time) string {
 		fmt.Fprintf(&report, "## %03d %s — %s (exit status %s)\n\n", entry.Sequence, html.EscapeString(entry.Step), stepResult, status)
 		report.WriteString("**実行コマンド**\n\n")
 		writeCodeBlock(&report, entry.Command)
+		if requestFile, ok := entry.Request.(RequestFileInput); ok {
+			fmt.Fprintf(&report, "**request file** (`%s`)\n\n", html.EscapeString(requestFile.Path))
+			writeCodeBlock(&report, requestFile.Content)
+		}
 		report.WriteString("**stdout**\n\n")
 		writeCodeBlock(&report, entry.Stdout)
 		report.WriteString("**stderr**\n\n")

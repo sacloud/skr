@@ -137,6 +137,38 @@ func TestSetResultWritesPrivateResult(t *testing.T) {
 	}
 }
 
+func TestReportIncludesRequestFileContent(t *testing.T) {
+	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "container-registry-api"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := RequestFileInput{
+		Path:    "/private/tmp/create.json",
+		Content: "{\n  \"Name\": \"example-registry\"\n}\n",
+	}
+	if err := recorder.Record("registry-create", "./skr", []string{
+		"container-registry-api", "registry", "create", "--request", "@" + input.Path,
+	}, input, "", "", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.SetResult("passed", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := os.ReadFile(filepath.Join(recorder.Dir(), "REPORT.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"**request file** (`/private/tmp/create.json`)",
+		"```text\n{\n  \"Name\": \"example-registry\"\n}\n```",
+	} {
+		if !strings.Contains(string(report), want) {
+			t.Errorf("report is missing %q:\n%s", want, report)
+		}
+	}
+}
+
 func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
 	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "http-api"), time.Now())
 	if err != nil {

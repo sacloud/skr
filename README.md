@@ -35,6 +35,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr eventbus-api schedule` | スケジュールの管理 |
 | `skr eventbus-api trigger` | イベントトリガーの管理 |
 | `skr apprun-dedicated-api` | AppRun 専有型のクラスタ、アプリケーション、ワーカノードなどの管理 |
+| `skr container-registry-api registry` | コンテナレジストリと認証ユーザーの管理 |
 | `skr iam-api user` | IAM ユーザーの作成、参照、更新、削除、メールアドレスの登録と解除 |
 | `skr iam-api group` | IAM グループの管理とメンバーシップの更新 |
 | `skr iam-api policy` | 組織・プロジェクト・フォルダの IAM ポリシーバインディングの参照と更新 |
@@ -61,6 +62,7 @@ $ skr iaas-api switch --help
 $ skr simplemq-api --help
 $ skr eventbus-api --help
 $ skr apprun-dedicated-api --help
+$ skr container-registry-api --help
 $ skr http --help
 ```
 
@@ -72,11 +74,16 @@ $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 
 
 ## 認証と出力
 
-IaaS API、EventBus API、SimpleMQ のキュー管理 API、AppRun Dedicated API、IAM API は、SDK のプロファイルか
-`SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で認証します。SimpleMQ の
-メッセージ API では対象キューの API キーが必要です。キーは `--api-key-file` でファイルから
-読み込み、コマンドライン引数に直接含めないでください。IAM のユーザー作成・更新で指定する
-パスワードも `--password-file` でファイルまたは標準入力から読み込み、引数に直接含めないでください。
+IaaS API、EventBus API、SimpleMQ のキュー管理 API、AppRun Dedicated API は SDK のプロファイルか
+`SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で認証します。Container Registry API と IAM API も同じ認証方法です。
+
+SimpleMQ のメッセージ API では対象キューの API キーが必要です。キーは `--api-key-file` でファイルから読み込みます。コマンドライン引数に直接含めないでください。
+
+IAM のユーザー作成・更新で指定するパスワードは `--password-file` でファイルまたは標準入力から読み込みます。値をコマンドライン引数に直接含めないでください。
+
+Container Registry のユーザーパスワードも `--password-file` で保護されたファイルまたは標準入力から読み込み、引数に直接含めないでください。
+Container Registry API の手順は[チュートリアル](docs/manual/tutorials/container-registry-api.md)を参照してください。
+レジストリは `skr container-registry-api registry create --name REGISTRY-NAME` で作成できます。タグなどを指定する場合は `--request @registry.json` を使います。個別フラグと JSON 入力は併用できません。
 IAM の各機能を利用するには、対象機能の権限を付与したサービスプリンシパルが必要です
 （[サービスプリンシパル](https://manual.sakura.ad.jp/cloud/controlpanel/service-principal.html)、[IAM ポリシー](https://manual.sakura.ad.jp/cloud/controlpanel/iam-policy.html)）。
 IAM の認証条件、SSO、ユーザープロビジョニング、サービス利用ポリシー、ID ポリシーは組織やユーザーの認証・操作に影響します。ポリシー更新は対象範囲の設定全体を置き換える操作があるため、更新前に現在値を読み取り、内容を確認してください。プロジェクト API キーや SCIM トークン、サービスプリンシパルのアクセストークンなどの秘密情報は、作成・再発行時の出力を安全に保管してください。詳しくは [IAM API チュートリアル](docs/manual/tutorials/iam-api.md)を参照してください。
