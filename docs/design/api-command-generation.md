@@ -93,7 +93,7 @@ $ make generate-api API_CONFIG=api/commands/eventbus-schedule.json API_OUTPUT=in
 $ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=internal/eventbusapi/eventbus_trigger_api_generated.go
 ```
 
-生成器は操作名とフィールド名を Go 識別子として扱います。Kong のコマンド名は操作名の小文字表記です。フラグ型は `string`、`bool`、`int`、`int64` に加えて `[]string` をサポートします。文字列スライスは `separator` に区切り文字を指定すると、区切り文字で分割して API リクエストの同名フィールドに設定できます。IaaS API ではトップレベル `Tags` に限って `--tags` とカンマ区切り (`separator: ","`) を使用します。これは配列入力全般をフラグ化するものではなく、他の配列は JSON 経路に残します。`pointer: true` は明示指定された値だけをリクエストのポインター項目へ設定します。更新時の `Tags` がポインター型なら `pointer: true` を指定し、省略時の未指定状態を維持します。`conversion` を指定すると、その型へ変換してから設定します。`required: true` はフラグ経路での指定有無を検証します。`request_validator` を指定すると、JSON／フラグからリクエストを構築した後、SDK 呼び出し前にサービス固有の検証関数を実行します。
+生成器は操作名とフィールド名を Go 識別子として扱います。Kong のコマンド名は操作名の小文字表記です。フラグ型は `string`、`bool`、`int`、`int64` に加えて、IaaS API のトップレベル `Tags` 専用の `[]string` をサポートします。配列フラグは `name: "tags"`、`field: "Tags"`、`type: "[]string"`、`separator: ","` の組み合わせだけを受け付けます。これは配列入力全般をフラグ化するものではなく、他の配列は JSON 経路に残します。`pointer: true` は明示指定された値だけをリクエストのポインター項目へ設定します。更新時の `Tags` がポインター型なら `pointer: true` を指定し、省略時の未指定状態を維持します。`conversion` を指定すると、その型へ変換してから設定します。`required: true` はフラグ経路での指定有無を検証します。`request_validator` を指定すると、JSON／フラグからリクエストを構築した後、SDK 呼び出し前にサービス固有の検証関数を実行します。
 
 リクエストを持つ操作では `--request` にインライン JSON または `@path.json` を指定できます。個別フラグを設定した場合は `--request` と併用できません。JSON 経路では個別フラグの必須指定を要求せず、フラグ経路では必須フラグと、少なくとも 1 つのフラグの指定を確認してから SDK を呼び出します。IaaS API のトップレベル `Tags` 配列は例外として `--tags` でも指定できますが、JSON 経路での `Tags` 配列も引き続き利用でき、両経路を混在させることはできません。その他の配列、map、union、nullable 値、秘密情報など生成器の単純な型で表現しない入力は `--request` に残します。
 

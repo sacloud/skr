@@ -82,11 +82,11 @@ $ skr iaas-api switch read --zone tk1v --id 123456789012
 出力の `Name`、`ID`、`Tags` が作成したスイッチの値に一致することを確認します。次に、同じ `ID` で名前とタグを更新します。`UPDATED-TEST-SWITCH-NAME` も一意なテスト専用名に置き換えてください。`update` で省略した項目は変更されないため、`Description` は指定しません。
 
 ```console
-$ skr iaas-api switch update --zone tk1v --id 123456789012 --name UPDATED-TEST-SWITCH-NAME --tags tutorial,managed
+$ skr iaas-api switch update --zone tk1v --id 123456789012 --name UPDATED-TEST-SWITCH-NAME --tags tutorial,updated
 $ skr iaas-api switch read --zone tk1v --id 123456789012
 ```
 
-読み取った `Name` が更新後の名前、`Description` が作成時の値であることを確認してください。これはスイッチの **設定の管理** を確認する手順です。Sandbox ではインターネットに接続できず、スイッチのネットワーク通信やサーバ間の接続性までは検証できません（[Sandbox の制限](https://manual.sakura.ad.jp/cloud/server/sandbox.html)）。
+読み取った `Name` と `Tags` が更新後の値、`Description` が作成時の値であることを確認してください。これはスイッチの **設定の管理** を確認する手順です。Sandbox ではインターネットに接続できず、スイッチのネットワーク通信やサーバ間の接続性までは検証できません（[Sandbox の制限](https://manual.sakura.ad.jp/cloud/server/sandbox.html)）。
 
 ## Step 4: 作成したスイッチを削除する
 

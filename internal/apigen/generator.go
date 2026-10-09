@@ -439,6 +439,9 @@ func (c Config) Validate() error {
 			default:
 				return fmt.Errorf("operation %q flag %q has unsupported type %q", operation.Name, flag.Name, flag.Type)
 			}
+			if flag.Type == "[]string" && (flag.Name != "tags" || flag.Field != "Tags" || flag.Separator != ",") {
+				return fmt.Errorf("operation %q flag %q: []string is supported only for the tags flag mapped to Tags with separator %q", operation.Name, flag.Name, ",")
+			}
 			if flag.Separator != "" && flag.Type != "[]string" {
 				return fmt.Errorf("operation %q flag %q separator requires []string type", operation.Name, flag.Name)
 			}

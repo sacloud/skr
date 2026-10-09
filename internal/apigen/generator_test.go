@@ -350,6 +350,37 @@ func TestValidateRejectsUnsupportedFlagsAndDuplicateNames(t *testing.T) {
 		t.Fatalf("Validate() error = %v, want separator type error", err)
 	}
 	config.Operations[0].Flags[0].Separator = ""
+	config.Operations[0].Flags[0] = Flag{
+		Name:      "names",
+		Field:     "Names",
+		Type:      "[]string",
+		Help:      "Names.",
+		Separator: ",",
+	}
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "supported only for the tags flag") {
+		t.Fatalf("Validate() error = %v, want unsupported array flag error", err)
+	}
+	config.Operations[0].Flags[0] = Flag{
+		Name:      "tags",
+		Field:     "Tags",
+		Type:      "[]string",
+		Help:      "Tags.",
+		Separator: ";",
+	}
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "supported only for the tags flag") {
+		t.Fatalf("Validate() error = %v, want unsupported tags separator error", err)
+	}
+	config.Operations[0].Flags[0] = Flag{
+		Name:      "tags",
+		Field:     "Tags",
+		Type:      "[]string",
+		Help:      "Tags.",
+		Separator: ",",
+	}
+	if err := config.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want valid tags array flag", err)
+	}
+	config.Operations[0].Flags[0] = Flag{Name: "zone", Field: "Zone", Type: "string", Help: "Zone."}
 	config.Operations = append(config.Operations, config.Operations[0])
 	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "duplicate operation") {
 		t.Fatalf("Validate() error = %v, want duplicate operation error", err)

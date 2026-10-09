@@ -75,11 +75,11 @@ $ skr iaas-api server read --zone ZONE --id 123456789012
 名前とタグを更新します。`update` で省略した項目は変更されません。タグを指定する場合は `--tags` にカンマ区切りで渡します。
 
 ```console
-$ skr iaas-api server update --zone ZONE --id 123456789012 --name UPDATED-SERVER-NAME --tags tutorial,managed
+$ skr iaas-api server update --zone ZONE --id 123456789012 --name UPDATED-SERVER-NAME --tags tutorial,updated
 $ skr iaas-api server read --zone ZONE --id 123456789012
 ```
 
-2回目の `read` で `Name` が更新後の値であることを確認してください。CPU またはメモリを更新する場合は、ゾーンで利用可能なプランの組み合わせを確認してください。プラン変更ではサーバのリソース ID が変わります。以降の操作では新しいサーバ ID を使ってください（[サーバのプラン変更](https://manual.sakura.ad.jp/cloud/server/plan-update.html)）。
+2回目の `read` で `Name` と `Tags` が更新後の値であることを確認してください。CPU またはメモリを更新する場合は、ゾーンで利用可能なプランの組み合わせを確認してください。プラン変更ではサーバのリソース ID が変わります。以降の操作では新しいサーバ ID を使ってください（[サーバのプラン変更](https://manual.sakura.ad.jp/cloud/server/plan-update.html)）。
 
 ## Step 4: 作成したサーバを削除する
 
