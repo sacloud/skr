@@ -17,6 +17,26 @@ include includes/go/single.mk
 default: $(DEFAULT_GOALS)
 tools: dev-tools
 
+.PHONY: lint-adr
+lint-adr:
+	@awk 'FNR == 1 { \
+		file = FILENAME; \
+		sub(/^.*\//, "", file); \
+		number = substr(file, 1, 4); \
+		files[number] = files[number] " " file; \
+		counts[number]++; \
+	} END { \
+		for (number in counts) { \
+			if (counts[number] > 1) { \
+				printf "duplicate ADR number %s:%s\n", number, files[number] > "/dev/stderr"; \
+				failed = 1; \
+			} \
+		} \
+		exit failed; \
+	}' docs/adr/[0-9][0-9][0-9][0-9]-*.md
+
+lint-text: lint-adr
+
 .PHONY: generate-api
 generate-api:
 	@test -n "$(API_CONFIG)" || (echo "API_CONFIG is required" >&2; exit 2)

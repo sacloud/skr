@@ -1,4 +1,4 @@
-# ADR 0031: IaaS の全ゾーン検索を廃止する
+# ADR 0038: IaaS の全ゾーン検索を廃止する
 
 - Status: Accepted
 - Date: 2026-10-08

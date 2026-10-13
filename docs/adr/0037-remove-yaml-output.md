@@ -1,4 +1,4 @@
-# ADR 0028: YAML API 出力を廃止する
+# ADR 0037: YAML API 出力を廃止する
 
 - Status: Accepted
 - Date: 2026-10-07

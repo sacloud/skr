@@ -1,4 +1,4 @@
-# ADR 0018: GitHub Pages artifact で HTML ドキュメントを公開する
+# ADR 0036: GitHub Pages artifact で HTML ドキュメントを公開する
 
 - Status: Accepted
 - Date: 2026-10-06
