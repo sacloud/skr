@@ -5,9 +5,10 @@ go 1.27.1
 require (
 	github.com/alecthomas/kong v1.16.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.19
 	github.com/sacloud/sacloud-sdk-go v0.3.0
-	github.com/sacloud/sakumock v0.12.0
+	github.com/sacloud/sakumock v0.13.0
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/term v0.46.0
 )
@@ -32,7 +33,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.30.5 // indirect
 	github.com/gofrs/flock v0.13.1 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect

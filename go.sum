@@ -109,8 +109,8 @@ github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0t
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/sacloud/sacloud-sdk-go v0.3.0 h1:wo9c3s2b7EMQdcbFRKFGM1pyAyfAoyWdl88iNO+3RvI=
 github.com/sacloud/sacloud-sdk-go v0.3.0/go.mod h1:Ss4lWgrWVL6Vtb6ia8hmndcVEHzSSQptGABoB+ZRFOQ=
-github.com/sacloud/sakumock v0.12.0 h1:iWGMzfsDEwlnyj4Ke5P7oFefml9oULFi3hQVfUGDc1I=
-github.com/sacloud/sakumock v0.12.0/go.mod h1:rqSonf4g/vD76ZFWU1FoORBKt3XSarnk3uNpSNNtgqk=
+github.com/sacloud/sakumock v0.13.0 h1:1gayIQfdNDfIEPn6gG+mfQzhAxWzDKVCyge6fj4tnm0=
+github.com/sacloud/sakumock v0.13.0/go.mod h1:rqSonf4g/vD76ZFWU1FoORBKt3XSarnk3uNpSNNtgqk=
 github.com/segmentio/asm v1.2.1 h1:DTNbBqs57ioxAD4PrArqftgypG4/qNpXoJx8TVXxPR0=
 github.com/segmentio/asm v1.2.1/go.mod h1:BqMnlJP91P8d+4ibuonYZw9mfnzI9HfxselHZr5aAcs=
 github.com/shopspring/decimal v1.4.0 h1:bxl37RwXBklmTi0C79JfXCEBD1cqqHt0bbgBAGFp81k=
