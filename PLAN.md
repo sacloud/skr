@@ -84,9 +84,9 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 SDK の `api` 直下には、IaaS 以外に次の API ドメインがあります。CLI コマンドの実装、ライブ E2E、チュートリアルの対応状況は分けて記載します。コマンドの入口があることは、そのドメインの SDK 操作すべてへの対応を意味しません。
 
 - [x] `iam` — `iam-api` コマンド、ライブ E2E、[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。
-- [x] `eventbus` — `eventbus-api`。
+- [x] `eventbus` — `eventbus-api`。Provider 補完・リクエスト検証・シークレット入力とエラー伝播のドメイン単体テストを実装済みです。
 - [x] `simplemq` — `simplemq-api`。キュー／メッセージコマンドは `apigen-api` を使います。
-- [ ] `apprun-dedicated` — `apprun-dedicated-api`
+- [ ] `apprun-dedicated` — `apprun-dedicated-api`。リクエスト入力・秘密情報のインライン拒否・エラー伝播のドメイン単体テストを実装済みです。
   - CLI 実装済み、ライブ E2E とチュートリアルは未対応。不足分は [#59](https://github.com/sacloud/skr/issues/59) で対応予定
 - [ ] `addon`
 - [ ] `apigw`
