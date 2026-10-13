@@ -29,7 +29,7 @@ $ skr iaas-api disk update --help
 $ skr iaas-api disk delete --help
 ```
 
-意図したプロファイル、プロジェクト、認証情報を確認します。ディスク作成と更新は SDK のリクエスト JSON を使います。JSON は `--request` に直接指定するか、`@ファイル名` で読み込めます。検索、参照、削除では個別フラグまたは JSON を使い、両方は併用できません。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
+意図したプロファイル、プロジェクト、認証情報を確認します。ディスクの作成と更新は JSON 専用です。JSON は `--request` に直接指定するか、`@ファイル名` で読み込めます。検索、参照、削除では個別フラグまたは JSON を使い、両方は併用できません。検索の `--tags` はカンマ区切りで指定できます。作成・更新でタグを指定する場合は、`--request` 内の `Tags` を文字列配列にします。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
 
 検索では対象のゾーンを明示してください。
 
@@ -43,11 +43,12 @@ $ skr iaas-api disk delete --help
   "Name": "TEST-DISK-NAME",
   "DiskPlanID": 4,
   "Connection": "virtio",
-  "SizeGB": 20
+  "SizeGB": 20,
+  "Tags": ["tutorial"]
 }
 ```
 
-この例ではディスクの内容のコピー元やサーバ ID を指定していないため、サーバ未接続のディスクを作成します。既存ディスクやアーカイブからコピーする場合は、`disk create --help` にある `SourceDiskID` または `SourceArchiveID` などを JSON に加えてください。コピー元、サイズ、プランの組み合わせは作成前に確認してください。
+この例ではディスクの内容のコピー元やサーバ ID を指定していないため、サーバ未接続のディスクを作成します。タグは JSON の `Tags` 配列で指定します。ディスクの作成は JSON 専用のため、`--tags` フラグは使えません。既存ディスクやアーカイブからコピーする場合は、`disk create --help` にある `SourceDiskID` または `SourceArchiveID` などを JSON に加えてください。コピー元、サイズ、プランの組み合わせは作成前に確認してください。
 
 ## Step 3: ディスクを作成し、検索・参照する
 
@@ -58,8 +59,11 @@ $ skr iaas-api disk create --request @disk-create.json
 成功すると Disk の情報が出力されます。以降の操作で使う `ID` を控えてください。`123456789012` は仮の値です。作成結果の ID に置き換えて検索・参照してください。
 
 ```console
-$ skr iaas-api disk find --request='{"Zone":"is1b","Names":["TEST-DISK-NAME"]}' --query 'map({ID,Name,SizeMB})'
+$ skr iaas-api disk find --request='{"Zone":"is1b","Names":["TEST-DISK-NAME"],"Tags":["tutorial"]}' --query 'map({ID,Name,SizeMB})'
+$ skr iaas-api disk find --zone is1b --tags tutorial --query 'map({ID,Name,SizeMB})'
 ```
+
+`--request` を使う検索では `Tags` を JSON の文字列配列で指定できます。上の1行目のように名前とタグの両方で検索する場合は JSON を使います。2行目のようにタグだけで検索する場合は、`--tags` にカンマ区切りで指定できます。`--request` と個別フラグは併用できません。
 
 次は CLI テストで確認した出力形式の例です。ID と名前は置き換えています。
 

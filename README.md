@@ -66,7 +66,7 @@ $ skr container-registry-api --help
 $ skr http --help
 ```
 
-Server creation requires a CPU/memory combination available in the target zone. Specify tags with the comma-separated `--tags` flag; use a JSON `--request` file for other array-based configuration. Confirm the target environment and pricing before creating a server ([server creation and deletion](https://manual.sakura.ad.jp/cloud/server/create-delete.html)).
+サーバの作成では、対象ゾーンで利用できる CPU とメモリの組み合わせを指定します。タグはカンマ区切りの `--tags` フラグで指定できます。その他の配列を含む設定には JSON の `--request` を使います。`--request` と個別フラグは併用できません。作成前に対象環境と料金を確認してください（[サーバの作成と削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)）。
 
 ```console
 $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1 --tags production,web
