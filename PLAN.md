@@ -10,16 +10,17 @@ API コマンド生成器は、IaaS 用の `cmd/apigen-iaas` / `generate-iaas-ap
 
 SimpleMQ のキュー／メッセージ API コマンドは [`api/commands/simplemq-queue.json`](api/commands/simplemq-queue.json) と [`api/commands/simplemq-message.json`](api/commands/simplemq-message.json) を使って生成します。SDK 固有の入力補完や出力整形が必要な操作は手書きハンドラーに残します。
 
+この一覧の `[x]` は、説明に列挙した操作が CLI に実装済みであることを示します。SDK の全操作への対応を示すものではありません。ライブ E2E runner とチュートリアルの有無は、それぞれ別に記載します。
+
 ## IaaS リソース候補
 
-SDK のサービスパッケージごとに対応状況を管理します。
+SDK のサービスパッケージごとに対応状況を管理します。実装済みコマンドの操作範囲は「実装済み IaaS コマンドの対応範囲」に記載し、ここには未実装の候補を記載します。
 
 - [ ] `archive`
 - [ ] `bridge`
 - [ ] `cdrom`
 - [ ] `coupon`
 - [ ] `database`
-- [ ] `disk`
 - [ ] `icon`
 - [ ] `iface`
 - [ ] `internet`
@@ -33,10 +34,17 @@ SDK のサービスパッケージごとに対応状況を管理します。
 - [ ] `note`
 - [ ] `packetfilter`
 - [ ] `privatehost`
-- [ ] `server`
 - [ ] `sshkey`
 - [ ] `subnet`
 - [ ] `vpcrouter`
+
+## 実装済み IaaS コマンドの対応範囲
+
+チェックは列挙した操作の CLI 実装状況を示します。SDK にある未対応操作、ライブ E2E、チュートリアルの状況も併記します。
+
+- [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
+- [x] `server` — `iaas-api server` の Find / Read / Create / Update / Delete を実装済みです。SDK の Apply / Boot / ChangePlan / EjectCDROM / InsertCDROM / MonitorCPU / Reset / SendNMI / Shutdown / WaitBoot / WaitShutdown は未対応です。ライブ E2E runner は未対応です。[チュートリアル](docs/manual/tutorials/iaas-api/server.md)があります。
+- [x] `switch` — SDK の `swytch` に対応する `iaas-api switch` の Find / Read / Create / Update / Delete を実装済みです。SDK の公開操作はすべて CLI にあります。Sandbox と is1b で作成・検索・参照・更新・削除を検証する [ライブ E2E runner](test/e2e/switch/) と[チュートリアル](docs/manual/tutorials/iaas-api/switch.md)があります。
 
 ## CommonServiceItem 系 API 候補
 
@@ -69,7 +77,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `region`
 - [ ] `serverplan`
 - [ ] `serviceclass`
-- [ ] `zone`
+- [x] `zone` — `iaas-api zone` の Find のみ実装済みです。SDK の Read は未対応です。ゾーン一覧を取得して jq で名前を抽出する読み取り専用の [ライブ E2E runner](test/e2e/zone/) と[チュートリアル](docs/manual/tutorials/iaas-api/zone.md)があります
 
 ## IaaS 以外の API ドメイン候補
 
