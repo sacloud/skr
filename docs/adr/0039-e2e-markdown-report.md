@@ -1,4 +1,4 @@
-# ADR 0032: E2E 実行レポートを Markdown で生成する
+# ADR 0039: E2E 実行レポートを Markdown で生成する
 
 - Status: Accepted
 - Date: 2026-10-08

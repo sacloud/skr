@@ -17,7 +17,7 @@ table 出力では列の優先順位、端末幅、表示幅、値と列の省�
 - Runtime は出力の事前検証と JSON 書き込みを受け取ります。無効なクエリは、結果を返す操作の API 呼び出し前に拒否します。
 - 全ゾーン検索の table 専用ラベルを削除します。通常 JSON の形状、結果集約、失敗時の部分出力抑止は維持します。
 - 既存 E2E の実環境検証では IaaS の作成先を `is1b` に揃えます。Switch runner には既存リソースを事前に削除しない、ランダム名の実行経路を追加します。Sandbox 用の既存経路は維持します。
-- [ADR 0009](0009-api-output-formats.md) の形式選択、[ADR 0013](0013-tutorial-list-output.md) の table 原則、[ADR 0025](0025-jq-output-filter.md) の出力形式の優先順位、[ADR 0028](0028-remove-yaml-output.md) の JSON と table の併存を置き換えます。出力例の根拠確認やクエリの評価方針など、その他の決定は維持します。
+- [ADR 0009](0009-api-output-formats.md) の形式選択、[ADR 0013](0013-tutorial-list-output.md) の table 原則、[ADR 0025](0025-jq-output-filter.md) の出力形式の優先順位、[ADR 0037](0037-remove-yaml-output.md) の JSON と table の併存を置き換えます。出力例の根拠確認やクエリの評価方針など、その他の決定は維持します。
 
 ## Consequences
 
