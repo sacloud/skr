@@ -16,6 +16,7 @@ package serverapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -121,6 +122,7 @@ func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			args := append([]string{"--zone", "is1b", "--name", "server", "--cpu", "1", "--memory-gb", "1"}, test.args...)
 			if strings.HasPrefix(test.name, "request ") {
 				args = test.args
@@ -132,9 +134,10 @@ func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
 			api := &createTestAPI{}
 			command.factory = func() (API, error) { return api, nil }
 			command.runtime = Runtime{
-				ValidateRequest: func(string, any) error { return nil },
-				ValidateOutput:  func(*kong.Context) error { return nil },
-				WriteOutput:     func(*kong.Context, any) error { return nil },
+				TransformCreateRequest: TransformCreateRequest,
+				ValidateRequest:        func(string, any) error { return nil },
+				ValidateOutput:         func(*kong.Context) error { return nil },
+				WriteOutput:            func(*kong.Context, any) error { return nil },
 			}
 			err = command.Run(ctx)
 			if (err != nil) != test.wantError {
@@ -154,6 +157,92 @@ func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
 					api.request.NetworkInterfaces[0].Upstream != "shared" || api.request.NetworkInterfaces[1].Upstream != "disconnected" {
 					t.Fatalf("unexpected request: %+v", api.request)
 				}
+			}
+		})
+	}
+}
+
+func TestCreateCommandRequestTransformLifecycle(t *testing.T) {
+	baseArgs := []string{"--zone", "is1b", "--name", "server", "--cpu", "1", "--memory-gb", "1"}
+	transformError := errors.New("transform failed")
+	for _, test := range []struct {
+		name string
+		args []string
+		mode string
+		want string
+	}{
+		{name: "flag transform", args: append(append([]string{}, baseArgs...), "--disk", "plan-id=4,size-gb=20"), mode: "normal"},
+		{name: "without devices", args: baseArgs, mode: "normal"},
+		{name: "missing callback", args: baseArgs, mode: "missing", want: "入力変換が設定されていません"},
+		{name: "callback error", args: baseArgs, mode: "error", want: transformError.Error()},
+		{name: "JSON bypasses transform", args: []string{"--request", `{"Zone":"is1b","Name":"json","CPU":2,"MemoryGB":4,"NetworkInterfaces":[{"Upstream":"disconnected"}]}`}, mode: "missing"},
+		{name: "explicit empty disk", args: []string{"--request", "{}", "--disk", ""}, mode: "normal", want: "併用できません"},
+		{name: "explicit empty nic", args: []string{"--request", "{}", "--nic", ""}, mode: "normal", want: "併用できません"},
+		{name: "missing name", args: []string{"--zone", "is1b", "--cpu", "1", "--memory-gb", "1", "--disk", "plan-id=4,size-gb=20"}, mode: "normal", want: "--name が必要です"},
+		{name: "no input", mode: "normal", want: "--request または個別フラグが必要です"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			command := CreateCommand{}
+			parser, err := kong.New(&command)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, err := parser.Parse(test.args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			api := &createTestAPI{}
+			command.factory = func() (API, error) { return api, nil }
+			transformed, validated := false, false
+			command.runtime = Runtime{
+				DecodeRequest: func(input string, target any) error { return json.Unmarshal([]byte(input), target) },
+				ValidateRequest: func(name string, target any) error {
+					validated = true
+					request, ok := target.(*server.CreateRequest)
+					if !ok || name != "validateServerCreateRequest" {
+						t.Fatalf("unexpected validation: %s, %T", name, target)
+					}
+					if command.Request == nil && !transformed {
+						t.Fatal("validation ran before transformation")
+					}
+					if len(command.Disks) != 0 && len(request.Disks) != 1 {
+						t.Fatal("validation did not receive the transformed disk")
+					}
+					return nil
+				},
+				ValidateOutput: func(*kong.Context) error { return nil },
+				WriteOutput:    func(*kong.Context, any) error { return nil },
+			}
+			if test.mode != "missing" {
+				command.runtime.TransformCreateRequest = func(c *CreateCommand, request *server.CreateRequest) error {
+					transformed = true
+					if request.Name != "server" || request.Zone != "is1b" || request.CPU != 1 || request.MemoryGB != 1 {
+						t.Fatalf("scalars were not assigned before transformation: %+v", request)
+					}
+					if test.mode == "error" {
+						return transformError
+					}
+					return TransformCreateRequest(c, request)
+				}
+			}
+			err = command.Run(ctx)
+			if test.want != "" {
+				if err == nil || !strings.Contains(err.Error(), test.want) {
+					t.Fatalf("Run() = %v, want %q", err, test.want)
+				}
+				if validated || api.request != nil {
+					t.Fatal("failed input reached validation or API")
+				}
+				if test.mode == "error" && !errors.Is(err, transformError) {
+					t.Fatal("transform error identity was lost")
+				}
+				return
+			}
+			if err != nil || !validated || api.request == nil {
+				t.Fatalf("Run() = %v, validated = %v, request = %+v", err, validated, api.request)
+			}
+			if command.Request != nil && (transformed || api.request.Name != "json" || len(api.request.NetworkInterfaces) != 1) {
+				t.Fatal("JSON request was transformed or lost fields")
 			}
 		})
 	}

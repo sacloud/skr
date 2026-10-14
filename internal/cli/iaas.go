@@ -112,10 +112,11 @@ func (c *cli) initIaaSAPI() {
 		return swytch.New(client), nil
 	})
 	c.IaaSAPI.Server.SetRuntime(serverapi.Runtime{
-		DecodeRequest:   decodeRequest,
-		ValidateOutput:  validateOutput,
-		WriteOutput:     writeOutput,
-		ValidateRequest: serverresource.ValidateRequest,
+		DecodeRequest:          decodeRequest,
+		ValidateOutput:         validateOutput,
+		WriteOutput:            writeOutput,
+		ValidateRequest:        serverresource.ValidateRequest,
+		TransformCreateRequest: serverapi.TransformCreateRequest,
 	})
 	c.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) {
 		client, err := iaasclient.New(c.Trace)

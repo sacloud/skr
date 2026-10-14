@@ -34,10 +34,11 @@ type API interface {
 type APIFactory func() (API, error)
 
 type Runtime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest          func(string, any) error
+	ValidateOutput         func(*kong.Context) error
+	WriteOutput            func(*kong.Context, any) error
+	ValidateRequest        func(string, any) error
+	TransformCreateRequest func(*CreateCommand, *server.CreateRequest) error
 }
 
 func (c *Commands) SetRuntime(runtime Runtime) {
@@ -196,6 +197,173 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 	result, err := op.ReadWithContext(context.Background(), request)
+	if err != nil {
+		return err
+	}
+	if c.runtime.WriteOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	return c.runtime.WriteOutput(ctx, result)
+}
+
+type CreateCommand struct {
+	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、Name、CPU、MemoryGB。CPU と MemoryGB は対象ゾーンで利用可能なプランを指定します。Tags は文字列配列です。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドも指定できます。NoWait=true と BootAfterCreate=true は併用できません。NoWait=true の場合は各ディスクも NoWait=true にします。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"Name\\\":\\\"example\\\",\\\"CPU\\\":1,\\\"MemoryGB\\\":1,\\\"Tags\\\":[\\\"tutorial\\\"]}'\""
+	Zone            *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
+	Name            *string   "name:\"name\" help:\"必須: サーバ名。\""
+	CPU             *int      "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
+	MemoryGB        *int      "name:\"memory-gb\" help:\"必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
+	Tags            *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
+	Description     *string   "name:\"description\" help:\"任意: サーバの説明 (最大512文字)。\""
+	IconID          *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
+	GPU             *int      "name:\"gpu\" help:\"任意: GPU 数。\""
+	GPUModel        *string   "name:\"gpu-model\" help:\"任意: GPU モデル。\""
+	CPUModel        *string   "name:\"cpu-model\" help:\"任意: CPU モデル。\""
+	Commitment      *string   "name:\"commitment\" help:\"任意: CPU プランのコミットメント。standard または dedicatedcpu を指定します。\""
+	Generation      *int      "name:\"generation\" help:\"任意: サーバプラン世代 (0: 既定、100、200)。\""
+	ConfidentialVM  *bool     "name:\"confidential-vm\" help:\"任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください。\""
+	InterfaceDriver *string   "name:\"interface-driver\" help:\"任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。\""
+	BootAfterCreate *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。cloud-init user-data を使う場合は省略してください。\""
+	CDROMID         *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
+	PrivateHostID   *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
+	Disks           []string  "name:\"disk\" help:\"任意: ディスク1個を key=value のカンマ区切りで指定します。必須キー: plan-id、size-gb (GB)。任意キー: archive-id。すべて正の整数です。例: --disk 'archive-id=123,plan-id=4,size-gb=20'。繰り返し指定でき、指定順に API の Disks 配列を組み立てます。接続は virtio です。archive-id 省略時は空のディスクを作成します。\" sep:\"none\""
+	NICs            []string  "name:\"nic\" help:\"任意: NIC 1個を upstream=shared または upstream=disconnected で指定します。共有セグメントまたは未接続です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。shared は先頭の NIC にだけ指定できます。\" sep:\"none\""
+	factory         APIFactory
+	runtime         Runtime
+}
+
+func (c *CreateCommand) Run(ctx *kong.Context) error {
+	flagsSet := false
+	flagsSet = flagsSet || c.Zone != nil
+	flagsSet = flagsSet || c.Name != nil
+	flagsSet = flagsSet || c.CPU != nil
+	flagsSet = flagsSet || c.MemoryGB != nil
+	flagsSet = flagsSet || c.Tags != nil
+	flagsSet = flagsSet || c.Description != nil
+	flagsSet = flagsSet || c.IconID != nil
+	flagsSet = flagsSet || c.GPU != nil
+	flagsSet = flagsSet || c.GPUModel != nil
+	flagsSet = flagsSet || c.CPUModel != nil
+	flagsSet = flagsSet || c.Commitment != nil
+	flagsSet = flagsSet || c.Generation != nil
+	flagsSet = flagsSet || c.ConfidentialVM != nil
+	flagsSet = flagsSet || c.InterfaceDriver != nil
+	flagsSet = flagsSet || c.BootAfterCreate != nil
+	flagsSet = flagsSet || c.CDROMID != nil
+	flagsSet = flagsSet || c.PrivateHostID != nil
+	flagsSet = flagsSet || len(c.Disks) != 0
+	flagsSet = flagsSet || len(c.NICs) != 0
+	if c.Request != nil && flagsSet {
+		return fmt.Errorf("--request と個別フラグは併用できません")
+	}
+	request := &server.CreateRequest{}
+	if c.Request != nil {
+		if c.runtime.DecodeRequest == nil {
+			return fmt.Errorf("API リクエスト処理が設定されていません")
+		}
+		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
+			return err
+		}
+	} else {
+		if !flagsSet {
+			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.Zone == nil {
+			return fmt.Errorf("--zone が必要です")
+		}
+		if c.Zone != nil {
+			request.Zone = *c.Zone
+		}
+		if c.Name == nil {
+			return fmt.Errorf("--name が必要です")
+		}
+		if c.Name != nil {
+			request.Name = *c.Name
+		}
+		if c.CPU == nil {
+			return fmt.Errorf("--cpu が必要です")
+		}
+		if c.CPU != nil {
+			request.CPU = *c.CPU
+		}
+		if c.MemoryGB == nil {
+			return fmt.Errorf("--memory-gb が必要です")
+		}
+		if c.MemoryGB != nil {
+			request.MemoryGB = *c.MemoryGB
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = value
+		}
+		if c.Description != nil {
+			request.Description = *c.Description
+		}
+		if c.IconID != nil {
+			value := types.ID(*c.IconID)
+			request.IconID = value
+		}
+		if c.GPU != nil {
+			request.GPU = *c.GPU
+		}
+		if c.GPUModel != nil {
+			request.GPUModel = *c.GPUModel
+		}
+		if c.CPUModel != nil {
+			request.CPUModel = *c.CPUModel
+		}
+		if c.Commitment != nil {
+			value := types.ECommitment(*c.Commitment)
+			request.Commitment = value
+		}
+		if c.Generation != nil {
+			value := types.EPlanGeneration(*c.Generation)
+			request.Generation = value
+		}
+		if c.ConfidentialVM != nil {
+			request.ConfidentialVM = *c.ConfidentialVM
+		}
+		if c.InterfaceDriver != nil {
+			value := types.EInterfaceDriver(*c.InterfaceDriver)
+			request.InterfaceDriver = value
+		}
+		if c.BootAfterCreate != nil {
+			request.BootAfterCreate = *c.BootAfterCreate
+		}
+		if c.CDROMID != nil {
+			value := types.ID(*c.CDROMID)
+			request.CDROMID = value
+		}
+		if c.PrivateHostID != nil {
+			value := types.ID(*c.PrivateHostID)
+			request.PrivateHostID = value
+		}
+		if c.runtime.TransformCreateRequest == nil {
+			return fmt.Errorf("API リクエスト入力変換が設定されていません")
+		}
+		if err := c.runtime.TransformCreateRequest(c, request); err != nil {
+			return err
+		}
+	}
+	if c.runtime.ValidateRequest == nil {
+		return fmt.Errorf("API リクエスト検証が設定されていません")
+	}
+	if err := c.runtime.ValidateRequest("validateServerCreateRequest", request); err != nil {
+		return err
+	}
+	if c.runtime.ValidateOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
+		return err
+	}
+	if c.factory == nil {
+		return fmt.Errorf("API クライアントが設定されていません")
+	}
+	op, err := c.factory()
+	if err != nil {
+		return err
+	}
+	result, err := op.CreateWithContext(context.Background(), request)
 	if err != nil {
 		return err
 	}
