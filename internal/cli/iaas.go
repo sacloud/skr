@@ -15,13 +15,19 @@
 package cli
 
 import (
+	archiveSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 	diskSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
+	diskplanSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/diskplan"
 	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	zoneSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
+	archiveresource "github.com/sacloud/skr/internal/iaas/archive"
+	archiveapi "github.com/sacloud/skr/internal/iaas/archiveapi"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	diskresource "github.com/sacloud/skr/internal/iaas/disk"
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
+	diskplanresource "github.com/sacloud/skr/internal/iaas/diskplan"
+	diskplanapi "github.com/sacloud/skr/internal/iaas/diskplanapi"
 	serverresource "github.com/sacloud/skr/internal/iaas/server"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
 	switchresource "github.com/sacloud/skr/internal/iaas/switch"
@@ -30,13 +36,29 @@ import (
 )
 
 type iaasAPICommand struct {
-	Disk   diskapi.Commands   `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
-	Switch switchapi.Commands `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
-	Server serverapi.Commands `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、起動、削除します。作成時はcloud-init用ディスクやNICを個別フラグで指定できます。"`
-	Zone   zoneapi.Commands   `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
+	Archive  archiveapi.Commands  `cmd:"" help:"さくらのクラウドのアーカイブを検索・参照します。検索では対象ゾーン、タグまたは OS 種別を指定できます。"`
+	Disk     diskapi.Commands     `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
+	DiskPlan diskplanapi.Commands `cmd:"" help:"指定したゾーンのディスクプランを検索・参照します。プランの利用可否とサイズを確認できます。"`
+	Switch   switchapi.Commands   `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
+	Server   serverapi.Commands   `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、起動、削除します。作成時はcloud-init用ディスクやNICを個別フラグで指定できます。"`
+	Zone     zoneapi.Commands     `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
 }
 
 func (c *cli) initIaaSAPI() {
+	c.IaaSAPI.Archive.SetRuntime(archiveapi.Runtime{
+		DecodeRequest:   decodeRequest,
+		ValidateOutput:  validateOutput,
+		WriteOutput:     writeOutput,
+		ValidateRequest: archiveresource.ValidateRequest,
+	})
+	c.IaaSAPI.Archive.SetFactory(func() (archiveapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return archiveSDK.New(client), nil
+	})
+
 	c.IaaSAPI.Zone.SetRuntime(zoneapi.Runtime{
 		DecodeRequest:  decodeRequest,
 		ValidateOutput: validateOutput,
@@ -62,6 +84,19 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return diskSDK.New(client), nil
+	})
+	c.IaaSAPI.DiskPlan.SetRuntime(diskplanapi.Runtime{
+		DecodeRequest:   decodeRequest,
+		ValidateOutput:  validateOutput,
+		WriteOutput:     writeOutput,
+		ValidateRequest: diskplanresource.ValidateRequest,
+	})
+	c.IaaSAPI.DiskPlan.SetFactory(func() (diskplanapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return diskplanSDK.New(client), nil
 	})
 	c.IaaSAPI.Switch.SetRuntime(switchapi.Runtime{
 		DecodeRequest:   decodeRequest,
