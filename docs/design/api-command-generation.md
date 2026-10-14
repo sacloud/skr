@@ -155,3 +155,15 @@ Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー�
 Boot は Zone と ID を必須とし、任意の user-data を `--user-data @path` または `--user-data -` で読み込みます。省略時は通常どおり起動し、インラインの user-data は拒否します。更新では単純なスカラーと `--tags` を任意フラグにし、未指定値を保持します。指定項目がない更新リクエストは拒否します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。サービス固有の検証は `internal/iaas/server/`、手書きハンドラーと入力処理は `internal/iaas/serverapi/` に置きます。各パッケージの単体テストと `internal/cli/server_test.go` で検証します。
 
 Disk では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-disk.json`](../../api/commands/iaas-disk.json)、生成先は `internal/iaas/diskapi/` です。各検索では対象ゾーンを明示し、`--tags` でタグ条件をカンマ区切り指定できます。Create は Zone、Name、DiskPlanID、Connection、SizeGB と独立した単純値および Tags を個別フラグで指定でき、DistantFrom と EditParameter は JSON に残します。SDK の CreateRequest にある OSType は API に送るフィールドではなく、SDK が OS 種別からコピー元アーカイブを解決する補助入力のため、個別フラグにはしません。Update は Zone と ID を必須とし、変更する Name、Description、Tags、IconID、Connection を個別フラグで指定できます。更新フラグは pointer 値として生成し、省略時の未指定を維持します。両操作とも `--request` JSON を維持し、個別フラグとの併用を拒否します。サービス固有の入力検証は `internal/iaas/disk/` に置きます。
+
+PacketFilter では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-packetfilter.json`](../../api/commands/iaas-packetfilter.json)、生成先は `internal/iaas/packetfilterapi/` です。`Expression` はルールの複雑な配列なので、各ルールを個別の CLI フラグにはせず、`--expressions` に JSON 配列を直接または `@path.json` で渡せる入力変換 callback を接続します。`--request` の完全な JSON 入力も維持し、両経路は併用できません。更新時の `OriginalExpressionHash` は読み取り結果の `ExpressionHash` を受け取るスカラー値です。サービス固有の単一ゾーン、ID、空更新の検証は `internal/iaas/packetfilter/` に置きます。ライブ E2E はフィルタの作成・ルール更新・削除を確認しますが、NIC への適用と通信の許可／拒否は行いません。
+
+PacketFilter のライブ E2E は、選択中プロファイルが指すプロジェクトの `is1b` を使います。実行前に対象と変更内容の承認を得て、次のコマンドを実行します。
+
+```console
+$ make build
+$ ./skr config current
+$ go run ./test/e2e/packetfilter --skr ./skr --confirm-is1b-live
+```
+
+作成・検索・参照・ルール更新・削除と削除後の不在をライブ環境で確認済みです。runner はランダムな専用名を使い、同名リソースがある場合は変更せず停止します。成功時と途中失敗時のどちらでも、今回作成したフィルタの ID、名前、説明を削除直前に照合してから後片付けします。サーバや NIC は作成・変更しません。証跡は共通の private evidence 機構で `tmp/packetfilter-api/<YYYYMMDDHHmm>/` に保存し、Git へ追加しません。

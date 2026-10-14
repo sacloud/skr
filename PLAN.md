@@ -31,7 +31,6 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
 - [ ] `mobilegateway`
 - [ ] `nfs`
 - [ ] `note`
-- [ ] `packetfilter`
 - [ ] `privatehost`
 - [ ] `sshkey`
 - [ ] `subnet`
@@ -46,6 +45,7 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - SDK の Create / Update / Delete / Upload / Download / OpenFTP / CloseFTP / WaitReady は未対応です。
     - 読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/archive.md)があります。is1b で検索・参照を確認済みです。
 - [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。Create は必須・任意の単純値とタグ、Update はゾーン・ID・変更する単純値とタグを個別フラグで指定でき、複雑な入力には JSON を使います。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
+- [x] `packetfilter` — `iaas-api packetfilter` の Find / Read / Create / Update / Delete を実装済みです。ルールの Expression 配列は `--expressions` の JSON 値または `--request` で指定し、ゾーン、名前、ID などの単純値はフラグで指定できます。is1b で作成・検索・参照・ルール更新・削除を確認する [ライブ E2E runner](test/e2e/packetfilter/) と[チュートリアル](docs/manual/tutorials/iaas-api/packetfilter.md)があります。ライブ E2E で各操作と削除後の不在を確認済みです。NIC への適用とパケット通信の検証は対象外です。
 - [x] `server`
     - [x] Find / Read / Create / Boot / Update / Delete を実装済みです。
     - Create では基本項目に加え、反復可能な `--disk` と `--nic` で複数ディスクと共有／未接続 NIC を指定できます。Boot は user-data のファイル／標準入力に対応します。

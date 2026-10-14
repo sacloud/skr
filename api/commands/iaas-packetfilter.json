@@ -1,0 +1,218 @@
+{
+  "package": "packetfilterapi",
+  "resource": "IaaS PacketFilter",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types",
+    "packetfilter": "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_type": "FindCommand",
+      "help": "パケットフィルタを指定したゾーンで検索して出力します。例: skr iaas-api packetfilter find --zone is1b",
+      "method": "FindWithContext",
+      "request_type": "packetfilter.FindRequest",
+      "response_type": "[]*iaas.PacketFilter",
+      "request_validator": "validatePacketFilterFindRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: Names (名前の文字列配列) は JSON、Count と From は個別フラグで指定します。例: --request='{\"Zone\":\"is1b\",\"Names\":[\"example\"]}'。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数 (整数)。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置 (整数)。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "ReadCommand",
+      "help": "パケットフィルタを読み取って出力します。例: skr iaas-api packetfilter read --zone ZONE --id 123456789012",
+      "method": "ReadWithContext",
+      "request_type": "packetfilter.ReadRequest",
+      "response_type": "*iaas.PacketFilter",
+      "request_validator": "validatePacketFilterReadRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: パケットフィルタの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "CreateCommand",
+      "help": "パケットフィルタを作成して出力します。基本項目はフラグ、ルールは --expressions JSON で指定できます。例: skr iaas-api packetfilter create --zone is1b --name example --expressions '[{\"Protocol\":\"tcp\",\"DestinationPort\":\"443\",\"Action\":\"allow\"}]'",
+      "method": "CreateWithContext",
+      "request_type": "packetfilter.CreateRequest",
+      "response_type": "*iaas.PacketFilter",
+      "request_validator": "validatePacketFilterCreateRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name。任意: Description (最大512文字)、Expression (ルールの配列)。ルールは個別フラグ経路では --expressions に JSON 配列を直接、または @path.json で指定できます。各要素は Protocol、SourceNetwork、SourcePort、DestinationPort、Action、Description を持ちます。Protocol は http、https、tcp、udp、icmp、fragment、ip、Action は allow または deny です。ポートは 0〜65535 の数値または範囲です。例: --expressions '[{\"Protocol\":\"tcp\",\"SourceNetwork\":\"192.0.2.0/24\",\"DestinationPort\":\"443\",\"Action\":\"allow\",\"Description\":\"Allow HTTPS\"}]'。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 作成先のゾーン名。",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "必須: パケットフィルタの名前。",
+          "required": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 説明 (最大512文字)。"
+        }
+      ],
+      "request_transform": "TransformCreateRequest",
+      "repeated_flags": [
+        {
+          "name": "expressions",
+          "field": "Expression",
+          "help": "任意: ルールの JSON 配列を直接、または @path.json で指定します。1回だけ指定できます。"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "command_type": "UpdateCommand",
+      "help": "パケットフィルタの指定項目を更新して出力します。ルール配列は --expressions JSON で指定できます。",
+      "method": "UpdateWithContext",
+      "request_type": "packetfilter.UpdateRequest",
+      "response_type": "*iaas.PacketFilter",
+      "request_validator": "validatePacketFilterUpdateRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID、変更する項目を1つ以上。Name、Description は個別フラグまたは JSON で指定できます。Expression はルール配列で、個別フラグ経路では --expressions に JSON 配列を直接、または @path.json で指定できます。Expression を更新する場合は OriginalExpressionHash (文字列) に read で得た ExpressionHash を必ず指定してください。JSON または --original-expression-hash で指定します。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012,\"Name\":\"updated\"}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 更新対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 新しい名前。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 新しい説明 (最大512文字)。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "original-expression-hash",
+          "field": "OriginalExpressionHash",
+          "type": "string",
+          "help": "任意: ルール更新時に read で取得した ExpressionHash。"
+        }
+      ],
+      "request_transform": "TransformUpdateRequest",
+      "repeated_flags": [
+        {
+          "name": "expressions",
+          "field": "Expression",
+          "help": "任意: ルールの JSON 配列を直接、または @path.json で指定します。1回だけ指定できます。"
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "DeleteCommand",
+      "help": "パケットフィルタを削除します。成功時は出力しません。例: skr iaas-api packetfilter delete --zone ZONE --id 123456789012",
+      "method": "DeleteWithContext",
+      "request_type": "packetfilter.DeleteRequest",
+      "request_validator": "validatePacketFilterDeleteRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: FailIfNotFound (対象がない場合にエラー)、WaitForRelease (他リソースから参照されている間の削除待機)、WaitForReleaseTimeout (秒)、WaitForReleaseTick (秒)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 削除対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "fail-if-not-found",
+          "field": "FailIfNotFound",
+          "type": "bool",
+          "help": "任意: 対象が見つからない場合にエラーにします。"
+        },
+        {
+          "name": "wait-for-release",
+          "field": "WaitForRelease",
+          "type": "bool",
+          "help": "任意: 他リソースから参照されている間は削除を待ちます。"
+        },
+        {
+          "name": "wait-for-release-timeout",
+          "field": "WaitForReleaseTimeout",
+          "type": "int",
+          "help": "任意: 削除待機のタイムアウト (秒)。"
+        },
+        {
+          "name": "wait-for-release-tick",
+          "field": "WaitForReleaseTick",
+          "type": "int",
+          "help": "任意: 削除待機中の確認間隔 (秒)。"
+        }
+      ]
+    }
+  ]
+}
