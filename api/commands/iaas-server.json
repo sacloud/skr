@@ -186,7 +186,7 @@
           "name": "boot-after-create",
           "field": "BootAfterCreate",
           "type": "bool",
-          "help": "任意: true の場合、作成後にサーバを起動します。cloud-init user-data を使う場合は省略してください。"
+          "help": "任意: true の場合、作成後にサーバを起動します。NoWait=true とは併用できません。cloud-init user-data を使う場合は省略してください。"
         },
         {
           "name": "cdrom-id",

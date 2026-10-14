@@ -64,7 +64,7 @@ func TestRunIaaSServerHelp(t *testing.T) {
 		{args: []string{"iaas-api", "server", "--help"}, want: []string{"find", "read", "create", "boot", "update", "delete"}},
 		{args: []string{"iaas-api", "server", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "server", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
-		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "--disk", "--nic", "archive-id", "plan-id", "size-gb", "繰り返し", "shared", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可", "必須: Zone", "文字列配列", "NoWait=true", "BootAfterCreate=true", `"Tags":["tutorial"]`}, notWant: []string{"--cloudimg-archive-id", "--disk-plan-id", "--disk-size-gb", "--network-interface"}},
+		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "--disk", "--nic", "archive-id", "plan-id", "size-gb", "繰り返し", "shared", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可", "必須: Zone", "文字列配列", "NoWait=true", "BootAfterCreate=true", "NoWait=true とは併用できません", `"Tags":["tutorial"]`}, notWant: []string{"--cloudimg-archive-id", "--disk-plan-id", "--disk-size-gb", "--network-interface"}},
 		{args: []string{"iaas-api", "server", "boot", "--help"}, want: []string{"--zone", "--id", "--user-data", "@path.yaml", "標準入力", "インライン値は指定できません"}},
 		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--tags", "--cpu", "--memory-gb", "省略", "併用不可"}},
 		{args: []string{"iaas-api", "server", "delete", "--help"}, want: []string{"--with-disks", "--force", "ディスク", "強制停止", "併用不可"}},
@@ -274,6 +274,28 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 	if len(api.findRequests) != 0 || api.readRequest != nil || api.createRequest != nil || api.bootRequest != nil ||
 		api.updateRequest != nil || api.deleteRequest != nil {
 		t.Fatalf("invalid input reached API: %+v", api)
+	}
+}
+
+func TestIaaSServerRejectsNoWaitWithBootAfterCreateBeforeCreatingAPIClient(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	factoryCalled := false
+	commandLine := newCLI()
+	commandLine.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) {
+		factoryCalled = true
+		return &serverAPITestDouble{}, nil
+	})
+	code := runCLI(
+		[]string{"iaas-api", "server", "create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1,"NoWait":true,"BootAfterCreate":true}`},
+		&stdout,
+		&stderr,
+		commandLine,
+	)
+	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "NoWait=true と BootAfterCreate=true は併用できません") {
+		t.Fatalf("create: code %d, stdout %q, stderr %q; want conflict error before API client creation", code, stdout.String(), stderr.String())
+	}
+	if factoryCalled {
+		t.Fatal("API client factory was called for an invalid request")
 	}
 }
 

@@ -50,6 +50,9 @@ func ValidateRequest(name string, request any) error {
 		if value.CPU <= 0 || value.MemoryGB <= 0 {
 			return fmt.Errorf("対象ゾーンで利用可能な CPU と MemoryGB の組み合わせが必要です")
 		}
+		if value.NoWait && value.BootAfterCreate {
+			return fmt.Errorf("NoWait=true と BootAfterCreate=true は併用できません")
+		}
 		return nil
 	case "validateServerBootRequest":
 		value, ok := request.(*server.BootRequest)
