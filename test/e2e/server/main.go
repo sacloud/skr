@@ -57,6 +57,16 @@ type serverItem struct {
 	Description    string                      `json:"Description"`
 	InstanceStatus types.EServerInstanceStatus `json:"InstanceStatus"`
 	Interfaces     []serverInterface           `json:"Interfaces"`
+	Disks          []diskItem                  `json:"Disks"`
+}
+
+type diskItem struct {
+	ID              types.ID `json:"ID"`
+	Name            string   `json:"Name"`
+	ServerID        types.ID `json:"ServerID"`
+	DiskPlanID      types.ID `json:"DiskPlanID"`
+	SourceArchiveID types.ID `json:"SourceArchiveID"`
+	SizeMB          int64    `json:"SizeMB"`
 }
 
 type cli interface {
@@ -111,7 +121,7 @@ func serverArgs(step string, request map[string]any, userDataPath string) ([]str
 	switch step {
 	case "preflight-find-server", "cleanup-find-server", "cleanup-find-server-after":
 		return findArgs("server", request)
-	case "preflight-find-disk", "cleanup-find-disk-after":
+	case "preflight-find-disk", "cleanup-find-disk-after", "cleanup-find-disk-final":
 		return findArgs("disk", request)
 	case "test-create":
 		name, err := requestString(request, "Name")
@@ -157,8 +167,17 @@ func serverArgs(step string, request map[string]any, userDataPath string) ([]str
 		}
 		return []string{
 			"iaas-api", "server", "read", "--zone", zone, "--id", id,
-			"--query", "{ID,Name,Description,InstanceStatus,Interfaces}",
+			"--query", "{ID,Name,Description,InstanceStatus,Interfaces,Disks}",
 		}, nil
+	case "cleanup-read-disk", "cleanup-delete-disk":
+		id, err := requestID(request)
+		if err != nil {
+			return nil, err
+		}
+		if step == "cleanup-read-disk" {
+			return []string{"iaas-api", "disk", "read", "--zone", zone, "--id", id}, nil
+		}
+		return []string{"iaas-api", "disk", "delete", "--zone", zone, "--id", id, "--fail-if-not-found"}, nil
 	case "cleanup-delete":
 		id, err := requestID(request)
 		if err != nil {
@@ -178,7 +197,13 @@ func findArgs(resource string, request map[string]any) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := json.Marshal(map[string]any{"Zone": zone, "Names": []string{name}})
+	input := map[string]any{"Zone": zone, "Names": []string{name}}
+	for _, key := range []string{"Count", "From"} {
+		if value, exists := request[key]; exists {
+			input[key] = value
+		}
+	}
+	data, err := json.Marshal(input)
 	if err != nil {
 		return nil, fmt.Errorf("encode %s find request: %w", resource, err)
 	}
@@ -237,15 +262,26 @@ func (s scenario) call(ctx context.Context, step string, request map[string]any)
 }
 
 func (s scenario) find(ctx context.Context, step, resource, name string) ([]serverItem, error) {
-	output, err := s.call(ctx, step, map[string]any{"Zone": zone, "Name": name})
+	var result []serverItem
+	for from := 0; ; from += 100 {
+		items, err := s.findPage(ctx, step, resource, name, from)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, items...)
+		if len(items) < 100 {
+			return result, nil
+		}
+	}
+}
+
+func (s scenario) findPage(ctx context.Context, step, resource, name string, from int) ([]serverItem, error) {
+	output, err := s.call(ctx, step, map[string]any{"Zone": zone, "Name": name, "Count": 100, "From": from})
 	if err != nil {
 		return nil, err
 	}
 	if resource == "disk" {
-		var disks []struct {
-			ID   types.ID `json:"ID"`
-			Name string   `json:"Name"`
-		}
+		var disks []diskItem
 		if err := json.Unmarshal(output, &disks); err != nil {
 			return nil, fmt.Errorf("%s: decode Disk list: %w", step, err)
 		}
@@ -360,7 +396,7 @@ func (s scenario) cleanup(name string, knownID types.ID) error {
 			return fmt.Errorf("cannot locate possibly created Server: %w", err)
 		}
 		if len(matches) == 0 {
-			return nil
+			return s.cleanupDisks(ctx, name, nil)
 		}
 		if len(matches) != 1 || matches[0].ID.IsEmpty() || matches[0].Description != description {
 			return errors.New("cannot safely identify created Server; manual cleanup required")
@@ -374,22 +410,52 @@ func (s scenario) cleanup(name string, knownID types.ID) error {
 	if err := checkServer(current, id, name); err != nil {
 		return fmt.Errorf("cleanup refused: Server identity changed; manual cleanup required: %w", err)
 	}
-	if _, err := s.call(ctx, "cleanup-delete", map[string]any{"Zone": zone, "ID": id}); err != nil {
-		return fmt.Errorf("delete test Server %s: %w", id, err)
+	_, deleteErr := s.call(ctx, "cleanup-delete", map[string]any{"Zone": zone, "ID": id})
+	matches, err := s.find(ctx, "cleanup-find-server-after", "server", name)
+	if err != nil {
+		return errors.Join(deleteErr, err)
 	}
-	for _, resource := range []struct {
-		step, kind string
-	}{
-		{"cleanup-find-server-after", "server"},
-		{"cleanup-find-disk-after", "disk"},
-	} {
-		matches, err := s.find(ctx, resource.step, resource.kind, name)
-		if err != nil {
-			return err
-		}
-		if len(matches) != 0 {
-			return fmt.Errorf("%s %q remains after Server cleanup", resource.kind, name)
-		}
+	if len(matches) != 0 {
+		return errors.Join(deleteErr, fmt.Errorf("Server %q remains after cleanup; manual cleanup required", name))
+	}
+	return errors.Join(deleteErr, s.cleanupDisks(ctx, name, current.Disks))
+}
+
+func (s scenario) cleanupDisks(ctx context.Context, name string, knownDisks []diskItem) error {
+	matches, err := s.find(ctx, "cleanup-find-disk-after", "disk", name)
+	if err != nil {
+		return err
+	}
+	if len(matches) == 0 {
+		return nil
+	}
+	if len(matches) != 1 || len(knownDisks) != 1 || matches[0].ID.IsEmpty() ||
+		matches[0].ID != knownDisks[0].ID || matches[0].Name != name {
+		return errors.New("cannot safely identify orphan Disk; manual cleanup required")
+	}
+	id := matches[0].ID
+	output, err := s.call(ctx, "cleanup-read-disk", map[string]any{"Zone": zone, "ID": id})
+	if err != nil {
+		return fmt.Errorf("cannot verify orphan Disk: %w", err)
+	}
+	var disk diskItem
+	if err := json.Unmarshal(output, &disk); err != nil {
+		return fmt.Errorf("decode orphan Disk: %w", err)
+	}
+	if disk.ID != id || disk.Name != name || !disk.ServerID.IsEmpty() ||
+		disk.DiskPlanID != types.ID(s.diskPlanID) || disk.SourceArchiveID != types.ID(s.archiveID) ||
+		s.diskSizeGB <= 0 || disk.SizeMB/1024 != s.diskSizeGB || disk.SizeMB%1024 != 0 {
+		return errors.New("orphan Disk identity or attachment changed; manual cleanup required")
+	}
+	if _, err := s.call(ctx, "cleanup-delete-disk", map[string]any{"Zone": zone, "ID": id}); err != nil {
+		return fmt.Errorf("delete orphan Disk %s: %w", id, err)
+	}
+	matches, err = s.find(ctx, "cleanup-find-disk-final", "disk", name)
+	if err != nil {
+		return err
+	}
+	if len(matches) != 0 {
+		return errors.New("Disk remains after cleanup; manual cleanup required")
 	}
 	return nil
 }

@@ -131,6 +131,13 @@ type fakeCLI struct {
 	changeIdentityAtCleanup   bool
 	deleted                   []types.ID
 	calls                     []string
+	leaveDisk                 bool
+	createDiskOnly            bool
+	orphanDisk                *diskItem
+	deletedDisks              []types.ID
+	multipleOrphans           bool
+	deleteServerError         bool
+	keepOrphan                bool
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) ([]byte, error) {
@@ -142,12 +149,15 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 		return nil, errors.New("injected CLI failure")
 	}
 	switch step {
-	case "preflight-find-server", "preflight-find-disk", "cleanup-find-server", "cleanup-find-server-after", "cleanup-find-disk-after":
+	case "preflight-find-server", "preflight-find-disk", "cleanup-find-server", "cleanup-find-server-after", "cleanup-find-disk-after", "cleanup-find-disk-final":
 		if step == "preflight-find-server" || step == "cleanup-find-server" || step == "cleanup-find-server-after" {
 			if f.server != nil && f.server.Name == request["Name"] {
 				return json.Marshal([]serverItem{*f.server})
 			}
 		} else if f.disk {
+			if f.multipleOrphans && step == "cleanup-find-disk-after" {
+				return json.Marshal([]diskItem{{ID: 45, Name: request["Name"].(string)}, {ID: 46, Name: request["Name"].(string)}})
+			}
 			return json.Marshal([]struct {
 				ID   types.ID `json:"ID"`
 				Name string   `json:"Name"`
@@ -157,8 +167,13 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 	case "test-create":
 		f.server = &serverItem{
 			ID: 123, Name: request["Name"].(string), Description: description,
+			Disks: []diskItem{{ID: 45}},
 		}
 		f.disk = true
+		if f.createDiskOnly {
+			f.server = nil
+			return nil, errors.New("injected partial create failure")
+		}
 		output, err := json.Marshal(f.server)
 		if f.failStep == step {
 			return nil, errors.New("injected CLI failure")
@@ -186,7 +201,24 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 		}
 		f.deleted = append(f.deleted, f.server.ID)
 		f.server = nil
-		f.disk = false
+		if !f.leaveDisk {
+			f.disk = false
+		}
+		if f.deleteServerError {
+			return nil, errors.New("injected partial delete failure")
+		}
+		return nil, nil
+	case "cleanup-read-disk":
+		disk := diskItem{ID: 45, Name: namePrefix + "test", DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 20 * 1024}
+		if f.orphanDisk != nil {
+			disk = *f.orphanDisk
+		}
+		return json.Marshal(disk)
+	case "cleanup-delete-disk":
+		f.deletedDisks = append(f.deletedDisks, request["ID"].(types.ID))
+		if !f.keepOrphan {
+			f.disk = false
+		}
 		return nil, nil
 	default:
 		return nil, errors.New("unexpected E2E step " + step)
@@ -232,6 +264,104 @@ func TestScenarioCleansUpAfterCreateReturnsError(t *testing.T) {
 	}
 	if fake.server != nil || fake.disk || len(fake.deleted) != 1 {
 		t.Fatalf("partially created resources not cleaned up: server=%+v disk=%v deleted=%v", fake.server, fake.disk, fake.deleted)
+	}
+}
+
+func TestScenarioDeletesVerifiedOrphanDisk(t *testing.T) {
+	fake := &fakeCLI{leaveDisk: true}
+	if err := testScenario(fake).run(context.Background(), namePrefix+"test"); err != nil {
+		t.Fatal(err)
+	}
+	if fake.disk || len(fake.deletedDisks) != 1 || fake.deletedDisks[0] != 45 {
+		t.Fatalf("orphan cleanup failed: %+v", fake)
+	}
+	for _, step := range []string{"cleanup-read-disk", "cleanup-delete-disk", "cleanup-find-disk-final"} {
+		if !containsStep(fake.calls, step) {
+			t.Errorf("missing cleanup step %s", step)
+		}
+	}
+}
+
+func TestScenarioRefusesUnverifiedOrphanDisk(t *testing.T) {
+	for _, disk := range []diskItem{
+		{ID: 46, Name: namePrefix + "test", DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 20 * 1024},
+		{ID: 45, Name: "different", DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 20 * 1024},
+		{ID: 45, Name: namePrefix + "test", ServerID: 999, DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 20 * 1024},
+		{ID: 45, Name: namePrefix + "test", DiskPlanID: 5, SourceArchiveID: 234, SizeMB: 20 * 1024},
+		{ID: 45, Name: namePrefix + "test", DiskPlanID: 4, SourceArchiveID: 235, SizeMB: 20 * 1024},
+		{ID: 45, Name: namePrefix + "test", DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 100 * 1024},
+	} {
+		fake := &fakeCLI{leaveDisk: true, orphanDisk: &disk}
+		err := testScenario(fake).run(context.Background(), namePrefix+"test")
+		if err == nil || !strings.Contains(err.Error(), "manual cleanup required") || !fake.disk || len(fake.deletedDisks) != 0 {
+			t.Fatalf("unsafe orphan deletion: disk=%+v error=%v", disk, err)
+		}
+	}
+}
+
+func TestScenarioReportsDiskWhenPartialCreateHasNoServer(t *testing.T) {
+	fake := &fakeCLI{createDiskOnly: true}
+	err := testScenario(fake).run(context.Background(), namePrefix+"test")
+	if err == nil || !strings.Contains(err.Error(), "cannot safely identify orphan Disk") ||
+		!containsStep(fake.calls, "cleanup-find-disk-after") || !fake.disk || len(fake.deletedDisks) != 0 {
+		t.Fatalf("unidentified disk was ignored or deleted: error=%v calls=%v", err, fake.calls)
+	}
+}
+
+func TestScenarioReportsOrphanCleanupFailures(t *testing.T) {
+	for _, step := range []string{"cleanup-find-disk-after", "cleanup-read-disk", "cleanup-delete-disk", "cleanup-find-disk-final"} {
+		fake := &fakeCLI{leaveDisk: true, failStep: step}
+		err := testScenario(fake).run(context.Background(), namePrefix+"test")
+		if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
+			t.Fatalf("%s: error=%v", step, err)
+		}
+	}
+}
+
+func TestScenarioRejectsAmbiguousOrRemainingOrphans(t *testing.T) {
+	for _, fake := range []*fakeCLI{
+		{leaveDisk: true, multipleOrphans: true},
+		{leaveDisk: true, keepOrphan: true},
+	} {
+		err := testScenario(fake).run(context.Background(), namePrefix+"test")
+		if err == nil || !strings.Contains(err.Error(), "manual cleanup required") || !fake.disk {
+			t.Fatalf("orphan not reported: error=%v", err)
+		}
+		if fake.multipleOrphans && len(fake.deletedDisks) != 0 {
+			t.Fatal("ambiguous disk was deleted")
+		}
+	}
+}
+
+func TestScenarioCleansDiskAfterPartialServerDelete(t *testing.T) {
+	fake := &fakeCLI{leaveDisk: true, deleteServerError: true}
+	err := testScenario(fake).run(context.Background(), namePrefix+"test")
+	if err == nil || !strings.Contains(err.Error(), "injected partial delete failure") ||
+		fake.disk || len(fake.deletedDisks) != 1 {
+		t.Fatalf("partial delete cleanup: error=%v deleted=%v", err, fake.deletedDisks)
+	}
+}
+
+type paginatedCLI struct {
+	calls int
+}
+
+func (f *paginatedCLI) call(_ context.Context, _ string, request map[string]any) ([]byte, error) {
+	f.calls++
+	if request["Count"] != 100 || request["From"] != (f.calls-1)*100 {
+		return nil, errors.New("unexpected pagination")
+	}
+	if f.calls == 2 {
+		return []byte("[]"), nil
+	}
+	return json.Marshal(make([]diskItem, 100))
+}
+
+func TestFindReadsAllPages(t *testing.T) {
+	fake := &paginatedCLI{}
+	items, err := (scenario{client: fake}).find(context.Background(), "preflight-find-disk", "disk", namePrefix+"test")
+	if err != nil || len(items) != 100 || fake.calls != 2 {
+		t.Fatalf("pagination: items=%d calls=%d error=%v", len(items), fake.calls, err)
 	}
 }
 
