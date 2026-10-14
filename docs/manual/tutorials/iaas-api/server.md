@@ -55,7 +55,7 @@ EOF
 
 Server 名には重複しない値を指定します。`CLOUDIMG_ARCHIVE_ID`、`DISK_PLAN_ID`、`DISK_SIZE_GB` は、is1b で利用できる正の整数に置き換えてください。
 
-`--disk` の plan-id と size-gb は必須です。archive-id を省略すると空のディスクを作成します。`--disk` と `--nic` は繰り返して指定でき、それぞれ指定順に接続します。この手順ではディスクと共有 NIC を1個ずつ指定します。`--request` とは併用できません。
+`--disk` の plan-id と size-gb は必須です。archive-id を省略すると空のディスクを作成します。`--disk` と `--nic` は繰り返して指定でき、それぞれ指定順に接続します。`upstream=shared` は先頭の NIC にだけ指定できます。この手順ではディスクと共有 NIC を1個ずつ指定します。`--request` とは併用できません。
 
 ```console
 $ SERVER_NAME="skr-tutorial-cloudinit-$(date +%s)"

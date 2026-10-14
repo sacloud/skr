@@ -109,6 +109,8 @@ func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
 		{"nonpositive disk", []string{"--disk", "plan-id=0,size-gb=20"}, true},
 		{"invalid second disk", []string{"--disk", "plan-id=4,size-gb=20", "--disk", ""}, true},
 		{"invalid NIC", []string{"--nic", "upstream=wrong"}, true},
+		{"shared second NIC", []string{"--nic", "upstream=disconnected", "--nic", "upstream=shared"}, true},
+		{"repeated shared NIC", []string{"--nic", "upstream=shared", "--nic", "upstream=shared"}, true},
 		{"request disk", []string{"--request", "{}", "--disk", "plan-id=4,size-gb=20"}, true},
 		{"request empty disk", []string{"--request", "{}", "--disk", ""}, true},
 		{"request NIC", []string{"--request", "{}", "--nic", ""}, true},
@@ -140,6 +142,10 @@ func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
 			}
 			if test.wantError && api.request != nil {
 				t.Fatal("invalid request reached API")
+			}
+			if (test.name == "shared second NIC" || test.name == "repeated shared NIC") &&
+				(err == nil || !strings.Contains(err.Error(), "--nic の 2 個目") || !strings.Contains(err.Error(), "先頭")) {
+				t.Fatalf("expected NIC position error, got %v", err)
 			}
 			if test.name == "multiple" {
 				if len(api.request.Disks) != 2 || api.request.Disks[0].SourceArchiveID != 123 ||

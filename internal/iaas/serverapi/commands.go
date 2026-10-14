@@ -46,7 +46,7 @@ type CreateCommand struct {
 	CDROMID         *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
 	PrivateHostID   *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
 	Disks           []string  `name:"disk" sep:"none" help:"任意: ディスク1個を key=value のカンマ区切りで指定します。必須キー: plan-id、size-gb (GB)。任意キー: archive-id。すべて正の整数です。例: --disk 'archive-id=123,plan-id=4,size-gb=20'。繰り返し指定でき、指定順に API の Disks 配列を組み立てます。接続は virtio です。archive-id 省略時は空のディスクを作成します。"`
-	NICs            []string  `name:"nic" sep:"none" help:"任意: NIC 1個を upstream=shared または upstream=disconnected で指定します。共有セグメントまたは未接続です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。"`
+	NICs            []string  `name:"nic" sep:"none" help:"任意: NIC 1個を upstream=shared または upstream=disconnected で指定します。共有セグメントまたは未接続です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。shared は先頭の NIC にだけ指定できます。"`
 	factory         APIFactory
 	runtime         Runtime
 }
@@ -182,6 +182,9 @@ func (c *CreateCommand) setDevices(request *server.CreateRequest) error {
 		value, err := parseNIC(input)
 		if err != nil {
 			return fmt.Errorf("--nic の %d 個目: %w", i+1, err)
+		}
+		if i > 0 && value.Upstream == "shared" {
+			return fmt.Errorf("--nic の %d 個目: shared は先頭の NIC にだけ指定できます", i+1)
 		}
 		request.NetworkInterfaces = append(request.NetworkInterfaces, value)
 	}
