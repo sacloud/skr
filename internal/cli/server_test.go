@@ -197,6 +197,15 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		t.Fatalf("Boot request = %+v, want zone, ID, and unmodified user-data", api.bootRequest)
 	}
 
+	_, stderr, code = run("boot", "--zone", "test-zone", "--id", "123")
+	if code != 0 || stderr != "" {
+		t.Fatalf("boot without user-data: code %d, stderr %q", code, stderr)
+	}
+	if api.bootRequest == nil || api.bootRequest.Zone != "test-zone" ||
+		api.bootRequest.ID != 123 || api.bootRequest.UserData != "" {
+		t.Fatalf("Boot request = %+v, want zone and ID without user-data", api.bootRequest)
+	}
+
 	_, stderr, code = run("find", "--zone", "test-zone", "--tags", "production,web", "--count", "4", "--from", "2")
 	if code != 0 || stderr != "" {
 		t.Fatalf("find: code %d, stderr %q", code, stderr)

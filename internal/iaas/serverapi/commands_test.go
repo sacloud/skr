@@ -153,6 +153,64 @@ func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
 	}
 }
 
+type bootTestAPI struct {
+	API
+	request *server.BootRequest
+}
+
+func (a *bootTestAPI) BootWithContext(_ context.Context, request *server.BootRequest) error {
+	a.request = request
+	return nil
+}
+
+func TestBootCommandOptionalUserData(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "user-data.yaml")
+	data := "#cloud-config\nhostname: example\n"
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name      string
+		args      []string
+		want      string
+		wantError bool
+	}{
+		{name: "omitted"},
+		{name: "file", args: []string{"--user-data", "@" + path}, want: data},
+		{name: "explicit empty", args: []string{"--user-data", ""}, wantError: true},
+		{name: "inline", args: []string{"--user-data", "secret-value"}, wantError: true},
+		{name: "missing file", args: []string{"--user-data", "@" + path + ".missing"}, wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			command := BootCommand{}
+			parser, err := kong.New(&command)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, err := parser.Parse(append([]string{"--zone", "is1b", "--id", "123"}, test.args...))
+			if err != nil {
+				t.Fatal(err)
+			}
+			api := &bootTestAPI{}
+			command.factory = func() (API, error) { return api, nil }
+			command.runtime = Runtime{ValidateRequest: func(string, any) error { return nil }}
+			err = command.Run(ctx)
+			if (err != nil) != test.wantError {
+				t.Fatalf("error = %v, wantError = %v", err, test.wantError)
+			}
+			if test.wantError {
+				if api.request != nil || strings.Contains(err.Error(), "secret-value") {
+					t.Fatalf("invalid input reached API or was echoed: %v", err)
+				}
+				return
+			}
+			if api.request == nil || api.request.Zone != "is1b" || api.request.ID != 123 || api.request.UserData != test.want {
+				t.Fatalf("unexpected Boot request: %+v", api.request)
+			}
+		})
+	}
+}
+
 func TestReadUserData(t *testing.T) {
 	userData := "#cloud-config\nssh_authorized_keys:\n  - ssh-ed25519 AAAA-example\n"
 	path := filepath.Join(t.TempDir(), "user-data.yaml")

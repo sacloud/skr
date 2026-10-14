@@ -89,7 +89,7 @@
     {
       "name": "Boot",
       "command_type": "BootCommand",
-      "help": "サーバを起動します。cloud-init の user-data は --user-data @path.yaml または --user-data - で指定します。例: skr iaas-api server boot --zone ZONE --id 123456789012 --user-data @cloud-c0nfig.yaml",
+      "help": "サーバを起動します。cloud-init の user-data は任意で、--user-data @path.yaml または --user-data - で指定します。例: skr iaas-api server boot --zone ZONE --id 123456789012",
       "method": "BootWithContext",
       "request_type": "server.BootRequest",
       "handwritten": true

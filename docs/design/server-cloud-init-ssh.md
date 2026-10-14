@@ -9,7 +9,7 @@
 1. `iaas-api server create` は反復可能な `--disk 'archive-id=123,plan-id=4,size-gb=20'` を受け付けます。各指定は virtio ディスク1個に対応し、plan-id と size-gb は必須です。archive-id 省略時は空のディスクを作成します。
 2. `--nic 'upstream=shared'` または `--nic 'upstream=disconnected'` を反復して NIC を指定します。ディスクと NIC はそれぞれ指定順に配列を組み立てます。チュートリアルでは共有 NIC を1個指定します。
 3. cloud-init 用の手順では Create 時に起動しません。archive-id を指定したディスクと `--boot-after-create=true` は併用できません。
-4. `iaas-api server boot` は `--user-data @path.yaml` または `--user-data -` を受け付けます。インラインの user-data は拒否します。Boot はサーバ起動時に user-data を適用する SDK 操作を呼び出します。
+4. `iaas-api server boot` は user-data を省略して通常どおり起動できます。指定する場合は `--user-data @path.yaml` または `--user-data -` を受け付けます。明示的な空値やインラインの user-data は拒否します。Boot はサーバ起動時に user-data を適用する SDK 操作を呼び出します。
 5. チュートリアルでは SSH 鍵をローカルで生成し、公開鍵だけを cloud-config に記載します。SSH 接続の前に、共有 NIC の IP アドレスを確認します。
 
 既存の Create の `--request` JSON 入力は、個別スカラーオプションで表せないリクエストにも引き続き利用できます。`--request` と Create の個別フラグは併用できません。

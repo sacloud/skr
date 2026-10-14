@@ -38,7 +38,7 @@ func TestValidateRequest(t *testing.T) {
 		{name: "create missing plan", validator: "validateServerCreateRequest", request: &server.CreateRequest{Zone: "tk1v", Name: "server"}, wantErr: "CPU と MemoryGB"},
 		{name: "boot", validator: "validateServerBootRequest", request: &server.BootRequest{Zone: "tk1v", ID: 123, UserData: "#cloud-config"}},
 		{name: "boot missing ID", validator: "validateServerBootRequest", request: &server.BootRequest{Zone: "tk1v", UserData: "#cloud-config"}, wantErr: "ID が必要"},
-		{name: "boot missing user-data", validator: "validateServerBootRequest", request: &server.BootRequest{Zone: "tk1v", ID: 123}, wantErr: "user-data が必要"},
+		{name: "boot without user-data", validator: "validateServerBootRequest", request: &server.BootRequest{Zone: "tk1v", ID: 123}},
 		{name: "update", validator: "validateServerUpdateRequest", request: &server.UpdateRequest{Zone: "tk1v", ID: 123, Name: stringPointer("server")}},
 		{name: "update empty", validator: "validateServerUpdateRequest", request: &server.UpdateRequest{Zone: "tk1v", ID: 123}, wantErr: "更新するフィールド"},
 		{name: "delete", validator: "validateServerDeleteRequest", request: &server.DeleteRequest{Zone: "tk1v", ID: 123}},

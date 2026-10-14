@@ -59,9 +59,6 @@ func ValidateRequest(name string, request any) error {
 		if err := validateIdentity(value.Zone, value.ID); err != nil {
 			return err
 		}
-		if value.UserData == "" {
-			return fmt.Errorf("user-data が必要です")
-		}
 		return value.Validate()
 	case "validateServerUpdateRequest":
 		value, ok := request.(*server.UpdateRequest)

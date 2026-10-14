@@ -189,17 +189,21 @@ func (c *CreateCommand) setDevices(request *server.CreateRequest) error {
 }
 
 type BootCommand struct {
-	Zone     string `name:"zone" required:"" help:"必須: 対象ゾーン名。"`
-	ID       int64  `name:"id" required:"" help:"必須: 起動するサーバ ID。"`
-	UserData string `name:"user-data" required:"" help:"必須: cloud-init user-data。@path.yaml でファイルから、- で標準入力から読み込みます。インライン値は指定できません。"`
+	Zone     string  `name:"zone" required:"" help:"必須: 対象ゾーン名。"`
+	ID       int64   `name:"id" required:"" help:"必須: 起動するサーバ ID。"`
+	UserData *string `name:"user-data" help:"任意: cloud-init user-data。省略すると user-data なしで起動します。@path.yaml でファイルから、- で標準入力から読み込みます。インライン値は指定できません。"`
 	factory  APIFactory
 	runtime  Runtime
 }
 
 func (c *BootCommand) Run(_ *kong.Context) error {
-	userData, err := readUserData(c.UserData, os.Stdin)
-	if err != nil {
-		return err
+	var userData string
+	if c.UserData != nil {
+		var err error
+		userData, err = readUserData(*c.UserData, os.Stdin)
+		if err != nil {
+			return err
+		}
 	}
 	request := &server.BootRequest{
 		Zone:     c.Zone,
