@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -60,8 +61,8 @@ func TestRunIaaSDiskHelp(t *testing.T) {
 		{args: []string{"iaas-api", "disk", "--help"}, want: []string{"find", "read", "create", "update", "delete"}},
 		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "--request", "JSON 例", `"Names":["example"]`, "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "disk", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
-		{args: []string{"iaas-api", "disk", "create", "--help"}, want: []string{"JSON 専用", "DiskPlanID", "Connection", "SizeGB", "@path.json"}},
-		{args: []string{"iaas-api", "disk", "update", "--help"}, want: []string{"JSON 専用", "省略した項目", "EditParameter"}},
+		{args: []string{"iaas-api", "disk", "create", "--help"}, want: []string{"--zone", "--name", "--disk-plan-id", "--connection", "--size-gb", "--tags", "--request", "DistantFrom", "OSType", "API フィールドではありません", "EditParameter", "@path.json", "併用不可"}},
+		{args: []string{"iaas-api", "disk", "update", "--help"}, want: []string{"--zone", "--id", "--name", "--description", "--tags", "--icon-id", "--connection", "--no-wait", "--request", "省略した項目", "EditParameter", "@path.json", "併用不可"}},
 		{args: []string{"iaas-api", "disk", "delete", "--help"}, want: []string{"--fail-if-not-found", "--wait-for-release", "接続中", "復旧できません"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -96,16 +97,41 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		return stdout.String(), stderr.String(), code
 	}
 
-	create := `{"Zone":"test-zone","Name":"test-disk","DiskPlanID":4,"Connection":"virtio","SizeGB":20,"Tags":["test"]}`
+	create := `{"Zone":"test-zone","Name":"test-disk","Description":"test description","DiskPlanID":4,"Connection":"virtio","SizeGB":20,"Tags":["test"],"IconID":11,"NoWait":true}`
 	output, stderr, code := run("create", "--request", create)
 	if code != 0 || stderr != "" || !strings.Contains(output, `"Name": "test-disk"`) {
 		t.Fatalf("create: code %d, stderr %q, output %q", code, stderr, output)
 	}
 	if api.createRequest == nil || api.createRequest.Zone != "test-zone" ||
-		api.createRequest.Name != "test-disk" || api.createRequest.DiskPlanID != 4 ||
-		api.createRequest.Connection != "virtio" || api.createRequest.SizeGB != 20 ||
+		api.createRequest.Name != "test-disk" || api.createRequest.Description != "test description" ||
+		api.createRequest.DiskPlanID != 4 || api.createRequest.Connection != "virtio" ||
+		api.createRequest.SizeGB != 20 || api.createRequest.IconID != 11 || !api.createRequest.NoWait ||
 		len(api.createRequest.Tags) != 1 || api.createRequest.Tags[0] != "test" {
 		t.Fatalf("Create request = %+v, want JSON values", api.createRequest)
+	}
+	jsonCreateRequest := *api.createRequest
+
+	_, stderr, code = run("create",
+		"--zone", "test-zone", "--name", "test-disk", "--description", "test description",
+		"--disk-plan-id", "4", "--connection", "virtio", "--size-gb", "20",
+		"--tags", "test", "--icon-id", "11", "--no-wait",
+	)
+	if code != 0 || stderr != "" {
+		t.Fatalf("flag create: code %d, stderr %q", code, stderr)
+	}
+	if api.createRequest == nil || !reflect.DeepEqual(*api.createRequest, jsonCreateRequest) {
+		t.Fatalf("flag Create request = %+v, want JSON request %+v", api.createRequest, jsonCreateRequest)
+	}
+
+	_, stderr, code = run("create",
+		"--zone", "test-zone", "--name", "test-disk", "--disk-plan-id", "4",
+		"--connection", "virtio", "--size-gb", "20", "--no-wait=false",
+	)
+	if code != 0 || stderr != "" {
+		t.Fatalf("create with explicit false boolean: code %d, stderr %q", code, stderr)
+	}
+	if api.createRequest == nil || api.createRequest.NoWait {
+		t.Fatalf("Create request NoWait = %v, want explicit false", api.createRequest)
 	}
 
 	_, stderr, code = run("find", "--zone", "test-zone", "--tags", "production,web", "--count", "7", "--from", "2")
@@ -144,14 +170,42 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		t.Fatalf("Read request = %+v, want zone and ID", api.readRequest)
 	}
 
-	update := `{"Zone":"test-zone","ID":123,"Name":"updated-disk"}`
+	update := `{"Zone":"test-zone","ID":123,"Name":"updated-disk","Description":"","Tags":["test"],"IconID":0,"Connection":"virtio","NoWait":true}`
 	_, stderr, code = run("update", "--request", update)
 	if code != 0 || stderr != "" {
 		t.Fatalf("update: code %d, stderr %q", code, stderr)
 	}
 	if api.updateRequest == nil || api.updateRequest.ID != 123 ||
-		api.updateRequest.Name == nil || *api.updateRequest.Name != "updated-disk" {
+		api.updateRequest.Name == nil || *api.updateRequest.Name != "updated-disk" ||
+		api.updateRequest.Description == nil || *api.updateRequest.Description != "" ||
+		api.updateRequest.Tags == nil || len(*api.updateRequest.Tags) != 1 || (*api.updateRequest.Tags)[0] != "test" ||
+		api.updateRequest.IconID == nil || *api.updateRequest.IconID != 0 ||
+		api.updateRequest.Connection == nil || *api.updateRequest.Connection != "virtio" ||
+		!api.updateRequest.NoWait {
 		t.Fatalf("Update request = %+v, want ID and Name", api.updateRequest)
+	}
+	jsonUpdateRequest := *api.updateRequest
+
+	_, stderr, code = run("update",
+		"--zone", "test-zone", "--id", "123", "--name", "updated-disk",
+		"--description", "", "--tags", "test", "--icon-id", "0",
+		"--connection", "virtio", "--no-wait",
+	)
+	if code != 0 || stderr != "" {
+		t.Fatalf("flag update: code %d, stderr %q", code, stderr)
+	}
+	if api.updateRequest == nil || !reflect.DeepEqual(*api.updateRequest, jsonUpdateRequest) {
+		t.Fatalf("flag Update request = %+v, want JSON request %+v", api.updateRequest, jsonUpdateRequest)
+	}
+
+	_, stderr, code = run("update", "--zone", "test-zone", "--id", "123", "--name", "partial-update")
+	if code != 0 || stderr != "" {
+		t.Fatalf("partial flag update: code %d, stderr %q", code, stderr)
+	}
+	if api.updateRequest == nil || api.updateRequest.Name == nil || *api.updateRequest.Name != "partial-update" ||
+		api.updateRequest.Description != nil || api.updateRequest.Tags != nil ||
+		api.updateRequest.IconID != nil || api.updateRequest.Connection != nil {
+		t.Fatalf("partial Update request = %+v, want only Name set", api.updateRequest)
 	}
 
 	_, stderr, code = run("delete", "--zone", "test-zone", "--id", "123", "--fail-if-not-found", "--wait-for-release")
@@ -171,9 +225,14 @@ func TestIaaSDiskRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		{"find", "--zone", "all"},
 		{"find", "--request", `{"Zone":"all"}`},
 		{"read", "--zone", "all", "--id", "123"},
+		{"create"},
+		{"create", "--zone", "test-zone", "--name", "disk", "--disk-plan-id", "4", "--connection", "virtio"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"disk","DiskPlanID":4,"Connection":"virtio","SizeGB":20}`, "--zone", "test-zone"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"disk","DiskPlanID":4,"Connection":"virtio"}`},
 		{"update", "--request", `{"Zone":"test-zone","ID":123}`},
+		{"update", "--zone", "test-zone", "--id", "123"},
+		{"update", "--request", `{"Zone":"test-zone","ID":123}`, "--zone", "test-zone"},
+		{"update", "--id", "123", "--name", "disk"},
 		{"delete", "--zone", "all", "--id", "123"},
 	} {
 		var stdout, stderr bytes.Buffer

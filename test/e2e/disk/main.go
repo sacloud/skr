@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -120,13 +121,120 @@ func diskArgs(step string, value any) ([]string, error) {
 		return nil, fmt.Errorf("unknown Disk E2E step %q", step)
 	}
 	args := []string{"iaas-api", "disk", op}
+	supportedFields := map[string]bool{}
 	switch op {
-	case "find", "create", "update":
+	case "create":
+		supportedFields = fields(
+			"Zone", "Name", "Description", "Tags", "IconID", "DiskPlanID",
+			"Connection", "EncryptionAlgorithm", "KMSKeyID", "DedicatedStorageContractID",
+			"SourceDiskID", "SourceArchiveID", "ServerID", "SizeGB", "NoWait",
+		)
+	case "update":
+		supportedFields = fields("Zone", "ID", "Name", "Description", "Tags", "IconID", "Connection", "NoWait")
+	case "find":
+		supportedFields = fields("Zone", "Names", "Tags", "Count", "From", "Sort")
+	case "read":
+		supportedFields = fields("Zone", "ID")
+	case "delete":
+		supportedFields = fields("Zone", "ID", "FailIfNotFound", "WaitForRelease", "WaitForReleaseTimeout", "WaitForReleaseTick")
+	}
+	if !supportsFields(request, supportedFields) || hasUnrepresentableTags(request) {
 		data, err := json.Marshal(request)
 		if err != nil {
 			return nil, fmt.Errorf("%s: encode request: %w", step, err)
 		}
 		args = append(args, "--request", string(data))
+		return append(args, queryArgs...), nil
+	}
+	switch op {
+	case "find":
+		data, err := json.Marshal(request)
+		if err != nil {
+			return nil, fmt.Errorf("%s: encode request: %w", step, err)
+		}
+		args = append(args, "--request", string(data))
+	case "create":
+		name, err := requestString(step, request, "Name")
+		if err != nil {
+			return nil, err
+		}
+		connection, err := requestString(step, request, "Connection")
+		if err != nil {
+			return nil, err
+		}
+		sizeGB, err := requestInt(step, request, "SizeGB")
+		if err != nil {
+			return nil, err
+		}
+		planID, err := requestInt64(step, request, "DiskPlanID")
+		if err != nil {
+			return nil, err
+		}
+		args = append(args,
+			"--zone", zone, "--name", name,
+			"--disk-plan-id", strconv.FormatInt(planID, 10),
+			"--connection", connection, "--size-gb", strconv.Itoa(sizeGB),
+		)
+		for _, field := range []struct{ name, flag string }{
+			{"Description", "--description"},
+			{"EncryptionAlgorithm", "--encryption-algorithm"},
+		} {
+			args, err = appendOptionalStringFlag(step, args, request, field.name, field.flag)
+			if err != nil {
+				return nil, err
+			}
+		}
+		for _, field := range []struct{ name, flag string }{
+			{"IconID", "--icon-id"},
+			{"KMSKeyID", "--kms-key-id"},
+			{"DedicatedStorageContractID", "--dedicated-storage-contract-id"},
+			{"SourceDiskID", "--source-disk-id"},
+			{"SourceArchiveID", "--source-archive-id"},
+			{"ServerID", "--server-id"},
+		} {
+			args, err = appendOptionalInt64Flag(step, args, request, field.name, field.flag)
+			if err != nil {
+				return nil, err
+			}
+		}
+		args, err = appendOptionalTagsFlag(step, args, request)
+		if err != nil {
+			return nil, err
+		}
+		args, err = appendOptionalBoolFlag(step, args, request, "NoWait", "--no-wait")
+		if err != nil {
+			return nil, err
+		}
+	case "update":
+		id, err := requestID(request)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", step, err)
+		}
+		args = append(args, "--zone", zone, "--id", id)
+		args, err = appendOptionalStringFlag(step, args, request, "Name", "--name")
+		if err != nil {
+			return nil, err
+		}
+		args, err = appendOptionalStringFlag(step, args, request, "Description", "--description")
+		if err != nil {
+			return nil, err
+		}
+		args, err = appendOptionalStringFlag(step, args, request, "Connection", "--connection")
+		if err != nil {
+			return nil, err
+		}
+		args, err = appendOptionalInt64Flag(step, args, request, "IconID", "--icon-id")
+		if err != nil {
+			return nil, err
+		}
+		args, err = appendOptionalTagsFlag(step, args, request)
+		if err != nil {
+			return nil, err
+		}
+		args, err = appendOptionalBoolFlag(step, args, request, "NoWait", "--no-wait")
+		if err != nil {
+			return nil, err
+		}
 	case "read":
 		id, err := requestID(request)
 		if err != nil {
@@ -138,21 +246,169 @@ func diskArgs(step string, value any) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", step, err)
 		}
-		args = append(args, "--zone", zone, "--id", id, "--fail-if-not-found")
+		args = append(args, "--zone", zone, "--id", id)
+		if _, exists := request["FailIfNotFound"]; exists {
+			args, err = appendOptionalBoolFlag(step, args, request, "FailIfNotFound", "--fail-if-not-found")
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			args = append(args, "--fail-if-not-found")
+		}
+		args, err = appendOptionalBoolFlag(step, args, request, "WaitForRelease", "--wait-for-release")
+		if err != nil {
+			return nil, err
+		}
+		args, err = appendOptionalIntFlag(step, args, request, "WaitForReleaseTimeout", "--wait-for-release-timeout")
+		if err != nil {
+			return nil, err
+		}
+		args, err = appendOptionalIntFlag(step, args, request, "WaitForReleaseTick", "--wait-for-release-tick")
+		if err != nil {
+			return nil, err
+		}
 	}
 	return append(args, queryArgs...), nil
 }
 
+func fields(names ...string) map[string]bool {
+	result := make(map[string]bool, len(names))
+	for _, name := range names {
+		result[name] = true
+	}
+	return result
+}
+
+func supportsFields(request map[string]any, supported map[string]bool) bool {
+	for name := range request {
+		if !supported[name] {
+			return false
+		}
+	}
+	return true
+}
+
+func hasUnrepresentableTags(request map[string]any) bool {
+	value, ok := request["Tags"]
+	if !ok {
+		return false
+	}
+	tags, ok := value.([]string)
+	if !ok || len(tags) == 0 {
+		return true
+	}
+	for _, tag := range tags {
+		if strings.Contains(tag, ",") {
+			return true
+		}
+	}
+	return false
+}
+
+func requestString(step string, request map[string]any, field string) (string, error) {
+	value, ok := request[field].(string)
+	if !ok {
+		return "", fmt.Errorf("%s: %s must be a string", step, field)
+	}
+	return value, nil
+}
+
+func requestInt(step string, request map[string]any, field string) (int, error) {
+	value, ok := request[field].(int)
+	if !ok {
+		return 0, fmt.Errorf("%s: %s must be an integer", step, field)
+	}
+	return value, nil
+}
+
+func requestInt64(step string, request map[string]any, field string) (int64, error) {
+	value, ok := request[field]
+	if !ok {
+		return 0, fmt.Errorf("%s: missing %s", step, field)
+	}
+	switch number := value.(type) {
+	case int:
+		return int64(number), nil
+	case int64:
+		return number, nil
+	case types.ID:
+		return int64(number), nil
+	default:
+		return 0, fmt.Errorf("%s: %s must be an integer", step, field)
+	}
+}
+
+func appendOptionalIntFlag(step string, args []string, request map[string]any, field, flagName string) ([]string, error) {
+	if _, exists := request[field]; !exists {
+		return args, nil
+	}
+	value, err := requestInt(step, request, field)
+	if err != nil {
+		return nil, err
+	}
+	return append(args, flagName, strconv.Itoa(value)), nil
+}
+
+func appendOptionalStringFlag(step string, args []string, request map[string]any, field, flagName string) ([]string, error) {
+	value, exists := request[field]
+	if !exists {
+		return args, nil
+	}
+	text, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("%s: %s must be a string", step, field)
+	}
+	return append(args, flagName, text), nil
+}
+
+func appendOptionalInt64Flag(step string, args []string, request map[string]any, field, flagName string) ([]string, error) {
+	if _, exists := request[field]; !exists {
+		return args, nil
+	}
+	value, err := requestInt64(step, request, field)
+	if err != nil {
+		return nil, err
+	}
+	return append(args, flagName, strconv.FormatInt(value, 10)), nil
+}
+
+func appendOptionalTagsFlag(step string, args []string, request map[string]any) ([]string, error) {
+	value, exists := request["Tags"]
+	if !exists {
+		return args, nil
+	}
+	tags, ok := value.([]string)
+	if !ok {
+		return nil, fmt.Errorf("%s: Tags must be a string array", step)
+	}
+	return append(args, "--tags", strings.Join(tags, ",")), nil
+}
+
+func appendOptionalBoolFlag(step string, args []string, request map[string]any, field, flagName string) ([]string, error) {
+	value, exists := request[field]
+	if !exists {
+		return args, nil
+	}
+	boolean, ok := value.(bool)
+	if !ok {
+		return nil, fmt.Errorf("%s: %s must be a boolean", step, field)
+	}
+	return append(args, flagName+"="+strconv.FormatBool(boolean)), nil
+}
+
 func requestID(request map[string]any) (string, error) {
-	id, ok := request["ID"]
+	_, ok := request["ID"]
 	if !ok {
 		return "", errors.New("missing ID")
 	}
-	value := fmt.Sprint(id)
-	if value == "" || value == "0" {
+	value, err := requestInt64("request", request, "ID")
+	if err != nil {
+		return "", err
+	}
+	if value == 0 {
 		return "", errors.New("invalid ID")
 	}
-	return value, nil
+	return strconv.FormatInt(value, 10), nil
 }
 
 type scenario struct {

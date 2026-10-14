@@ -72,6 +72,13 @@ $ skr http --help
 $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1 --tags production,web
 ```
 
+Disk の作成では `--zone`、`--name`、`--disk-plan-id`、`--connection`、`--size-gb` を指定します。更新では `--zone` と `--id` に加えて、変更する値だけをフラグで指定できます。省略した値は変更されません。複雑な値は `--request` にインライン JSON または `@path.json` で渡せますが、個別フラグとは併用できません。詳しくは[Disk API チュートリアル](docs/manual/tutorials/iaas-api/disk.md)を参照してください。
+
+```console
+$ skr iaas-api disk create --zone ZONE --name DISK-NAME --disk-plan-id 4 --connection virtio --size-gb 20 --tags production,web
+$ skr iaas-api disk update --zone ZONE --id DISK-ID --name UPDATED-DISK-NAME
+```
+
 ## 認証
 
 サービスプリンシパルキーを基本の認証方式としています。API キー認証も引き続き利用できます。プロファイルの設定方法は[プロファイルの管理](docs/manual/c0nfig.md)、API キーの設定方法は[API キーを使う場合](docs/manual/c0nfig.md#api-キーを使う場合)を参照してください。

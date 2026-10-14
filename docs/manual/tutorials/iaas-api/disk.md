@@ -29,14 +29,29 @@ $ skr iaas-api disk update --help
 $ skr iaas-api disk delete --help
 ```
 
-意図したプロファイル、プロジェクト、認証情報を確認します。ディスクの作成と更新は JSON 専用です。JSON は `--request` に直接指定するか、`@ファイル名` で読み込めます。検索、参照、削除では個別フラグまたは JSON を使い、両方は併用できません。検索の `--tags` はカンマ区切りで指定できます。作成・更新でタグを指定する場合は、`--request` 内の `Tags` を文字列配列にします。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
+意図したプロファイル、プロジェクト、認証情報を確認します。作成と更新では単純な値を個別フラグで指定でき、複雑な値は `--request` にインライン JSON または `@ファイル名` で指定できます。両方の入力経路は併用できません。作成の `DistantFrom` と `EditParameter`、更新の `EditParameter` は JSON で指定します。タグは個別フラグではカンマ区切り、JSON では `Tags` の文字列配列で指定できます。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
 
 検索では対象のゾーンを明示してください。
 
-## Step 2: ディスク作成リクエストを用意する
+## Step 2: ディスク作成の入力を用意する
 
-次の内容を `disk-create.json` として保存し、`TEST-DISK-NAME` を重複しないテスト専用名に置き換えてください。`DiskPlanID` 4 は `is1b` の SSD プラン、`SizeGB` 20 はそのプランで利用できるサイズです。
+`TEST-DISK-NAME` を対象プロジェクト内で重複しないテスト専用名に置き換えてください。`DiskPlanID` 4 は `is1b` の SSD プラン、`SizeGB` 20 はそのプランで利用できるサイズです。これらの値は対象ゾーンとプランに合わせてください。
 
+単純な入力には個別フラグを使えます。`Zone`、`Name`、`DiskPlanID`、`Connection`、`SizeGB` は必須です。`Tags` や `Description` などの独立したスカラー値も指定できます。
+
+```console
+$ skr iaas-api disk create \
+    --zone is1b \
+    --name TEST-DISK-NAME \
+    --disk-plan-id 4 \
+    --connection virtio \
+    --size-gb 20 \
+    --tags tutorial
+```
+
+同じ値は JSON リクエストでも指定できます。JSON の `Tags` は文字列配列です。複雑な入力が必要な場合は JSON ファイルを使ってください。
+
+次の内容を `disk-create.json` として保存してください。
 ```json
 {
   "Zone": "is1b",
@@ -48,15 +63,16 @@ $ skr iaas-api disk delete --help
 }
 ```
 
-この例ではディスクの内容のコピー元やサーバ ID を指定していないため、サーバ未接続のディスクを作成します。タグは JSON の `Tags` 配列で指定します。ディスクの作成は JSON 専用のため、`--tags` フラグは使えません。既存ディスクやアーカイブからコピーする場合は、`disk create --help` にある `SourceDiskID` または `SourceArchiveID` などを JSON に加えてください。コピー元、サイズ、プランの組み合わせは作成前に確認してください。
+この例ではディスクの内容のコピー元やサーバ ID を指定していないため、サーバ未接続のディスクを作成します。個別フラグと JSON は同じリクエストを組み立てますが、1回のコマンドでは併用できません。作成時の `DistantFrom` と `EditParameter` は JSON で指定します。既存ディスクやアーカイブからコピーする場合は、`disk create --help` にある `SourceDiskID` または `SourceArchiveID` などを指定してください。コピー元、サイズ、プランの組み合わせは作成前に確認してください。
 
 ## Step 3: ディスクを作成し、検索・参照する
 
+Step 2 のフラグ例、または次の JSON 入力例のどちらか一方を使います。
 ```console
 $ skr iaas-api disk create --request @disk-create.json
 ```
 
-成功すると Disk の情報が出力されます。以降の操作で使う `ID` を控えてください。`123456789012` は仮の値です。作成結果の ID に置き換えて検索・参照してください。
+成功すると Disk の情報が出力されます。2つの入力例からは同じフィールドを持つリクエストが作られます。以降の操作で使う `ID` を控えてください。`123456789012` は仮の値です。作成結果の ID に置き換えて検索・参照してください。
 
 ```console
 $ skr iaas-api disk find --request='{"Zone":"is1b","Names":["TEST-DISK-NAME"],"Tags":["tutorial"]}' --query 'map({ID,Name,SizeMB})'
@@ -85,7 +101,13 @@ $ skr iaas-api disk read --zone is1b --id 123456789012
 
 ## Step 4: 名前を更新する
 
-次の JSON を `disk-update.json` として保存し、ID と `UPDATED-TEST-DISK-NAME` を実際の値に置き換えてください。更新で省略した項目は変更されません。
+ID と `UPDATED-TEST-DISK-NAME` を実際の値に置き換えて、名前をフラグで更新します。更新する項目だけを指定し、省略した項目は変更しません。
+
+```console
+$ skr iaas-api disk update --zone is1b --id 123456789012 --name UPDATED-TEST-DISK-NAME
+```
+
+JSON を使う場合は、次の内容を `disk-update.json` として保存します。タグなどの配列を更新する場合も JSON を利用できます。
 
 ```json
 {
@@ -95,8 +117,13 @@ $ skr iaas-api disk read --zone is1b --id 123456789012
 }
 ```
 
+JSON 入力を使う場合は、次のコマンドで更新します。
 ```console
 $ skr iaas-api disk update --request @disk-update.json
+```
+
+フラグ例または JSON 入力例のどちらかで更新した後、名前が変わったことを次のコマンドで確認します。
+```console
 $ skr iaas-api disk read --zone is1b --id 123456789012
 ```
 
@@ -116,18 +143,6 @@ $ skr iaas-api disk find --request='{"Zone":"is1b","Names":["UPDATED-TEST-DISK-N
 ```json
 []
 ```
-
-## ライブ E2E の実行
-
-リポジトリの E2E runner で、対象プロジェクトの `is1b` におけるディスク作成・更新・削除を検証できます。対象プロファイルとプロジェクトを確認してから実行してください。runner はランダムな名前のディスクだけを作成し、同名のディスクが既にある場合は中止します。実行にはディスク作成の承認が必要です。
-
-```console
-$ make build
-$ ./skr config current
-$ go run ./test/e2e/disk --skr ./skr --confirm-is1b-live
-```
-
-runner は検索、参照、作成、更新、削除と削除後の不在を確認します。実行の入出力は `tmp/disk-api/` にプライベートな証跡として保存されます。実際のリソース ID やアカウント情報を含むため、Git に追加したり他者へ共有したりしないでください。失敗時にクリーンアップできなかった場合は、標準エラーと証跡から対象を確認し、不要なディスクだけを削除してください。
 
 ## 参考情報
 

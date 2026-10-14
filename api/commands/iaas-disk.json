@@ -80,22 +80,192 @@
     {
       "name": "Create",
       "command_type": "CreateCommand",
-      "help": "JSON リクエストでディスクを作成して出力します。ディスクプラン、接続インターフェース、サイズを対象ゾーンに合わせて指定してください。例: skr iaas-api disk create --request @disk-create.json",
+      "help": "ディスクを作成して出力します。基本項目はフラグ、複雑な値は --request JSON で指定します。例: skr iaas-api disk create --zone is1b --name DISK-NAME --disk-plan-id 4 --connection virtio --size-gb 20",
       "method": "CreateWithContext",
       "request_type": "disk.CreateRequest",
       "response_type": "*iaas.Disk",
       "request_validator": "validateDiskCreateRequest",
-      "request_help": "JSON 専用です。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、DiskPlanID (対象ゾーンで利用できるディスクプラン ID)、Connection (IDE または virtio)、SizeGB (プランとゾーンで利用できるサイズ、GB)。任意: Description、Tags、IconID、EncryptionAlgorithm、KMSKeyID、DedicatedStorageContractID、SourceDiskID、SourceArchiveID、ServerID、DistantFrom、OSType、EditParameter、NoWait。ディスクやアーカイブをコピーする場合は対応する ID を指定します。作成先のゾーン、プラン、サイズ、接続先は事前に確認してください。例: --request @disk-create.json。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"DISK-NAME\",\"DiskPlanID\":4,\"Connection\":\"virtio\",\"SizeGB\":20}。DiskPlanID と SizeGB は対象プランに合わせて置き換えてください。"
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて単純なスカラー値と Tags を指定できます。DistantFrom (ID 配列)、EditParameter (複雑な設定)、OSType (SDK の補助入力で、API フィールドではありません) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。例: --request @disk-create.json。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"DISK-NAME\",\"DiskPlanID\":4,\"Connection\":\"virtio\",\"SizeGB\":20,\"Tags\":[\"production\",\"web\"]}。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 作成先のゾーン名。",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "必須: ディスク名。",
+          "required": true
+        },
+        {
+          "name": "disk-plan-id",
+          "field": "DiskPlanID",
+          "type": "int64",
+          "help": "必須: 対象ゾーンで利用できるディスクプラン ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "connection",
+          "field": "Connection",
+          "type": "string",
+          "help": "必須: 接続インターフェース。virtio または ide を指定します。",
+          "required": true,
+          "conversion": "types.EDiskConnection"
+        },
+        {
+          "name": "size-gb",
+          "field": "SizeGB",
+          "type": "int",
+          "help": "必須: 対象ゾーンとディスクプランで利用できるサイズ (GB)。",
+          "required": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
+          "conversion": "types.Tags",
+          "separator": ","
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: ディスクの説明 (最大512文字)。"
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコンの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "encryption-algorithm",
+          "field": "EncryptionAlgorithm",
+          "type": "string",
+          "help": "任意: 暗号化アルゴリズム (none または aes256_xts)。",
+          "conversion": "types.EDiskEncryptionAlgorithm"
+        },
+        {
+          "name": "kms-key-id",
+          "field": "KMSKeyID",
+          "type": "int64",
+          "help": "任意: KMS キーの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "dedicated-storage-contract-id",
+          "field": "DedicatedStorageContractID",
+          "type": "int64",
+          "help": "任意: 専有ストレージ契約の ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "source-disk-id",
+          "field": "SourceDiskID",
+          "type": "int64",
+          "help": "任意: コピー元ディスクの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "source-archive-id",
+          "field": "SourceArchiveID",
+          "type": "int64",
+          "help": "任意: コピー元アーカイブの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "server-id",
+          "field": "ServerID",
+          "type": "int64",
+          "help": "任意: 接続先サーバの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "no-wait",
+          "field": "NoWait",
+          "type": "bool",
+          "help": "任意: ディスクの作成完了を待たずに戻ります。"
+        }
+      ]
     },
     {
       "name": "Update",
       "command_type": "UpdateCommand",
-      "help": "JSON リクエストでディスクの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api disk update --request @disk-update.json",
+      "help": "ディスクの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api disk update --zone ZONE --id 123456789012 --name UPDATED-DISK-NAME",
       "method": "UpdateWithContext",
       "request_type": "disk.UpdateRequest",
       "response_type": "*iaas.Disk",
       "request_validator": "validateDiskUpdateRequest",
-      "request_help": "JSON 専用です。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)、変更する項目を1つ以上。変更可能な項目: Name、Description、Tags、IconID、Connection、EditParameter。省略した項目は変更しません。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"Name\":\"UPDATED-DISK-NAME\"}'。Zone、ID、Name は実際の値に置き換えます。"
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID、変更する項目を1つ以上。Name、Description、Tags、IconID、Connection、NoWait は個別フラグまたは JSON で指定できます。EditParameter は JSON で指定します。省略した項目は変更しません。JSON 例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"Name\":\"UPDATED-DISK-NAME\"}'。Zone と ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 更新対象のディスク ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 新しい名前。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 新しい説明 (最大512文字)。空文字列も指定できます。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。",
+          "pointer": true,
+          "conversion": "types.Tags",
+          "separator": ","
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコンの ID (数値)。未指定なら変更しません。",
+          "pointer": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "connection",
+          "field": "Connection",
+          "type": "string",
+          "help": "任意: 接続インターフェース。virtio または ide を指定します。未指定なら変更しません。",
+          "pointer": true,
+          "conversion": "types.EDiskConnection"
+        },
+        {
+          "name": "no-wait",
+          "field": "NoWait",
+          "type": "bool",
+          "help": "任意: ディスクの更新完了を待たずに戻ります。"
+        }
+      ]
     },
     {
       "name": "Delete",

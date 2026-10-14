@@ -16,8 +16,8 @@ import (
 type Commands struct {
 	Find   FindCommand   "cmd:\"\" help:\"ディスクを指定したゾーンで検索して出力します。例: skr iaas-api disk find --zone is1b\""
 	Read   ReadCommand   "cmd:\"\" help:\"ディスクを読み取って出力します。例: skr iaas-api disk read --zone ZONE --id 123456789012\""
-	Create CreateCommand "cmd:\"\" help:\"JSON リクエストでディスクを作成して出力します。ディスクプラン、接続インターフェース、サイズを対象ゾーンに合わせて指定してください。例: skr iaas-api disk create --request @disk-create.json\""
-	Update UpdateCommand "cmd:\"\" help:\"JSON リクエストでディスクの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api disk update --request @disk-update.json\""
+	Create CreateCommand "cmd:\"\" help:\"ディスクを作成して出力します。基本項目はフラグ、複雑な値は --request JSON で指定します。例: skr iaas-api disk create --zone is1b --name DISK-NAME --disk-plan-id 4 --connection virtio --size-gb 20\""
+	Update UpdateCommand "cmd:\"\" help:\"ディスクの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api disk update --zone ZONE --id 123456789012 --name UPDATED-DISK-NAME\""
 	Delete DeleteCommand "cmd:\"\" help:\"ディスクを削除します。サーバに接続中のディスクは削除できません。削除後は復旧できません。成功時は出力しません。例: skr iaas-api disk delete --zone ZONE --id 123456789012 --fail-if-not-found\""
 }
 
@@ -202,13 +202,43 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request *string "help:\"JSON 専用です。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、DiskPlanID (対象ゾーンで利用できるディスクプラン ID)、Connection (IDE または virtio)、SizeGB (プランとゾーンで利用できるサイズ、GB)。任意: Description、Tags、IconID、EncryptionAlgorithm、KMSKeyID、DedicatedStorageContractID、SourceDiskID、SourceArchiveID、ServerID、DistantFrom、OSType、EditParameter、NoWait。ディスクやアーカイブをコピーする場合は対応する ID を指定します。作成先のゾーン、プラン、サイズ、接続先は事前に確認してください。例: --request @disk-create.json。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"DISK-NAME\\\",\\\"DiskPlanID\\\":4,\\\"Connection\\\":\\\"virtio\\\",\\\"SizeGB\\\":20}。DiskPlanID と SizeGB は対象プランに合わせて置き換えてください。\""
-	factory APIFactory
-	runtime Runtime
+	Request                    *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて単純なスカラー値と Tags を指定できます。DistantFrom (ID 配列)、EditParameter (複雑な設定)、OSType (SDK の補助入力で、API フィールドではありません) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。例: --request @disk-create.json。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"DISK-NAME\\\",\\\"DiskPlanID\\\":4,\\\"Connection\\\":\\\"virtio\\\",\\\"SizeGB\\\":20,\\\"Tags\\\":[\\\"production\\\",\\\"web\\\"]}。\""
+	Zone                       *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
+	Name                       *string   "name:\"name\" help:\"必須: ディスク名。\""
+	DiskPlanID                 *int64    "name:\"disk-plan-id\" help:\"必須: 対象ゾーンで利用できるディスクプラン ID (数値)。\""
+	Connection                 *string   "name:\"connection\" help:\"必須: 接続インターフェース。virtio または ide を指定します。\""
+	SizeGB                     *int      "name:\"size-gb\" help:\"必須: 対象ゾーンとディスクプランで利用できるサイズ (GB)。\""
+	Tags                       *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
+	Description                *string   "name:\"description\" help:\"任意: ディスクの説明 (最大512文字)。\""
+	IconID                     *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
+	EncryptionAlgorithm        *string   "name:\"encryption-algorithm\" help:\"任意: 暗号化アルゴリズム (none または aes256_xts)。\""
+	KMSKeyID                   *int64    "name:\"kms-key-id\" help:\"任意: KMS キーの ID (数値)。\""
+	DedicatedStorageContractID *int64    "name:\"dedicated-storage-contract-id\" help:\"任意: 専有ストレージ契約の ID (数値)。\""
+	SourceDiskID               *int64    "name:\"source-disk-id\" help:\"任意: コピー元ディスクの ID (数値)。\""
+	SourceArchiveID            *int64    "name:\"source-archive-id\" help:\"任意: コピー元アーカイブの ID (数値)。\""
+	ServerID                   *int64    "name:\"server-id\" help:\"任意: 接続先サーバの ID (数値)。\""
+	NoWait                     *bool     "name:\"no-wait\" help:\"任意: ディスクの作成完了を待たずに戻ります。\""
+	factory                    APIFactory
+	runtime                    Runtime
 }
 
 func (c *CreateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
+	flagsSet = flagsSet || c.Zone != nil
+	flagsSet = flagsSet || c.Name != nil
+	flagsSet = flagsSet || c.DiskPlanID != nil
+	flagsSet = flagsSet || c.Connection != nil
+	flagsSet = flagsSet || c.SizeGB != nil
+	flagsSet = flagsSet || c.Tags != nil
+	flagsSet = flagsSet || c.Description != nil
+	flagsSet = flagsSet || c.IconID != nil
+	flagsSet = flagsSet || c.EncryptionAlgorithm != nil
+	flagsSet = flagsSet || c.KMSKeyID != nil
+	flagsSet = flagsSet || c.DedicatedStorageContractID != nil
+	flagsSet = flagsSet || c.SourceDiskID != nil
+	flagsSet = flagsSet || c.SourceArchiveID != nil
+	flagsSet = flagsSet || c.ServerID != nil
+	flagsSet = flagsSet || c.NoWait != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -221,7 +251,79 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
-		return fmt.Errorf("--request が必要です")
+		if !flagsSet {
+			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.Zone == nil {
+			return fmt.Errorf("--zone が必要です")
+		}
+		if c.Zone != nil {
+			request.Zone = *c.Zone
+		}
+		if c.Name == nil {
+			return fmt.Errorf("--name が必要です")
+		}
+		if c.Name != nil {
+			request.Name = *c.Name
+		}
+		if c.DiskPlanID == nil {
+			return fmt.Errorf("--disk-plan-id が必要です")
+		}
+		if c.DiskPlanID != nil {
+			value := types.ID(*c.DiskPlanID)
+			request.DiskPlanID = value
+		}
+		if c.Connection == nil {
+			return fmt.Errorf("--connection が必要です")
+		}
+		if c.Connection != nil {
+			value := types.EDiskConnection(*c.Connection)
+			request.Connection = value
+		}
+		if c.SizeGB == nil {
+			return fmt.Errorf("--size-gb が必要です")
+		}
+		if c.SizeGB != nil {
+			request.SizeGB = *c.SizeGB
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = value
+		}
+		if c.Description != nil {
+			request.Description = *c.Description
+		}
+		if c.IconID != nil {
+			value := types.ID(*c.IconID)
+			request.IconID = value
+		}
+		if c.EncryptionAlgorithm != nil {
+			value := types.EDiskEncryptionAlgorithm(*c.EncryptionAlgorithm)
+			request.EncryptionAlgorithm = value
+		}
+		if c.KMSKeyID != nil {
+			value := types.ID(*c.KMSKeyID)
+			request.KMSKeyID = value
+		}
+		if c.DedicatedStorageContractID != nil {
+			value := types.ID(*c.DedicatedStorageContractID)
+			request.DedicatedStorageContractID = value
+		}
+		if c.SourceDiskID != nil {
+			value := types.ID(*c.SourceDiskID)
+			request.SourceDiskID = value
+		}
+		if c.SourceArchiveID != nil {
+			value := types.ID(*c.SourceArchiveID)
+			request.SourceArchiveID = value
+		}
+		if c.ServerID != nil {
+			value := types.ID(*c.ServerID)
+			request.ServerID = value
+		}
+		if c.NoWait != nil {
+			request.NoWait = *c.NoWait
+		}
 	}
 	if c.runtime.ValidateRequest == nil {
 		return fmt.Errorf("API リクエスト検証が設定されていません")
@@ -253,13 +355,29 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request *string "help:\"JSON 専用です。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)、変更する項目を1つ以上。変更可能な項目: Name、Description、Tags、IconID、Connection、EditParameter。省略した項目は変更しません。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-DISK-NAME\\\"}'。Zone、ID、Name は実際の値に置き換えます。\""
-	factory APIFactory
-	runtime Runtime
+	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID、変更する項目を1つ以上。Name、Description、Tags、IconID、Connection、NoWait は個別フラグまたは JSON で指定できます。EditParameter は JSON で指定します。省略した項目は変更しません。JSON 例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-DISK-NAME\\\"}'。Zone と ID は実際の値に置き換えます。\""
+	Zone        *string   "name:\"zone\" help:\"必須: 対象ゾーン名。\""
+	ID          *int64    "name:\"id\" help:\"必須: 更新対象のディスク ID (数値)。\""
+	Name        *string   "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
+	Description *string   "name:\"description\" help:\"任意: 新しい説明 (最大512文字)。空文字列も指定できます。未指定なら変更しません。\""
+	Tags        *[]string "name:\"tags\" help:\"任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。\" sep:\",\""
+	IconID      *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。未指定なら変更しません。\""
+	Connection  *string   "name:\"connection\" help:\"任意: 接続インターフェース。virtio または ide を指定します。未指定なら変更しません。\""
+	NoWait      *bool     "name:\"no-wait\" help:\"任意: ディスクの更新完了を待たずに戻ります。\""
+	factory     APIFactory
+	runtime     Runtime
 }
 
 func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
+	flagsSet = flagsSet || c.Zone != nil
+	flagsSet = flagsSet || c.ID != nil
+	flagsSet = flagsSet || c.Name != nil
+	flagsSet = flagsSet || c.Description != nil
+	flagsSet = flagsSet || c.Tags != nil
+	flagsSet = flagsSet || c.IconID != nil
+	flagsSet = flagsSet || c.Connection != nil
+	flagsSet = flagsSet || c.NoWait != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -272,7 +390,43 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
-		return fmt.Errorf("--request が必要です")
+		if !flagsSet {
+			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.Zone == nil {
+			return fmt.Errorf("--zone が必要です")
+		}
+		if c.Zone != nil {
+			request.Zone = *c.Zone
+		}
+		if c.ID == nil {
+			return fmt.Errorf("--id が必要です")
+		}
+		if c.ID != nil {
+			value := types.ID(*c.ID)
+			request.ID = value
+		}
+		if c.Name != nil {
+			request.Name = c.Name
+		}
+		if c.Description != nil {
+			request.Description = c.Description
+		}
+		if c.Tags != nil {
+			value := types.Tags(*c.Tags)
+			request.Tags = &value
+		}
+		if c.IconID != nil {
+			value := types.ID(*c.IconID)
+			request.IconID = &value
+		}
+		if c.Connection != nil {
+			value := types.EDiskConnection(*c.Connection)
+			request.Connection = &value
+		}
+		if c.NoWait != nil {
+			request.NoWait = *c.NoWait
+		}
 	}
 	if c.runtime.ValidateRequest == nil {
 		return fmt.Errorf("API リクエスト検証が設定されていません")
