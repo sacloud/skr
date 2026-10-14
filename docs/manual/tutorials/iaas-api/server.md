@@ -28,6 +28,7 @@ $ skr iaas-api disk find --help
 作業用ディレクトリを作成し、その中に鍵を生成します。秘密鍵はローカルに保管し、コマンドの引数や API リクエストに含めません。
 
 ```console
+$ umask 077
 $ WORK_DIR=$(mktemp -d)
 $ KEY_PATH="$WORK_DIR/server-tutorial-key"
 $ USER_DATA_PATH="$WORK_DIR/server-c0nfig.yaml"
@@ -68,6 +69,8 @@ $ skr iaas-api server create \
 ```
 
 作成結果の Server ID を控え、`SERVER_ID` に設定します。cloud-init の user-data を適用するため、作成時には Server を起動せず、次の `boot` 操作で起動します。
+
+`--user-data` 自体は任意ですが、この手順では SSH 公開鍵とユーザーを設定するために指定します。user-data が不要な通常の起動では省略できます。指定する場合は `@path` または `-` を使い、内容を直接引数に渡さないでください。
 
 ```console
 $ SERVER_ID=SERVER_ID
@@ -119,6 +122,10 @@ Server と同名の Disk が残っていないことを確認します。出力�
 ```console
 $ skr iaas-api disk find --zone is1b \
     --query "map(select(.Name == \"$SERVER_NAME\") | {ID, Name})"
+```
+
+```json
+[]
 ```
 
 ローカルの鍵と user-data も不要になったら削除してください。秘密鍵を失うと同じ鍵では再接続できません。必要なデータを退避してから削除します。
