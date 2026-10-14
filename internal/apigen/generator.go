@@ -43,19 +43,27 @@ type Config struct {
 }
 
 type Operation struct {
-	Name             string     `json:"name"`
-	CommandType      string     `json:"command_type"`
-	Help             string     `json:"help"`
-	Method           string     `json:"method"`
-	RequestType      string     `json:"request_type,omitempty"`
-	RequestByValue   bool       `json:"request_by_value,omitempty"`
-	RequestOptional  bool       `json:"request_optional,omitempty"`
-	ResponseType     string     `json:"response_type,omitempty"`
-	RequestHelp      string     `json:"request_help,omitempty"`
-	RequestValidator string     `json:"request_validator,omitempty"`
-	Handwritten      bool       `json:"handwritten,omitempty"`
-	Arguments        []Argument `json:"arguments,omitempty"`
-	Flags            []Flag     `json:"flags,omitempty"`
+	Name             string         `json:"name"`
+	CommandType      string         `json:"command_type"`
+	Help             string         `json:"help"`
+	Method           string         `json:"method"`
+	RequestType      string         `json:"request_type,omitempty"`
+	RequestByValue   bool           `json:"request_by_value,omitempty"`
+	RequestOptional  bool           `json:"request_optional,omitempty"`
+	ResponseType     string         `json:"response_type,omitempty"`
+	RequestHelp      string         `json:"request_help,omitempty"`
+	RequestValidator string         `json:"request_validator,omitempty"`
+	RequestTransform string         `json:"request_transform,omitempty"`
+	Handwritten      bool           `json:"handwritten,omitempty"`
+	Arguments        []Argument     `json:"arguments,omitempty"`
+	Flags            []Flag         `json:"flags,omitempty"`
+	RepeatedFlags    []RepeatedFlag `json:"repeated_flags,omitempty"`
+}
+
+type RepeatedFlag struct {
+	Name  string `json:"name"`
+	Field string `json:"field"`
+	Help  string `json:"help"`
 }
 
 type Argument struct {
@@ -126,6 +134,11 @@ type {{.RuntimeType}} struct {
 	ValidateOutput func(*kong.Context) error
 	WriteOutput func(*kong.Context, any) error
 	ValidateRequest func(string, any) error
+{{- range .Operations }}
+{{- if .RequestTransform }}
+	{{.RequestTransform}} func(*{{.CommandType}}, *{{.RequestType}}) error
+{{- end }}
+{{- end }}
 }
 
 func (c *{{.CommandType}}) SetRuntime(runtime {{.RuntimeType}}) {
@@ -158,6 +171,9 @@ type {{.CommandType}} struct {
 {{- range .Flags }}
 	{{.Field}} *{{.Type}} {{flagTag .Name .Help .Separator}}
 {{- end }}
+{{- range .RepeatedFlags }}
+	{{.Field}} []string {{flagTag .Name .Help "none"}}
+{{- end }}
 {{- end }}
 	factory {{$.FactoryType}}
 	runtime {{$.RuntimeType}}
@@ -168,6 +184,9 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 	flagsSet := false
 {{- range .Flags }}
 	flagsSet = flagsSet || c.{{.Field}} != nil
+{{- end }}
+{{- range .RepeatedFlags }}
+	flagsSet = flagsSet || len(c.{{.Field}}) != 0
 {{- end }}
 	if c.Request != nil && flagsSet {
 	return fmt.Errorf("--request と個別フラグは併用できません")
@@ -181,7 +200,7 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
-{{- if .Flags }}
+{{- if or .Flags .RepeatedFlags }}
 		if !flagsSet {
 {{- if not .RequestOptional }}
 			return fmt.Errorf("--request または個別フラグが必要です")
@@ -211,6 +230,14 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 {{- else }}
 			request.{{.Field}} = *c.{{.Field}}
 {{- end }}
+		}
+{{- end }}
+{{- if .RequestTransform }}
+		if c.runtime.{{.RequestTransform}} == nil {
+			return fmt.Errorf("API リクエスト入力変換が設定されていません")
+		}
+		if err := c.runtime.{{.RequestTransform}}(c, request); err != nil {
+			return err
 		}
 {{- end }}
 	}
@@ -338,7 +365,16 @@ func (c Config) Validate() error {
 
 	operations := make(map[string]bool, len(c.Operations))
 	methods := make(map[string]bool, len(c.Operations))
-	commandTypes := map[string]bool{c.CommandType: true, c.APIType: true, c.FactoryType: true}
+	commandTypes := make(map[string]bool)
+	for _, name := range []string{c.CommandType, c.APIType, c.FactoryType, c.RuntimeType} {
+		if commandTypes[name] {
+			return fmt.Errorf("duplicate generated type name %q", name)
+		}
+		commandTypes[name] = true
+	}
+	runtimeFields := map[string]bool{
+		"DecodeRequest": true, "ValidateOutput": true, "WriteOutput": true, "ValidateRequest": true,
+	}
 	for i, operation := range c.Operations {
 		if !token.IsIdentifier(operation.Name) || token.Lookup(operation.Name).IsKeyword() {
 			return fmt.Errorf("operation %d name must be a valid Go identifier", i)
@@ -379,6 +415,21 @@ func (c Config) Validate() error {
 		}
 		if operation.RequestValidator != "" && (operation.RequestType == "" || operation.Handwritten) {
 			return fmt.Errorf("operation %q request_validator requires a generated request operation", operation.Name)
+		}
+		if operation.RequestTransform != "" {
+			if !token.IsIdentifier(operation.RequestTransform) || !token.IsExported(operation.RequestTransform) {
+				return fmt.Errorf("operation %q request_transform must be an exported Go identifier", operation.Name)
+			}
+			if operation.RequestType == "" || operation.Handwritten {
+				return fmt.Errorf("operation %q request_transform requires a generated request operation", operation.Name)
+			}
+			if runtimeFields[operation.RequestTransform] {
+				return fmt.Errorf("duplicate runtime field name %q", operation.RequestTransform)
+			}
+			runtimeFields[operation.RequestTransform] = true
+		}
+		if len(operation.RepeatedFlags) > 0 && operation.RequestTransform == "" {
+			return fmt.Errorf("operation %q repeated_flags requires request_transform", operation.Name)
 		}
 		if operation.RequestType == "" && len(operation.Flags) > 0 {
 			return fmt.Errorf("operation %q cannot define flags without request_type", operation.Name)
@@ -454,6 +505,22 @@ func (c Config) Validate() error {
 			if flag.Conversion != "" && flag.Pointer && strings.HasPrefix(flag.Conversion, "*") {
 				return fmt.Errorf("operation %q flag %q pointer conversion must name a value type", operation.Name, flag.Name)
 			}
+		}
+		for _, flag := range operation.RepeatedFlags {
+			if !isKebabName(flag.Name) {
+				return fmt.Errorf("operation %q repeated flag name %q must be kebab-case", operation.Name, flag.Name)
+			}
+			if !token.IsIdentifier(flag.Field) || token.Lookup(flag.Field).IsKeyword() || flag.Field == "Run" {
+				return fmt.Errorf("operation %q repeated flag field %q must be a valid Go field identifier", operation.Name, flag.Field)
+			}
+			if fields[flag.Field] || cliNames[flag.Name] {
+				return fmt.Errorf("operation %q has duplicate repeated flag name or field", operation.Name)
+			}
+			if strings.TrimSpace(flag.Help) == "" {
+				return fmt.Errorf("operation %q repeated flag %q help must not be empty", operation.Name, flag.Name)
+			}
+			fields[flag.Field] = true
+			cliNames[flag.Name] = true
 		}
 		operations[operation.Name] = true
 		methods[operation.Method] = true

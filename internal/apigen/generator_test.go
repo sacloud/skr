@@ -387,3 +387,109 @@ func TestValidateRejectsUnsupportedFlagsAndDuplicateNames(t *testing.T) {
 		t.Fatalf("Validate() error = %v, want duplicate operation error", err)
 	}
 }
+
+func transformTestConfig() Config {
+	return Config{
+		Package: "exampleapi", Resource: "Example",
+		CommandType: "Commands", APIType: "API", FactoryType: "APIFactory", RuntimeType: "Runtime",
+		Operations: []Operation{{
+			Name: "Create", CommandType: "CreateCommand", Help: "作成します。",
+			Method: "Create", RequestType: "CreateRequest", RequestTransform: "TransformCreateRequest",
+			RequestValidator: "validateCreateRequest",
+			Flags:            []Flag{{Name: "name", Field: "Name", Type: "string", Required: true, Help: "名前です。"}},
+			RepeatedFlags:    []RepeatedFlag{{Name: "item", Field: "Items", Help: "繰り返し指定します。"}},
+		}},
+	}
+}
+
+func TestGenerateRequestTransform(t *testing.T) {
+	config := transformTestConfig()
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(source)
+	for _, want := range []string{
+		"TransformCreateRequest func(*CreateCommand, *CreateRequest) error",
+		"Items",
+		"[]string",
+		`sep:\"none\"`,
+		"flagsSet = flagsSet || len(c.Items) != 0",
+		"if c.runtime.TransformCreateRequest == nil",
+		"if err := c.runtime.TransformCreateRequest(c, request); err != nil",
+		"API リクエスト入力変換が設定されていません",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("generated source does not contain %q", want)
+		}
+	}
+	assign := strings.Index(text, "request.Name = *c.Name")
+	transform := strings.Index(text, "c.runtime.TransformCreateRequest(c, request)")
+	validate := strings.Index(text, `c.runtime.ValidateRequest("validateCreateRequest", request)`)
+	if assign < 0 || transform <= assign || validate <= transform {
+		t.Fatal("expected scalar assignment, transform, then validation")
+	}
+	if strings.Contains(text, "request.Items =") {
+		t.Fatal("repeated input must not be assigned directly to the API request")
+	}
+	second, err := Generate(config)
+	if err != nil || string(second) != text {
+		t.Fatalf("generation is not deterministic: %v", err)
+	}
+
+	config.Operations[0].Flags = nil
+	source, err = Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(source), `return fmt.Errorf("--request が必要です")`) {
+		t.Fatal("repeated flags alone must provide the flag input path")
+	}
+}
+
+func TestValidateRequestTransform(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		change func(*Config)
+		want   string
+	}{
+		{"missing transform", func(c *Config) { c.Operations[0].RequestTransform = "" }, "requires request_transform"},
+		{"invalid transform", func(c *Config) { c.Operations[0].RequestTransform = "x.y" }, "exported Go identifier"},
+		{"private transform", func(c *Config) { c.Operations[0].RequestTransform = "transform" }, "exported Go identifier"},
+		{"reserved callback", func(c *Config) { c.Operations[0].RequestTransform = "DecodeRequest" }, "duplicate runtime field"},
+		{"handwritten", func(c *Config) { c.Operations[0].Handwritten = true; c.Operations[0].RequestValidator = "" }, "requires a generated request operation"},
+		{"no request", func(c *Config) { c.Operations[0].RequestType = ""; c.Operations[0].RequestValidator = "" }, "requires a generated request operation"},
+		{"invalid name", func(c *Config) { c.Operations[0].RepeatedFlags[0].Name = "Item" }, "kebab-case"},
+		{"invalid field", func(c *Config) { c.Operations[0].RepeatedFlags[0].Field = "a.b" }, "field identifier"},
+		{"method field", func(c *Config) { c.Operations[0].RepeatedFlags[0].Field = "Run" }, "field identifier"},
+		{"empty help", func(c *Config) { c.Operations[0].RepeatedFlags[0].Help = "" }, "help must not be empty"},
+		{"request name", func(c *Config) { c.Operations[0].RepeatedFlags[0].Name = "request" }, "duplicate repeated flag"},
+		{"runtime field", func(c *Config) { c.Operations[0].RepeatedFlags[0].Field = "runtime" }, "duplicate repeated flag"},
+		{"scalar name", func(c *Config) { c.Operations[0].RepeatedFlags[0].Name = "name" }, "duplicate repeated flag"},
+		{"scalar field", func(c *Config) { c.Operations[0].RepeatedFlags[0].Field = "Name" }, "duplicate repeated flag"},
+		{"duplicate input", func(c *Config) {
+			c.Operations[0].RepeatedFlags = append(c.Operations[0].RepeatedFlags, c.Operations[0].RepeatedFlags[0])
+		}, "duplicate repeated flag"},
+		{"argument name", func(c *Config) {
+			c.Operations[0].Arguments = []Argument{{Name: "item", Field: "ID", Type: "string", Help: "ID です。"}}
+		}, "duplicate repeated flag"},
+		{"factory field", func(c *Config) {
+			c.FactoryArguments = []Argument{{Name: "tenant", Field: "Items", Type: "string", Help: "対象です。"}}
+		}, "duplicate repeated flag"},
+		{"duplicate callback", func(c *Config) {
+			op := c.Operations[0]
+			op.Name, op.CommandType, op.Method = "Update", "UpdateCommand", "Update"
+			c.Operations = append(c.Operations, op)
+		}, "duplicate runtime field"},
+		{"runtime type collision", func(c *Config) { c.Operations[0].CommandType = c.RuntimeType }, "duplicate generated type"},
+		{"top level type collision", func(c *Config) { c.RuntimeType = c.APIType }, "duplicate generated type"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := transformTestConfig()
+			test.change(&config)
+			if err := config.Validate(); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Validate() = %v, want %q", err, test.want)
+			}
+		})
+	}
+}

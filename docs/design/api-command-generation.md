@@ -121,9 +121,34 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 `request_validator` は、JSON／フラグから同じリクエストを構築した後、SDK 呼び出し前に行う明示的なサービス固有検証の関数名です。`handwritten: true` は、操作を親コマンドと型付き API インターフェースには登録しながら、そのコマンド構造体と `Run` ハンドラーを手書きにする指定です。これにより、標準操作と個別処理を同じコマンド階層に配置できます。
 
+### 反復可能な入力と型付き変換
+
+[ADR 0042](../adr/0042-generated-request-transform.md) に従い、標準処理を生成したまま、フラグ経路の入力変換だけを手書き callback に委ねられます。操作の設定例は次のとおりです。
+
+```json
+{
+  "request_transform": "TransformCreateRequest",
+  "repeated_flags": [
+    {
+      "name": "disk",
+      "field": "Disks",
+      "help": "ディスク1個を指定します。繰り返し指定できます。"
+    }
+  ]
+}
+```
+
+これは Server Create の設定の抜粋です。実際のヘルプでは対応キー、必須条件、値の形式を説明します。`repeated_flags` は `name`、`field`、`help` を持ち、コマンドに `[]string` の入力フィールドを生成します。各指定の文字列を分割・補正せず、空文字列も含めて指定順に保持します。API リクエストの同名フィールドへ直接代入する設定ではありません。反復入力の指定も `--request` と相互排他です。
+
+`request_transform` は生成する Runtime callback の公開フィールド名です。Server Create では `TransformCreateRequest func(*CreateCommand, *server.CreateRequest) error` を生成し、`internal/cli` が `serverapi.TransformCreateRequest` を接続します。生成器は callback の型を明示し、関数の実装を探索しません。Runtime の既存フィールドや他の callback と同じ名前は拒否します。反復入力には変換を必須とし、`handwritten: true` またはリクエストのない操作では使えません。
+
+フラグ経路では必須入力の確認とスカラー値の代入後に変換し、その後で既存の `request_validator` と API 呼び出しへ進みます。反復入力のない指定でも変換は実行します。未接続の callback や変換エラーは API 呼び出し前にエラーとして返します。JSON 経路は変換を通らず、従来のデコードとリクエスト検証を維持します。
+
+生成器は `key=value` の構文、キーの意味、値の範囲、要素間の制約を扱いません。Server ではドメイン側がディスク名の補完、virtio 接続、正の整数の検証、shared NIC の位置制約を担当します。反復入力は対象操作が明示的に採用するもので、任意の配列や秘密情報をフラグ化する機構ではありません。
+
 Switch では `find`、`read`、`create`、`update`、`delete` を生成します。すべての操作で対象ゾーンを明示し、`Zone` が `all` の場合は `request_validator` で SDK 呼び出し前に拒否します。個別の Zone／ID 検証も `request_validator` で明示します。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
 
-Server では `find`、`read`、`update`、`delete` を生成し、`create` と `boot` は `handwritten: true` で登録した手書きハンドラーとして実装します。設定は [`api/commands/iaas-server.json`](../../api/commands/iaas-server.json)、生成先は `internal/iaas/serverapi/` です。各操作では対象ゾーンを明示し、対応するフラグと JSON のどちらでも `Zone: "all"` を SDK 呼び出し前に拒否します。
+Server では `find`、`read`、`create`、`update`、`delete` を生成します。`create` のディスク／NIC 入力は型付き変換 callback に接続し、`boot` は `handwritten: true` で登録した手書きハンドラーとして実装します。設定は [`api/commands/iaas-server.json`](../../api/commands/iaas-server.json)、生成先は `internal/iaas/serverapi/` です。各操作では対象ゾーンを明示し、対応するフラグと JSON のどちらでも `Zone: "all"` を SDK 呼び出し前に拒否します。
 
 Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー値をフラグで指定できます。IaaS のトップレベル `Tags` は `--tags` にカンマ区切りで指定できます。[ADR 0041](../adr/0041-server-repeatable-disk-and-nic-options.md) の限定例外として、反復可能な `--disk` と `--nic` でディスクと NIC を指定順に構築します。ディスクは plan-id と size-gb が必須で、任意の archive-id を受け付け、virtio 接続にします。NIC は upstream=shared または upstream=disconnected を受け付け、shared は先頭に限定します。それ以外の複雑な構成は JSON リクエストで渡し、JSON と個別フラグの併用を拒否します。ディスク作成の待機設定 `NoWait` はディスク構成や `BootAfterCreate` と関係するため JSON 経路に残します。
 
