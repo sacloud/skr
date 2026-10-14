@@ -16,7 +16,8 @@ import (
 type Commands struct {
 	Find   FindCommand   "cmd:\"\" help:\"サーバを指定したゾーンで検索して出力します。例: skr iaas-api server find --zone tk1v\""
 	Read   ReadCommand   "cmd:\"\" help:\"サーバを読み取って出力します。例: skr iaas-api server read --zone ZONE --id 123456789012\""
-	Create CreateCommand "cmd:\"\" help:\"サーバを作成して出力します。--zone、--name、--cpu、--memory-gb のフラグ、または --request JSON で指定します。CPU とメモリは対象ゾーンで利用可能な組み合わせを指定してください。タグは --tags にカンマ区切りで指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --tags production,web\""
+	Create CreateCommand "cmd:\"\" help:\"サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。cloud-init 用アーカイブと共有セグメント NIC もオプションで指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --cloudimg-archive-id ARCHIVE-ID --disk-plan-id DISK-PLAN-ID --disk-size-gb 20 --network-interface shared\""
+	Boot   BootCommand   "cmd:\"\" help:\"サーバを起動します。cloud-init の user-data は --user-data @path.yaml または --user-data - で指定します。例: skr iaas-api server boot --zone ZONE --id 123456789012 --user-data @cloud-c0nfig.yaml\""
 	Update UpdateCommand "cmd:\"\" help:\"サーバの指定項目を更新して出力します。省略した項目は変更しません。CPU または MemoryGB の変更はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated\""
 	Delete DeleteCommand "cmd:\"\" help:\"サーバを削除します。成功時は出力しません。ディスクも削除する場合は --with-disks を指定します。例: skr iaas-api server delete --zone ZONE --id 123456789012\""
 }
@@ -25,6 +26,7 @@ type API interface {
 	FindWithContext(context.Context, *server.FindRequest) ([]*iaas.Server, error)
 	ReadWithContext(context.Context, *server.ReadRequest) (*iaas.Server, error)
 	CreateWithContext(context.Context, *server.CreateRequest) (*iaas.Server, error)
+	BootWithContext(context.Context, *server.BootRequest) error
 	UpdateWithContext(context.Context, *server.UpdateRequest) (*iaas.Server, error)
 	DeleteWithContext(context.Context, *server.DeleteRequest) error
 }
@@ -42,6 +44,7 @@ func (c *Commands) SetRuntime(runtime Runtime) {
 	c.Find.runtime = runtime
 	c.Read.runtime = runtime
 	c.Create.runtime = runtime
+	c.Boot.runtime = runtime
 	c.Update.runtime = runtime
 	c.Delete.runtime = runtime
 }
@@ -50,6 +53,7 @@ func (c *Commands) SetFactory(factory APIFactory) {
 	c.Find.factory = factory
 	c.Read.factory = factory
 	c.Create.factory = factory
+	c.Boot.factory = factory
 	c.Update.factory = factory
 	c.Delete.factory = factory
 }
@@ -192,163 +196,6 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 	result, err := op.ReadWithContext(context.Background(), request)
-	if err != nil {
-		return err
-	}
-	if c.runtime.WriteOutput == nil {
-		return fmt.Errorf("API 出力処理が設定されていません")
-	}
-	return c.runtime.WriteOutput(ctx, result)
-}
-
-type CreateCommand struct {
-	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、CPU と MemoryGB (対象ゾーンで利用できるプランの組み合わせ)。任意フラグは Description、IconID、GPU、GPUModel、CPUModel、Commitment、Generation、ConfidentialVM、InterfaceDriver、CDROMID、PrivateHostID、BootAfterCreate、Tags (--tags でカンマ区切り) です。JSON 経路では Tags を文字列配列で指定できます。Disks、NetworkInterfaces、NoWait は JSON で指定します。NoWait はディスク作成時の待機設定で、BootAfterCreate が true の場合は指定できません。ディスクレス構成では Disks と NetworkInterfaces を省略できます。BootAfterCreate を true にすると作成後にサーバを起動します。CPU と MemoryGB の数値は例です。対象ゾーンで利用可能な組み合わせに置き換えてください。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"SERVER-NAME\\\",\\\"CPU\\\":1,\\\"MemoryGB\\\":1,\\\"Tags\\\":[\\\"example\\\"]}\""
-	Zone            *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
-	Name            *string   "name:\"name\" help:\"必須: サーバ名。\""
-	CPU             *int      "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
-	MemoryGB        *int      "name:\"memory-gb\" help:\"必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
-	Tags            *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
-	Description     *string   "name:\"description\" help:\"任意: サーバの説明 (最大512文字)。\""
-	IconID          *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
-	GPU             *int      "name:\"gpu\" help:\"任意: GPU 数。\""
-	GPUModel        *string   "name:\"gpu-model\" help:\"任意: GPU モデル。\""
-	CPUModel        *string   "name:\"cpu-model\" help:\"任意: CPU モデル。\""
-	Commitment      *string   "name:\"commitment\" help:\"任意: CPU プランのコミットメント。standard または dedicatedcpu を指定します。\""
-	Generation      *int      "name:\"generation\" help:\"任意: サーバプラン世代 (0: 既定、100、200)。\""
-	ConfidentialVM  *bool     "name:\"confidential-vm\" help:\"任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください (https://manual.sakura.ad.jp/cloud/server/confidential-vm-plan/about.html)。\""
-	InterfaceDriver *string   "name:\"interface-driver\" help:\"任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。\""
-	BootAfterCreate *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。\""
-	CDROMID         *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
-	PrivateHostID   *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
-	factory         APIFactory
-	runtime         Runtime
-}
-
-func (c *CreateCommand) Run(ctx *kong.Context) error {
-	flagsSet := false
-	flagsSet = flagsSet || c.Zone != nil
-	flagsSet = flagsSet || c.Name != nil
-	flagsSet = flagsSet || c.CPU != nil
-	flagsSet = flagsSet || c.MemoryGB != nil
-	flagsSet = flagsSet || c.Tags != nil
-	flagsSet = flagsSet || c.Description != nil
-	flagsSet = flagsSet || c.IconID != nil
-	flagsSet = flagsSet || c.GPU != nil
-	flagsSet = flagsSet || c.GPUModel != nil
-	flagsSet = flagsSet || c.CPUModel != nil
-	flagsSet = flagsSet || c.Commitment != nil
-	flagsSet = flagsSet || c.Generation != nil
-	flagsSet = flagsSet || c.ConfidentialVM != nil
-	flagsSet = flagsSet || c.InterfaceDriver != nil
-	flagsSet = flagsSet || c.BootAfterCreate != nil
-	flagsSet = flagsSet || c.CDROMID != nil
-	flagsSet = flagsSet || c.PrivateHostID != nil
-	if c.Request != nil && flagsSet {
-		return fmt.Errorf("--request と個別フラグは併用できません")
-	}
-	request := &server.CreateRequest{}
-	if c.Request != nil {
-		if c.runtime.DecodeRequest == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
-			return err
-		}
-	} else {
-		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
-		}
-		if c.Zone == nil {
-			return fmt.Errorf("--zone が必要です")
-		}
-		if c.Zone != nil {
-			request.Zone = *c.Zone
-		}
-		if c.Name == nil {
-			return fmt.Errorf("--name が必要です")
-		}
-		if c.Name != nil {
-			request.Name = *c.Name
-		}
-		if c.CPU == nil {
-			return fmt.Errorf("--cpu が必要です")
-		}
-		if c.CPU != nil {
-			request.CPU = *c.CPU
-		}
-		if c.MemoryGB == nil {
-			return fmt.Errorf("--memory-gb が必要です")
-		}
-		if c.MemoryGB != nil {
-			request.MemoryGB = *c.MemoryGB
-		}
-		if c.Tags != nil {
-			value := types.Tags(*c.Tags)
-			request.Tags = value
-		}
-		if c.Description != nil {
-			request.Description = *c.Description
-		}
-		if c.IconID != nil {
-			value := types.ID(*c.IconID)
-			request.IconID = value
-		}
-		if c.GPU != nil {
-			request.GPU = *c.GPU
-		}
-		if c.GPUModel != nil {
-			request.GPUModel = *c.GPUModel
-		}
-		if c.CPUModel != nil {
-			request.CPUModel = *c.CPUModel
-		}
-		if c.Commitment != nil {
-			value := types.ECommitment(*c.Commitment)
-			request.Commitment = value
-		}
-		if c.Generation != nil {
-			value := types.EPlanGeneration(*c.Generation)
-			request.Generation = value
-		}
-		if c.ConfidentialVM != nil {
-			request.ConfidentialVM = *c.ConfidentialVM
-		}
-		if c.InterfaceDriver != nil {
-			value := types.EInterfaceDriver(*c.InterfaceDriver)
-			request.InterfaceDriver = value
-		}
-		if c.BootAfterCreate != nil {
-			request.BootAfterCreate = *c.BootAfterCreate
-		}
-		if c.CDROMID != nil {
-			value := types.ID(*c.CDROMID)
-			request.CDROMID = value
-		}
-		if c.PrivateHostID != nil {
-			value := types.ID(*c.PrivateHostID)
-			request.PrivateHostID = value
-		}
-	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateServerCreateRequest", request); err != nil {
-		return err
-	}
-	if c.runtime.ValidateOutput == nil {
-		return fmt.Errorf("API 出力処理が設定されていません")
-	}
-	if err := c.runtime.ValidateOutput(ctx); err != nil {
-		return err
-	}
-	if c.factory == nil {
-		return fmt.Errorf("API クライアントが設定されていません")
-	}
-	op, err := c.factory()
-	if err != nil {
-		return err
-	}
-	result, err := op.CreateWithContext(context.Background(), request)
 	if err != nil {
 		return err
 	}

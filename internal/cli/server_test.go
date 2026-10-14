@@ -61,10 +61,11 @@ func TestRunIaaSServerHelp(t *testing.T) {
 		notWant []string
 	}{
 		{args: []string{"iaas-api", "--help"}, want: []string{"server", "switch"}},
-		{args: []string{"iaas-api", "server", "--help"}, want: []string{"find", "read", "create", "update", "delete"}},
+		{args: []string{"iaas-api", "server", "--help"}, want: []string{"find", "read", "create", "boot", "update", "delete"}},
 		{args: []string{"iaas-api", "server", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "server", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
-		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "カンマ区切り", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可"}},
+		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "--cloudimg-archive-id", "--disk-plan-id", "--disk-size-gb", "--network-interface", "shared", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可"}},
+		{args: []string{"iaas-api", "server", "boot", "--help"}, want: []string{"--zone", "--id", "--user-data", "@path.yaml", "標準入力", "インライン値は指定できません"}},
 		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--tags", "--cpu", "--memory-gb", "省略", "併用不可"}},
 		{args: []string{"iaas-api", "server", "delete", "--help"}, want: []string{"--with-disks", "--force", "ディスク", "強制停止", "併用不可"}},
 	} {
@@ -153,6 +154,46 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		t.Fatalf("Create flag request = %+v, want JSON request %+v", api.createRequest, jsonCreateRequest)
 	}
 
+	_, stderr, code = run(
+		"create",
+		"--zone", "test-zone",
+		"--name", "cloudimg-server",
+		"--cpu", "2",
+		"--memory-gb", "4",
+		"--cloudimg-archive-id", "456",
+		"--disk-plan-id", "7",
+		"--disk-size-gb", "20",
+		"--network-interface", "shared",
+	)
+	if code != 0 || stderr != "" {
+		t.Fatalf("create cloud-init options: code %d, stderr %q", code, stderr)
+	}
+	if api.createRequest == nil || len(api.createRequest.Disks) != 1 {
+		t.Fatalf("Create request disks = %+v, want one cloudimg disk", api.createRequest)
+	}
+	createdDisk := api.createRequest.Disks[0]
+	if createdDisk.Name != "cloudimg-server" || createdDisk.DiskPlanID != 7 ||
+		createdDisk.Connection != "virtio" || createdDisk.SourceArchiveID != 456 || createdDisk.SizeGB != 20 {
+		t.Errorf("cloudimg disk = %+v, want name, plan 7, virtio, archive 456, size 20", createdDisk)
+	}
+	if len(api.createRequest.NetworkInterfaces) != 1 || api.createRequest.NetworkInterfaces[0].Upstream != "shared" {
+		t.Errorf("Create network interfaces = %+v, want shared segment", api.createRequest.NetworkInterfaces)
+	}
+
+	userDataPath := filepath.Join(t.TempDir(), "cloud-c0nfig.yaml")
+	userData := "#cloud-config\nssh_authorized_keys:\n  - ssh-ed25519 AAAA-example\n"
+	if err := os.WriteFile(userDataPath, []byte(userData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr, code = run("boot", "--zone", "test-zone", "--id", "123", "--user-data", "@"+userDataPath)
+	if code != 0 || stderr != "" {
+		t.Fatalf("boot: code %d, stderr %q", code, stderr)
+	}
+	if api.bootRequest == nil || api.bootRequest.Zone != "test-zone" ||
+		api.bootRequest.ID != 123 || api.bootRequest.UserData != userData {
+		t.Fatalf("Boot request = %+v, want zone, ID, and unmodified user-data", api.bootRequest)
+	}
+
 	_, stderr, code = run("find", "--zone", "test-zone", "--tags", "production,web", "--count", "4", "--from", "2")
 	if code != 0 || stderr != "" {
 		t.Fatalf("find: code %d, stderr %q", code, stderr)
@@ -202,6 +243,10 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 		{"create", "--request", `{"Zone":"test-zone","Name":"server"}`, "--zone", "test-zone"},
 		{"create", "--zone", "test-zone", "--name", "server", "--memory-gb", "1"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1}`, "--boot-after-create=false"},
+		{"create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1}`, "--cloudimg-archive-id", "123"},
+		{"create", "--zone", "test-zone", "--name", "server", "--cpu", "1", "--memory-gb", "1", "--cloudimg-archive-id", "123"},
+		{"create", "--zone", "test-zone", "--name", "server", "--cpu", "1", "--memory-gb", "1", "--cloudimg-archive-id", "123", "--disk-plan-id", "7", "--disk-size-gb", "20", "--boot-after-create"},
+		{"boot", "--zone", "test-zone", "--id", "123", "--user-data", "inline-user-data"},
 		{"update", "--zone", "test-zone", "--id", "123"},
 		{"delete", "--zone", "all", "--id", "123"},
 	} {
@@ -213,7 +258,7 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 			t.Errorf("%v: code %d stdout %q stderr %q; want an error before API call", args, code, stdout.String(), stderr.String())
 		}
 	}
-	if len(api.findRequests) != 0 || api.readRequest != nil || api.createRequest != nil ||
+	if len(api.findRequests) != 0 || api.readRequest != nil || api.createRequest != nil || api.bootRequest != nil ||
 		api.updateRequest != nil || api.deleteRequest != nil {
 		t.Fatalf("invalid input reached API: %+v", api)
 	}
@@ -250,6 +295,7 @@ type serverAPITestDouble struct {
 	findRequests  []server.FindRequest
 	readRequest   *server.ReadRequest
 	createRequest *server.CreateRequest
+	bootRequest   *server.BootRequest
 	updateRequest *server.UpdateRequest
 	deleteRequest *server.DeleteRequest
 }
@@ -267,6 +313,11 @@ func (api *serverAPITestDouble) ReadWithContext(_ context.Context, request *serv
 func (api *serverAPITestDouble) CreateWithContext(_ context.Context, request *server.CreateRequest) (*iaas.Server, error) {
 	api.createRequest = request
 	return &iaas.Server{ID: 123, Name: request.Name}, nil
+}
+
+func (api *serverAPITestDouble) BootWithContext(_ context.Context, request *server.BootRequest) error {
+	api.bootRequest = request
+	return nil
 }
 
 func (api *serverAPITestDouble) UpdateWithContext(_ context.Context, request *server.UpdateRequest) (*iaas.Server, error) {
