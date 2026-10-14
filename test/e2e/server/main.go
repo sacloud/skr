@@ -575,6 +575,25 @@ func runSSH(ctx context.Context, args []string) (string, string, error) {
 	return stdout.String(), stderr.String(), err
 }
 
+func finalizeRun(exitCode int, cleanup func() error, saveResult func(string) error) (int, error) {
+	cleanupErr := cleanup()
+	if cleanupErr != nil {
+		exitCode = 1
+	}
+	var resultErr error
+	if saveResult != nil {
+		result := "failed"
+		if exitCode == 0 {
+			result = "passed"
+		}
+		resultErr = saveResult(result)
+		if resultErr != nil {
+			exitCode = 1
+		}
+	}
+	return exitCode, errors.Join(cleanupErr, resultErr)
+}
+
 func runMain() (exitCode int) {
 	binary := flag.String("skr", "./skr", "Path to a built skr binary")
 	archiveID := flag.Int64("cloudimg-archive-id", 0, "cloud-init archive ID available in is1b")
@@ -600,10 +619,20 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "create temporary SSH material directory:", err)
 		return 1
 	}
+	var saveResult func(string) error
 	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			fmt.Fprintln(os.Stderr, "remove temporary SSH material:", err)
-			exitCode = 1
+		var err error
+		exitCode, err = finalizeRun(exitCode, func() error {
+			if err := os.RemoveAll(dir); err != nil {
+				return fmt.Errorf("remove temporary SSH material: %w", err)
+			}
+			return nil
+		}, saveResult)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		if exitCode == 0 {
+			fmt.Println("Server E2E passed; cloud-init SSH login succeeded, the Server and Disk were deleted, and temporary SSH material was removed.")
 		}
 	}()
 	userDataPath, privateKey, knownHosts, err := createSSHMaterial(dir)
@@ -617,16 +646,9 @@ func runMain() (exitCode int) {
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
-	defer func() {
-		result := "failed"
-		if exitCode == 0 {
-			result = "passed"
-		}
-		if err := recorder.SetResult(result, time.Now()); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			exitCode = 1
-		}
-	}()
+	saveResult = func(result string) error {
+		return recorder.SetResult(result, time.Now())
+	}
 	var suffix [8]byte
 	if _, err := rand.Read(suffix[:]); err != nil {
 		fmt.Fprintln(os.Stderr, "generate unique E2E Server name:", err)
@@ -649,7 +671,6 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
 	}
-	fmt.Println("Server E2E passed; cloud-init SSH login succeeded and the Server and Disk were deleted.")
 	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
 }

@@ -28,6 +28,57 @@ import (
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
+func TestFinalizeRunCleansUpBeforeRecordingResult(t *testing.T) {
+	cleanupFailure := errors.New("cleanup failed")
+	recordFailure := errors.New("record failed")
+	for _, test := range []struct {
+		name       string
+		exitCode   int
+		cleanupErr error
+		recordErr  error
+		wantCode   int
+		wantResult string
+	}{
+		{"success", 0, nil, nil, 0, "passed"},
+		{"scenario failure", 1, nil, nil, 1, "failed"},
+		{"cleanup failure", 0, cleanupFailure, nil, 1, "failed"},
+		{"record failure", 0, nil, recordFailure, 1, "passed"},
+		{"both failures", 0, cleanupFailure, recordFailure, 1, "failed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cleaned := false
+			code, err := finalizeRun(test.exitCode, func() error {
+				cleaned = true
+				return test.cleanupErr
+			}, func(result string) error {
+				if !cleaned || result != test.wantResult {
+					t.Fatalf("cleanup completed=%v, result=%q; want %q", cleaned, result, test.wantResult)
+				}
+				return test.recordErr
+			})
+			if code != test.wantCode || (err != nil) != (test.cleanupErr != nil || test.recordErr != nil) {
+				t.Fatalf("code=%d error=%v", code, err)
+			}
+			for _, expected := range []error{test.cleanupErr, test.recordErr} {
+				if expected != nil && !errors.Is(err, expected) {
+					t.Fatalf("error does not preserve %v: %v", expected, err)
+				}
+			}
+		})
+	}
+}
+
+func TestFinalizeRunBeforeRecorderCreation(t *testing.T) {
+	cleaned := false
+	code, err := finalizeRun(1, func() error {
+		cleaned = true
+		return nil
+	}, nil)
+	if !cleaned || code != 1 || err != nil {
+		t.Fatalf("cleaned=%v code=%d error=%v", cleaned, code, err)
+	}
+}
+
 func TestSSHRunnerRecordsLoginResult(t *testing.T) {
 	for _, test := range []struct {
 		name   string
