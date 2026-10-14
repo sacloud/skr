@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -91,7 +92,7 @@ func TestScenarioRejectsInvalidProfileZoneAndResults(t *testing.T) {
 		{name: "all zones", zone: "all", wantErr: "single target zone"},
 		{name: "invalid archive JSON", zone: "is1b", outputs: map[string][]byte{"archive-find": []byte("{")}, wantErr: "decode Archive find"},
 		{name: "empty archive result", zone: "is1b", outputs: map[string][]byte{"archive-find": []byte("[]")}, wantErr: "no item"},
-		{name: "archive identity mismatch", zone: "is1b", outputs: map[string][]byte{"archive-read": []byte(`{"ID":124,"Name":"other"}`)}, wantErr: "does not match"},
+		{name: "archive identity mismatch", zone: "is1b", outputs: map[string][]byte{"archive-read": []byte(`{"ID":124,"Name":"other","Description":"test","DiskPlanID":4,"DiskPlanName":"ssd","SizeMB":20480,"Tags":["test"]}`)}, wantErr: "does not match"},
 		{name: "disk plan API error", zone: "is1b", failStep: "disk-plan-find", wantErr: "injected CLI failure"},
 		{name: "empty disk plan result", zone: "is1b", outputs: map[string][]byte{"disk-plan-find": []byte("[]")}, wantErr: "no item"},
 		{name: "disk plan missing size data", zone: "is1b", outputs: map[string][]byte{"disk-plan-find": []byte(`[{"ID":4,"Name":"ssd"}]`)}, wantErr: "no size data"},
@@ -105,5 +106,93 @@ func TestScenarioRejectsInvalidProfileZoneAndResults(t *testing.T) {
 				t.Fatalf("scenario error = %v, want %q", err, test.wantErr)
 			}
 		})
+	}
+}
+
+func TestScenarioRejectsArchiveFieldMismatchesAndMissingFields(t *testing.T) {
+	changes := map[string]any{
+		"ID": 124, "Name": "other", "Description": "changed", "DiskPlanID": 5,
+		"DiskPlanName": "other", "SizeMB": 40960, "Tags": []string{"other"},
+	}
+	for field, changed := range changes {
+		t.Run(field+" mismatch", func(t *testing.T) {
+			value := archiveOutputFields()
+			value[field] = changed
+			output, err := json.Marshal(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fake := &fakeCLI{outputs: map[string][]byte{"archive-read": output}}
+			err = (scenario{client: fake, zone: "is1b"}).run(context.Background())
+			if err == nil || !strings.Contains(err.Error(), "does not match") {
+				t.Fatalf("scenario error = %v, want field mismatch", err)
+			}
+		})
+		for _, step := range []string{"archive-find", "archive-read"} {
+			t.Run(field+" missing from "+step, func(t *testing.T) {
+				value := archiveOutputFields()
+				delete(value, field)
+				var result any = value
+				if step == "archive-find" {
+					result = []map[string]any{value}
+				}
+				output, err := json.Marshal(result)
+				if err != nil {
+					t.Fatal(err)
+				}
+				fake := &fakeCLI{outputs: map[string][]byte{step: output}}
+				err = (scenario{client: fake, zone: "is1b"}).run(context.Background())
+				if err == nil || !strings.Contains(err.Error(), "missing field "+field) {
+					t.Fatalf("scenario error = %v, want missing field %s", err, field)
+				}
+			})
+		}
+	}
+}
+
+func archiveOutputFields() map[string]any {
+	return map[string]any{
+		"ID": 123, "Name": "archive", "Description": "test", "DiskPlanID": 4,
+		"DiskPlanName": "ssd", "SizeMB": 20480, "Tags": []string{"test"},
+	}
+}
+
+func TestArchiveSummaryNullFields(t *testing.T) {
+	for field := range archiveOutputFields() {
+		t.Run(field, func(t *testing.T) {
+			value := archiveOutputFields()
+			value[field] = nil
+			output, err := json.Marshal(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var summary archiveSummary
+			err = json.Unmarshal(output, &summary)
+			if field == "Tags" {
+				if err != nil {
+					t.Fatalf("null Tags must be accepted: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), "missing field "+field) {
+				t.Fatalf("decode error = %v, want missing field %s", err, field)
+			}
+		})
+	}
+}
+
+func TestScenarioAcceptsReorderedArchiveTags(t *testing.T) {
+	find, read := archiveOutputFields(), archiveOutputFields()
+	find["Tags"] = []string{"first", "second"}
+	read["Tags"] = []string{"second", "first"}
+	findOutput, err := json.Marshal([]map[string]any{find})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readOutput, err := json.Marshal(read)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeCLI{outputs: map[string][]byte{"archive-find": findOutput, "archive-read": readOutput}}
+	if err := (scenario{client: fake, zone: "is1b"}).run(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }

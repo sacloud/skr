@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -80,6 +81,26 @@ type archiveSummary struct {
 	Tags         []string
 }
 
+func (a *archiveSummary) UnmarshalJSON(data []byte) error {
+	type summary archiveSummary
+	var value summary
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for _, name := range []string{"ID", "Name", "Description", "DiskPlanID", "DiskPlanName", "SizeMB", "Tags"} {
+		field, exists := fields[name]
+		if !exists || (name != "Tags" && bytes.Equal(bytes.TrimSpace(field), []byte("null"))) {
+			return fmt.Errorf("Archive output is missing field %s", name)
+		}
+	}
+	*a = archiveSummary(value)
+	return nil
+}
+
 type diskPlanSize struct {
 	Availability  string
 	DisplaySize   int
@@ -133,7 +154,7 @@ func (s scenario) run(ctx context.Context) error {
 	if err := json.Unmarshal(archiveOutput, &archive); err != nil {
 		return fmt.Errorf("decode Archive read output: %w", err)
 	}
-	if archive.ID != archives[0].ID || archive.Name != archives[0].Name {
+	if !sameArchive(archive, archives[0]) {
 		return fmt.Errorf("Archive read result does not match find result ID %d", archives[0].ID)
 	}
 
@@ -165,6 +186,18 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("DiskPlan read result does not match find result ID %d", diskPlans[0].ID)
 	}
 	return nil
+}
+
+func sameArchive(left, right archiveSummary) bool {
+	if left.ID != right.ID || left.Name != right.Name ||
+		left.Description != right.Description || left.DiskPlanID != right.DiskPlanID ||
+		left.DiskPlanName != right.DiskPlanName || left.SizeMB != right.SizeMB {
+		return false
+	}
+	leftTags, rightTags := slices.Clone(left.Tags), slices.Clone(right.Tags)
+	slices.Sort(leftTags)
+	slices.Sort(rightTags)
+	return slices.Equal(leftTags, rightTags)
 }
 
 func sameDiskPlan(left, right diskPlanSummary) bool {
