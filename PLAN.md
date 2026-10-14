@@ -16,7 +16,6 @@ SimpleMQ のキュー／メッセージ API コマンドは [`api/commands/simpl
 
 SDK のサービスパッケージごとに対応状況を管理します。実装済みコマンドの操作範囲は「実装済み IaaS コマンドの対応範囲」に記載し、ここには未実装の候補を記載します。
 
-- [ ] `archive`
 - [ ] `bridge`
 - [ ] `cdrom`
 - [ ] `coupon`
@@ -42,6 +41,10 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
 
 チェックは列挙した操作の CLI 実装状況を示します。SDK にある未対応操作、ライブ E2E、チュートリアルの状況も併記します。
 
+- [x] `archive`
+    - `iaas-api archive` の Find / Read を実装済みです。Find はゾーン、タグ、公開アーカイブの OS 種別で検索できます。
+    - SDK の Create / Update / Delete / Upload / Download / OpenFTP / CloseFTP / WaitReady は未対応です。
+    - 読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/archive.md)があります。is1b で検索・参照を確認済みです。
 - [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
 - [x] `server`
     - [x] Find / Read / Create / Boot / Update / Delete を実装済みです。
@@ -74,7 +77,6 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 
 - [ ] `authstatus`
 - [ ] `bill`
-- [ ] `diskplan`
 - [ ] `internetplan`
 - [ ] `licenseinfo`
 - [ ] `privatehostplan`
@@ -82,6 +84,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `serverplan`
 - [ ] `serviceclass`
 - [x] `zone` — `iaas-api zone` の Find のみ実装済みです。SDK の Read は未対応です。ゾーン一覧を取得して jq で名前を抽出する読み取り専用の [ライブ E2E runner](test/e2e/zone/) と[チュートリアル](docs/manual/tutorials/iaas-api/zone.md)があります
+- [x] `diskplan` — `iaas-api disk-plan` の Find / Read を実装済みです。検索結果の API `Availability` と `Size` から、指定ゾーンの利用可否とサイズを確認できます。SDK の公開操作はすべて CLI にあります。Archive と合わせて検証する読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk-plan.md)があります。is1b で検索・参照を確認済みです
 
 ## IaaS 以外の API ドメイン候補
 
