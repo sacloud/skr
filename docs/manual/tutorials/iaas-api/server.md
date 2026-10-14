@@ -2,13 +2,13 @@
 
 このチュートリアルでは、cloud-init 対応パブリックアーカイブから Server を作成し、共有セグメントへ接続して SSH ログインします。`server create` の個別オプションでディスクと NIC を指定し、cloud-init の user-data は起動時に `server boot` へ渡します。秘密鍵はローカルで生成し、API へ送信しません。
 
-この手順では is1b を使用します。アーカイブ ID、ディスクプラン ID、ディスクサイズは、is1b で利用できる値を指定してください。
+この手順では is1b を使用します。アーカイブ ID、ディスクプラン ID、ディスクサイズは、作成前に同じゾーンの検索・参照結果から選びます。
 
 ## 前提条件
 
 - `skr` と SSH クライアントが利用できること
 - さくらのクラウドの認証設定と、is1b で Server・Disk を作成できるプロジェクトを選択していること
-- cloud-init 対応パブリックアーカイブの ID と、利用可能なディスクプラン ID・サイズが分かること
+- is1b で Archive・DiskPlan を検索・参照できること
 - Server の作成、起動、外部 SSH 接続および削除が許可されていること
 
 Server と Disk の利用料金が発生します。共有セグメントへ接続した Server は外部から SSH 接続できるため、公開鍵認証を設定し、不要になったら削除してください。
@@ -16,6 +16,10 @@ Server と Disk の利用料金が発生します。共有セグメントへ接�
 ## コマンドを確認する
 
 ```console
+$ skr iaas-api archive find --help
+$ skr iaas-api archive read --help
+$ skr iaas-api disk-plan find --help
+$ skr iaas-api disk-plan read --help
 $ skr iaas-api server create --help
 $ skr iaas-api server boot --help
 $ skr iaas-api server read --help
@@ -23,6 +27,35 @@ $ skr iaas-api server delete --help
 $ skr iaas-api server find --help
 $ skr iaas-api disk find --help
 ```
+
+## アーカイブとディスクプランを選ぶ
+
+is1b のアーカイブを検索し、名前と説明から [cloud-init 対応パブリックアーカイブ（cloudimg）](https://manual.sakura.ad.jp/cloud/server/cloud-init.html)を選びます。通常の OS アーカイブではなく、cloudimg のアーカイブを選んでください。検索結果の ID を `CLOUDIMG_ARCHIVE_ID` に設定し、参照結果でも名前、説明、サイズを確認します。
+
+```console
+$ skr iaas-api archive find --zone is1b \
+    --query 'map({ID,Name,Description,DiskPlanID,DiskPlanName,SizeMB,Tags})'
+$ CLOUDIMG_ARCHIVE_ID=CLOUDIMG_ARCHIVE_ID
+$ skr iaas-api archive read --zone is1b --id "$CLOUDIMG_ARCHIVE_ID" \
+    --query '{ID,Name,Description,DiskPlanID,DiskPlanName,SizeMB,Tags}'
+```
+
+代入の右辺の `CLOUDIMG_ARCHIVE_ID` は、選んだアーカイブの実際の ID に置き換えます。検索条件の指定方法は [Archive API チュートリアル](archive.md)を参照してください。
+
+次に、同じゾーンのディスクプランを検索します。プランの `Availability` と `Size` 内の各サイズの `Availability` を確認し、利用可能なプランとサイズを選びます。[ディスクプランや作成先のゾーンによって選択可能なサイズは異なります](https://manual.sakura.ad.jp/cloud/storage/disk.html)。
+
+```console
+$ skr iaas-api disk-plan find --zone is1b \
+    --query 'map({ID,Name,StorageClass,Availability,Size})'
+$ DISK_PLAN_ID=DISK_PLAN_ID
+$ skr iaas-api disk-plan read --zone is1b --id "$DISK_PLAN_ID" \
+    --query '{ID,Name,StorageClass,Availability,Size}'
+$ DISK_SIZE_GB=DISK_SIZE_GB
+```
+
+代入の右辺の `DISK_PLAN_ID` は、選んだプランの実際の ID に置き換えます。`DISK_SIZE_GB` は、`Size` 内で `DisplaySuffix` が `GB` の利用可能なサイズの `DisplaySize` に置き換えます。アーカイブの `SizeMB` と、選んだディスクサイズの `SizeMB` も確認してください。各フィールドの説明は [DiskPlan API チュートリアル](disk-plan.md)を参照してください。
+
+ここまでの操作は検索・参照のみで、クラウドリソースを変更しません。
 
 ## SSH 鍵を作成する
 
@@ -54,7 +87,7 @@ EOF
 
 ## Server を作成して起動する
 
-Server 名には重複しない値を指定します。`CLOUDIMG_ARCHIVE_ID`、`DISK_PLAN_ID`、`DISK_SIZE_GB` は、is1b で利用できる正の整数に置き換えてください。
+Server 名には重複しない値を指定します。`CLOUDIMG_ARCHIVE_ID`、`DISK_PLAN_ID`、`DISK_SIZE_GB` には、前の手順で選んだ正の整数を設定しておきます。
 
 `--disk` の plan-id と size-gb は必須です。archive-id を省略すると空のディスクを作成します。`--disk` と `--nic` は繰り返して指定でき、それぞれ指定順に接続します。`upstream=shared` は先頭の NIC にだけ指定できます。この手順ではディスクと共有 NIC を1個ずつ指定します。`--request` とは併用できません。
 
@@ -65,7 +98,7 @@ $ skr iaas-api server create \
     --name "$SERVER_NAME" \
     --cpu 1 \
     --memory-gb 1 \
-    --disk 'archive-id=CLOUDIMG_ARCHIVE_ID,plan-id=DISK_PLAN_ID,size-gb=DISK_SIZE_GB' \
+    --disk "archive-id=$CLOUDIMG_ARCHIVE_ID,plan-id=$DISK_PLAN_ID,size-gb=$DISK_SIZE_GB" \
     --nic 'upstream=shared'
 ```
 
