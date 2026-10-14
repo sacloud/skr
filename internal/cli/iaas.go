@@ -18,6 +18,7 @@ import (
 	archiveSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 	diskSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	diskplanSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/diskplan"
+	packetfilterSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	zoneSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
@@ -28,6 +29,8 @@ import (
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
 	diskplanresource "github.com/sacloud/skr/internal/iaas/diskplan"
 	diskplanapi "github.com/sacloud/skr/internal/iaas/diskplanapi"
+	packetfilterresource "github.com/sacloud/skr/internal/iaas/packetfilter"
+	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	serverresource "github.com/sacloud/skr/internal/iaas/server"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
 	switchresource "github.com/sacloud/skr/internal/iaas/switch"
@@ -36,12 +39,13 @@ import (
 )
 
 type iaasAPICommand struct {
-	Archive  archiveapi.Commands  `cmd:"" help:"さくらのクラウドのアーカイブを検索・参照します。検索では対象ゾーン、タグまたは OS 種別を指定できます。"`
-	Disk     diskapi.Commands     `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
-	DiskPlan diskplanapi.Commands `cmd:"" help:"指定したゾーンのディスクプランを検索・参照します。プランの利用可否とサイズを確認できます。"`
-	Switch   switchapi.Commands   `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
-	Server   serverapi.Commands   `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、起動、削除します。作成時はcloud-init用ディスクやNICを個別フラグで指定できます。"`
-	Zone     zoneapi.Commands     `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
+	Archive      archiveapi.Commands      `cmd:"" help:"さくらのクラウドのアーカイブを検索・参照します。検索では対象ゾーン、タグまたは OS 種別を指定できます。"`
+	Disk         diskapi.Commands         `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
+	DiskPlan     diskplanapi.Commands     `cmd:"" help:"指定したゾーンのディスクプランを検索・参照します。プランの利用可否とサイズを確認できます。"`
+	PacketFilter packetfilterapi.Commands `cmd:"" name:"packetfilter" help:"さくらのクラウドのパケットフィルタを検索、参照、作成、更新、削除します。ルール配列は --expressions JSON または --request JSON で指定します。"`
+	Switch       switchapi.Commands       `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
+	Server       serverapi.Commands       `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、起動、削除します。作成時はcloud-init用ディスクやNICを個別フラグで指定できます。"`
+	Zone         zoneapi.Commands         `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
 }
 
 func (c *cli) initIaaSAPI() {
@@ -97,6 +101,21 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return diskplanSDK.New(client), nil
+	})
+	c.IaaSAPI.PacketFilter.SetRuntime(packetfilterapi.Runtime{
+		DecodeRequest:          decodeRequest,
+		ValidateOutput:         validateOutput,
+		WriteOutput:            writeOutput,
+		ValidateRequest:        packetfilterresource.ValidateRequest,
+		TransformCreateRequest: transformPacketFilterCreateRequest,
+		TransformUpdateRequest: transformPacketFilterUpdateRequest,
+	})
+	c.IaaSAPI.PacketFilter.SetFactory(func() (packetfilterapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return packetfilterSDK.New(client), nil
 	})
 	c.IaaSAPI.Switch.SetRuntime(switchapi.Runtime{
 		DecodeRequest:   decodeRequest,

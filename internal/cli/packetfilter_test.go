@@ -1,0 +1,231 @@
+// Copyright 2022-2026 The sacloud/skr Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package cli
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	"github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
+	"github.com/sacloud/skr/internal/apigen"
+	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
+	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
+)
+
+func TestPacketFilterGeneratedCodeMatchesConfig(t *testing.T) {
+	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-packetfilter.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := apigen.DecodeConfig(configData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := apigen.Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(repositoryPath("internal/iaas/packetfilterapi/packetfilter_api_generated.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatal("generated PacketFilter commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-packetfilter.json API_OUTPUT=internal/iaas/packetfilterapi/packetfilter_api_generated.go")
+	}
+}
+
+func TestRunIaaSPacketFilterHelp(t *testing.T) {
+	for _, test := range []struct {
+		args []string
+		want []string
+	}{
+		{args: []string{"iaas-api", "--help"}, want: []string{"packetfilter"}},
+		{args: []string{"iaas-api", "packetfilter", "--help"}, want: []string{"find", "read", "create", "update", "delete", "--expressions", "--request"}},
+		{args: []string{"iaas-api", "packetfilter", "create", "--help"}, want: []string{"--zone", "--name", "--description", "Expression", "tcp", "allow", "--expressions", "@path.json", "併用不可"}},
+		{args: []string{"iaas-api", "packetfilter", "update", "--help"}, want: []string{"--zone", "--id", "--name", "--description", "Expression", "OriginalExpressionHash", "変更する項目", "併用不可"}},
+		{args: []string{"iaas-api", "packetfilter", "find", "--help"}, want: []string{"Names", "--count", "--from", "単一のゾーン"}},
+	} {
+		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if code := run(test.args, &stdout, &stderr); code != 0 {
+				t.Fatalf("run(%v) code = %d; stderr: %s", test.args, code, stderr.String())
+			}
+			help := strings.Join(strings.Fields(stdout.String()), " ")
+			for _, text := range test.want {
+				if !strings.Contains(help, text) {
+					t.Errorf("help does not contain %q", text)
+				}
+			}
+		})
+	}
+}
+
+func TestIaaSPacketFilterAPIWithLocalMock(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	server := iaasmock.NewTestServer(iaasmock.Config{})
+	t.Cleanup(server.Close)
+
+	runCommand := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		commandLine := newCLI()
+		commandLine.IaaSAPI.PacketFilter.SetFactory(func() (packetfilterapi.API, error) {
+			return packetfilter.New(server), nil
+		})
+		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
+			t.Fatalf("run(%v) code = %d; stderr: %s", args, code, stderr.String())
+		}
+		if stderr.Len() != 0 {
+			t.Errorf("run(%v) stderr = %q", args, stderr.String())
+		}
+		return stdout.Bytes()
+	}
+
+	expressions := `[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","DestinationPort":"443","Action":"allow","Description":"Allow HTTPS"}]`
+	var created iaas.PacketFilter
+	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "create", "--zone", "test-zone", "--name", "packetfilter-test", "--description", "test filter", "--expressions", expressions), &created); err != nil {
+		t.Fatal(err)
+	}
+	if created.ID == 0 || created.Name != "packetfilter-test" || len(created.Expression) != 1 || created.ExpressionHash != "mock-expression-hash" {
+		t.Fatalf("create returned %#v", created)
+	}
+	rule := created.Expression[0]
+	if rule.Protocol != types.Protocols.TCP || rule.SourceNetwork != "192.0.2.0/24" ||
+		rule.DestinationPort != "443" || rule.Action != types.Actions.Allow {
+		t.Fatalf("create returned unexpected rule: %+v", rule)
+	}
+
+	findRequest := `{"Zone":"test-zone","Names":["packetfilter-test"]}`
+	var found []*iaas.PacketFilter
+	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "find", "--request", findRequest), &found); err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 1 || found[0].ID != created.ID {
+		t.Fatalf("find returned %#v, want PacketFilter %s", found, created.ID)
+	}
+
+	var read iaas.PacketFilter
+	readRequest, err := json.Marshal(map[string]any{"Zone": "test-zone", "ID": created.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "read", "--request", string(readRequest)), &read); err != nil {
+		t.Fatal(err)
+	}
+	if read.ID != created.ID || len(read.Expression) != 1 {
+		t.Fatalf("read returned %#v", read)
+	}
+
+	rulesPath := t.TempDir() + "/rules.json"
+	updatedExpressions := `[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","DestinationPort":"8443","Action":"allow","Description":"Allow HTTPS alternative"}]`
+	if err := os.WriteFile(rulesPath, []byte(updatedExpressions), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var updated iaas.PacketFilter
+	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "update", "--zone", "test-zone", "--id", created.ID.String(), "--name", "updated-filter", "--expressions", "@"+rulesPath, "--original-expression-hash", created.ExpressionHash), &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID != created.ID || updated.Name != "updated-filter" || updated.Description != "test filter" ||
+		len(updated.Expression) != 1 || updated.Expression[0].DestinationPort != "8443" {
+		t.Fatalf("update did not preserve omitted values: %+v", updated)
+	}
+
+	if output := runCommand("iaas-api", "packetfilter", "delete", "--zone", "test-zone", "--id", created.ID.String(), "--fail-if-not-found"); len(output) != 0 {
+		t.Fatalf("delete output = %q, want empty", output)
+	}
+	found = nil
+	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "find", "--request", `{"Zone":"test-zone"}`), &found); err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 0 {
+		t.Fatalf("find after delete returned %#v, want empty", found)
+	}
+}
+
+func TestPacketFilterRejectsInvalidRequestsBeforeFactory(t *testing.T) {
+	for _, test := range []struct {
+		args []string
+	}{
+		{args: []string{"find", "--zone", "all"}},
+		{args: []string{"find", "--request", `{"Zone":"all"}`}},
+		{args: []string{"create", "--zone", "all", "--name", "filter"}},
+		{args: []string{"update", "--zone", "test-zone", "--id", "123"}},
+		{args: []string{"update", "--zone", "test-zone", "--id", "123", "--expressions", `[]`}},
+		{args: []string{"update", "--request", `{"Zone":"test-zone","ID":123}`}},
+		{args: []string{"create", "--request", `{"Zone":"test-zone","Name":"filter"}`, "--expressions", `[]`}},
+	} {
+		t.Run(strings.Join(test.args, "_"), func(t *testing.T) {
+			factoryCalled := false
+			commandLine := newCLI()
+			commandLine.IaaSAPI.PacketFilter.SetFactory(func() (packetfilterapi.API, error) {
+				factoryCalled = true
+				return packetfilter.New(iaasmock.NewTestServer(iaasmock.Config{})), nil
+			})
+			var stdout, stderr bytes.Buffer
+			args := append([]string{"iaas-api", "packetfilter"}, test.args...)
+			if code := runCLI(args, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
+				t.Fatalf("run(%v): code=%d stdout=%q stderr=%q; want input error", args, code, stdout.String(), stderr.String())
+			}
+			if factoryCalled {
+				t.Fatal("invalid request created an API client")
+			}
+		})
+	}
+}
+
+func TestPacketFilterHelpExampleDecodes(t *testing.T) {
+	var request packetfilter.CreateRequest
+	if err := decodeRequest(`{"Zone":"is1b","Name":"example","Expression":[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","DestinationPort":"443","Action":"allow","Description":"Allow HTTPS"}]}`, &request); err != nil {
+		t.Fatal(err)
+	}
+	if request.Zone != "is1b" || request.Name != "example" || len(request.Expression) != 1 ||
+		request.Expression[0].Protocol != types.Protocols.TCP || request.Expression[0].Action != types.Actions.Allow {
+		t.Fatalf("decoded request = %+v", request)
+	}
+}
+
+func TestDecodePacketFilterExpressions(t *testing.T) {
+	path := t.TempDir() + "/rules.json"
+	fileContent := `[{"Protocol":"udp","DestinationPort":"53","Action":"allow"}]`
+	if err := os.WriteFile(path, []byte(fileContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, input := range []string{
+		`[{"Protocol":"tcp","DestinationPort":"443","Action":"allow"}]`,
+		"@" + path,
+	} {
+		expressions, err := decodePacketFilterExpressions([]string{input})
+		if err != nil {
+			t.Fatalf("decodePacketFilterExpressions(%q): %v", input, err)
+		}
+		if len(expressions) != 1 {
+			t.Fatalf("decoded %q to %d expressions, want 1", input, len(expressions))
+		}
+	}
+	for _, inputs := range [][]string{
+		{"{"},
+		{`{"Protocol":"tcp"}`},
+		{"[]", "[]"},
+	} {
+		if _, err := decodePacketFilterExpressions(inputs); err == nil {
+			t.Errorf("decodePacketFilterExpressions(%q) succeeded, want error", inputs)
+		}
+	}
+}
