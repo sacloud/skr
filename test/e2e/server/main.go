@@ -134,10 +134,8 @@ func serverArgs(step string, request map[string]any, userDataPath string) ([]str
 			"iaas-api", "server", "create",
 			"--zone", zone, "--name", name, "--description", description,
 			"--cpu", "1", "--memory-gb", "1",
-			"--cloudimg-archive-id", fmt.Sprint(archiveID),
-			"--disk-plan-id", fmt.Sprint(diskPlanID),
-			"--disk-size-gb", fmt.Sprint(diskSizeGB),
-			"--network-interface", "shared",
+			"--disk", fmt.Sprintf("archive-id=%d,plan-id=%d,size-gb=%d", archiveID, diskPlanID, diskSizeGB),
+			"--nic", "upstream=shared",
 		}, nil
 	case "test-boot":
 		id, err := requestID(request)

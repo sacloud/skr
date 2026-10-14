@@ -52,7 +52,9 @@ EOF
 
 ## Server を作成して起動する
 
-Server 名には重複しない値を指定します。`CLOUDIMG_ARCHIVE_ID`、`DISK_PLAN_ID`、`DISK_SIZE_GB` は、is1b で利用できる値に置き換えてください。
+Server 名には重複しない値を指定します。`CLOUDIMG_ARCHIVE_ID`、`DISK_PLAN_ID`、`DISK_SIZE_GB` は、is1b で利用できる正の整数に置き換えてください。
+
+`--disk` の plan-id と size-gb は必須です。archive-id を省略すると空のディスクを作成します。`--disk` と `--nic` は繰り返して指定でき、それぞれ指定順に接続します。この手順ではディスクと共有 NIC を1個ずつ指定します。`--request` とは併用できません。
 
 ```console
 $ SERVER_NAME="skr-tutorial-cloudinit-$(date +%s)"
@@ -61,10 +63,8 @@ $ skr iaas-api server create \
     --name "$SERVER_NAME" \
     --cpu 1 \
     --memory-gb 1 \
-    --cloudimg-archive-id CLOUDIMG_ARCHIVE_ID \
-    --disk-plan-id DISK_PLAN_ID \
-    --disk-size-gb DISK_SIZE_GB \
-    --network-interface shared
+    --disk 'archive-id=CLOUDIMG_ARCHIVE_ID,plan-id=DISK_PLAN_ID,size-gb=DISK_SIZE_GB' \
+    --nic 'upstream=shared'
 ```
 
 作成結果の Server ID を控え、`SERVER_ID` に設定します。cloud-init の user-data を適用するため、作成時には Server を起動せず、次の `boot` 操作で起動します。

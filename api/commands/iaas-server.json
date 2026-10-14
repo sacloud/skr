@@ -80,7 +80,7 @@
     {
       "name": "Create",
       "command_type": "CreateCommand",
-      "help": "サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。cloud-init 用アーカイブと共有セグメント NIC もオプションで指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --cloudimg-archive-id ARCHIVE-ID --disk-plan-id DISK-PLAN-ID --disk-size-gb 20 --network-interface shared",
+      "help": "サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'",
       "method": "CreateWithContext",
       "request_type": "server.CreateRequest",
       "response_type": "*iaas.Server",

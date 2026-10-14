@@ -23,35 +23,32 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 )
 
 type CreateCommand struct {
-	Request           *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドを指定できます。\""
-	Zone              *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
-	Name              *string   "name:\"name\" help:\"必須: サーバ名。\""
-	CPU               *int      "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
-	MemoryGB          *int      "name:\"memory-gb\" help:\"必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
-	Tags              *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
-	Description       *string   "name:\"description\" help:\"任意: サーバの説明 (最大512文字)。\""
-	IconID            *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
-	GPU               *int      "name:\"gpu\" help:\"任意: GPU 数。\""
-	GPUModel          *string   "name:\"gpu-model\" help:\"任意: GPU モデル。\""
-	CPUModel          *string   "name:\"cpu-model\" help:\"任意: CPU モデル。\""
-	Commitment        *string   "name:\"commitment\" help:\"任意: CPU プランのコミットメント。standard または dedicatedcpu を指定します。\""
-	Generation        *int      "name:\"generation\" help:\"任意: サーバプラン世代 (0: 既定、100、200)。\""
-	ConfidentialVM    *bool     "name:\"confidential-vm\" help:\"任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください。\""
-	InterfaceDriver   *string   "name:\"interface-driver\" help:\"任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。\""
-	BootAfterCreate   *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。cloud-init user-data を使う場合は省略してください。\""
-	CDROMID           *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
-	PrivateHostID     *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
-	CloudimgArchiveID *int64    "name:\"cloudimg-archive-id\" help:\"任意: cloud-init 対応パブリックアーカイブの ID。指定時は --disk-plan-id と --disk-size-gb も必要です。\""
-	DiskPlanID        *int64    "name:\"disk-plan-id\" help:\"cloudimg ディスクのディスクプラン ID。--cloudimg-archive-id と --disk-size-gb と併せて指定します。\""
-	DiskSizeGB        *int      "name:\"disk-size-gb\" help:\"cloudimg ディスクのサイズ (GB)。--cloudimg-archive-id と --disk-plan-id と併せて指定します。\""
-	NetworkInterface  *string   "name:\"network-interface\" enum:\"shared,disconnected\" help:\"任意: 接続する NIC。shared は共有セグメント、disconnected は未接続です。\""
-	factory           APIFactory
-	runtime           Runtime
+	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドを指定できます。\""
+	Zone            *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
+	Name            *string   "name:\"name\" help:\"必須: サーバ名。\""
+	CPU             *int      "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
+	MemoryGB        *int      "name:\"memory-gb\" help:\"必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
+	Tags            *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
+	Description     *string   "name:\"description\" help:\"任意: サーバの説明 (最大512文字)。\""
+	IconID          *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
+	GPU             *int      "name:\"gpu\" help:\"任意: GPU 数。\""
+	GPUModel        *string   "name:\"gpu-model\" help:\"任意: GPU モデル。\""
+	CPUModel        *string   "name:\"cpu-model\" help:\"任意: CPU モデル。\""
+	Commitment      *string   "name:\"commitment\" help:\"任意: CPU プランのコミットメント。standard または dedicatedcpu を指定します。\""
+	Generation      *int      "name:\"generation\" help:\"任意: サーバプラン世代 (0: 既定、100、200)。\""
+	ConfidentialVM  *bool     "name:\"confidential-vm\" help:\"任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください。\""
+	InterfaceDriver *string   "name:\"interface-driver\" help:\"任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。\""
+	BootAfterCreate *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。cloud-init user-data を使う場合は省略してください。\""
+	CDROMID         *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
+	PrivateHostID   *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
+	Disks           []string  `name:"disk" sep:"none" help:"任意: ディスク1個を key=value のカンマ区切りで指定します。必須キー: plan-id、size-gb (GB)。任意キー: archive-id。すべて正の整数です。例: --disk 'archive-id=123,plan-id=4,size-gb=20'。繰り返し指定でき、指定順に API の Disks 配列を組み立てます。接続は virtio です。archive-id 省略時は空のディスクを作成します。"`
+	NICs            []string  `name:"nic" sep:"none" help:"任意: NIC 1個を upstream=shared または upstream=disconnected で指定します。共有セグメントまたは未接続です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。"`
+	factory         APIFactory
+	runtime         Runtime
 }
 
 func (c *CreateCommand) Run(ctx *kong.Context) error {
@@ -73,10 +70,8 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	flagsSet = flagsSet || c.BootAfterCreate != nil
 	flagsSet = flagsSet || c.CDROMID != nil
 	flagsSet = flagsSet || c.PrivateHostID != nil
-	flagsSet = flagsSet || c.CloudimgArchiveID != nil
-	flagsSet = flagsSet || c.DiskPlanID != nil
-	flagsSet = flagsSet || c.DiskSizeGB != nil
-	flagsSet = flagsSet || c.NetworkInterface != nil
+	flagsSet = flagsSet || len(c.Disks) != 0
+	flagsSet = flagsSet || len(c.NICs) != 0
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -139,11 +134,8 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 		if c.PrivateHostID != nil {
 			request.PrivateHostID = types.ID(*c.PrivateHostID)
 		}
-		if err := c.setCloudimgDisk(request); err != nil {
+		if err := c.setDevices(request); err != nil {
 			return err
-		}
-		if c.NetworkInterface != nil {
-			request.NetworkInterfaces = []*server.NetworkInterface{{Upstream: *c.NetworkInterface}}
 		}
 	}
 	if c.runtime.ValidateRequest == nil {
@@ -175,27 +167,24 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-func (c *CreateCommand) setCloudimgDisk(request *server.CreateRequest) error {
-	diskOptionsSet := c.CloudimgArchiveID != nil || c.DiskPlanID != nil || c.DiskSizeGB != nil
-	if !diskOptionsSet {
-		return nil
+func (c *CreateCommand) setDevices(request *server.CreateRequest) error {
+	for i, input := range c.Disks {
+		value, err := parseDisk(input, request.Name)
+		if err != nil {
+			return fmt.Errorf("--disk の %d 個目: %w", i+1, err)
+		}
+		if value.SourceArchiveID != 0 && c.BootAfterCreate != nil && *c.BootAfterCreate {
+			return fmt.Errorf("アーカイブから作成するディスクでは --boot-after-create=true を指定できません。user-data は server boot で渡してください")
+		}
+		request.Disks = append(request.Disks, value)
 	}
-	if c.BootAfterCreate != nil && *c.BootAfterCreate {
-		return fmt.Errorf("cloud-init user-data を初回起動に渡す場合は --boot-after-create=true を指定できません")
+	for i, input := range c.NICs {
+		value, err := parseNIC(input)
+		if err != nil {
+			return fmt.Errorf("--nic の %d 個目: %w", i+1, err)
+		}
+		request.NetworkInterfaces = append(request.NetworkInterfaces, value)
 	}
-	if c.CloudimgArchiveID == nil || c.DiskPlanID == nil || c.DiskSizeGB == nil {
-		return fmt.Errorf("--cloudimg-archive-id、--disk-plan-id、--disk-size-gb は併せて指定してください")
-	}
-	if *c.CloudimgArchiveID <= 0 || *c.DiskPlanID <= 0 || *c.DiskSizeGB <= 0 {
-		return fmt.Errorf("cloudimg アーカイブ ID、ディスクプラン ID、ディスクサイズは正の値が必要です")
-	}
-	request.Disks = []*disk.ApplyRequest{{
-		Name:            request.Name,
-		DiskPlanID:      types.ID(*c.DiskPlanID),
-		Connection:      types.EDiskConnection("virtio"),
-		SourceArchiveID: types.ID(*c.CloudimgArchiveID),
-		SizeGB:          *c.DiskSizeGB,
-	}}
 	return nil
 }
 

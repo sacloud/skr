@@ -64,7 +64,7 @@ func TestRunIaaSServerHelp(t *testing.T) {
 		{args: []string{"iaas-api", "server", "--help"}, want: []string{"find", "read", "create", "boot", "update", "delete"}},
 		{args: []string{"iaas-api", "server", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "server", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
-		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "--cloudimg-archive-id", "--disk-plan-id", "--disk-size-gb", "--network-interface", "shared", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可"}},
+		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "--disk", "--nic", "archive-id", "plan-id", "size-gb", "繰り返し", "shared", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可"}, notWant: []string{"--cloudimg-archive-id", "--disk-plan-id", "--disk-size-gb", "--network-interface"}},
 		{args: []string{"iaas-api", "server", "boot", "--help"}, want: []string{"--zone", "--id", "--user-data", "@path.yaml", "標準入力", "インライン値は指定できません"}},
 		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--tags", "--cpu", "--memory-gb", "省略", "併用不可"}},
 		{args: []string{"iaas-api", "server", "delete", "--help"}, want: []string{"--with-disks", "--force", "ディスク", "強制停止", "併用不可"}},
@@ -160,24 +160,27 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		"--name", "cloudimg-server",
 		"--cpu", "2",
 		"--memory-gb", "4",
-		"--cloudimg-archive-id", "456",
-		"--disk-plan-id", "7",
-		"--disk-size-gb", "20",
-		"--network-interface", "shared",
+		"--disk", "archive-id=456,plan-id=7,size-gb=20",
+		"--disk", "plan-id=4,size-gb=100",
+		"--nic", "upstream=shared",
+		"--nic", "upstream=disconnected",
 	)
 	if code != 0 || stderr != "" {
 		t.Fatalf("create cloud-init options: code %d, stderr %q", code, stderr)
 	}
-	if api.createRequest == nil || len(api.createRequest.Disks) != 1 {
-		t.Fatalf("Create request disks = %+v, want one cloudimg disk", api.createRequest)
+	if api.createRequest == nil || len(api.createRequest.Disks) != 2 {
+		t.Fatalf("Create request disks = %+v, want two disks", api.createRequest)
 	}
 	createdDisk := api.createRequest.Disks[0]
 	if createdDisk.Name != "cloudimg-server" || createdDisk.DiskPlanID != 7 ||
 		createdDisk.Connection != "virtio" || createdDisk.SourceArchiveID != 456 || createdDisk.SizeGB != 20 {
 		t.Errorf("cloudimg disk = %+v, want name, plan 7, virtio, archive 456, size 20", createdDisk)
 	}
-	if len(api.createRequest.NetworkInterfaces) != 1 || api.createRequest.NetworkInterfaces[0].Upstream != "shared" {
-		t.Errorf("Create network interfaces = %+v, want shared segment", api.createRequest.NetworkInterfaces)
+	if second := api.createRequest.Disks[1]; second.DiskPlanID != 4 || second.SizeGB != 100 || second.SourceArchiveID != 0 {
+		t.Errorf("second disk = %+v, want empty 100 GB disk", second)
+	}
+	if len(api.createRequest.NetworkInterfaces) != 2 || api.createRequest.NetworkInterfaces[0].Upstream != "shared" || api.createRequest.NetworkInterfaces[1].Upstream != "disconnected" {
+		t.Errorf("Create network interfaces = %+v, want shared then disconnected", api.createRequest.NetworkInterfaces)
 	}
 
 	userDataPath := filepath.Join(t.TempDir(), "cloud-c0nfig.yaml")
@@ -243,9 +246,10 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 		{"create", "--request", `{"Zone":"test-zone","Name":"server"}`, "--zone", "test-zone"},
 		{"create", "--zone", "test-zone", "--name", "server", "--memory-gb", "1"},
 		{"create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1}`, "--boot-after-create=false"},
-		{"create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1}`, "--cloudimg-archive-id", "123"},
-		{"create", "--zone", "test-zone", "--name", "server", "--cpu", "1", "--memory-gb", "1", "--cloudimg-archive-id", "123"},
-		{"create", "--zone", "test-zone", "--name", "server", "--cpu", "1", "--memory-gb", "1", "--cloudimg-archive-id", "123", "--disk-plan-id", "7", "--disk-size-gb", "20", "--boot-after-create"},
+		{"create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1}`, "--disk", "plan-id=4,size-gb=20"},
+		{"create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1}`, "--nic", "upstream=shared"},
+		{"create", "--zone", "test-zone", "--name", "server", "--cpu", "1", "--memory-gb", "1", "--disk", "archive-id=123"},
+		{"create", "--zone", "test-zone", "--name", "server", "--cpu", "1", "--memory-gb", "1", "--disk", "archive-id=123,plan-id=7,size-gb=20", "--boot-after-create"},
 		{"boot", "--zone", "test-zone", "--id", "123", "--user-data", "inline-user-data"},
 		{"update", "--zone", "test-zone", "--id", "123"},
 		{"delete", "--zone", "all", "--id", "123"},

@@ -6,13 +6,19 @@
 
 ## CLI の手順
 
-1. `iaas-api server create` は通常の必須スカラーオプションに加え、`--cloudimg-archive-id`、`--disk-plan-id`、`--disk-size-gb` を受け付けます。ディスク用の3オプションはすべて指定する必要があり、選択したアーカイブをソースとする virtio ディスクを作成します。
-2. `--network-interface shared|disconnected` は、指定した接続先を持つ NIC を1つ作成します。チュートリアルでは `shared` を選択します。
-3. cloud-init 用の手順では Create 時に起動しません。cloud-init ディスク用オプションを指定したときに `--boot-after-create=true` を指定するとエラーになります。
+1. `iaas-api server create` は反復可能な `--disk 'archive-id=123,plan-id=4,size-gb=20'` を受け付けます。各指定は virtio ディスク1個に対応し、plan-id と size-gb は必須です。archive-id 省略時は空のディスクを作成します。
+2. `--nic 'upstream=shared'` または `--nic 'upstream=disconnected'` を反復して NIC を指定します。ディスクと NIC はそれぞれ指定順に配列を組み立てます。チュートリアルでは共有 NIC を1個指定します。
+3. cloud-init 用の手順では Create 時に起動しません。archive-id を指定したディスクと `--boot-after-create=true` は併用できません。
 4. `iaas-api server boot` は `--user-data @path.yaml` または `--user-data -` を受け付けます。インラインの user-data は拒否します。Boot はサーバ起動時に user-data を適用する SDK 操作を呼び出します。
 5. チュートリアルでは SSH 鍵をローカルで生成し、公開鍵だけを cloud-config に記載します。SSH 接続の前に、共有 NIC の IP アドレスを確認します。
 
 既存の Create の `--request` JSON 入力は、個別スカラーオプションで表せないリクエストにも引き続き利用できます。`--request` と Create の個別フラグは併用できません。
+
+## ディスクと NIC の入力処理
+
+[ADR 0041](../adr/0041-server-repeatable-disk-and-nic-options.md) に従い、各オプションの値をカンマで分割し、各要素を `key=value` として解析します。引用符やエスケープは独自に解釈せず、空要素、空値、不明キー、重複キー、必須キーの欠落はエラーにします。ID は正の64ビット整数、size-gb は正の整数として範囲も検証します。入力値そのものはエラーに含めません。
+
+オプションの反復はカンマ区切りと区別して取り込み、各ディスクと NIC を指定順に構築します。ディスク名には従来の単一ディスクと同様にサーバ名を使い、複数ディスクの場合もすべて同じ名前にします。構造化オプションで表せないディスク名や接続先などは `--request` で指定します。空のディスクだけを指定した場合は、作成後の起動を制限しません。
 
 ## ライブ E2E の安全性
 

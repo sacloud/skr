@@ -21,7 +21,7 @@ $ skr iaas-api server create --zone is1b --name example --cpu 1 --memory-gb 1 \
     --nic 'upstream=disconnected'
 ```
 
-この例は実装予定の構文を示します。アーカイブ ID は仮の値です。
+アーカイブ ID は仮の値です。
 
 - 初期の対応キーは `archive-id`、`plan-id`、`size-gb` とします。`plan-id` と `size-gb` は各ディスクで必須とし、`archive-id` を省略した場合は空のディスクを作成します。接続方式は virtio とします。
 - NIC の初期の対応キーは必須の `upstream` とし、`shared` または `disconnected` を受け付けます。スイッチ ID など、それ以外の構成は JSON 入力に残します。

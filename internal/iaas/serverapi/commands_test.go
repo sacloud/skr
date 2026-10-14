@@ -15,13 +15,143 @@
 package serverapi
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/alecthomas/kong"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 )
+
+func TestParseDevices(t *testing.T) {
+	for _, test := range []struct {
+		input   string
+		plan    int64
+		size    int
+		archive int64
+	}{
+		{"archive-id=123,plan-id=4,size-gb=20", 4, 20, 123},
+		{"size-gb=100,plan-id=4", 4, 100, 0},
+	} {
+		value, err := parseDisk(test.input, "server")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(value.DiskPlanID) != test.plan || value.SizeGB != test.size ||
+			int64(value.SourceArchiveID) != test.archive || value.Name != "server" || value.Connection != "virtio" {
+			t.Fatalf("unexpected disk: %+v", value)
+		}
+	}
+	for _, upstream := range []string{"shared", "disconnected"} {
+		value, err := parseNIC("upstream=" + upstream)
+		if err != nil || value.Upstream != upstream {
+			t.Fatalf("NIC = %+v, error = %v", value, err)
+		}
+	}
+}
+
+func TestParseDevicesRejectInvalidInputsWithoutEcho(t *testing.T) {
+	for _, input := range []string{
+		"", "plan-id=4", "size-gb=20", "archive-id=123",
+		"plan-id=0,size-gb=20", "plan-id=-4,size-gb=20",
+		"plan-id=4,size-gb=0", "plan-id=4,size-gb=-1",
+		"plan-id=4,size-gb=20,archive-id=0",
+		"plan-id=4,size-gb=20,archive-id=-1",
+		"plan-id=9223372036854775808,size-gb=20",
+		"plan-id=4,size-gb=9223372036854775808",
+		"plan-id=4,size-gb=20,archive-id=9223372036854775808",
+		"plan-id=4,size-gb=20,plan-id=4", "plan-id=4,size-gb=20,",
+		"plan-id=4,,size-gb=20", "plan-id=,size-gb=20", "plan-id=4,size-gb",
+		"plan-id=4,size-gb=20=secret-value", "password=secret-value",
+		"plan-id=4,size-gb=secret-value", "plan-id=+4,size-gb=20",
+		"plan-id=4, size-gb=20", "plan-id=4,size-gb=20\n",
+	} {
+		if _, err := parseDisk(input, "server"); err == nil || strings.Contains(err.Error(), "secret-value") {
+			t.Errorf("input %q: error = %v", input, err)
+		}
+	}
+	for _, input := range []string{
+		"", "upstream=", "upstream=123", "upstream=secret-value",
+		"upstream=shared,upstream=disconnected", "upstream=shared,",
+		"password=secret-value", "upstream=shared=secret-value",
+	} {
+		if _, err := parseNIC(input); err == nil || strings.Contains(err.Error(), "secret-value") {
+			t.Errorf("input %q: error = %v", input, err)
+		}
+	}
+}
+
+type createTestAPI struct {
+	API
+	request *server.CreateRequest
+}
+
+func (a *createTestAPI) CreateWithContext(_ context.Context, request *server.CreateRequest) (*iaas.Server, error) {
+	a.request = request
+	return &iaas.Server{Name: request.Name}, nil
+}
+
+func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		args      []string
+		wantError bool
+	}{
+		{"multiple", []string{"--disk", "archive-id=123,plan-id=4,size-gb=20", "--disk", "plan-id=4,size-gb=100", "--nic", "upstream=shared", "--nic", "upstream=disconnected"}, false},
+		{"archive boot conflict", []string{"--disk", "archive-id=123,plan-id=4,size-gb=20", "--boot-after-create"}, true},
+		{"empty disk boot", []string{"--disk", "plan-id=4,size-gb=20", "--boot-after-create"}, false},
+		{"partial disk", []string{"--disk", "archive-id=123"}, true},
+		{"nonpositive disk", []string{"--disk", "plan-id=0,size-gb=20"}, true},
+		{"invalid second disk", []string{"--disk", "plan-id=4,size-gb=20", "--disk", ""}, true},
+		{"invalid NIC", []string{"--nic", "upstream=wrong"}, true},
+		{"request disk", []string{"--request", "{}", "--disk", "plan-id=4,size-gb=20"}, true},
+		{"request empty disk", []string{"--request", "{}", "--disk", ""}, true},
+		{"request NIC", []string{"--request", "{}", "--nic", ""}, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			command := CreateCommand{}
+			parser, err := kong.New(&command)
+			if err != nil {
+				t.Fatal(err)
+			}
+			args := append([]string{"--zone", "is1b", "--name", "server", "--cpu", "1", "--memory-gb", "1"}, test.args...)
+			if strings.HasPrefix(test.name, "request ") {
+				args = test.args
+			}
+			ctx, err := parser.Parse(args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			api := &createTestAPI{}
+			command.factory = func() (API, error) { return api, nil }
+			command.runtime = Runtime{
+				ValidateRequest: func(string, any) error { return nil },
+				ValidateOutput:  func(*kong.Context) error { return nil },
+				WriteOutput:     func(*kong.Context, any) error { return nil },
+			}
+			err = command.Run(ctx)
+			if (err != nil) != test.wantError {
+				t.Fatalf("error = %v, wantError = %v", err, test.wantError)
+			}
+			if test.wantError && api.request != nil {
+				t.Fatal("invalid request reached API")
+			}
+			if test.name == "multiple" {
+				if len(api.request.Disks) != 2 || api.request.Disks[0].SourceArchiveID != 123 ||
+					api.request.Disks[1].SizeGB != 100 || api.request.Disks[0].Name != "server" ||
+					api.request.Disks[1].Name != "server" || len(api.request.NetworkInterfaces) != 2 ||
+					api.request.NetworkInterfaces[0].Upstream != "shared" || api.request.NetworkInterfaces[1].Upstream != "disconnected" {
+					t.Fatalf("unexpected request: %+v", api.request)
+				}
+			}
+		})
+	}
+}
 
 func TestReadUserData(t *testing.T) {
 	userData := "#cloud-config\nssh_authorized_keys:\n  - ssh-ed25519 AAAA-example\n"

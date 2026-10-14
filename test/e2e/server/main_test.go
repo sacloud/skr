@@ -284,7 +284,7 @@ func TestServerArgsUseDedicatedOptionsAndDoNotIncludeUserData(t *testing.T) {
 	}
 	joined := strings.Join(args, " ")
 	for _, expected := range []string{
-		"--cloudimg-archive-id 234", "--disk-plan-id 4", "--disk-size-gb 20", "--network-interface shared",
+		"--disk archive-id=234,plan-id=4,size-gb=20", "--nic upstream=shared",
 	} {
 		if !strings.Contains(joined, expected) {
 			t.Errorf("Create args %q do not include %q", joined, expected)
