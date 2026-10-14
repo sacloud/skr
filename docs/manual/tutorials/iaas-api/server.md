@@ -20,6 +20,7 @@ $ skr iaas-api server create --help
 $ skr iaas-api server boot --help
 $ skr iaas-api server read --help
 $ skr iaas-api server delete --help
+$ skr iaas-api server find --help
 $ skr iaas-api disk find --help
 ```
 
@@ -117,7 +118,18 @@ $ skr iaas-api server delete \
     --fail-if-not-found
 ```
 
-Server と同名の Disk が残っていないことを確認します。出力が空の配列なら該当する Disk はありません。
+Server が残っていないことを ID と名前で確認します。出力が空の配列なら該当する Server はありません。
+
+```console
+$ skr iaas-api server find --zone is1b \
+    --query "map(select((.ID | tostring) == \"$SERVER_ID\" or .Name == \"$SERVER_NAME\") | {ID, Name})"
+```
+
+```json
+[]
+```
+
+続いて Server と同名の Disk が残っていないことを確認します。出力が空の配列なら該当する Disk はありません。
 
 ```console
 $ skr iaas-api disk find --zone is1b \

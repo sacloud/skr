@@ -27,7 +27,7 @@ import (
 )
 
 type CreateCommand struct {
-	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドを指定できます。\""
+	Request         *string   `help:"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、Name、CPU、MemoryGB。CPU と MemoryGB は対象ゾーンで利用可能なプランを指定します。Tags は文字列配列です。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドも指定できます。NoWait=true と BootAfterCreate=true は併用できません。NoWait=true の場合は各ディスクも NoWait=true にします。例: --request='{\"Zone\":\"is1b\",\"Name\":\"example\",\"CPU\":1,\"MemoryGB\":1,\"Tags\":[\"tutorial\"]}'"`
 	Zone            *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
 	Name            *string   "name:\"name\" help:\"必須: サーバ名。\""
 	CPU             *int      "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
