@@ -43,7 +43,11 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
 チェックは列挙した操作の CLI 実装状況を示します。SDK にある未対応操作、ライブ E2E、チュートリアルの状況も併記します。
 
 - [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
-- [x] `server` — `iaas-api server` の Find / Read / Create / Update / Delete を実装済みです。SDK の Apply / Boot / ChangePlan / EjectCDROM / InsertCDROM / MonitorCPU / Reset / SendNMI / Shutdown / WaitBoot / WaitShutdown は未対応です。ライブ E2E runner は未対応です。[チュートリアル](docs/manual/tutorials/iaas-api/server.md)があります。
+- [x] `server`
+    - [x] Find / Read / Create / Boot / Update / Delete を実装済みです。
+    - Create では基本項目に加え、反復可能な `--disk` と `--nic` で複数ディスクと共有／未接続 NIC を指定できます。Boot は user-data のファイル／標準入力に対応します。
+    - [ ] SDK の Apply / ChangePlan / EjectCDROM / InsertCDROM / MonitorCPU / Reset / SendNMI / Shutdown / WaitBoot / WaitShutdown は **未対応**です。
+    - is1b で新記法による cloud-init 起動・SSH 接続・削除・一時 SSH ファイルの後始末を確認済みです。[ライブ E2E runner](test/e2e/server/) と[チュートリアル](docs/manual/tutorials/iaas-api/server.md)があります。設計は [ADR 0040](docs/adr/0040-server-cloud-init-and-ssh-tutorial.md)、[ADR 0041](docs/adr/0041-server-repeatable-disk-and-nic-options.md) と[設計文書](docs/design/server-cloud-init-ssh.md)を参照してください。
 - [x] `switch` — SDK の `swytch` に対応する `iaas-api switch` の Find / Read / Create / Update / Delete を実装済みです。SDK の公開操作はすべて CLI にあります。Sandbox と is1b で作成・検索・参照・更新・削除を検証する [ライブ E2E runner](test/e2e/switch/) と[チュートリアル](docs/manual/tutorials/iaas-api/switch.md)があります。
 
 ## CommonServiceItem 系 API 候補

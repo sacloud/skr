@@ -13,7 +13,7 @@ IaaS API のリソースには `Tags` 配列があります。`--request` また
 - `--tags` は SDK リクエストの `Tags` フィールドへ文字列配列として設定します。検索・作成・更新の各操作で同じフラグ表記を使います。
 - JSON 入力では従来どおり `Tags` 配列を指定できます。`--request` と `--tags` を含む個別フラグは併用できず、値をマージしません。
 - 個別フラグ入力を提供しない JSON 専用操作は JSON 専用のままにします。タグだけを `--request` に合成する例外は設けません。
-- `Names`、`Sort`、`Disks`、`NetworkInterfaces` など、タグ以外の配列や複雑な値は JSON 入力に残します。
+- `Names`、`Sort`、`Disks`、`NetworkInterfaces` など、タグ以外の配列や複雑な値は JSON 入力に残します。ただし、Server Create の限定的なディスクと NIC の指定は [ADR 0041](0041-server-repeatable-disk-and-nic-options.md) の例外に従います。
 
 ## Consequences
 

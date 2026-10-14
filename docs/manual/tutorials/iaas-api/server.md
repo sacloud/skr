@@ -1,98 +1,156 @@
-# IaaS Server API: ディスクレスサーバを作成して管理する
+# Server API チュートリアル
 
-[サーバ](https://manual.sakura.ad.jp/cloud/server/create-delete.html)は、CPU とメモリのプランを選び、必要に応じてディスクやネットワークインターフェースを接続して利用します。このチュートリアルでは、ディスクとネットワークを接続しないサーバを停止状態で作成し、参照、名前の更新、削除をします。ゲスト OS を起動したり、ネットワークを使ったりしません。
+このチュートリアルでは、cloud-init 対応パブリックアーカイブから Server を作成し、共有セグメントへ接続して SSH ログインします。`server create` の個別オプションでディスクと NIC を指定し、cloud-init の user-data は起動時に `server boot` へ渡します。秘密鍵はローカルで生成し、API へ送信しません。
 
-> [!WARNING]
-> サーバの作成・更新・削除は選択中のプロジェクトに影響します。対象プロファイル、プロジェクト、ゾーン、利用可能なサーバプランを確認してから実行してください。構成に応じた料金が発生する場合があります。料金や対象環境を確認し、このチュートリアルのための操作について必要な承認を得てください。
+この手順では is1b を使用します。アーカイブ ID、ディスクプラン ID、ディスクサイズは、is1b で利用できる値を指定してください。
 
 ## 前提条件
 
-- `skr iaas-api server` を含むバイナリが利用できること。リポジトリで `make build` を実行すると `./skr` が生成されます。以下の `skr` は、そのバイナリを実行するコマンドとして記載します。
-- 対象プロジェクトへの認証情報を SDK プロファイル、または `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で設定済みであること。対象サーバを作成・更新・削除できる権限も必要です。認証情報をコマンド例や JSON ファイルに書かないでください。
-- 対象ゾーンで利用可能な CPU とメモリの組み合わせを確認できること。CPU 数に応じて選択できるメモリ容量が異なります。コントロールパネルではサーバプラン一覧から選択できます（[サーバの作成・削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)）。
-- `SERVER-NAME` と `UPDATED-SERVER-NAME` を、対象プロジェクトで重複しないテスト用の名前に置き換えること。後述の `123456789012` は仮の ID です。必ず作成結果の `ID` に置き換えてください。
+- `skr` と SSH クライアントが利用できること
+- さくらのクラウドの認証設定と、is1b で Server・Disk を作成できるプロジェクトを選択していること
+- cloud-init 対応パブリックアーカイブの ID と、利用可能なディスクプラン ID・サイズが分かること
+- Server の作成、起動、外部 SSH 接続および削除が許可されていること
 
-## 作成するリソースと順序
+Server と Disk の利用料金が発生します。共有セグメントへ接続した Server は外部から SSH 接続できるため、公開鍵認証を設定し、不要になったら削除してください。
 
-作成するのはサーバ1台です。ディスクとネットワークインターフェースは接続しません。作成後もサーバを起動しません。サーバにはディスクレス構成と NIC の切断を設定できます（[サーバの作成・削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)）。この手順ではディスクやスイッチなどの別リソースを作成しません。クリーンアップで削除するのはサーバだけです。
-
-## Step 1: 対象環境とコマンドを確認する
+## コマンドを確認する
 
 ```console
-$ skr config current
-$ skr iaas-api --help
-$ skr iaas-api server --help
-$ skr iaas-api server find --help
-$ skr iaas-api server read --help
 $ skr iaas-api server create --help
-$ skr iaas-api server update --help
+$ skr iaas-api server boot --help
+$ skr iaas-api server read --help
 $ skr iaas-api server delete --help
+$ skr iaas-api server find --help
+$ skr iaas-api disk find --help
 ```
 
-意図したプロファイルが選択されていることを確認してください。環境変数で認証する場合も、対象プロジェクトと権限を別途確認します。検索・参照・更新・削除では `--zone` などの個別フラグか、`--request` の JSON オブジェクトを指定します。両方は併用できません。タグは個別フラグ経路では `--tags` にカンマ区切りで指定でき、JSON 経路では `Tags` 配列で指定できます。`--tags` と `--request` は併用できません。JSON はコマンドラインに直接指定するか、`@ファイル名` で読み込めます。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
+## SSH 鍵を作成する
 
-検索では対象のゾーンを明示してください。
-
-## Step 2: 停止状態のサーバを作成する
-
-`Zone` と `Name` を環境に合わせて置き換えます。`CPU` と `MemoryGB` は数値の例です。対象ゾーンで利用可能な組み合わせに置き換えてください。料金の内訳は構成によって異なります。コントロールパネルでは作成前に料金内訳を表示できます（[サーバの作成・削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)）。
-
-基本的な構成は `--zone`、`--name`、`--cpu`、`--memory-gb` で指定できます。タグは `--tags` にカンマ区切りで渡します。作成後に起動しないよう `--boot-after-create=false` を指定します。
+作業用ディレクトリを作成し、その中に鍵を生成します。秘密鍵はローカルに保管し、コマンドの引数や API リクエストに含めません。
 
 ```console
-$ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1 --boot-after-create=false --tags tutorial,managed
+$ umask 077
+$ WORK_DIR=$(mktemp -d)
+$ KEY_PATH="$WORK_DIR/server-tutorial-key"
+$ USER_DATA_PATH="$WORK_DIR/server-c0nfig.yaml"
+$ ssh-keygen -t rsa -b 3072 -N '' -f "$KEY_PATH"
 ```
 
-配列などの複雑な値を渡す場合は JSON を使います。JSON 経路でタグも設定するときは `Tags` 配列を含めます。JSON と個別フラグは併用できません。フラグで作成した場合はこの JSON コマンドを実行せず、JSON を使う場合は上のフラグコマンドを実行しないでください。
+## cloud-init の user-data を作成する
+
+公開鍵を cloud-config に設定します。次のコマンドは公開鍵だけをファイルへ書き込みます。
+
+```console
+$ cat > "$USER_DATA_PATH" <<EOF
+#cloud-config
+users:
+  - default
+  - name: skr-tutorial
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - $(cat "$KEY_PATH.pub")
+EOF
+```
+
+## Server を作成して起動する
+
+Server 名には重複しない値を指定します。`CLOUDIMG_ARCHIVE_ID`、`DISK_PLAN_ID`、`DISK_SIZE_GB` は、is1b で利用できる正の整数に置き換えてください。
+
+`--disk` の plan-id と size-gb は必須です。archive-id を省略すると空のディスクを作成します。`--disk` と `--nic` は繰り返して指定でき、それぞれ指定順に接続します。`upstream=shared` は先頭の NIC にだけ指定できます。この手順ではディスクと共有 NIC を1個ずつ指定します。`--request` とは併用できません。
+
+```console
+$ SERVER_NAME="skr-tutorial-cloudinit-$(date +%s)"
+$ skr iaas-api server create \
+    --zone is1b \
+    --name "$SERVER_NAME" \
+    --cpu 1 \
+    --memory-gb 1 \
+    --disk 'archive-id=CLOUDIMG_ARCHIVE_ID,plan-id=DISK_PLAN_ID,size-gb=DISK_SIZE_GB' \
+    --nic 'upstream=shared'
+```
+
+作成結果の Server ID を控え、`SERVER_ID` に設定します。cloud-init の user-data を適用するため、作成時には Server を起動せず、次の `boot` 操作で起動します。
+
+`--user-data` 自体は任意ですが、この手順では SSH 公開鍵とユーザーを設定するために指定します。user-data が不要な通常の起動では省略できます。指定する場合は `@path` または `-` を使い、内容を直接引数に渡さないでください。
+
+```console
+$ SERVER_ID=SERVER_ID
+$ skr iaas-api server boot \
+    --zone is1b \
+    --id "$SERVER_ID" \
+    --user-data "@$USER_DATA_PATH"
+```
+
+Server の状態と NIC の IP アドレスを確認します。`Interfaces` の共有セグメントに割り当てられた `IPAddress` を `PUBLIC_IP` に設定してください。
+
+```console
+$ skr iaas-api server read --zone is1b --id "$SERVER_ID" \
+    --query '{ID, Name, InstanceStatus, Interfaces}'
+$ PUBLIC_IP=PUBLIC_IP
+```
+
+`InstanceStatus` が起動状態になり、IP アドレスが割り当てられるまで待ってから SSH 接続します。初回接続では表示されるホスト鍵の指紋を確認してください。
+
+```console
+$ ssh -i "$KEY_PATH" \
+    -o IdentitiesOnly=yes \
+    "skr-tutorial@$PUBLIC_IP"
+```
+
+ログインできたら、次のコマンドで Server のホスト名を確認します。
+
+```console
+$ hostname
+```
+
+## Server と Disk を削除する
+
+SSH セッションで `exit` を実行し、削除前に Server ID と名前を確認します。`--with-disks` は接続中の Disk も削除します。対象がこの手順で作成した Server であることを必ず確認してください。
+
+```console
+$ skr iaas-api server read --zone is1b --id "$SERVER_ID" \
+    --query '{ID, Name, InstanceStatus}'
+$ skr iaas-api server delete \
+    --zone is1b \
+    --id "$SERVER_ID" \
+    --with-disks \
+    --force \
+    --fail-if-not-found
+```
+
+Server が残っていないことを ID と名前で確認します。出力が空の配列なら該当する Server はありません。
+
+```console
+$ skr iaas-api server find --zone is1b \
+    --query "map(select((.ID | tostring) == \"$SERVER_ID\" or .Name == \"$SERVER_NAME\") | {ID, Name})"
+```
 
 ```json
-{
-  "Zone": "ZONE",
-  "Name": "SERVER-NAME",
-  "CPU": 1,
-  "MemoryGB": 1,
-  "BootAfterCreate": false,
-  "Tags": ["tutorial"]
-}
+[]
 ```
 
-ディスクを作成する `Disks` とネットワーク接続を設定する `NetworkInterfaces` は省略しています。OS をインストールしたり起動したりする構成ではありません。ディスク、アーカイブ、ネットワークインターフェースを指定する場合は、対象 ID など必要な値を含む JSON ファイルを用意してください。
+続いて Server と同名の Disk が残っていないことを確認します。出力が空の配列なら該当する Disk はありません。
 
 ```console
-$ skr iaas-api server create --request @server-create.json
+$ skr iaas-api disk find --zone is1b \
+    --query "map(select(.Name == \"$SERVER_NAME\") | {ID, Name})"
 ```
 
-成功するとサーバ情報が出力されます。以降の操作で使う `ID` を控えてください。`Tags` は `--tags` にカンマ区切りで指定できます。`Disks`、`NetworkInterfaces` などの配列や複雑な値は JSON に残します。
+```json
+[]
+```
 
-## Step 3: サーバを参照して名前を更新する
-
-`123456789012` は作成結果の `ID` に置き換えてください。最初に対象サーバの `ID` と `Name` を確認します。
+ローカルの鍵と user-data も不要になったら削除してください。秘密鍵を失うと同じ鍵では再接続できません。必要なデータを退避してから削除します。
 
 ```console
-$ skr iaas-api server read --zone ZONE --id 123456789012
+$ rm "$KEY_PATH" "$KEY_PATH.pub" "$USER_DATA_PATH"
+$ rmdir "$WORK_DIR"
 ```
 
-名前とタグを更新します。`update` で省略した項目は変更されません。タグを指定する場合は `--tags` にカンマ区切りで渡します。
+## 参考資料
 
-```console
-$ skr iaas-api server update --zone ZONE --id 123456789012 --name UPDATED-SERVER-NAME --tags tutorial,updated
-$ skr iaas-api server read --zone ZONE --id 123456789012
-```
-
-2回目の `read` で `Name` と `Tags` が更新後の値であることを確認してください。CPU またはメモリを更新する場合は、ゾーンで利用可能なプランの組み合わせを確認してください。プラン変更ではサーバのリソース ID が変わります。以降の操作では新しいサーバ ID を使ってください（[サーバのプラン変更](https://manual.sakura.ad.jp/cloud/server/plan-update.html)）。
-
-## Step 4: 作成したサーバを削除する
-
-削除前に `read` で対象の `ID` と `Name` を再確認してください。サーバ作成時にディスクは作成していないため、このチュートリアルではサーバだけを削除します。`--with-disks` は指定しません。これは接続ディスクを削除せずに残す動作です。起動中のサーバは停止が必要です。意図せず強制停止しないよう、この例では `--force` も指定しません。
-
-```console
-$ skr iaas-api server delete --zone ZONE --id 123456789012 --fail-if-not-found
-```
-
-削除後に同じ ID を `read` し、対象が見つからないエラーになることを確認できます。`delete` 成功時は標準出力に何も出しません。削除対象を取り違えないよう、既存サーバの ID を使わないでください。
-
-## 参考情報
-
-- [さくらのクラウドマニュアル: サーバの作成・削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)
-- [さくらのクラウドマニュアル: サーバのプラン変更](https://manual.sakura.ad.jp/cloud/server/plan-update.html)
-- [sacloud-sdk-go v0.3.0: Server サービスとリクエスト型](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/server)
+- [cloud-init 対応パブリックアーカイブからサーバを作成する](https://manual.sakura.ad.jp/cloud/server/cloud-init.html)
+- [サーバの作成と削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)
+- [共有セグメントを利用する](https://manual.sakura.ad.jp/cloud/design-pattern/ex01.html)
+- [公開鍵認証の設定](https://manual.sakura.ad.jp/cloud/controlpanel/settings/public-key.html)
+- [sacloud-sdk-go v0.3.0 Server API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/server)

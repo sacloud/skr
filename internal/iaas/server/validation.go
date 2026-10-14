@@ -51,6 +51,15 @@ func ValidateRequest(name string, request any) error {
 			return fmt.Errorf("対象ゾーンで利用可能な CPU と MemoryGB の組み合わせが必要です")
 		}
 		return nil
+	case "validateServerBootRequest":
+		value, ok := request.(*server.BootRequest)
+		if !ok {
+			return fmt.Errorf("Boot API リクエストの型が不正です")
+		}
+		if err := validateIdentity(value.Zone, value.ID); err != nil {
+			return err
+		}
+		return value.Validate()
 	case "validateServerUpdateRequest":
 		value, ok := request.(*server.UpdateRequest)
 		if !ok {

@@ -80,128 +80,19 @@
     {
       "name": "Create",
       "command_type": "CreateCommand",
-      "help": "サーバを作成して出力します。--zone、--name、--cpu、--memory-gb のフラグ、または --request JSON で指定します。CPU とメモリは対象ゾーンで利用可能な組み合わせを指定してください。タグは --tags にカンマ区切りで指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --tags production,web",
+      "help": "サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'",
       "method": "CreateWithContext",
       "request_type": "server.CreateRequest",
       "response_type": "*iaas.Server",
-      "request_validator": "validateServerCreateRequest",
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、Name (名前)、CPU と MemoryGB (対象ゾーンで利用できるプランの組み合わせ)。任意フラグは Description、IconID、GPU、GPUModel、CPUModel、Commitment、Generation、ConfidentialVM、InterfaceDriver、CDROMID、PrivateHostID、BootAfterCreate、Tags (--tags でカンマ区切り) です。JSON 経路では Tags を文字列配列で指定できます。Disks、NetworkInterfaces、NoWait は JSON で指定します。NoWait はディスク作成時の待機設定で、BootAfterCreate が true の場合は指定できません。ディスクレス構成では Disks と NetworkInterfaces を省略できます。BootAfterCreate を true にすると作成後にサーバを起動します。CPU と MemoryGB の数値は例です。対象ゾーンで利用可能な組み合わせに置き換えてください。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"SERVER-NAME\",\"CPU\":1,\"MemoryGB\":1,\"Tags\":[\"example\"]}",
-      "flags": [
-        {
-          "name": "zone",
-          "field": "Zone",
-          "type": "string",
-          "help": "必須: 作成先のゾーン名。",
-          "required": true
-        },
-        {
-          "name": "name",
-          "field": "Name",
-          "type": "string",
-          "help": "必須: サーバ名。",
-          "required": true
-        },
-        {
-          "name": "cpu",
-          "field": "CPU",
-          "type": "int",
-          "help": "必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。",
-          "required": true
-        },
-        {
-          "name": "memory-gb",
-          "field": "MemoryGB",
-          "type": "int",
-          "help": "必須: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。",
-          "required": true
-        },
-        {
-          "name": "tags",
-          "field": "Tags",
-          "type": "[]string",
-          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
-          "conversion": "types.Tags",
-          "separator": ","
-        },
-        {
-          "name": "description",
-          "field": "Description",
-          "type": "string",
-          "help": "任意: サーバの説明 (最大512文字)。"
-        },
-        {
-          "name": "icon-id",
-          "field": "IconID",
-          "type": "int64",
-          "help": "任意: アイコンの ID (数値)。",
-          "conversion": "types.ID"
-        },
-        {
-          "name": "gpu",
-          "field": "GPU",
-          "type": "int",
-          "help": "任意: GPU 数。"
-        },
-        {
-          "name": "gpu-model",
-          "field": "GPUModel",
-          "type": "string",
-          "help": "任意: GPU モデル。"
-        },
-        {
-          "name": "cpu-model",
-          "field": "CPUModel",
-          "type": "string",
-          "help": "任意: CPU モデル。"
-        },
-        {
-          "name": "commitment",
-          "field": "Commitment",
-          "type": "string",
-          "help": "任意: CPU プランのコミットメント。standard または dedicatedcpu を指定します。",
-          "conversion": "types.ECommitment"
-        },
-        {
-          "name": "generation",
-          "field": "Generation",
-          "type": "int",
-          "help": "任意: サーバプラン世代 (0: 既定、100、200)。",
-          "conversion": "types.EPlanGeneration"
-        },
-        {
-          "name": "confidential-vm",
-          "field": "ConfidentialVM",
-          "type": "bool",
-          "help": "任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください (https://manual.sakura.ad.jp/cloud/server/confidential-vm-plan/about.html)。"
-        },
-        {
-          "name": "interface-driver",
-          "field": "InterfaceDriver",
-          "type": "string",
-          "help": "任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。",
-          "conversion": "types.EInterfaceDriver"
-        },
-        {
-          "name": "boot-after-create",
-          "field": "BootAfterCreate",
-          "type": "bool",
-          "help": "任意: true の場合、作成後にサーバを起動します。"
-        },
-        {
-          "name": "cdrom-id",
-          "field": "CDROMID",
-          "type": "int64",
-          "help": "任意: 作成時に挿入する CD-ROM イメージの ID (数値)。",
-          "conversion": "types.ID"
-        },
-        {
-          "name": "private-host-id",
-          "field": "PrivateHostID",
-          "type": "int64",
-          "help": "任意: 接続先の専有ホスト ID (数値)。",
-          "conversion": "types.ID"
-        }
-      ]
+      "handwritten": true
+    },
+    {
+      "name": "Boot",
+      "command_type": "BootCommand",
+      "help": "サーバを起動します。cloud-init の user-data は任意で、--user-data @path.yaml または --user-data - で指定します。例: skr iaas-api server boot --zone ZONE --id 123456789012",
+      "method": "BootWithContext",
+      "request_type": "server.BootRequest",
+      "handwritten": true
     },
     {
       "name": "Update",

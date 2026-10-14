@@ -17,6 +17,8 @@
 
 ## Consequences
 
+Server Create の限定的なディスクと NIC の指定は、[ADR 0041](0041-server-repeatable-disk-and-nic-options.md) により反復可能な構造化オプションを使う例外とします。その他の複雑な入力を JSON に残す方針は維持します。
+
 - SDK v0.3.0 の Switch `CreateRequest` には7フィールドあり、`Zone` と `Name` が必須です。Server の作成には20フィールド、Disk の作成には18フィールドあり、任意値や複雑な型も含まれます。Database の作成には33フィールドあり、配列、秘密情報、条件付きの必須値も含まれます。フィールド総数や検証タグの数でフラグ経路を決めません。
 - Switch では作成時の zone と name、参照・削除時の zone と ID などをフラグ化します。検索の `Names` と `Tags`、作成・更新の `Tags` など配列は JSON 経路に残します。ただし、IaaS のトップレベル `Tags` は [ADR 0035](0035-iaas-tags-flag.md) により `--tags` でも指定できます。単純な操作のチュートリアルにはフラグを使用します。
 - 新しい API 操作ごとに、フラグと JSON が同じ SDK リクエストに至ること、必須値、相互排他、未指定と明示的なゼロ値、エラー表示をテストします。既存操作にフラグを追加する場合も JSON 経路を維持します。
