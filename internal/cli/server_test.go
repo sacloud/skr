@@ -66,7 +66,7 @@ func TestRunIaaSServerHelp(t *testing.T) {
 		{args: []string{"iaas-api", "server", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
 		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "--disk", "--nic", "archive-id", "plan-id", "size-gb", "繰り返し", "shared", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可", "必須: Zone", "文字列配列", "NoWait=true", "BootAfterCreate=true", "NoWait=true とは併用できません", `"Tags":["tutorial"]`}, notWant: []string{"--cloudimg-archive-id", "--disk-plan-id", "--disk-size-gb", "--network-interface"}},
 		{args: []string{"iaas-api", "server", "boot", "--help"}, want: []string{"--zone", "--id", "--user-data", "@path.yaml", "標準入力", "インライン値は指定できません"}},
-		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--tags", "--cpu", "--memory-gb", "省略", "併用不可"}},
+		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--tags", "--cpu", "--memory-gb", "省略", "併用不可", "任意フラグは Name、Description、Tags", "CPUModel です。JSON 経路", "IconID、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID、Disks、NetworkInterfaces", "ID の設定・クリアには JSON"}, notWant: []string{"--icon-id", "--commitment", "--generation", "--interface-driver", "--cdrom-id", "--private-host-id"}},
 		{args: []string{"iaas-api", "server", "delete", "--help"}, want: []string{"--with-disks", "--force", "ディスク", "強制停止", "併用不可"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
