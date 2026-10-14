@@ -179,14 +179,16 @@ func TestScenarioRefusesCleanupAfterIdentityChange(t *testing.T) {
 	}
 }
 
-func TestDiskArgsUsesJSONForComplexRequestsAndFlagsForIDs(t *testing.T) {
+func TestDiskArgsUsesFlagsForSimpleRequestsAndJSONForComplexRequests(t *testing.T) {
 	for _, test := range []struct {
 		step    string
 		request map[string]any
 		want    []string
 	}{
-		{"test-create", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "SizeGB": diskSizeGB}, []string{"--request", `"DiskPlanID":4`}},
-		{"test-update", map[string]any{"Zone": zone, "ID": types.ID(123), "Name": "renamed"}, []string{"--request", `"Name":"renamed"`}},
+		{"test-create", map[string]any{"Zone": zone, "Name": "disk", "Description": "test", "DiskPlanID": diskPlanID, "Connection": "virtio", "SizeGB": diskSizeGB}, []string{"--zone is1b", "--name disk", "--description test", "--disk-plan-id 4", "--connection virtio", "--size-gb 20"}},
+		{"test-create-complex", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "Connection": "virtio", "SizeGB": diskSizeGB, "DistantFrom": []int{123}}, []string{"--request", `"DistantFrom":[123]`}},
+		{"test-update", map[string]any{"Zone": zone, "ID": types.ID(123), "Name": "renamed"}, []string{"--zone is1b", "--id 123", "--name renamed"}},
+		{"test-update-complex", map[string]any{"Zone": zone, "ID": types.ID(123), "EditParameter": map[string]any{"Hostname": "host"}}, []string{"--request", `"EditParameter":{"Hostname":"host"}`}},
 		{"test-find", map[string]any{"Zone": zone, "Names": []string{"disk"}}, []string{"--request", `"Names":["disk"]`}},
 		{"test-find-query", map[string]any{"Zone": zone, "Names": []string{"disk"}}, []string{"--request", `"Names":["disk"]`, "--query map({ID,Name})"}},
 		{"test-read", map[string]any{"Zone": zone, "ID": types.ID(123)}, []string{"--zone", "is1b", "--id", "123"}},
@@ -205,6 +207,94 @@ func TestDiskArgsUsesJSONForComplexRequestsAndFlagsForIDs(t *testing.T) {
 				t.Errorf("%s args = %v, want %q", test.step, args, want)
 			}
 		}
+	}
+}
+
+func TestDiskArgsPreservesAllRepresentableCreateAndUpdateFields(t *testing.T) {
+	tests := []struct {
+		step    string
+		request map[string]any
+		want    []string
+	}{
+		{
+			step: "test-create",
+			request: map[string]any{
+				"Zone": zone, "Name": "disk", "DiskPlanID": types.ID(4),
+				"Connection": "virtio", "SizeGB": 20, "Description": "description",
+				"Tags": []string{"one", "two"}, "IconID": types.ID(0),
+				"EncryptionAlgorithm": "aes256_xts", "KMSKeyID": types.ID(12),
+				"DedicatedStorageContractID": types.ID(13), "SourceDiskID": types.ID(14),
+				"SourceArchiveID": types.ID(15), "ServerID": types.ID(16), "NoWait": false,
+			},
+			want: []string{
+				"--description description", "--tags one,two", "--icon-id 0",
+				"--encryption-algorithm aes256_xts", "--kms-key-id 12",
+				"--dedicated-storage-contract-id 13", "--source-disk-id 14",
+				"--source-archive-id 15", "--server-id 16", "--no-wait=false",
+			},
+		},
+		{
+			step: "test-update",
+			request: map[string]any{
+				"Zone": zone, "ID": types.ID(123), "Name": "", "Description": "",
+				"Tags": []string{"one", "two"}, "IconID": types.ID(0),
+				"Connection": "ide", "NoWait": false,
+			},
+			want: []string{
+				"--name ", "--description ", "--tags one,two", "--icon-id 0",
+				"--connection ide", "--no-wait=false",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.step, func(t *testing.T) {
+			args, err := diskArgs(test.step, test.request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			joined := strings.Join(args, " ")
+			if strings.Contains(joined, "--request") {
+				t.Fatalf("representable request unexpectedly used JSON: %v", args)
+			}
+			for _, want := range test.want {
+				if !strings.Contains(joined, want) {
+					t.Errorf("args = %v, want %q", args, want)
+				}
+			}
+		})
+	}
+}
+
+func TestDiskArgsFallsBackToJSONForUnrepresentableFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		request map[string]any
+	}{
+		{"sdk helper input", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "Connection": "virtio", "SizeGB": diskSizeGB, "OSType": 2}},
+		{"complex input", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "Connection": "virtio", "SizeGB": diskSizeGB, "DistantFrom": []types.ID{123}}},
+		{"unknown field", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "Connection": "virtio", "SizeGB": diskSizeGB, "Unmapped": "value"}},
+		{"comma in tag", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "Connection": "virtio", "SizeGB": diskSizeGB, "Tags": []string{"tag,with-comma"}}},
+		{"empty tags", map[string]any{"Zone": zone, "Name": "disk", "DiskPlanID": diskPlanID, "Connection": "virtio", "SizeGB": diskSizeGB, "Tags": []string{}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args, err := diskArgs("test-create", test.request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			joined := strings.Join(args, " ")
+			if !strings.Contains(joined, "--request") {
+				t.Fatalf("args = %v, want JSON fallback", args)
+			}
+			for field := range test.request {
+				if field == "Zone" {
+					continue
+				}
+				if !strings.Contains(joined, `"`+field+`":`) {
+					t.Errorf("JSON args = %v, missing field %q", args, field)
+				}
+			}
+		})
 	}
 }
 

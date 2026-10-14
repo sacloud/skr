@@ -45,7 +45,7 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - `iaas-api archive` の Find / Read を実装済みです。Find はゾーン、タグ、公開アーカイブの OS 種別で検索できます。
     - SDK の Create / Update / Delete / Upload / Download / OpenFTP / CloseFTP / WaitReady は未対応です。
     - 読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/archive.md)があります。is1b で検索・参照を確認済みです。
-- [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
+- [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。Create は必須・任意の単純値とタグ、Update はゾーン・ID・変更する単純値とタグを個別フラグで指定でき、複雑な入力には JSON を使います。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
 - [x] `server`
     - [x] Find / Read / Create / Boot / Update / Delete を実装済みです。
     - Create では基本項目に加え、反復可能な `--disk` と `--nic` で複数ディスクと共有／未接続 NIC を指定できます。Boot は user-data のファイル／標準入力に対応します。
