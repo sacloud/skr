@@ -222,7 +222,7 @@ type CreateCommand struct {
 	Generation      *int      "name:\"generation\" help:\"任意: サーバプラン世代 (0: 既定、100、200)。\""
 	ConfidentialVM  *bool     "name:\"confidential-vm\" help:\"任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください。\""
 	InterfaceDriver *string   "name:\"interface-driver\" help:\"任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。\""
-	BootAfterCreate *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。cloud-init user-data を使う場合は省略してください。\""
+	BootAfterCreate *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。NoWait=true とは併用できません。cloud-init user-data を使う場合は省略してください。\""
 	CDROMID         *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
 	PrivateHostID   *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
 	Disks           []string  "name:\"disk\" help:\"任意: ディスク1個を key=value のカンマ区切りで指定します。必須キー: plan-id、size-gb (GB)。任意キー: archive-id。すべて正の整数です。例: --disk 'archive-id=123,plan-id=4,size-gb=20'。繰り返し指定でき、指定順に API の Disks 配列を組み立てます。接続は virtio です。archive-id 省略時は空のディスクを作成します。\" sep:\"none\""
