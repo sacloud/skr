@@ -19,21 +19,13 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
-func ValidateFindRequest(request *disk.FindRequest) error {
-	return validateZone(request.Zone)
-}
-
 func ValidateReadRequest(request *disk.ReadRequest) error {
-	return validateIdentity(request.Zone, request.ID)
+	return validateID(request.ID)
 }
 
 func ValidateCreateRequest(request *disk.CreateRequest) error {
-	if err := validateZone(request.Zone); err != nil {
-		return err
-	}
 	if request.Name == "" {
 		return fmt.Errorf("Name が必要です")
 	}
@@ -50,7 +42,7 @@ func ValidateCreateRequest(request *disk.CreateRequest) error {
 }
 
 func ValidateUpdateRequest(request *disk.UpdateRequest) error {
-	if err := validateIdentity(request.Zone, request.ID); err != nil {
+	if err := validateID(request.ID); err != nil {
 		return err
 	}
 	if request.Name == nil && request.Description == nil && request.Tags == nil &&
@@ -61,29 +53,12 @@ func ValidateUpdateRequest(request *disk.UpdateRequest) error {
 }
 
 func ValidateDeleteRequest(request *disk.DeleteRequest) error {
-	return validateIdentity(request.Zone, request.ID)
+	return validateID(request.ID)
 }
 
-func validateIdentity(zone string, id types.ID) error {
-	if err := validateZone(zone); err != nil {
-		return err
-	}
+func validateID(id types.ID) error {
 	if id == 0 {
 		return fmt.Errorf("ID が必要です")
-	}
-	return nil
-}
-
-func validateZone(zone string) error {
-	if err := validateZoneRequired(zone); err != nil {
-		return err
-	}
-	return zones.ValidateSingleZone(zone)
-}
-
-func validateZoneRequired(zone string) error {
-	if zone == "" {
-		return fmt.Errorf("Zone が必要です (--request JSON も指定できます)")
 	}
 	return nil
 }

@@ -21,6 +21,9 @@ import (
 const all = "all"
 
 func ValidateSingleZone(zone string) error {
+	if zone == "" {
+		return fmt.Errorf("Zone が必要です (--request JSON も指定できます)")
+	}
 	if zone == all {
 		return fmt.Errorf("Zone に %q は指定できません。検索対象のゾーン名を指定してください", all)
 	}

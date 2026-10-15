@@ -11,6 +11,7 @@ import (
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	archive "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
+	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
 type Commands struct {
@@ -93,6 +94,9 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 			request.From = *c.From
 		}
 	}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
+	}
 	if err := ValidateFindRequest(request); err != nil {
 		return err
 	}
@@ -159,6 +163,9 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 			value := types.ID(*c.ID)
 			request.ID = value
 		}
+	}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
 	}
 	if err := ValidateReadRequest(request); err != nil {
 		return err

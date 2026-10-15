@@ -18,7 +18,7 @@
       "method": "FindWithContext",
       "request_type": "disk.FindRequest",
       "response_type": "[]*iaas.Disk",
-      "request_validator": "ValidateFindRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。JSON 例: --request='{\"Zone\":\"ZONE\",\"Names\":[\"example\"]}'。タグのフラグ例: skr iaas-api disk find --zone ZONE --tags production,web",
       "flags": [
         {
@@ -58,6 +58,7 @@
       "request_type": "disk.ReadRequest",
       "response_type": "*iaas.Disk",
       "request_validator": "ValidateReadRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
       "flags": [
         {
@@ -85,6 +86,7 @@
       "request_type": "disk.CreateRequest",
       "response_type": "*iaas.Disk",
       "request_validator": "ValidateCreateRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて単純なスカラー値と Tags を指定できます。DistantFrom (ID 配列)、EditParameter (複雑な設定)、OSType (SDK の補助入力で、API フィールドではありません) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。例: --request @disk-create.json。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"DISK-NAME\",\"DiskPlanID\":4,\"Connection\":\"virtio\",\"SizeGB\":20,\"Tags\":[\"production\",\"web\"]}。",
       "flags": [
         {
@@ -203,6 +205,7 @@
       "request_type": "disk.UpdateRequest",
       "response_type": "*iaas.Disk",
       "request_validator": "ValidateUpdateRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID、変更する項目を1つ以上。Name、Description、Tags、IconID、Connection、NoWait は個別フラグまたは JSON で指定できます。EditParameter は JSON で指定します。省略した項目は変更しません。JSON 例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"Name\":\"UPDATED-DISK-NAME\"}'。Zone と ID は実際の値に置き換えます。",
       "flags": [
         {
@@ -274,6 +277,7 @@
       "method": "DeleteWithContext",
       "request_type": "disk.DeleteRequest",
       "request_validator": "ValidateDeleteRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: FailIfNotFound (対象がない場合にエラー)、WaitForRelease (他リソースから参照されている間の削除待機)、WaitForReleaseTimeout (秒)、WaitForReleaseTick (秒)。サーバ接続中のディスクは削除できません。削除後は復旧できないため、対象 ID と接続状態を確認してください。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
       "flags": [
         {

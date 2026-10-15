@@ -11,6 +11,7 @@ import (
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	disk "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
+	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
 type Commands struct {
@@ -100,7 +101,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 			request.From = *c.From
 		}
 	}
-	if err := ValidateFindRequest(request); err != nil {
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -166,6 +167,9 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 			value := types.ID(*c.ID)
 			request.ID = value
 		}
+	}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
 	}
 	if err := ValidateReadRequest(request); err != nil {
 		return err
@@ -317,6 +321,9 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 			request.NoWait = *c.NoWait
 		}
 	}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
+	}
 	if err := ValidateCreateRequest(request); err != nil {
 		return err
 	}
@@ -417,6 +424,9 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 			request.NoWait = *c.NoWait
 		}
 	}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
+	}
 	if err := ValidateUpdateRequest(request); err != nil {
 		return err
 	}
@@ -503,6 +513,9 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 		if c.WaitForReleaseTick != nil {
 			request.WaitForReleaseTick = *c.WaitForReleaseTick
 		}
+	}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
 	}
 	if err := ValidateDeleteRequest(request); err != nil {
 		return err

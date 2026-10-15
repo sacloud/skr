@@ -18,9 +18,7 @@ import (
 	"fmt"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/ostype"
-	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
-	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
 func ValidateFindRequest(request *archive.FindRequest) error {
@@ -28,13 +26,13 @@ func ValidateFindRequest(request *archive.FindRequest) error {
 }
 
 func ValidateReadRequest(request *archive.ReadRequest) error {
-	return validateIdentity(request.Zone, request.ID)
+	if request.ID == 0 {
+		return fmt.Errorf("ID が必要です (--request JSON も指定できます)")
+	}
+	return nil
 }
 
 func validateFindRequest(request *archive.FindRequest) error {
-	if err := validateZone(request.Zone); err != nil {
-		return err
-	}
 	if request.OSType < 0 || !validOSType(request.OSType) {
 		return fmt.Errorf("OSType が不正です")
 	}
@@ -54,21 +52,4 @@ func validOSType(value ostype.ArchiveOSType) bool {
 		}
 	}
 	return false
-}
-
-func validateIdentity(zone string, id types.ID) error {
-	if err := validateZone(zone); err != nil {
-		return err
-	}
-	if id == 0 {
-		return fmt.Errorf("ID が必要です (--request JSON も指定できます)")
-	}
-	return nil
-}
-
-func validateZone(zone string) error {
-	if zone == "" {
-		return fmt.Errorf("Zone が必要です (--request JSON も指定できます)")
-	}
-	return zones.ValidateSingleZone(zone)
 }

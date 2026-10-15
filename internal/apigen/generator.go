@@ -53,6 +53,7 @@ type Operation struct {
 	ResponseType     string         `json:"response_type,omitempty"`
 	RequestHelp      string         `json:"request_help,omitempty"`
 	RequestValidator string         `json:"request_validator,omitempty"`
+	ValidateZone     bool           `json:"validate_zone,omitempty"`
 	RequestTransform string         `json:"request_transform,omitempty"`
 	Handwritten      bool           `json:"handwritten,omitempty"`
 	Arguments        []Argument     `json:"arguments,omitempty"`
@@ -237,6 +238,11 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 		}
 {{- end }}
 	}
+{{- if .ValidateZone }}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
+	}
+{{- end }}
 {{- if .RequestValidator }}
 	if err := {{.RequestValidator}}(request); err != nil {
 		return err
@@ -321,6 +327,11 @@ func (c Config) Validate() error {
 	}
 
 	aliases := map[string]bool{"context": true, "fmt": true, "kong": true}
+	for _, operation := range c.Operations {
+		if operation.ValidateZone {
+			aliases["zones"] = true
+		}
+	}
 	for alias, path := range c.Imports {
 		if !token.IsIdentifier(alias) || token.Lookup(alias).IsKeyword() || aliases[alias] {
 			return fmt.Errorf("invalid or reserved import alias %q", alias)
@@ -400,6 +411,9 @@ func (c Config) Validate() error {
 		}
 		if operation.RequestOptional && operation.RequestType == "" {
 			return fmt.Errorf("operation %q request_optional requires request_type", operation.Name)
+		}
+		if operation.ValidateZone && (operation.RequestType == "" || operation.Handwritten) {
+			return fmt.Errorf("operation %q validate_zone requires a generated request operation", operation.Name)
 		}
 		if err := validateType(operation.ResponseType); err != nil {
 			return fmt.Errorf("operation %q response_type: %w", operation.Name, err)
@@ -533,6 +547,9 @@ func (c Config) Validate() error {
 		methods[operation.Method] = true
 		commandTypes[operation.CommandType] = true
 	}
+	if aliases["zones"] && commandTypes["zones"] {
+		return fmt.Errorf("generated type %q conflicts with an import alias", "zones")
+	}
 	for name := range requestValidators {
 		if commandTypes[name] {
 			return fmt.Errorf("request_validator %q conflicts with a generated type name", name)
@@ -583,6 +600,12 @@ func Generate(config Config) ([]byte, error) {
 	imports := make([]importSpec, 0, len(config.Imports))
 	for alias, path := range config.Imports {
 		imports = append(imports, importSpec{Alias: alias, Path: path})
+	}
+	for _, operation := range config.Operations {
+		if operation.ValidateZone {
+			imports = append(imports, importSpec{Alias: "zones", Path: "github.com/sacloud/skr/internal/iaas/zones"})
+			break
+		}
 	}
 	sort.Slice(imports, func(i, j int) bool { return imports[i].Alias < imports[j].Alias })
 	hasGeneratedOperations := false

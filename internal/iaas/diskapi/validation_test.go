@@ -28,11 +28,7 @@ func TestTypedRequestValidators(t *testing.T) {
 		validate  func() error
 		wantError string
 	}{
-		{name: "find", validate: func() error { return ValidateFindRequest(&disk.FindRequest{Zone: "tk1v"}) }},
-		{name: "find missing zone", validate: func() error { return ValidateFindRequest(&disk.FindRequest{}) }, wantError: "Zone が必要"},
-		{name: "find rejects all zone", validate: func() error { return ValidateFindRequest(&disk.FindRequest{Zone: zonesAll}) }, wantError: `Zone に "all"`},
 		{name: "read", validate: func() error { return ValidateReadRequest(&disk.ReadRequest{Zone: "tk1v", ID: 123}) }},
-		{name: "read rejects all", validate: func() error { return ValidateReadRequest(&disk.ReadRequest{Zone: zonesAll, ID: 123}) }, wantError: `Zone に "all"`},
 		{name: "create", validate: func() error {
 			return ValidateCreateRequest(&disk.CreateRequest{
 				Zone: "tk1v", Name: "disk", DiskPlanID: 4, Connection: types.EDiskConnection("virtio"), SizeGB: 20,
@@ -66,8 +62,6 @@ func TestTypedRequestValidators(t *testing.T) {
 		})
 	}
 }
-
-const zonesAll = "all"
 
 func stringPointer(value string) *string {
 	return &value

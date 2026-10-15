@@ -36,14 +36,6 @@ func TestTypedRequestValidators(t *testing.T) {
 		{testName: "read valid", validate: func() error {
 			return ValidateReadRequest(&archiveSDK.ReadRequest{Zone: "is1b", ID: types.ID(123)})
 		}},
-		{testName: "find zone required", validate: func() error { return ValidateFindRequest(&archiveSDK.FindRequest{}) }, wantErr: "Zone が必要"},
-		{testName: "find all zone", validate: func() error {
-			return ValidateFindRequest(&archiveSDK.FindRequest{Zone: "all"})
-		}, wantErr: "指定できません"},
-		{testName: "read zone required", validate: func() error { return ValidateReadRequest(&archiveSDK.ReadRequest{ID: 123}) }, wantErr: "Zone が必要"},
-		{testName: "read all zone", validate: func() error {
-			return ValidateReadRequest(&archiveSDK.ReadRequest{Zone: "all", ID: 123})
-		}, wantErr: "指定できません"},
 		{testName: "read id required", validate: func() error { return ValidateReadRequest(&archiveSDK.ReadRequest{Zone: "is1b"}) }, wantErr: "ID が必要"},
 		{testName: "invalid os type", validate: func() error {
 			return ValidateFindRequest(&archiveSDK.FindRequest{Zone: "is1b", OSType: -1})

@@ -19,12 +19,7 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
-	"github.com/sacloud/skr/internal/iaas/zones"
 )
-
-func ValidateFindRequest(request *swytch.FindRequest) error {
-	return validateFindRequest(request)
-}
 
 func ValidateReadRequest(request *swytch.ReadRequest) error {
 	return validateReadRequest(request)
@@ -42,21 +37,11 @@ func ValidateDeleteRequest(request *swytch.DeleteRequest) error {
 	return validateDeleteRequest(request)
 }
 
-func validateFindRequest(request *swytch.FindRequest) error {
-	return validateZone(request.Zone)
-}
-
 func validateReadRequest(request *swytch.ReadRequest) error {
-	if err := validateZone(request.Zone); err != nil {
-		return err
-	}
 	return validateID(request.ID)
 }
 
 func validateCreateRequest(request *swytch.CreateRequest) error {
-	if err := validateZone(request.Zone); err != nil {
-		return err
-	}
 	if request.Name == "" {
 		return fmt.Errorf("--name が必要です")
 	}
@@ -64,31 +49,11 @@ func validateCreateRequest(request *swytch.CreateRequest) error {
 }
 
 func validateUpdateRequest(request *swytch.UpdateRequest) error {
-	if err := validateZone(request.Zone); err != nil {
-		return err
-	}
 	return validateID(request.ID)
 }
 
 func validateDeleteRequest(request *swytch.DeleteRequest) error {
-	if err := validateZone(request.Zone); err != nil {
-		return err
-	}
 	return validateID(request.ID)
-}
-
-func validateZone(name string) error {
-	if err := validateZoneRequired(name); err != nil {
-		return err
-	}
-	return zones.ValidateSingleZone(name)
-}
-
-func validateZoneRequired(name string) error {
-	if name == "" {
-		return fmt.Errorf("--zone が必要です (--request JSON も指定できます)")
-	}
-	return nil
 }
 
 func validateID(id types.ID) error {

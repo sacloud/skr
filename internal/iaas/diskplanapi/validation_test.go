@@ -28,12 +28,7 @@ func TestTypedRequestValidators(t *testing.T) {
 		validate func() error
 		wantErr  string
 	}{
-		{testName: "find valid", validate: func() error { return ValidateFindRequest(&diskplanSDK.FindRequest{Zone: "is1b"}) }},
 		{testName: "read valid", validate: func() error { return ValidateReadRequest(&diskplanSDK.ReadRequest{Zone: "is1b", ID: types.ID(4)}) }},
-		{testName: "find zone required", validate: func() error { return ValidateFindRequest(&diskplanSDK.FindRequest{}) }, wantErr: "Zone が必要"},
-		{testName: "find all zone", validate: func() error { return ValidateFindRequest(&diskplanSDK.FindRequest{Zone: "all"}) }, wantErr: "指定できません"},
-		{testName: "read zone required", validate: func() error { return ValidateReadRequest(&diskplanSDK.ReadRequest{ID: 4}) }, wantErr: "Zone が必要"},
-		{testName: "read all zone", validate: func() error { return ValidateReadRequest(&diskplanSDK.ReadRequest{Zone: "all", ID: 4}) }, wantErr: "指定できません"},
 		{testName: "read id required", validate: func() error { return ValidateReadRequest(&diskplanSDK.ReadRequest{Zone: "is1b"}) }, wantErr: "ID が必要"},
 	} {
 		t.Run(test.testName, func(t *testing.T) {

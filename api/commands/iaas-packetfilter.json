@@ -18,7 +18,7 @@
       "method": "FindWithContext",
       "request_type": "packetfilter.FindRequest",
       "response_type": "[]*iaas.PacketFilter",
-      "request_validator": "ValidateFindRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: Names (名前の文字列配列) は JSON、Count と From は個別フラグで指定します。例: --request='{\"Zone\":\"is1b\",\"Names\":[\"example\"]}'。",
       "flags": [
         {
@@ -50,6 +50,7 @@
       "request_type": "packetfilter.ReadRequest",
       "response_type": "*iaas.PacketFilter",
       "request_validator": "ValidateReadRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
       "flags": [
         {
@@ -77,6 +78,7 @@
       "request_type": "packetfilter.CreateRequest",
       "response_type": "*iaas.PacketFilter",
       "request_validator": "ValidateCreateRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name。任意: Description (最大512文字)、Expression (ルールの配列)。ルールは個別フラグ経路では --expressions に JSON 配列を直接、または @path.json で指定できます。各要素は Protocol、SourceNetwork、SourcePort、DestinationPort、Action、Description を持ちます。Protocol は http、https、tcp、udp、icmp、fragment、ip、Action は allow または deny です。ポートは 0〜65535 の数値または範囲です。例: --expressions '[{\"Protocol\":\"tcp\",\"SourceNetwork\":\"192.0.2.0/24\",\"DestinationPort\":\"443\",\"Action\":\"allow\",\"Description\":\"Allow HTTPS\"}]'。",
       "flags": [
         {
@@ -117,6 +119,7 @@
       "request_type": "packetfilter.UpdateRequest",
       "response_type": "*iaas.PacketFilter",
       "request_validator": "ValidateUpdateRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID、変更する項目を1つ以上。Name、Description は個別フラグまたは JSON で指定できます。Expression はルール配列で、個別フラグ経路では --expressions に JSON 配列を直接、または @path.json で指定できます。Expression を更新する場合は OriginalExpressionHash (文字列) に read で得た ExpressionHash を必ず指定してください。JSON または --original-expression-hash で指定します。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012,\"Name\":\"updated\"}'。ID は実際の値に置き換えます。",
       "flags": [
         {
@@ -171,6 +174,7 @@
       "method": "DeleteWithContext",
       "request_type": "packetfilter.DeleteRequest",
       "request_validator": "ValidateDeleteRequest",
+      "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: FailIfNotFound (対象がない場合にエラー)、WaitForRelease (他リソースから参照されている間の削除待機)、WaitForReleaseTimeout (秒)、WaitForReleaseTick (秒)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
       "flags": [
         {

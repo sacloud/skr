@@ -18,26 +18,11 @@ import (
 	"fmt"
 
 	diskplanSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/diskplan"
-	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
-func ValidateFindRequest(request *diskplanSDK.FindRequest) error {
-	return validateZone(request.Zone)
-}
-
 func ValidateReadRequest(request *diskplanSDK.ReadRequest) error {
-	if err := validateZone(request.Zone); err != nil {
-		return err
-	}
 	if request.ID == 0 {
 		return fmt.Errorf("ID が必要です (--request JSON も指定できます)")
 	}
 	return nil
-}
-
-func validateZone(zone string) error {
-	if zone == "" {
-		return fmt.Errorf("Zone が必要です (--request JSON も指定できます)")
-	}
-	return zones.ValidateSingleZone(zone)
 }

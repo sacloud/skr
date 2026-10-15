@@ -99,6 +99,8 @@ $ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=int
 
 IaaS の検索では、フラグと `--request` JSON のどちらでも対象ゾーンを明示します。`Zone` に `all` を指定したゾーン横断検索はサポートせず、生成コードにゾーン列挙や複数ゾーンの結果集約を含めません。
 
+[ADR 0046](../adr/0046-common-iaas-zone-validation.md) に従い、単一ゾーンを対象とする生成操作には `validate_zone: true` を指定します。生成コードはフラグの代入・入力変換または JSON デコードの後、`request_validator` と API クライアント生成の前に `zones.ValidateSingleZone(request.Zone)` を呼び出します。空文字列と `all` を両経路で拒否し、空文字列は `Zone が必要です (--request JSON も指定できます)` と表示します。既存の必須フラグの指定有無の確認は維持します。Zone は文字列のフィールドを前提とし、型の一致は生成コードのビルドで検証します。この設定はリクエストを持つ生成操作だけで利用でき、手書きハンドラーでは共通関数を直接呼び出します。フラグ名から検証を自動推測せず、設定で有効化しない操作には検証とインポートを追加しません。
+
 リポジトリルートから実行し、生成先を明示します。
 
 ```console
@@ -146,7 +148,7 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 生成器は `key=value` の構文、キーの意味、値の範囲、要素間の制約を扱いません。Server ではドメイン側がディスク名の補完、virtio 接続、正の整数の検証、shared NIC の位置制約を担当します。反復入力は対象操作が明示的に採用するもので、任意の配列や秘密情報をフラグ化する機構ではありません。
 
-Switch では `find`、`read`、`create`、`update`、`delete` を生成します。すべての操作で対象ゾーンを明示し、`Zone` が `all` の場合は `request_validator` で SDK 呼び出し前に拒否します。個別の Zone／ID 検証も `request_validator` で明示します。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
+Switch では `find`、`read`、`create`、`update`、`delete` を生成します。すべての操作で対象ゾーンを明示し、`validate_zone: true` による共通検証で空文字列と `all` を SDK 呼び出し前に拒否します。ID などの固有制約は `request_validator` で検証します。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
 
 Server では `find`、`read`、`create`、`update`、`delete` を生成します。`create` のディスク／NIC 入力は型付き変換 callback に接続し、`boot` は `handwritten: true` で登録した手書きハンドラーとして実装します。設定は [`api/commands/iaas-server.json`](../../api/commands/iaas-server.json)、生成先は `internal/iaas/serverapi/` です。各操作では対象ゾーンを明示し、対応するフラグと JSON のどちらでも `Zone: "all"` を SDK 呼び出し前に拒否します。
 

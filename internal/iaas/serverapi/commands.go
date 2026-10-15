@@ -24,6 +24,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
+	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
 func TransformCreateRequest(c *CreateCommand, request *server.CreateRequest) error {
@@ -59,6 +60,9 @@ type BootCommand struct {
 }
 
 func (c *BootCommand) Run(_ *kong.Context) error {
+	if err := zones.ValidateSingleZone(c.Zone); err != nil {
+		return err
+	}
 	var userData string
 	if c.UserData != nil {
 		var err error

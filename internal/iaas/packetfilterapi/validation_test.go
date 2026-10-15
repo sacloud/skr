@@ -28,9 +28,6 @@ func TestTypedRequestValidators(t *testing.T) {
 		validate  func() error
 		wantError string
 	}{
-		{name: "find", validate: func() error { return ValidateFindRequest(&packetfilter.FindRequest{Zone: "is1b"}) }},
-		{name: "find missing zone", validate: func() error { return ValidateFindRequest(&packetfilter.FindRequest{}) }, wantError: "Zone が必要"},
-		{name: "find rejects all", validate: func() error { return ValidateFindRequest(&packetfilter.FindRequest{Zone: "all"}) }, wantError: `Zone に "all"`},
 		{name: "read", validate: func() error { return ValidateReadRequest(&packetfilter.ReadRequest{Zone: "is1b", ID: 123}) }},
 		{name: "read missing ID", validate: func() error { return ValidateReadRequest(&packetfilter.ReadRequest{Zone: "is1b"}) }, wantError: "ID が必要"},
 		{name: "create", validate: func() error { return ValidateCreateRequest(&packetfilter.CreateRequest{Zone: "is1b", Name: "filter"}) }},
@@ -46,7 +43,6 @@ func TestTypedRequestValidators(t *testing.T) {
 		}, wantError: "OriginalExpressionHash が必要"},
 		{name: "update no changes", validate: func() error { return ValidateUpdateRequest(&packetfilter.UpdateRequest{Zone: "is1b", ID: 123}) }, wantError: "更新するフィールド"},
 		{name: "delete", validate: func() error { return ValidateDeleteRequest(&packetfilter.DeleteRequest{Zone: "is1b", ID: 123}) }},
-		{name: "delete rejects all", validate: func() error { return ValidateDeleteRequest(&packetfilter.DeleteRequest{Zone: "all", ID: 123}) }, wantError: `Zone に "all"`},
 	}
 
 	for _, test := range tests {

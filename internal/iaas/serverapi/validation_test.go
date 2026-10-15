@@ -27,11 +27,7 @@ func TestTypedRequestValidators(t *testing.T) {
 		validate func() error
 		wantErr  string
 	}{
-		{name: "find", validate: func() error { return ValidateFindRequest(&server.FindRequest{Zone: "tk1v"}) }},
-		{name: "find missing zone", validate: func() error { return ValidateFindRequest(&server.FindRequest{}) }, wantErr: "Zone が必要"},
-		{name: "find rejects all zones", validate: func() error { return ValidateFindRequest(&server.FindRequest{Zone: "all"}) }, wantErr: `Zone に "all"`},
 		{name: "read", validate: func() error { return ValidateReadRequest(&server.ReadRequest{Zone: "tk1v", ID: 123}) }},
-		{name: "read rejects all", validate: func() error { return ValidateReadRequest(&server.ReadRequest{Zone: "all", ID: 123}) }, wantErr: `Zone に "all"`},
 		{name: "create", validate: func() error {
 			return ValidateCreateRequest(&server.CreateRequest{Zone: "tk1v", Name: "server", CPU: 1, MemoryGB: 1})
 		}},

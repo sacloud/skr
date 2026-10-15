@@ -42,6 +42,7 @@ description: cmd/apigen-iaas を使って IaaS API コマンドの設定を更�
 ## 設定と生成物の境界
 
 - 設定 JSON はコマンドの公開範囲とユーザー向け説明の根拠です。SDK の型だけでは決まらないフラグ、必須条件、ヘルプ、検証関数を明示します。
+- 単一ゾーンを対象とする生成操作には `validate_zone: true` を指定します。共通検証はリクエスト構築後、`request_validator` の前に空文字列と `all` を拒否します。リソース固有の validator でゾーン検証を重複させず、手書きハンドラーでは `zones.ValidateSingleZone` を直接呼び出します。詳細は [ADR 0046](../../../docs/adr/0046-common-iaas-zone-validation.md) を参照してください。
 - `request_type` がある操作は `--request` と個別フラグを併用させず、JSON とフラグの経路を混ぜません。個別フラグの必須性はフラグ経路だけに適用します。
 - `response_type` がない操作は成功時に出力しません。通常と異なる SDK 操作やユーザー向け挙動を隠さないよう、設定と生成コードを対応させます。
 - `Runtime` callback と SDK API factory は CLI 側で設定します。生成されたコマンド群には `New...Commands(runtime, factory)` constructor からまとめて渡し、setter による段階的な初期化は使いません。リクエスト検証関数は生成 package に置き、`request_validator` で生成コードから直接呼び出します。文字列キーによる振り分けや CLI の Runtime 検証 callback 接続は使いません。生成 package と `package main` の非公開処理を直接結び付けず、既存の callback パターンに従います。
