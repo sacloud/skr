@@ -44,10 +44,9 @@ type ServicePrincipalAPI interface {
 type ServicePrincipalAPIFactory func() (ServicePrincipalAPI, error)
 
 type ServicePrincipalRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *ServicePrincipalCommands) SetRuntime(runtime ServicePrincipalRuntime) {

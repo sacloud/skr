@@ -37,7 +37,6 @@ type Runtime struct {
 	DecodeRequest          func(string, any) error
 	ValidateOutput         func(*kong.Context) error
 	WriteOutput            func(*kong.Context, any) error
-	ValidateRequest        func(string, any) error
 	TransformCreateRequest func(*CreateCommand, *server.CreateRequest) error
 }
 
@@ -107,10 +106,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 			request.From = *c.From
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateServerFindRequest", request); err != nil {
+	if err := ValidateFindRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -177,10 +173,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 			request.ID = value
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateServerReadRequest", request); err != nil {
+	if err := ValidateReadRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -344,10 +337,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateServerCreateRequest", request); err != nil {
+	if err := ValidateCreateRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -455,10 +445,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 			request.CPUModel = c.CPUModel
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateServerUpdateRequest", request); err != nil {
+	if err := ValidateUpdateRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -540,10 +527,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 			request.Force = *c.Force
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateServerDeleteRequest", request); err != nil {
+	if err := ValidateDeleteRequest(request); err != nil {
 		return err
 	}
 	if c.factory == nil {

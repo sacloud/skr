@@ -28,10 +28,9 @@ type MessageAPI interface {
 type MessageAPIFactory func(QueueName string, APIKeyFile string) (MessageAPI, error)
 
 type MessageRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *MessageCommands) SetRuntime(runtime MessageRuntime) {

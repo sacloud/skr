@@ -33,10 +33,9 @@ type ProjectAPI interface {
 type ProjectAPIFactory func() (ProjectAPI, error)
 
 type ProjectRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *ProjectCommands) SetRuntime(runtime ProjectRuntime) {

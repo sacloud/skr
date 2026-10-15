@@ -72,10 +72,7 @@ func (c *BootCommand) Run(_ *kong.Context) error {
 		ID:       types.ID(c.ID),
 		UserData: userData,
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateServerBootRequest", request); err != nil {
+	if err := ValidateBootRequest(request); err != nil {
 		return err
 	}
 	if c.factory == nil {

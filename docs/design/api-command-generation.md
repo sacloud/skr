@@ -115,11 +115,11 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 ## 手書きコードとの境界
 
-生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理、リクエスト検証を受け取ります。生成されたコマンド構造体を親コマンドへ登録し、生成された API interface を実際の SDK クライアントに結ぶ factory は、CLI 側で設定します。
+生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理を受け取ります。リクエスト検証関数はコマンドと同じ package に置き、生成コードから直接呼び出します。設定した関数が存在しない場合や引数型が一致しない場合はビルド時に検出されます。[ADR 0044](../adr/0044-typed-request-validator-callbacks.md) に従い、文字列キー、`any` による振り分け、CLI の検証 callback 接続は使いません。生成されたコマンド構造体を親コマンドへ登録し、生成された API interface を実際の SDK クライアントに結ぶ factory は、CLI 側で設定します。
 
 [ADR 0030](../adr/0030-remove-table-output.md) に従い、出力形式は JSON のみです。`ValidateOutput func(*kong.Context) error` は結果を返す操作の API 呼び出し前にクエリを検証し、`WriteOutput func(*kong.Context, any) error` は結果全体またはクエリ結果を JSON で書き込みます。出力形式と表示用 Zone ラベルは callback に渡しません。手書きハンドラーも同じ契約に揃えます。
 
-`request_validator` は、JSON／フラグから同じリクエストを構築した後、SDK 呼び出し前に行う明示的なサービス固有検証の関数名です。`handwritten: true` は、操作を親コマンドと型付き API インターフェースには登録しながら、そのコマンド構造体と `Run` ハンドラーを手書きにする指定です。これにより、標準操作と個別処理を同じコマンド階層に配置できます。
+`request_validator` は、JSON／フラグからリクエストを構築した後、SDK 呼び出し前に実行する検証関数名です。生成コードと同じ package に関数を定義し、生成器は `ValidateRequest(request)` のように直接呼び出します。`handwritten: true` の操作も、手書きハンドラーから同じ package の検証関数を直接呼び出します。これは操作を親コマンドと型付き API インターフェースに登録しながら、コマンド構造体と `Run` ハンドラーを手書きにする指定です。これにより、標準操作と個別処理を同じコマンド階層に配置できます。
 
 ### 反復可能な入力と型付き変換
 
@@ -142,7 +142,7 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 `request_transform` は生成する Runtime callback の公開フィールド名です。Server Create では `TransformCreateRequest func(*CreateCommand, *server.CreateRequest) error` を生成し、`internal/cli` が `serverapi.TransformCreateRequest` を接続します。生成器は callback の型を明示し、関数の実装を探索しません。Runtime の既存フィールドや他の callback と同じ名前は拒否します。反復入力には変換を必須とし、`handwritten: true` またはリクエストのない操作では使えません。
 
-フラグ経路では必須入力の確認とスカラー値の代入後に変換し、その後で既存の `request_validator` と API 呼び出しへ進みます。反復入力のない指定でも変換は実行します。未接続の callback や変換エラーは API 呼び出し前にエラーとして返します。JSON 経路は変換を通らず、従来のデコードとリクエスト検証を維持します。
+フラグ経路では必須入力の確認とスカラー値の代入後に変換し、その後で `request_validator` と API 呼び出しへ進みます。反復入力のない指定でも変換は実行します。変換エラーは API 呼び出し前に返します。JSON 経路は変換を通らず、デコード後に同じ検証関数を直接呼び出します。
 
 生成器は `key=value` の構文、キーの意味、値の範囲、要素間の制約を扱いません。Server ではドメイン側がディスク名の補完、virtio 接続、正の整数の検証、shared NIC の位置制約を担当します。反復入力は対象操作が明示的に採用するもので、任意の配列や秘密情報をフラグ化する機構ではありません。
 

@@ -40,7 +40,7 @@
       "request_by_value": true,
       "response_type": "*v1.CommonServiceItem",
       "request_help": "Settings に Source、Types（文字列配列）、ProcessConfigurationID を含む JSON。直接指定するか @path.json でファイルを指定します。Provider は eventbustrigger に自動設定されます。",
-      "request_validator": "setTriggerProvider"
+      "request_validator": "SetTriggerProvider"
     },
     {
       "name": "Update",

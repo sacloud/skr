@@ -24,10 +24,9 @@ type IDRoleAPI interface {
 type IDRoleAPIFactory func() (IDRoleAPI, error)
 
 type IDRoleRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *IDRoleCommands) SetRuntime(runtime IDRoleRuntime) {

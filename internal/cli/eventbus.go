@@ -18,22 +18,19 @@ import "github.com/sacloud/skr/internal/eventbusapi"
 
 func (c *cli) initEventbusAPI() {
 	processConfigurationRuntime := eventbusapi.ProcessConfigurationRuntime{
-		DecodeRequest:   eventbusapi.DecodeRequest,
-		ValidateOutput:  validateOutput,
-		WriteOutput:     writeOutput,
-		ValidateRequest: eventbusapi.ValidateRequest,
+		DecodeRequest:  eventbusapi.DecodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
 	}
 	scheduleRuntime := eventbusapi.ScheduleRuntime{
-		DecodeRequest:   eventbusapi.DecodeRequest,
-		ValidateOutput:  validateOutput,
-		WriteOutput:     writeOutput,
-		ValidateRequest: eventbusapi.ValidateRequest,
+		DecodeRequest:  eventbusapi.DecodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
 	}
 	triggerRuntime := eventbusapi.TriggerRuntime{
-		DecodeRequest:   eventbusapi.DecodeRequest,
-		ValidateOutput:  validateOutput,
-		WriteOutput:     writeOutput,
-		ValidateRequest: eventbusapi.ValidateRequest,
+		DecodeRequest:  eventbusapi.DecodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
 	}
 	c.EventbusAPI.ProcessConfiguration.SetRuntime(processConfigurationRuntime)
 	c.EventbusAPI.ProcessConfiguration.SetFactory(func() (eventbusapi.ProcessConfigurationAPI, error) {

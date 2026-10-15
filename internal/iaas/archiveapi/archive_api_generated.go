@@ -26,10 +26,9 @@ type API interface {
 type APIFactory func() (API, error)
 
 type Runtime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *Commands) SetRuntime(runtime Runtime) {
@@ -95,10 +94,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 			request.From = *c.From
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateArchiveFindRequest", request); err != nil {
+	if err := ValidateFindRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -165,10 +161,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 			request.ID = value
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateArchiveReadRequest", request); err != nil {
+	if err := ValidateReadRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {

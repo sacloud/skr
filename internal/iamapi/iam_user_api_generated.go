@@ -35,10 +35,9 @@ type UserAPI interface {
 type UserAPIFactory func() (UserAPI, error)
 
 type UserRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *UserCommands) SetRuntime(runtime UserRuntime) {

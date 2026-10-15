@@ -30,10 +30,9 @@ type ScheduleAPI interface {
 type ScheduleAPIFactory func() (ScheduleAPI, error)
 
 type ScheduleRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *ScheduleCommands) SetRuntime(runtime ScheduleRuntime) {
@@ -133,10 +132,7 @@ func (c *ScheduleCreateCommand) Run(ctx *kong.Context) error {
 	} else {
 		return fmt.Errorf("--request が必要です")
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("setScheduleProvider", request); err != nil {
+	if err := SetScheduleProvider(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {

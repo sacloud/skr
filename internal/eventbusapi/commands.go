@@ -85,17 +85,19 @@ func NewTriggerAPI(trace bool) (TriggerAPI, error) {
 	return eventbus.NewTriggerOp(client), nil
 }
 
-func ValidateRequest(name string, request any) error {
-	switch name {
-	case "setProcessConfigurationProvider":
-		return setProvider(request, v1.ProviderClassEventbusprocessconfiguration)
-	case "setScheduleProvider":
-		return setProvider(request, v1.ProviderClassEventbusschedule)
-	case "setTriggerProvider":
-		return setProvider(request, v1.ProviderClassEventbustrigger)
-	default:
-		return fmt.Errorf("unknown EventBus request validator %q", name)
-	}
+func SetProcessConfigurationProvider(request *v1.CreateCommonServiceItemRequest) error {
+	setProvider(request, v1.ProviderClassEventbusprocessconfiguration)
+	return nil
+}
+
+func SetScheduleProvider(request *v1.CreateCommonServiceItemRequest) error {
+	setProvider(request, v1.ProviderClassEventbusschedule)
+	return nil
+}
+
+func SetTriggerProvider(request *v1.CreateCommonServiceItemRequest) error {
+	setProvider(request, v1.ProviderClassEventbustrigger)
+	return nil
 }
 
 func DecodeRequest(input string, destination any) error {
@@ -115,13 +117,8 @@ func DecodeRequest(input string, destination any) error {
 	return nil
 }
 
-func setProvider(request any, providerClass v1.ProviderClass) error {
-	createRequest, ok := request.(*v1.CreateCommonServiceItemRequest)
-	if !ok {
-		return fmt.Errorf("EventBus provider can only be set on create requests")
-	}
-	createRequest.CommonServiceItem.Provider = v1.Provider{Class: providerClass}
-	return nil
+func setProvider(request *v1.CreateCommonServiceItemRequest, providerClass v1.ProviderClass) {
+	request.CommonServiceItem.Provider = v1.Provider{Class: providerClass}
 }
 
 func withProvider(data []byte, providerClass v1.ProviderClass) ([]byte, error) {

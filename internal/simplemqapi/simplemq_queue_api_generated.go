@@ -36,10 +36,9 @@ type QueueAPI interface {
 type QueueAPIFactory func() (QueueAPI, error)
 
 type QueueRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *QueueCommands) SetRuntime(runtime QueueRuntime) {

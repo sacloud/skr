@@ -61,7 +61,7 @@ func TestGenerate(t *testing.T) {
 				Help:             "Delete a switch.",
 				Method:           "DeleteWithContext",
 				RequestType:      "swytch.DeleteRequest",
-				RequestValidator: "validateSwitchDeleteRequest",
+				RequestValidator: "ValidateDeleteRequest",
 			},
 			{
 				Name:         "Version",
@@ -97,7 +97,7 @@ func TestGenerate(t *testing.T) {
 		"c.runtime.WriteOutput(ctx, result)",
 		"if err := c.runtime.ValidateOutput(ctx); err != nil",
 		"return op.DeleteWithContext(context.Background(), request)",
-		"ValidateRequest(\"validateSwitchDeleteRequest\", request)",
+		"if err := ValidateDeleteRequest(request); err != nil",
 		"switchFindCommand",
 		"c.Find.runtime = runtime",
 		"op.SearchWithContext(context.Background(), request)",
@@ -108,6 +108,10 @@ func TestGenerate(t *testing.T) {
 	}
 	if strings.Contains(string(source), "type switchFindCommand struct") {
 		t.Fatal("handwritten operation command was generated")
+	}
+	if strings.Contains(string(source), "ValidateDeleteRequest func(") ||
+		strings.Contains(string(source), "c.runtime.ValidateDeleteRequest") {
+		t.Fatal("request validator is configured through Runtime instead of called directly")
 	}
 	for _, removed := range []string{"OutputType", "tableZones", "format,", "SetZoneFactory", "zoneFactory", "zones."} {
 		if strings.Contains(string(source), removed) {
@@ -121,6 +125,32 @@ func TestGenerate(t *testing.T) {
 	}
 	if string(source) != string(second) {
 		t.Fatal("Generate() output is not deterministic")
+	}
+}
+
+func TestGenerateHandwrittenRequestValidator(t *testing.T) {
+	config := Config{
+		Package: "exampleapi", Resource: "Example",
+		CommandType: "Commands", APIType: "API", FactoryType: "APIFactory", RuntimeType: "Runtime",
+		Operations: []Operation{{
+			Name: "Boot", CommandType: "BootCommand", Help: "起動します。",
+			Method: "Boot", RequestType: "BootRequest", RequestValidator: "ValidateBootRequest", Handwritten: true,
+		}},
+	}
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(source)
+	for _, want := range []string{
+		"Boot BootCommand",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("generated source does not contain %q", want)
+		}
+	}
+	if strings.Contains(text, "type BootCommand struct") {
+		t.Fatal("handwritten operation command was generated")
 	}
 }
 
@@ -395,7 +425,7 @@ func transformTestConfig() Config {
 		Operations: []Operation{{
 			Name: "Create", CommandType: "CreateCommand", Help: "作成します。",
 			Method: "Create", RequestType: "CreateRequest", RequestTransform: "TransformCreateRequest",
-			RequestValidator: "validateCreateRequest",
+			RequestValidator: "ValidateCreateRequest",
 			Flags:            []Flag{{Name: "name", Field: "Name", Type: "string", Required: true, Help: "名前です。"}},
 			RepeatedFlags:    []RepeatedFlag{{Name: "item", Field: "Items", Help: "繰り返し指定します。"}},
 		}},
@@ -425,7 +455,7 @@ func TestGenerateRequestTransform(t *testing.T) {
 	}
 	assign := strings.Index(text, "request.Name = *c.Name")
 	transform := strings.Index(text, "c.runtime.TransformCreateRequest(c, request)")
-	validate := strings.Index(text, `c.runtime.ValidateRequest("validateCreateRequest", request)`)
+	validate := strings.Index(text, "if err := ValidateCreateRequest(request); err != nil")
 	if assign < 0 || transform <= assign || validate <= transform {
 		t.Fatal("expected scalar assignment, transform, then validation")
 	}
@@ -457,8 +487,32 @@ func TestValidateRequestTransform(t *testing.T) {
 		{"invalid transform", func(c *Config) { c.Operations[0].RequestTransform = "x.y" }, "exported Go identifier"},
 		{"private transform", func(c *Config) { c.Operations[0].RequestTransform = "transform" }, "exported Go identifier"},
 		{"reserved callback", func(c *Config) { c.Operations[0].RequestTransform = "DecodeRequest" }, "duplicate runtime field"},
-		{"handwritten", func(c *Config) { c.Operations[0].Handwritten = true; c.Operations[0].RequestValidator = "" }, "requires a generated request operation"},
-		{"no request", func(c *Config) { c.Operations[0].RequestType = ""; c.Operations[0].RequestValidator = "" }, "requires a generated request operation"},
+		{"no request", func(c *Config) { c.Operations[0].RequestType = "" }, "requires a request_type"},
+		{"request validator type collision", func(c *Config) { c.Operations[0].RequestValidator = "CreateCommand" }, "conflicts with a generated type"},
+		{"request validator import collision", func(c *Config) {
+			c.Imports = map[string]string{"ValidateCreateRequest": "example/sdk"}
+		}, "conflicts with an import alias"},
+		{"request validator transform collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "TransformCreateRequest"
+		}, "conflicts with a generated Runtime field"},
+		{"request validator c collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "c"
+		}, "conflicts with a generated local name"},
+		{"request validator ctx collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "ctx"
+		}, "conflicts with a generated local name"},
+		{"request validator flagsSet collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "flagsSet"
+		}, "conflicts with a generated local name"},
+		{"request validator request collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "request"
+		}, "conflicts with a generated local name"},
+		{"validator reused for different request types", func(c *Config) {
+			op := c.Operations[0]
+			op.Name, op.CommandType, op.Method, op.RequestType, op.RequestTransform, op.RepeatedFlags =
+				"Update", "UpdateCommand", "Update", "UpdateRequest", "", nil
+			c.Operations = append(c.Operations, op)
+		}, "used with multiple request types"},
 		{"invalid name", func(c *Config) { c.Operations[0].RepeatedFlags[0].Name = "Item" }, "kebab-case"},
 		{"invalid field", func(c *Config) { c.Operations[0].RepeatedFlags[0].Field = "a.b" }, "field identifier"},
 		{"method field", func(c *Config) { c.Operations[0].RepeatedFlags[0].Field = "Run" }, "field identifier"},

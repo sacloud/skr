@@ -29,10 +29,9 @@ type ServicePolicyAPI interface {
 type ServicePolicyAPIFactory func() (ServicePolicyAPI, error)
 
 type ServicePolicyRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *ServicePolicyCommands) SetRuntime(runtime ServicePolicyRuntime) {
