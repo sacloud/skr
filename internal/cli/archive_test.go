@@ -88,7 +88,7 @@ func TestIaaSArchiveCommandsUseSDKRequests(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	api := &archiveAPITestDouble{}
 	commandLine := newCLI()
-	commandLine.IaaSAPI.Archive.SetFactory(func() (archiveapi.API, error) { return api, nil })
+	setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return api, nil })
 
 	run := func(args ...string) (string, string, int) {
 		t.Helper()
@@ -172,7 +172,7 @@ func TestIaaSArchiveRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 	} {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.Archive.SetFactory(func() (archiveapi.API, error) { return api, nil })
+		setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "archive"}, args...), &stdout, &stderr, commandLine)
 		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
 			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
@@ -186,7 +186,7 @@ func TestIaaSArchiveRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 func TestIaaSArchiveJSONUnknownFieldsAndTrailingValues(t *testing.T) {
 	api := &archiveAPITestDouble{}
 	commandLine := newCLI()
-	commandLine.IaaSAPI.Archive.SetFactory(func() (archiveapi.API, error) { return api, nil })
+	setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return api, nil })
 
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "archive", "find", "--request", `{"Zone":"test-zone","Unknown":"ignored"}`}, &stdout, &stderr, commandLine)
@@ -205,7 +205,7 @@ func TestIaaSArchiveJSONUnknownFieldsAndTrailingValues(t *testing.T) {
 func TestIaaSArchivePropagatesAPIErrors(t *testing.T) {
 	api := &archiveAPITestDouble{findErr: errors.New("archive API failure")}
 	commandLine := newCLI()
-	commandLine.IaaSAPI.Archive.SetFactory(func() (archiveapi.API, error) { return api, nil })
+	setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return api, nil })
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "archive", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
 	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "archive API failure") {

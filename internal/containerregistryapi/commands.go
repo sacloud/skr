@@ -61,12 +61,11 @@ type RegistryCommands struct {
 	runtime Runtime
 }
 
-func (c *Commands) SetRuntime(runtime Runtime) {
-	c.Registry.setRuntime(runtime)
-}
-
-func (c *Commands) SetFactory(factory APIFactory) {
-	c.Registry.setFactory(factory)
+func NewCommands(runtime Runtime, factory APIFactory) Commands {
+	var commands Commands
+	commands.Registry.setRuntime(runtime)
+	commands.Registry.setFactory(factory)
+	return commands
 }
 
 func (c *RegistryCommands) setRuntime(runtime Runtime) {

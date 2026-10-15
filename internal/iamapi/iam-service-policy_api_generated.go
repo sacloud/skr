@@ -34,18 +34,17 @@ type ServicePolicyRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *ServicePolicyCommands) SetRuntime(runtime ServicePolicyRuntime) {
-	c.Enable.runtime = runtime
-	c.Disable.runtime = runtime
-	c.IsEnabled.runtime = runtime
-	c.ListRuleTemplates.runtime = runtime
-}
-
-func (c *ServicePolicyCommands) SetFactory(factory ServicePolicyAPIFactory) {
-	c.Enable.factory = factory
-	c.Disable.factory = factory
-	c.IsEnabled.factory = factory
-	c.ListRuleTemplates.factory = factory
+func NewServicePolicyCommands(runtime ServicePolicyRuntime, factory ServicePolicyAPIFactory) ServicePolicyCommands {
+	var commands ServicePolicyCommands
+	commands.Enable.runtime = runtime
+	commands.Enable.factory = factory
+	commands.Disable.runtime = runtime
+	commands.Disable.factory = factory
+	commands.IsEnabled.runtime = runtime
+	commands.IsEnabled.factory = factory
+	commands.ListRuleTemplates.runtime = runtime
+	commands.ListRuleTemplates.factory = factory
+	return commands
 }
 
 type ServicePolicyEnableCommand struct {

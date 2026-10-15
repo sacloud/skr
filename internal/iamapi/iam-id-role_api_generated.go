@@ -29,14 +29,13 @@ type IDRoleRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *IDRoleCommands) SetRuntime(runtime IDRoleRuntime) {
-	c.List.runtime = runtime
-	c.Read.runtime = runtime
-}
-
-func (c *IDRoleCommands) SetFactory(factory IDRoleAPIFactory) {
-	c.List.factory = factory
-	c.Read.factory = factory
+func NewIDRoleCommands(runtime IDRoleRuntime, factory IDRoleAPIFactory) IDRoleCommands {
+	var commands IDRoleCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	return commands
 }
 
 type IDRoleListCommand struct {

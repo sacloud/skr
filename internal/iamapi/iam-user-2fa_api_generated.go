@@ -39,24 +39,23 @@ type User2FARuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *User2FACommands) SetRuntime(runtime User2FARuntime) {
-	c.DeactivateOTP.runtime = runtime
-	c.ListTrustedDevices.runtime = runtime
-	c.DeleteTrustedDevice.runtime = runtime
-	c.ClearTrustedDevices.runtime = runtime
-	c.ListSecurityKeys.runtime = runtime
-	c.ReadSecurityKey.runtime = runtime
-	c.DeleteSecurityKey.runtime = runtime
-}
-
-func (c *User2FACommands) SetFactory(factory User2FAAPIFactory) {
-	c.DeactivateOTP.factory = factory
-	c.ListTrustedDevices.factory = factory
-	c.DeleteTrustedDevice.factory = factory
-	c.ClearTrustedDevices.factory = factory
-	c.ListSecurityKeys.factory = factory
-	c.ReadSecurityKey.factory = factory
-	c.DeleteSecurityKey.factory = factory
+func NewUser2FACommands(runtime User2FARuntime, factory User2FAAPIFactory) User2FACommands {
+	var commands User2FACommands
+	commands.DeactivateOTP.runtime = runtime
+	commands.DeactivateOTP.factory = factory
+	commands.ListTrustedDevices.runtime = runtime
+	commands.ListTrustedDevices.factory = factory
+	commands.DeleteTrustedDevice.runtime = runtime
+	commands.DeleteTrustedDevice.factory = factory
+	commands.ClearTrustedDevices.runtime = runtime
+	commands.ClearTrustedDevices.factory = factory
+	commands.ListSecurityKeys.runtime = runtime
+	commands.ListSecurityKeys.factory = factory
+	commands.ReadSecurityKey.runtime = runtime
+	commands.ReadSecurityKey.factory = factory
+	commands.DeleteSecurityKey.runtime = runtime
+	commands.DeleteSecurityKey.factory = factory
+	return commands
 }
 
 type User2FADeactivateOTPCommand struct {

@@ -38,22 +38,21 @@ type FolderRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *FolderCommands) SetRuntime(runtime FolderRuntime) {
-	c.List.runtime = runtime
-	c.Create.runtime = runtime
-	c.Read.runtime = runtime
-	c.Update.runtime = runtime
-	c.Move.runtime = runtime
-	c.Delete.runtime = runtime
-}
-
-func (c *FolderCommands) SetFactory(factory FolderAPIFactory) {
-	c.List.factory = factory
-	c.Create.factory = factory
-	c.Read.factory = factory
-	c.Update.factory = factory
-	c.Move.factory = factory
-	c.Delete.factory = factory
+func NewFolderCommands(runtime FolderRuntime, factory FolderAPIFactory) FolderCommands {
+	var commands FolderCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Move.runtime = runtime
+	commands.Move.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	return commands
 }
 
 type FolderListCommand struct {

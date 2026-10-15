@@ -86,7 +86,7 @@ func TestIaaSPacketFilterAPIWithLocalMock(t *testing.T) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.PacketFilter.SetFactory(func() (packetfilterapi.API, error) {
+		setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) {
 			return packetfilter.New(server), nil
 		})
 		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
@@ -174,7 +174,7 @@ func TestPacketFilterRejectsInvalidRequestsBeforeFactory(t *testing.T) {
 		t.Run(strings.Join(test.args, "_"), func(t *testing.T) {
 			factoryCalled := false
 			commandLine := newCLI()
-			commandLine.IaaSAPI.PacketFilter.SetFactory(func() (packetfilterapi.API, error) {
+			setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) {
 				factoryCalled = true
 				return packetfilter.New(iaasmock.NewTestServer(iaasmock.Config{})), nil
 			})

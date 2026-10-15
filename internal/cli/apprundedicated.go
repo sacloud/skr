@@ -20,7 +20,7 @@ import (
 )
 
 func (c *cli) initAppRunDedicatedAPI() {
-	c.AppRunDedicatedAPI.SetRuntime(apprundedicatedapi.Runtime{
+	c.AppRunDedicatedAPI = apprundedicatedapi.NewCommands(apprundedicatedapi.Runtime{
 		NewClient: func() (*v1.Client, error) {
 			return apprundedicatedapi.NewClient(c.Trace)
 		},

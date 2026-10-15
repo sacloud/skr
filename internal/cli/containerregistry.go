@@ -17,12 +17,15 @@ package cli
 import "github.com/sacloud/skr/internal/containerregistryapi"
 
 func (c *cli) initContainerRegistryAPI() {
-	c.ContainerRegistryAPI.SetRuntime(containerregistryapi.Runtime{
+	c.ContainerRegistryAPI = containerregistryapi.NewCommands(containerRegistryRuntime(), func() (containerregistryapi.API, error) {
+		return containerregistryapi.NewAPI(c.Trace)
+	})
+}
+
+func containerRegistryRuntime() containerregistryapi.Runtime {
+	return containerregistryapi.Runtime{
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
 		ReadPassword:   containerregistryapi.ReadPasswordFile,
-	})
-	c.ContainerRegistryAPI.SetFactory(func() (containerregistryapi.API, error) {
-		return containerregistryapi.NewAPI(c.Trace)
-	})
+	}
 }

@@ -35,20 +35,19 @@ type AuthRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *AuthCommands) SetRuntime(runtime AuthRuntime) {
-	c.ReadPasswordPolicy.runtime = runtime
-	c.UpdatePasswordPolicy.runtime = runtime
-	c.ReadAuthConditions.runtime = runtime
-	c.UpdateAuthConditions.runtime = runtime
-	c.ReadAuthContext.runtime = runtime
-}
-
-func (c *AuthCommands) SetFactory(factory AuthAPIFactory) {
-	c.ReadPasswordPolicy.factory = factory
-	c.UpdatePasswordPolicy.factory = factory
-	c.ReadAuthConditions.factory = factory
-	c.UpdateAuthConditions.factory = factory
-	c.ReadAuthContext.factory = factory
+func NewAuthCommands(runtime AuthRuntime, factory AuthAPIFactory) AuthCommands {
+	var commands AuthCommands
+	commands.ReadPasswordPolicy.runtime = runtime
+	commands.ReadPasswordPolicy.factory = factory
+	commands.UpdatePasswordPolicy.runtime = runtime
+	commands.UpdatePasswordPolicy.factory = factory
+	commands.ReadAuthConditions.runtime = runtime
+	commands.ReadAuthConditions.factory = factory
+	commands.UpdateAuthConditions.runtime = runtime
+	commands.UpdateAuthConditions.factory = factory
+	commands.ReadAuthContext.runtime = runtime
+	commands.ReadAuthContext.factory = factory
+	return commands
 }
 
 type AuthReadPasswordPolicyCommand struct {

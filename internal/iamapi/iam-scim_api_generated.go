@@ -38,22 +38,21 @@ type ScimRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *SCIMCommands) SetRuntime(runtime ScimRuntime) {
-	c.List.runtime = runtime
-	c.Create.runtime = runtime
-	c.Read.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-	c.RegenerateToken.runtime = runtime
-}
-
-func (c *SCIMCommands) SetFactory(factory ScimAPIFactory) {
-	c.List.factory = factory
-	c.Create.factory = factory
-	c.Read.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
-	c.RegenerateToken.factory = factory
+func NewSCIMCommands(runtime ScimRuntime, factory ScimAPIFactory) SCIMCommands {
+	var commands SCIMCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	commands.RegenerateToken.runtime = runtime
+	commands.RegenerateToken.factory = factory
+	return commands
 }
 
 type SCIMListCommand struct {

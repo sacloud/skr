@@ -140,16 +140,13 @@ type {{.RuntimeType}} struct {
 {{- end }}
 }
 
-func (c *{{.CommandType}}) SetRuntime(runtime {{.RuntimeType}}) {
+func New{{.CommandType}}(runtime {{.RuntimeType}}, factory {{.FactoryType}}) {{.CommandType}} {
+	var commands {{.CommandType}}
 {{- range .Operations }}
-	c.{{.Name}}.runtime = runtime
+	commands.{{.Name}}.runtime = runtime
+	commands.{{.Name}}.factory = factory
 {{- end }}
-}
-
-func (c *{{.CommandType}}) SetFactory(factory {{.FactoryType}}) {
-{{- range .Operations }}
-	c.{{.Name}}.factory = factory
-{{- end }}
+	return commands
 }
 
 {{range .Operations}}
@@ -543,6 +540,16 @@ func (c Config) Validate() error {
 		if runtimeFields[name] {
 			return fmt.Errorf("request_validator %q conflicts with a generated Runtime field", name)
 		}
+	}
+	constructorName := "New" + c.CommandType
+	if commandTypes[constructorName] {
+		return fmt.Errorf("generated constructor %q conflicts with a generated type name", constructorName)
+	}
+	if requestValidators[constructorName] != "" {
+		return fmt.Errorf("generated constructor %q conflicts with a request_validator", constructorName)
+	}
+	if aliases[constructorName] {
+		return fmt.Errorf("generated constructor %q conflicts with an import alias", constructorName)
 	}
 	return nil
 }

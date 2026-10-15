@@ -78,7 +78,7 @@ $ make generate-api API_CONFIG=path/to/simplemq-example.json API_OUTPUT=path/to/
 
 上記のパスは設定例です。設定ファイルと生成先は対象 API とパッケージ構成に合わせて用意します。生成器が利用できることは、EventBus / SimpleMQ の全操作が生成済み、または CLI で公開済みであることを意味しません。プロバイダークラスの補完、秘密情報の扱い、独自の入力検証などは設定から意味を推測せず、対象の設計に従って手書きに残します。
 
-SimpleMQ のキュー／メッセージコマンドは次の設定から `internal/simplemqapi/` に再生成します。生成コマンドと Provider クラス補完、キュー設定のフラットなフラグ、メッセージ数と API キーの出力形状を同じ内部パッケージに置き、ルートの `package main` は CLI 登録と Runtime／SDK factory の接続を担当します。
+SimpleMQ のキュー／メッセージコマンドは次の設定から `internal/simplemqapi/` に再生成します。生成コマンドと Provider クラス補完、キュー設定のフラットなフラグ、メッセージ数と API キーの出力形状を同じ内部パッケージに置き、ルートの `package main` は CLI 登録と Runtime／SDK factory の接続を担当します。コマンド群の依存は生成された `New...Commands(runtime, factory)` constructor で一度に注入します。
 
 ```console
 $ make generate-api API_CONFIG=api/commands/simplemq-queue.json API_OUTPUT=internal/simplemqapi/simplemq_queue_api_generated.go
@@ -115,7 +115,7 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 ## 手書きコードとの境界
 
-生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理を受け取ります。リクエスト検証関数はコマンドと同じ package に置き、生成コードから直接呼び出します。設定した関数が存在しない場合や引数型が一致しない場合はビルド時に検出されます。[ADR 0044](../adr/0044-typed-request-validator-callbacks.md) に従い、文字列キー、`any` による振り分け、CLI の検証 callback 接続は使いません。生成されたコマンド構造体を親コマンドへ登録し、生成された API interface を実際の SDK クライアントに結ぶ factory は、CLI 側で設定します。
+生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理を受け取ります。リクエスト検証関数はコマンドと同じ package に置き、生成コードから直接呼び出します。設定した関数が存在しない場合や引数型が一致しない場合はビルド時に検出されます。[ADR 0044](../adr/0044-typed-request-validator-callbacks.md) に従い、文字列キー、`any` による振り分け、CLI の検証 callback 接続は使いません。生成されたコマンド群の `Runtime` と SDK API factory は `New...Commands(runtime, factory)` でまとめて注入し、setter による段階的な初期化を避けます。[ADR 0045](../adr/0045-initialize-api-commands-with-constructors.md) を参照してください。
 
 [ADR 0030](../adr/0030-remove-table-output.md) に従い、出力形式は JSON のみです。`ValidateOutput func(*kong.Context) error` は結果を返す操作の API 呼び出し前にクエリを検証し、`WriteOutput func(*kong.Context, any) error` は結果全体またはクエリ結果を JSON で書き込みます。出力形式と表示用 Zone ラベルは callback に渡しません。手書きハンドラーも同じ契約に揃えます。
 

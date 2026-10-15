@@ -40,24 +40,23 @@ type UserRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *UserCommands) SetRuntime(runtime UserRuntime) {
-	c.List.runtime = runtime
-	c.Create.runtime = runtime
-	c.Read.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-	c.RegisterEmail.runtime = runtime
-	c.UnregisterEmail.runtime = runtime
-}
-
-func (c *UserCommands) SetFactory(factory UserAPIFactory) {
-	c.List.factory = factory
-	c.Create.factory = factory
-	c.Read.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
-	c.RegisterEmail.factory = factory
-	c.UnregisterEmail.factory = factory
+func NewUserCommands(runtime UserRuntime, factory UserAPIFactory) UserCommands {
+	var commands UserCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	commands.RegisterEmail.runtime = runtime
+	commands.RegisterEmail.factory = factory
+	commands.UnregisterEmail.runtime = runtime
+	commands.UnregisterEmail.factory = factory
+	return commands
 }
 
 type UserReadCommand struct {

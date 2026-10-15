@@ -40,24 +40,23 @@ type GroupRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *GroupCommands) SetRuntime(runtime GroupRuntime) {
-	c.List.runtime = runtime
-	c.Create.runtime = runtime
-	c.Read.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-	c.ReadMemberships.runtime = runtime
-	c.UpdateMemberships.runtime = runtime
-}
-
-func (c *GroupCommands) SetFactory(factory GroupAPIFactory) {
-	c.List.factory = factory
-	c.Create.factory = factory
-	c.Read.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
-	c.ReadMemberships.factory = factory
-	c.UpdateMemberships.factory = factory
+func NewGroupCommands(runtime GroupRuntime, factory GroupAPIFactory) GroupCommands {
+	var commands GroupCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	commands.ReadMemberships.runtime = runtime
+	commands.ReadMemberships.factory = factory
+	commands.UpdateMemberships.runtime = runtime
+	commands.UpdateMemberships.factory = factory
+	return commands
 }
 
 type GroupCreateCommand struct {

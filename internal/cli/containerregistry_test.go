@@ -124,7 +124,7 @@ func TestContainerRegistryCommandOperations(t *testing.T) {
 		Permission: types.ContainerRegistryPermissions.ReadWrite,
 	}}}
 	commandLine := newCLI()
-	commandLine.ContainerRegistryAPI.SetFactory(func() (containerregistryapi.API, error) { return api, nil })
+	setContainerRegistryAPIFactory(commandLine, containerRegistryRuntime(), func() (containerregistryapi.API, error) { return api, nil })
 
 	run := func(args ...string) []byte {
 		t.Helper()
@@ -227,7 +227,7 @@ func TestContainerRegistryCommandOperations(t *testing.T) {
 
 func TestContainerRegistryRequestAndUserValidationBeforeAPICall(t *testing.T) {
 	commandLine := newCLI()
-	commandLine.ContainerRegistryAPI.SetFactory(func() (containerregistryapi.API, error) {
+	setContainerRegistryAPIFactory(commandLine, containerRegistryRuntime(), func() (containerregistryapi.API, error) {
 		t.Fatal("API factory called for invalid input")
 		return nil, nil
 	})
@@ -262,10 +262,9 @@ func TestContainerRegistryPasswordUpdateRejectsMissingOrInvalidUser(t *testing.T
 	} {
 		api := &containerRegistryAPIMock{users: users}
 		commandLine := newCLI()
-		commandLine.ContainerRegistryAPI.SetFactory(func() (containerregistryapi.API, error) { return api, nil })
-		commandLine.ContainerRegistryAPI.SetRuntime(containerregistryapi.Runtime{
+		setContainerRegistryAPIFactory(commandLine, containerregistryapi.Runtime{
 			ReadPassword: func(string) (string, error) { return "test-password", nil },
-		})
+		}, func() (containerregistryapi.API, error) { return api, nil })
 		var stdout, stderr bytes.Buffer
 		if code := runCLI([]string{
 			"container-registry-api", "registry", "user", "update", "123", "builder", "--password-file", "password",

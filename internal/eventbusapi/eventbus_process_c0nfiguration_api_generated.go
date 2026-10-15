@@ -37,22 +37,21 @@ type ProcessConfigurationRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *ProcessConfigurationCommands) SetRuntime(runtime ProcessConfigurationRuntime) {
-	c.List.runtime = runtime
-	c.Read.runtime = runtime
-	c.Create.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-	c.UpdateSecret.runtime = runtime
-}
-
-func (c *ProcessConfigurationCommands) SetFactory(factory ProcessConfigurationAPIFactory) {
-	c.List.factory = factory
-	c.Read.factory = factory
-	c.Create.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
-	c.UpdateSecret.factory = factory
+func NewProcessConfigurationCommands(runtime ProcessConfigurationRuntime, factory ProcessConfigurationAPIFactory) ProcessConfigurationCommands {
+	var commands ProcessConfigurationCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	commands.UpdateSecret.runtime = runtime
+	commands.UpdateSecret.factory = factory
+	return commands
 }
 
 type ProcessConfigurationListCommand struct {

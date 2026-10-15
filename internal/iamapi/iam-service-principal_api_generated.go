@@ -49,32 +49,31 @@ type ServicePrincipalRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *ServicePrincipalCommands) SetRuntime(runtime ServicePrincipalRuntime) {
-	c.List.runtime = runtime
-	c.Create.runtime = runtime
-	c.Read.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-	c.ListKeys.runtime = runtime
-	c.UploadKey.runtime = runtime
-	c.EnableKey.runtime = runtime
-	c.DisableKey.runtime = runtime
-	c.DeleteKey.runtime = runtime
-	c.IssueToken.runtime = runtime
-}
-
-func (c *ServicePrincipalCommands) SetFactory(factory ServicePrincipalAPIFactory) {
-	c.List.factory = factory
-	c.Create.factory = factory
-	c.Read.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
-	c.ListKeys.factory = factory
-	c.UploadKey.factory = factory
-	c.EnableKey.factory = factory
-	c.DisableKey.factory = factory
-	c.DeleteKey.factory = factory
-	c.IssueToken.factory = factory
+func NewServicePrincipalCommands(runtime ServicePrincipalRuntime, factory ServicePrincipalAPIFactory) ServicePrincipalCommands {
+	var commands ServicePrincipalCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	commands.ListKeys.runtime = runtime
+	commands.ListKeys.factory = factory
+	commands.UploadKey.runtime = runtime
+	commands.UploadKey.factory = factory
+	commands.EnableKey.runtime = runtime
+	commands.EnableKey.factory = factory
+	commands.DisableKey.runtime = runtime
+	commands.DisableKey.factory = factory
+	commands.DeleteKey.runtime = runtime
+	commands.DeleteKey.factory = factory
+	commands.IssueToken.runtime = runtime
+	commands.IssueToken.factory = factory
+	return commands
 }
 
 type ServicePrincipalListCommand struct {

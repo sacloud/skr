@@ -40,22 +40,21 @@ type Runtime struct {
 	TransformCreateRequest func(*CreateCommand, *server.CreateRequest) error
 }
 
-func (c *Commands) SetRuntime(runtime Runtime) {
-	c.Find.runtime = runtime
-	c.Read.runtime = runtime
-	c.Create.runtime = runtime
-	c.Boot.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-}
-
-func (c *Commands) SetFactory(factory APIFactory) {
-	c.Find.factory = factory
-	c.Read.factory = factory
-	c.Create.factory = factory
-	c.Boot.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
+func NewCommands(runtime Runtime, factory APIFactory) Commands {
+	var commands Commands
+	commands.Find.runtime = runtime
+	commands.Find.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Boot.runtime = runtime
+	commands.Boot.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	return commands
 }
 
 type FindCommand struct {

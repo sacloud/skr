@@ -92,7 +92,7 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.Disk.SetFactory(func() (diskapi.API, error) { return api, nil })
+		setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "disk"}, args...), &stdout, &stderr, commandLine)
 		return stdout.String(), stderr.String(), code
 	}
@@ -237,7 +237,7 @@ func TestIaaSDiskRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 	} {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.Disk.SetFactory(func() (diskapi.API, error) { return api, nil })
+		setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "disk"}, args...), &stdout, &stderr, commandLine)
 		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
 			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())

@@ -99,7 +99,8 @@ func TestGenerate(t *testing.T) {
 		"return op.DeleteWithContext(context.Background(), request)",
 		"if err := ValidateDeleteRequest(request); err != nil",
 		"switchFindCommand",
-		"c.Find.runtime = runtime",
+		"commands.Find.runtime = runtime",
+		"commands.Find.factory = factory",
 		"op.SearchWithContext(context.Background(), request)",
 	} {
 		if !strings.Contains(string(source), want) {
@@ -307,6 +308,7 @@ func TestGenerateFactoryArgumentsAndNamedMethodArguments(t *testing.T) {
 	}
 	for _, want := range []string{
 		"type APIFactory func(QueueName string, APIKeyFile string) (API, error)",
+		"func NewCommands(runtime Runtime, factory APIFactory) Commands",
 		`name:\"queue-name\" help:\"対象キュー名。\" required:\"\"`,
 		`name:\"content\" help:\"本文。\" required:\"\"`,
 		"op.Send(context.Background(), c.Content)",
@@ -315,6 +317,9 @@ func TestGenerateFactoryArgumentsAndNamedMethodArguments(t *testing.T) {
 		if !strings.Contains(string(source), want) {
 			t.Errorf("generated source does not contain %q", want)
 		}
+	}
+	if strings.Contains(string(source), ".SetRuntime(") || strings.Contains(string(source), ".SetFactory(") {
+		t.Fatal("generated source contains dependency setters")
 	}
 }
 
@@ -507,6 +512,18 @@ func TestValidateRequestTransform(t *testing.T) {
 		{"request validator request collision", func(c *Config) {
 			c.Operations[0].RequestValidator = "request"
 		}, "conflicts with a generated local name"},
+		{"constructor conflicts with top-level type", func(c *Config) {
+			c.APIType = "NewCommands"
+		}, "constructor \"NewCommands\" conflicts with a generated type name"},
+		{"constructor conflicts with operation type", func(c *Config) {
+			c.Operations[0].CommandType = "NewCommands"
+		}, "constructor \"NewCommands\" conflicts with a generated type name"},
+		{"constructor conflicts with request validator", func(c *Config) {
+			c.Operations[0].RequestValidator = "NewCommands"
+		}, "constructor \"NewCommands\" conflicts with a request_validator"},
+		{"constructor conflicts with import alias", func(c *Config) {
+			c.Imports = map[string]string{"NewCommands": "example/sdk"}
+		}, "constructor \"NewCommands\" conflicts with an import alias"},
 		{"validator reused for different request types", func(c *Config) {
 			op := c.Operations[0]
 			op.Name, op.CommandType, op.Method, op.RequestType, op.RequestTransform, op.RepeatedFlags =
