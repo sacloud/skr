@@ -20,7 +20,7 @@ description: cmd/apigen-iaas を使って IaaS API コマンドの設定を更�
 2. 対象 SDK のバージョン、公開 API メソッド、リクエスト／レスポンス型、SDK の検証動作を確認します。各リクエスト値について、API 用リクエストへの変換を追い、実際に送信される API フィールドと SDK の補助入力を区別します。コマンド名、フラグ、必須値、例、サービス固有の制約は型から推測せず、根拠を確認して設定します。
 3. 既存のリソース設定を最小限変更します。設定のルートには `package`、`resource`、コマンド／API／factory／runtime の型名、`imports`、`operations` を指定します。操作ごとに API メソッド、必要なリクエスト／レスポンス型、ヘルプ、リクエスト説明、必要なフラグを明記します。
 4. フラグは API に送信されるリクエストフィールドと対応させます。生成器が扱うスカラー型は `string`、`bool`、`int`、`int64` です。SDK が API 用リクエストの構築前に検索・変換などに使う補助入力は、別途ユーザー向け操作として設計しない限り API フィールドのフラグにしません。IaaS API のトップレベル `Tags` 配列に限り、`name: "tags"`、`field: "Tags"`、`type: "[]string"`、`separator: ","` の組み合わせで、カンマ区切りの `--tags` フラグを生成できます。SDK の `Tags` 型に変換する場合は `conversion: "types.Tags"` を指定します。更新時に明示指定の有無を保持する必要がある任意値では `pointer: true` を使い、`Tags` がポインター型の場合も同様に設定します。必要な型変換は `conversion` に指定します。その他の配列、map、union、nullable 値、秘密情報、複雑な入力は JSON リクエストに残します。JSON 入力では `Tags` 配列を引き続き使えますが、`--request` と個別フラグの併用・マージは認めません。詳細は [ADR 0035](../../../docs/adr/0035-iaas-tags-flag.md) を参照してください。
-5. SDK 呼び出し前に追加検証が必要な場合は `request_validator` を指定し、検証関数を手書きコードに実装します。Server Create のような明示的な反復入力には、[ADR 0042](../../../docs/adr/0042-generated-request-transform.md) の `repeated_flags` と `request_transform` を使えます。フラグ名、コマンドフィールド名、ヘルプを設定し、Runtime に生成する型付き callback を CLI 側から接続します。変換はフラグ経路のスカラー代入後、リクエスト検証前に実行し、JSON 経路には適用しません。入力の解析と固有制約はドメイン側で実装・テストし、秘密情報や任意の配列を自動的にフラグ化しないでください。IaaS の検索操作では単一の対象ゾーンを必須とし、`Zone` に `all` が渡された場合はフラグ経路と JSON 経路の両方で API 呼び出し前に拒否します。特殊な操作は `handwritten: true` とし、そのハンドラーは手書きで実装します。
+5. SDK 呼び出し前に追加検証が必要な場合は `request_validator` に関数名を指定し、生成コマンドと同じ package に検証関数を実装します。生成コードはその関数を直接呼び出すため、関数名や引数型の不一致をビルド時に検出できます。`handwritten: true` の操作も、同じ package の検証関数を手書きハンドラーから直接呼び出します。Server Create のような明示的な反復入力には、[ADR 0042](../../../docs/adr/0042-generated-request-transform.md) の `repeated_flags` と `request_transform` を使えます。フラグ名、コマンドフィールド名、ヘルプを設定し、Runtime に生成する型付き callback を CLI 側から接続します。変換はフラグ経路のスカラー代入後、リクエスト検証前に実行し、JSON 経路には適用しません。入力の解析と固有制約はドメイン側で実装・テストし、秘密情報や任意の配列を自動的にフラグ化しないでください。IaaS の検索操作では単一の対象ゾーンを必須とし、`Zone` に `all` が渡された場合はフラグ経路と JSON 経路の両方で API 呼び出し前に拒否します。特殊な操作は `handwritten: true` とし、そのハンドラーは手書きで実装します。
 6. リポジトリの設定と出力先を明示して生成します。Switch の設定と出力先は次のとおりです。
 
    ```console
@@ -44,5 +44,5 @@ description: cmd/apigen-iaas を使って IaaS API コマンドの設定を更�
 - 設定 JSON はコマンドの公開範囲とユーザー向け説明の根拠です。SDK の型だけでは決まらないフラグ、必須条件、ヘルプ、検証関数を明示します。
 - `request_type` がある操作は `--request` と個別フラグを併用させず、JSON とフラグの経路を混ぜません。個別フラグの必須性はフラグ経路だけに適用します。
 - `response_type` がない操作は成功時に出力しません。通常と異なる SDK 操作やユーザー向け挙動を隠さないよう、設定と生成コードを対応させます。
-- `Runtime` callback と SDK API factory は CLI 側で設定します。生成 package と `package main` の非公開処理を直接結び付けず、既存の callback パターンに従います。
+- `Runtime` callback と SDK API factory は CLI 側で設定します。リクエスト検証関数は生成 package に置き、`request_validator` で生成コードから直接呼び出します。文字列キーによる振り分けや CLI の Runtime 検証 callback 接続は使いません。生成 package と `package main` の非公開処理を直接結び付けず、既存の callback パターンに従います。
 - 生成器が新しい設定項目を扱う変更では、設定の型、検証、テンプレート、決定性・エラー経路のテスト、設計文書を一緒に見直します。既存の生成物だけを更新して生成器のテストを省略しないでください。

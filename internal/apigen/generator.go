@@ -133,7 +133,6 @@ type {{.RuntimeType}} struct {
 	DecodeRequest func(string, any) error
 	ValidateOutput func(*kong.Context) error
 	WriteOutput func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
 {{- range .Operations }}
 {{- if .RequestTransform }}
 	{{.RequestTransform}} func(*{{.CommandType}}, *{{.RequestType}}) error
@@ -242,10 +241,7 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 {{- end }}
 	}
 {{- if .RequestValidator }}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("{{.RequestValidator}}", request); err != nil {
+	if err := {{.RequestValidator}}(request); err != nil {
 		return err
 	}
 {{- end }}
@@ -372,9 +368,8 @@ func (c Config) Validate() error {
 		}
 		commandTypes[name] = true
 	}
-	runtimeFields := map[string]bool{
-		"DecodeRequest": true, "ValidateOutput": true, "WriteOutput": true, "ValidateRequest": true,
-	}
+	runtimeFields := map[string]bool{"DecodeRequest": true, "ValidateOutput": true, "WriteOutput": true}
+	requestValidators := make(map[string]string)
 	for i, operation := range c.Operations {
 		if !token.IsIdentifier(operation.Name) || token.Lookup(operation.Name).IsKeyword() {
 			return fmt.Errorf("operation %d name must be a valid Go identifier", i)
@@ -413,8 +408,17 @@ func (c Config) Validate() error {
 			(!token.IsIdentifier(operation.RequestValidator) || token.Lookup(operation.RequestValidator).IsKeyword()) {
 			return fmt.Errorf("operation %q request_validator must be a valid Go identifier", operation.Name)
 		}
-		if operation.RequestValidator != "" && (operation.RequestType == "" || operation.Handwritten) {
-			return fmt.Errorf("operation %q request_validator requires a generated request operation", operation.Name)
+		if operation.RequestValidator != "" && operation.RequestType == "" {
+			return fmt.Errorf("operation %q request_validator requires a request_type", operation.Name)
+		}
+		if operation.RequestValidator != "" {
+			if aliases[operation.RequestValidator] {
+				return fmt.Errorf("request_validator %q conflicts with an import alias", operation.RequestValidator)
+			}
+			if requestType, exists := requestValidators[operation.RequestValidator]; exists && requestType != operation.RequestType {
+				return fmt.Errorf("request_validator %q is used with multiple request types", operation.RequestValidator)
+			}
+			requestValidators[operation.RequestValidator] = operation.RequestType
 		}
 		if operation.RequestTransform != "" {
 			if !token.IsIdentifier(operation.RequestTransform) || !token.IsExported(operation.RequestTransform) {
@@ -525,6 +529,14 @@ func (c Config) Validate() error {
 		operations[operation.Name] = true
 		methods[operation.Method] = true
 		commandTypes[operation.CommandType] = true
+	}
+	for name := range requestValidators {
+		if commandTypes[name] {
+			return fmt.Errorf("request_validator %q conflicts with a generated type name", name)
+		}
+		if runtimeFields[name] {
+			return fmt.Errorf("request_validator %q conflicts with a generated Runtime field", name)
+		}
 	}
 	return nil
 }

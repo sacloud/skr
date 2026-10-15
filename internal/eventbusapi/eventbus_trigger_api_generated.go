@@ -30,10 +30,9 @@ type TriggerAPI interface {
 type TriggerAPIFactory func() (TriggerAPI, error)
 
 type TriggerRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *TriggerCommands) SetRuntime(runtime TriggerRuntime) {
@@ -133,10 +132,7 @@ func (c *TriggerCreateCommand) Run(ctx *kong.Context) error {
 	} else {
 		return fmt.Errorf("--request が必要です")
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("setTriggerProvider", request); err != nil {
+	if err := SetTriggerProvider(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {

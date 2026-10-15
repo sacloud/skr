@@ -27,15 +27,16 @@ import (
 	v1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 )
 
-func TestDecodeAndValidateCreateRequest(t *testing.T) {
+func TestDecodeAndSetCreateProvider(t *testing.T) {
 	for _, test := range []struct {
 		name     string
 		provider v1.ProviderClass
 		settings string
+		set      func(*v1.CreateCommonServiceItemRequest) error
 	}{
-		{"setProcessConfigurationProvider", v1.ProviderClassEventbusprocessconfiguration, `{"Destination":"simplemq","Parameters":"{\"queue_name\":\"test\",\"content\":\"message\"}"}`},
-		{"setScheduleProvider", v1.ProviderClassEventbusschedule, `{"ProcessConfigurationID":"123","StartsAt":1893456000000,"RecurringStep":1,"RecurringUnit":"day"}`},
-		{"setTriggerProvider", v1.ProviderClassEventbustrigger, `{"ProcessConfigurationID":"123","Source":"source","Types":["type"]}`},
+		{"SetProcessConfigurationProvider", v1.ProviderClassEventbusprocessconfiguration, `{"Destination":"simplemq","Parameters":"{\"queue_name\":\"test\",\"content\":\"message\"}"}`, SetProcessConfigurationProvider},
+		{"SetScheduleProvider", v1.ProviderClassEventbusschedule, `{"ProcessConfigurationID":"123","StartsAt":1893456000000,"RecurringStep":1,"RecurringUnit":"day"}`, SetScheduleProvider},
+		{"SetTriggerProvider", v1.ProviderClassEventbustrigger, `{"ProcessConfigurationID":"123","Source":"source","Types":["type"]}`, SetTriggerProvider},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			for _, provider := range []string{"", `,"Provider":{"Class":"eventbustrigger"}`} {
@@ -52,7 +53,7 @@ func TestDecodeAndValidateCreateRequest(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if err := ValidateRequest(test.name, &request); err != nil {
+					if err := test.set(&request); err != nil {
 						t.Fatal(err)
 					}
 					if request.CommonServiceItem.Provider.Class != test.provider || request.CommonServiceItem.Name != "test" {
@@ -134,19 +135,6 @@ func TestDecodeUpdateRequestDoesNotSetProvider(t *testing.T) {
 	}
 	if request.CommonServiceItem.Name.Value != "updated" {
 		t.Fatalf("Name = %#v", request.CommonServiceItem.Name)
-	}
-}
-
-func TestValidateRequestErrors(t *testing.T) {
-	if err := ValidateRequest("unknown", &v1.CreateCommonServiceItemRequest{}); err == nil || !strings.Contains(err.Error(), "unknown EventBus request validator") {
-		t.Fatalf("unknown validator error = %v", err)
-	}
-	for _, name := range []string{"setProcessConfigurationProvider", "setScheduleProvider", "setTriggerProvider"} {
-		for _, request := range []any{nil, v1.CreateCommonServiceItemRequest{}, &v1.UpdateCommonServiceItemRequest{}} {
-			if err := ValidateRequest(name, request); err == nil || !strings.Contains(err.Error(), "create requests") {
-				t.Fatalf("ValidateRequest(%q, %T) error = %v", name, request, err)
-			}
-		}
 	}
 }
 

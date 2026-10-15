@@ -30,10 +30,9 @@ type AuthAPI interface {
 type AuthAPIFactory func() (AuthAPI, error)
 
 type AuthRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *AuthCommands) SetRuntime(runtime AuthRuntime) {

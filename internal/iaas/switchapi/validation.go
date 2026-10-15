@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package switchresource
+package switchapi
 
 import (
 	"fmt"
@@ -22,41 +22,24 @@ import (
 	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
-func ValidateRequest(name string, request any) error {
-	switch name {
-	case "validateSwitchFindRequest":
-		value, ok := request.(*swytch.FindRequest)
-		if !ok {
-			return fmt.Errorf("Find API リクエストの型が不正です")
-		}
-		return validateFindRequest(value)
-	case "validateSwitchReadRequest":
-		value, ok := request.(*swytch.ReadRequest)
-		if !ok {
-			return fmt.Errorf("Read API リクエストの型が不正です")
-		}
-		return validateReadRequest(value)
-	case "validateSwitchCreateRequest":
-		value, ok := request.(*swytch.CreateRequest)
-		if !ok {
-			return fmt.Errorf("Create API リクエストの型が不正です")
-		}
-		return validateCreateRequest(value)
-	case "validateSwitchUpdateRequest":
-		value, ok := request.(*swytch.UpdateRequest)
-		if !ok {
-			return fmt.Errorf("Update API リクエストの型が不正です")
-		}
-		return validateUpdateRequest(value)
-	case "validateSwitchDeleteRequest":
-		value, ok := request.(*swytch.DeleteRequest)
-		if !ok {
-			return fmt.Errorf("Delete API リクエストの型が不正です")
-		}
-		return validateDeleteRequest(value)
-	default:
-		return fmt.Errorf("未知の Switch API リクエスト検証 %q", name)
-	}
+func ValidateFindRequest(request *swytch.FindRequest) error {
+	return validateFindRequest(request)
+}
+
+func ValidateReadRequest(request *swytch.ReadRequest) error {
+	return validateReadRequest(request)
+}
+
+func ValidateCreateRequest(request *swytch.CreateRequest) error {
+	return validateCreateRequest(request)
+}
+
+func ValidateUpdateRequest(request *swytch.UpdateRequest) error {
+	return validateUpdateRequest(request)
+}
+
+func ValidateDeleteRequest(request *swytch.DeleteRequest) error {
+	return validateDeleteRequest(request)
 }
 
 func validateFindRequest(request *swytch.FindRequest) error {

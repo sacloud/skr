@@ -35,10 +35,9 @@ type GroupAPI interface {
 type GroupAPIFactory func() (GroupAPI, error)
 
 type GroupRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *GroupCommands) SetRuntime(runtime GroupRuntime) {

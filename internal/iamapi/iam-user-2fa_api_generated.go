@@ -34,10 +34,9 @@ type User2FAAPI interface {
 type User2FAAPIFactory func(UserID int) (User2FAAPI, error)
 
 type User2FARuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *User2FACommands) SetRuntime(runtime User2FARuntime) {

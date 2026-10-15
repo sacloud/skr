@@ -24,10 +24,9 @@ type IDPolicyAPI interface {
 type IDPolicyAPIFactory func() (IDPolicyAPI, error)
 
 type IDPolicyRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *IDPolicyCommands) SetRuntime(runtime IDPolicyRuntime) {

@@ -15,16 +15,60 @@
 package archiveapi
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/ostype"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	"github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
+	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
-func parseArchiveOSType(value string) ostype.ArchiveOSType {
-	for _, name := range ostype.OSTypeShortNames {
-		if strings.EqualFold(value, name) {
-			return ostype.StrToOSType(name)
+func ValidateFindRequest(request *archive.FindRequest) error {
+	return validateFindRequest(request)
+}
+
+func ValidateReadRequest(request *archive.ReadRequest) error {
+	return validateIdentity(request.Zone, request.ID)
+}
+
+func validateFindRequest(request *archive.FindRequest) error {
+	if err := validateZone(request.Zone); err != nil {
+		return err
+	}
+	if request.OSType < 0 || !validOSType(request.OSType) {
+		return fmt.Errorf("OSType が不正です")
+	}
+	if request.OSType != ostype.Custom && (len(request.Names) > 0 || len(request.Tags) > 0) {
+		return fmt.Errorf("OSType は Names または Tags と併用できません")
+	}
+	return nil
+}
+
+func validOSType(value ostype.ArchiveOSType) bool {
+	if value == ostype.Custom {
+		return true
+	}
+	for _, candidate := range ostype.ArchiveOSTypes {
+		if value == candidate {
+			return true
 		}
 	}
-	return -1
+	return false
+}
+
+func validateIdentity(zone string, id types.ID) error {
+	if err := validateZone(zone); err != nil {
+		return err
+	}
+	if id == 0 {
+		return fmt.Errorf("ID が必要です (--request JSON も指定できます)")
+	}
+	return nil
+}
+
+func validateZone(zone string) error {
+	if zone == "" {
+		return fmt.Errorf("Zone が必要です (--request JSON も指定できます)")
+	}
+	return zones.ValidateSingleZone(zone)
 }

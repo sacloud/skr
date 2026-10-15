@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package diskplan
+package diskplanapi
 
 import (
 	"fmt"
@@ -21,29 +21,18 @@ import (
 	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
-func ValidateRequest(name string, request any) error {
-	switch name {
-	case "validateDiskPlanFindRequest":
-		value, ok := request.(*diskplanSDK.FindRequest)
-		if !ok {
-			return fmt.Errorf("Find API リクエストの型が不正です")
-		}
-		return validateZone(value.Zone)
-	case "validateDiskPlanReadRequest":
-		value, ok := request.(*diskplanSDK.ReadRequest)
-		if !ok {
-			return fmt.Errorf("Read API リクエストの型が不正です")
-		}
-		if err := validateZone(value.Zone); err != nil {
-			return err
-		}
-		if value.ID == 0 {
-			return fmt.Errorf("ID が必要です (--request JSON も指定できます)")
-		}
-		return nil
-	default:
-		return fmt.Errorf("未知の DiskPlan API リクエスト検証 %q", name)
+func ValidateFindRequest(request *diskplanSDK.FindRequest) error {
+	return validateZone(request.Zone)
+}
+
+func ValidateReadRequest(request *diskplanSDK.ReadRequest) error {
+	if err := validateZone(request.Zone); err != nil {
+		return err
 	}
+	if request.ID == 0 {
+		return fmt.Errorf("ID が必要です (--request JSON も指定できます)")
+	}
+	return nil
 }
 
 func validateZone(zone string) error {

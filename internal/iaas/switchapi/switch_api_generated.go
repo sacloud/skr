@@ -32,10 +32,9 @@ type API interface {
 type APIFactory func() (API, error)
 
 type Runtime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *Commands) SetRuntime(runtime Runtime) {
@@ -102,10 +101,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 			request.From = *c.From
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateSwitchFindRequest", request); err != nil {
+	if err := ValidateFindRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -172,10 +168,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 			request.ID = value
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateSwitchReadRequest", request); err != nil {
+	if err := ValidateReadRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -268,10 +261,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 			request.DefaultRoute = *c.DefaultRoute
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateSwitchCreateRequest", request); err != nil {
+	if err := ValidateCreateRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -370,10 +360,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 			request.DefaultRoute = c.DefaultRoute
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateSwitchUpdateRequest", request); err != nil {
+	if err := ValidateUpdateRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -460,10 +447,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 			request.WaitForReleaseTick = *c.WaitForReleaseTick
 		}
 	}
-	if c.runtime.ValidateRequest == nil {
-		return fmt.Errorf("API リクエスト検証が設定されていません")
-	}
-	if err := c.runtime.ValidateRequest("validateSwitchDeleteRequest", request); err != nil {
+	if err := ValidateDeleteRequest(request); err != nil {
 		return err
 	}
 	if c.factory == nil {

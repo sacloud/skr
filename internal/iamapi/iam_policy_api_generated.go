@@ -32,10 +32,9 @@ type PolicyAPI interface {
 type PolicyAPIFactory func() (PolicyAPI, error)
 
 type PolicyRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *PolicyCommands) SetRuntime(runtime PolicyRuntime) {

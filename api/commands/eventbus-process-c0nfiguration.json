@@ -40,7 +40,7 @@
       "request_by_value": true,
       "response_type": "*v1.CommonServiceItem",
       "request_help": "CommonServiceItem に Name と Settings を含む JSON。直接指定するか @path.json でファイルを指定します。Provider は eventbusprocessconfiguration に自動設定されます。",
-      "request_validator": "setProcessConfigurationProvider"
+      "request_validator": "SetProcessConfigurationProvider"
     },
     {
       "name": "Update",

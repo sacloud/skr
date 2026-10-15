@@ -35,10 +35,9 @@ type SSOAPI interface {
 type SSOAPIFactory func() (SSOAPI, error)
 
 type SSORuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *SSOCommands) SetRuntime(runtime SSORuntime) {

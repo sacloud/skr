@@ -33,10 +33,9 @@ type ScimAPI interface {
 type ScimAPIFactory func() (ScimAPI, error)
 
 type ScimRuntime struct {
-	DecodeRequest   func(string, any) error
-	ValidateOutput  func(*kong.Context) error
-	WriteOutput     func(*kong.Context, any) error
-	ValidateRequest func(string, any) error
+	DecodeRequest  func(string, any) error
+	ValidateOutput func(*kong.Context) error
+	WriteOutput    func(*kong.Context, any) error
 }
 
 func (c *SCIMCommands) SetRuntime(runtime ScimRuntime) {
