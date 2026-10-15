@@ -99,6 +99,8 @@ $ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=int
 
 IaaS の検索では、フラグと `--request` JSON のどちらでも対象ゾーンを明示します。`Zone` に `all` を指定したゾーン横断検索はサポートせず、生成コードにゾーン列挙や複数ゾーンの結果集約を含めません。
 
+[ADR 0046](../adr/0046-common-iaas-zone-validation.md) に従い、単一ゾーンを対象とする生成操作には `validate_zone: true` を指定します。生成コードはフラグの代入・入力変換または JSON デコードの後、`request_validator` と API クライアント生成の前に `zones.ValidateSingleZone(request.Zone)` を呼び出します。空文字列と `all` を両経路で拒否し、空文字列は `Zone が必要です (--request JSON も指定できます)` と表示します。既存の必須フラグの指定有無の確認は維持します。Zone は文字列のフィールドを前提とし、型の一致は生成コードのビルドで検証します。この設定はリクエストを持つ生成操作だけで利用でき、手書きハンドラーでは共通関数を直接呼び出します。フラグ名から検証を自動推測せず、設定で有効化しない操作には検証とインポートを追加しません。
+
 リポジトリルートから実行し、生成先を明示します。
 
 ```console
@@ -114,6 +116,8 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型で受け付けず、出力は `go/format` で整形します。IaaS と Ogen 系 API は生成対象の形が異なるため、IaaS は専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
 
 ## 手書きコードとの境界
+
+[ADR 0047](../adr/0047-minimize-cli-request-body-validation.md) に従い、CLI の検証は入力経路と CLI 固有の制約を中心にします。本文の必須項目、値の範囲、サービス上の相関制約は SDK と API に委ね、`request.Validate()` の重複呼び出しは行いません。`validate_zone` と、無視される補助入力を防ぐ Archive の未知 OSType 拒否は維持します。変更項目のない更新も SDK へ渡し、そのエラーを利用者へ返します。EventBus の `Set*Provider` は入力補完なので残します。
 
 生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理を受け取ります。リクエスト検証関数はコマンドと同じ package に置き、生成コードから直接呼び出します。設定した関数が存在しない場合や引数型が一致しない場合はビルド時に検出されます。[ADR 0044](../adr/0044-typed-request-validator-callbacks.md) に従い、文字列キー、`any` による振り分け、CLI の検証 callback 接続は使いません。生成されたコマンド群の `Runtime` と SDK API factory は `New...Commands(runtime, factory)` でまとめて注入し、setter による段階的な初期化を避けます。[ADR 0045](../adr/0045-initialize-api-commands-with-constructors.md) を参照してください。
 
@@ -146,17 +150,17 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 生成器は `key=value` の構文、キーの意味、値の範囲、要素間の制約を扱いません。Server ではドメイン側がディスク名の補完、virtio 接続、正の整数の検証、shared NIC の位置制約を担当します。反復入力は対象操作が明示的に採用するもので、任意の配列や秘密情報をフラグ化する機構ではありません。
 
-Switch では `find`、`read`、`create`、`update`、`delete` を生成します。すべての操作で対象ゾーンを明示し、`Zone` が `all` の場合は `request_validator` で SDK 呼び出し前に拒否します。個別の Zone／ID 検証も `request_validator` で明示します。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
+Switch では `find`、`read`、`create`、`update`、`delete` を生成します。すべての操作で対象ゾーンを明示し、`validate_zone: true` による共通検証で空文字列と `all` を SDK 呼び出し前に拒否します。ID や Name の検証は SDK に委ねます。`handwritten: true` を設定した操作は、親コマンドと API インターフェースに登録しながらコマンド構造体と handler を手書きにできます。SDK の provider class 設定、秘密情報の読み込み、複雑なリクエスト構築、通常と異なる出力や失敗処理は引き続き手書きの実装に残します。対象コマンドで `go test` を実行し、SDK 呼び出し、入力、出力、エラー経路を確認してから生成コードを採用します。
 
 Server では `find`、`read`、`create`、`update`、`delete` を生成します。`create` のディスク／NIC 入力は型付き変換 callback に接続し、`boot` は `handwritten: true` で登録した手書きハンドラーとして実装します。設定は [`api/commands/iaas-server.json`](../../api/commands/iaas-server.json)、生成先は `internal/iaas/serverapi/` です。各操作では対象ゾーンを明示し、対応するフラグと JSON のどちらでも `Zone: "all"` を SDK 呼び出し前に拒否します。
 
 Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー値をフラグで指定できます。IaaS のトップレベル `Tags` は `--tags` にカンマ区切りで指定できます。[ADR 0041](../adr/0041-server-repeatable-disk-and-nic-options.md) の限定例外として、反復可能な `--disk` と `--nic` でディスクと NIC を指定順に構築します。ディスクは plan-id と size-gb が必須で、任意の archive-id を受け付け、virtio 接続にします。NIC は upstream=shared または upstream=disconnected を受け付け、shared は先頭に限定します。それ以外の複雑な構成は JSON リクエストで渡し、JSON と個別フラグの併用を拒否します。ディスク作成の待機設定 `NoWait` はディスク構成や `BootAfterCreate` と関係するため JSON 経路に残します。
 
-Boot は Zone と ID を必須とし、任意の user-data を `--user-data @path` または `--user-data -` で読み込みます。省略時は通常どおり起動し、インラインの user-data は拒否します。更新では単純なスカラーと `--tags` を任意フラグにし、未指定値を保持します。指定項目がない更新リクエストは拒否します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。サービス固有の検証は `internal/iaas/server/`、手書きハンドラーと入力処理は `internal/iaas/serverapi/` に置きます。各パッケージの単体テストと `internal/cli/server_test.go` で検証します。
+Boot は Zone と ID を必須とし、任意の user-data を `--user-data @path` または `--user-data -` で読み込みます。省略時は通常どおり起動し、インラインの user-data は拒否します。更新では単純なスカラーと `--tags` を任意フラグにし、未指定値を保持します。指定項目がない更新リクエストも SDK へ渡します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。本文の検証は SDK と API に委ね、手書きハンドラーと CLI 独自の入力処理は `internal/iaas/serverapi/` に置きます。各パッケージの単体テストと `internal/cli/server_test.go` で検証します。
 
-Disk では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-disk.json`](../../api/commands/iaas-disk.json)、生成先は `internal/iaas/diskapi/` です。各検索では対象ゾーンを明示し、`--tags` でタグ条件をカンマ区切り指定できます。Create は Zone、Name、DiskPlanID、Connection、SizeGB と独立した単純値および Tags を個別フラグで指定でき、DistantFrom と EditParameter は JSON に残します。SDK の CreateRequest にある OSType は API に送るフィールドではなく、SDK が OS 種別からコピー元アーカイブを解決する補助入力のため、個別フラグにはしません。Update は Zone と ID を必須とし、変更する Name、Description、Tags、IconID、Connection を個別フラグで指定できます。更新フラグは pointer 値として生成し、省略時の未指定を維持します。両操作とも `--request` JSON を維持し、個別フラグとの併用を拒否します。サービス固有の入力検証は `internal/iaas/disk/` に置きます。
+Disk では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-disk.json`](../../api/commands/iaas-disk.json)、生成先は `internal/iaas/diskapi/` です。各検索では対象ゾーンを明示し、`--tags` でタグ条件をカンマ区切り指定できます。Create は Zone、Name、DiskPlanID、Connection、SizeGB と独立した単純値および Tags を個別フラグで指定でき、DistantFrom と EditParameter は JSON に残します。SDK の CreateRequest にある OSType は API に送るフィールドではなく、SDK が OS 種別からコピー元アーカイブを解決する補助入力のため、個別フラグにはしません。Update は Zone と ID を必須とし、変更する Name、Description、Tags、IconID、Connection を個別フラグで指定できます。更新フラグは pointer 値として生成し、省略時の未指定を維持します。両操作とも `--request` JSON を維持し、個別フラグとの併用を拒否します。本文の検証は SDK と API に委ねます。
 
-PacketFilter では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-packetfilter.json`](../../api/commands/iaas-packetfilter.json)、生成先は `internal/iaas/packetfilterapi/` です。`Expression` はルールの複雑な配列なので、各ルールを個別の CLI フラグにはせず、`--expressions` に JSON 配列を直接または `@path.json` で渡せる入力変換 callback を接続します。`--request` の完全な JSON 入力も維持し、両経路は併用できません。更新時の `OriginalExpressionHash` は読み取り結果の `ExpressionHash` を受け取るスカラー値です。サービス固有の単一ゾーン、ID、空更新の検証は `internal/iaas/packetfilter/` に置きます。ライブ E2E はフィルタの作成・ルール更新・削除を確認しますが、NIC への適用と通信の許可／拒否は行いません。
+PacketFilter では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-packetfilter.json`](../../api/commands/iaas-packetfilter.json)、生成先は `internal/iaas/packetfilterapi/` です。`Expression` はルールの複雑な配列なので、各ルールを個別の CLI フラグにはせず、`--expressions` に JSON 配列を直接または `@path.json` で渡せる入力変換 callback を接続します。`--request` の完全な JSON 入力も維持し、両経路は併用できません。更新時の `OriginalExpressionHash` は読み取り結果の `ExpressionHash` を受け取るスカラー値です。単一ゾーンは共通処理で検証し、ID や更新内容の検証は SDK と API に委ねます。ライブ E2E はフィルタの作成・ルール更新・削除を確認しますが、NIC への適用と通信の許可／拒否は行いません。
 
 PacketFilter のライブ E2E は、選択中プロファイルが指すプロジェクトの `is1b` を使います。実行前に対象と変更内容の承認を得て、次のコマンドを実行します。
 

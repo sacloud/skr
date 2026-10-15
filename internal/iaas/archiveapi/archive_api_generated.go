@@ -11,6 +11,7 @@ import (
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	archive "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
+	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
 type Commands struct {
@@ -41,10 +42,10 @@ func NewCommands(runtime Runtime, factory APIFactory) Commands {
 }
 
 type FindCommand struct {
-	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: OSType は --os-type で指定できます。Names (名前の文字列配列)、Tags (文字列配列)、Scope、Sort は JSON で指定できます。OSType と Names または Tags を同時に指定するとエラーになります。Count と From は個別フラグです。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Names\\\":[\\\"ARCHIVE-NAME\\\"]}'。ZONE と名前は実際の値に置き換えます。\""
+	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: OSType は --os-type で指定できます。Names (名前の文字列配列)、Tags (文字列配列)、Scope、Sort は JSON で指定できます。OSType の検索条件は Names または Tags の指定で対応する条件が上書きされます。Count と From は個別フラグです。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Names\\\":[\\\"ARCHIVE-NAME\\\"]}'。ZONE と名前は実際の値に置き換えます。\""
 	Zone    *string   "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone is1b\""
-	OSType  *string   "name:\"os-type\" help:\"任意: 公開アーカイブの OS 種別。例: ubuntu2404、debian12、almalinux9。Names または Tags とは併用できません。\""
-	Tags    *[]string "name:\"tags\" help:\"任意: タグで検索します。カンマ区切りで指定します。API の Tags フィールドに対応します。--os-type とは併用できません。\" sep:\",\""
+	OSType  *string   "name:\"os-type\" help:\"任意: 公開アーカイブの OS 種別。例: ubuntu2404、debian12、almalinux9。Names または Tags を併用すると対応する検索条件が上書きされます。\""
+	Tags    *[]string "name:\"tags\" help:\"任意: タグで検索します。カンマ区切りで指定します。API の Tags フィールドに対応します。--os-type を併用すると OS 種別のタグ条件を上書きします。\" sep:\",\""
 	Count   *int      "name:\"count\" help:\"任意: 取得件数 (整数)。\""
 	From    *int      "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
 	factory APIFactory
@@ -92,6 +93,9 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		if c.From != nil {
 			request.From = *c.From
 		}
+	}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
 	}
 	if err := ValidateFindRequest(request); err != nil {
 		return err
@@ -160,7 +164,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 			request.ID = value
 		}
 	}
-	if err := ValidateReadRequest(request); err != nil {
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {

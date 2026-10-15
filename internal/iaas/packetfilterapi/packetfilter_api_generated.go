@@ -11,6 +11,7 @@ import (
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	packetfilter "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
+	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
 type Commands struct {
@@ -96,7 +97,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 			request.From = *c.From
 		}
 	}
-	if err := ValidateFindRequest(request); err != nil {
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -163,7 +164,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 			request.ID = value
 		}
 	}
-	if err := ValidateReadRequest(request); err != nil {
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -242,7 +243,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	}
-	if err := ValidateCreateRequest(request); err != nil {
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -269,7 +270,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request                *string  "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID、変更する項目を1つ以上。Name、Description は個別フラグまたは JSON で指定できます。Expression はルール配列で、個別フラグ経路では --expressions に JSON 配列を直接、または @path.json で指定できます。Expression を更新する場合は OriginalExpressionHash (文字列) に read で得た ExpressionHash を必ず指定してください。JSON または --original-expression-hash で指定します。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"updated\\\"}'。ID は実際の値に置き換えます。\""
+	Request                *string  "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。変更する項目は Name、Description を個別フラグまたは JSON で指定できます。Expression はルール配列で、個別フラグ経路では --expressions に JSON 配列を直接、または @path.json で指定できます。Expression を更新する場合は OriginalExpressionHash (文字列) に read で得た ExpressionHash を必ず指定してください。JSON または --original-expression-hash で指定します。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"updated\\\"}'。ID は実際の値に置き換えます。\""
 	Zone                   *string  "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID                     *int64   "name:\"id\" help:\"必須: 更新対象の ID (数値)。\""
 	Name                   *string  "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
@@ -332,7 +333,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	}
-	if err := ValidateUpdateRequest(request); err != nil {
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -419,7 +420,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 			request.WaitForReleaseTick = *c.WaitForReleaseTick
 		}
 	}
-	if err := ValidateDeleteRequest(request); err != nil {
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
 	if c.factory == nil {

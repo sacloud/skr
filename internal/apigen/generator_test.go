@@ -155,6 +155,81 @@ func TestGenerateHandwrittenRequestValidator(t *testing.T) {
 	}
 }
 
+func TestGenerateZoneValidation(t *testing.T) {
+	config := Config{
+		Package: "exampleapi", Resource: "Example",
+		CommandType: "Commands", APIType: "API", FactoryType: "APIFactory", RuntimeType: "Runtime",
+		Operations: []Operation{{
+			Name: "Create", CommandType: "CreateCommand", Help: "作成します。",
+			Method: "Create", RequestType: "CreateRequest", ValidateZone: true,
+			RequestValidator: "ValidateCreateRequest", RequestTransform: "TransformCreateRequest",
+			Flags: []Flag{{Name: "zone", Field: "Zone", Type: "string", Help: "対象ゾーンです。"}},
+		}},
+	}
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(source)
+	if !strings.Contains(text, `zones "github.com/sacloud/skr/internal/iaas/zones"`) {
+		t.Fatal("shared zone validator import is missing")
+	}
+	zoneValidation := strings.Index(text, "if err := zones.ValidateSingleZone(request.Zone); err != nil")
+	transform := strings.Index(text, "if err := c.runtime.TransformCreateRequest(c, request); err != nil")
+	validator := strings.Index(text, "if err := ValidateCreateRequest(request); err != nil")
+	factory := strings.Index(text, "op, err := c.factory(")
+	if zoneValidation < 0 || transform < 0 || validator < 0 || factory < 0 ||
+		!(transform < zoneValidation && zoneValidation < validator && validator < factory) {
+		t.Fatal("zone validation must follow request construction and precede domain validation and API setup")
+	}
+	second, err := Generate(config)
+	if err != nil || string(second) != text {
+		t.Fatalf("second Generate() is not deterministic: %v", err)
+	}
+	config.Operations[0].ValidateZone = false
+	source, err = Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(source), "zones") {
+		t.Fatal("disabled zone validation added an import or validation call")
+	}
+}
+
+func TestValidateZoneSetting(t *testing.T) {
+	base := `{"package":"exampleapi","resource":"Example","command_type":"Commands","api_type":"API","factory_type":"APIFactory","runtime_type":"Runtime","operations":[{"name":"Find","command_type":"FindCommand","help":"検索します。","method":"Find","request_type":"FindRequest","validate_zone":true}]}`
+	for _, test := range []struct {
+		name   string
+		change func(*Config)
+		want   string
+	}{
+		{name: "valid"},
+		{name: "no request", change: func(c *Config) { c.Operations[0].RequestType = "" }, want: "requires a generated request operation"},
+		{name: "handwritten", change: func(c *Config) { c.Operations[0].Handwritten = true }, want: "requires a generated request operation"},
+		{name: "import collision", change: func(c *Config) { c.Imports = map[string]string{"zones": "example.test/zones"} }, want: "reserved import alias"},
+		{name: "validator collision", change: func(c *Config) { c.Operations[0].RequestValidator = "zones" }, want: "conflicts with an import alias"},
+		{name: "type collision", change: func(c *Config) { c.Operations[0].CommandType = "zones" }, want: "conflicts with an import alias"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config, err := DecodeConfig([]byte(base))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.change != nil {
+				test.change(&config)
+			}
+			err = config.Validate()
+			if test.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Validate() error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestGenerateOptionalRequest(t *testing.T) {
 	config := Config{
 		Package:     "exampleapi",

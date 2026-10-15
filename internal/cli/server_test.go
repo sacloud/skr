@@ -260,7 +260,6 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 		{"create", "--zone", "test-zone", "--name", "server", "--cpu", "1", "--memory-gb", "1", "--disk", "archive-id=123"},
 		{"create", "--zone", "test-zone", "--name", "server", "--cpu", "1", "--memory-gb", "1", "--disk", "archive-id=123,plan-id=7,size-gb=20", "--boot-after-create"},
 		{"boot", "--zone", "test-zone", "--id", "123", "--user-data", "inline-user-data"},
-		{"update", "--zone", "test-zone", "--id", "123"},
 		{"delete", "--zone", "all", "--id", "123"},
 	} {
 		var stdout, stderr bytes.Buffer
@@ -277,13 +276,14 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 	}
 }
 
-func TestIaaSServerRejectsNoWaitWithBootAfterCreateBeforeCreatingAPIClient(t *testing.T) {
+func TestIaaSServerPassesNoWaitWithBootAfterCreateToSDK(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	factoryCalled := false
 	commandLine := newCLI()
+	api := &serverAPITestDouble{}
 	setServerAPIFactory(commandLine, func() (serverapi.API, error) {
 		factoryCalled = true
-		return &serverAPITestDouble{}, nil
+		return api, nil
 	})
 	code := runCLI(
 		[]string{"iaas-api", "server", "create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1,"NoWait":true,"BootAfterCreate":true}`},
@@ -291,11 +291,11 @@ func TestIaaSServerRejectsNoWaitWithBootAfterCreateBeforeCreatingAPIClient(t *te
 		&stderr,
 		commandLine,
 	)
-	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "NoWait=true と BootAfterCreate=true は併用できません") {
-		t.Fatalf("create: code %d, stdout %q, stderr %q; want conflict error before API client creation", code, stdout.String(), stderr.String())
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("create: code %d, stdout %q, stderr %q; want request forwarded", code, stdout.String(), stderr.String())
 	}
-	if factoryCalled {
-		t.Fatal("API client factory was called for an invalid request")
+	if !factoryCalled || api.createRequest == nil || !api.createRequest.NoWait || !api.createRequest.BootAfterCreate {
+		t.Fatalf("request was not forwarded unchanged: %+v", api.createRequest)
 	}
 }
 

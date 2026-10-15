@@ -166,9 +166,6 @@ func TestPacketFilterRejectsInvalidRequestsBeforeFactory(t *testing.T) {
 		{args: []string{"find", "--zone", "all"}},
 		{args: []string{"find", "--request", `{"Zone":"all"}`}},
 		{args: []string{"create", "--zone", "all", "--name", "filter"}},
-		{args: []string{"update", "--zone", "test-zone", "--id", "123"}},
-		{args: []string{"update", "--zone", "test-zone", "--id", "123", "--expressions", `[]`}},
-		{args: []string{"update", "--request", `{"Zone":"test-zone","ID":123}`}},
 		{args: []string{"create", "--request", `{"Zone":"test-zone","Name":"filter"}`, "--expressions", `[]`}},
 	} {
 		t.Run(strings.Join(test.args, "_"), func(t *testing.T) {

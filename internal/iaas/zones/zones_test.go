@@ -15,24 +15,24 @@
 package zones
 
 import (
-	"strings"
 	"testing"
 )
 
 func TestValidateSingleZone(t *testing.T) {
 	for _, test := range []struct {
 		zone      string
-		wantError bool
+		wantError string
 	}{
+		{zone: "", wantError: "Zone が必要です (--request JSON も指定できます)"},
 		{zone: "tk1v"},
 		{zone: "is1b"},
-		{zone: "all", wantError: true},
+		{zone: "all", wantError: `Zone に "all" は指定できません。検索対象のゾーン名を指定してください`},
 	} {
 		t.Run(test.zone, func(t *testing.T) {
 			err := ValidateSingleZone(test.zone)
-			if test.wantError {
-				if err == nil || !strings.Contains(err.Error(), `Zone に "all"`) {
-					t.Fatalf("ValidateSingleZone(%q) error = %v, want retired all-zones error", test.zone, err)
+			if test.wantError != "" {
+				if err == nil || err.Error() != test.wantError {
+					t.Fatalf("ValidateSingleZone(%q) error = %v, want %q", test.zone, err, test.wantError)
 				}
 				return
 			}
