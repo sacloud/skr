@@ -74,11 +74,12 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 						}, func() (serverapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Switch = switchapi.NewCommands(switchapi.Runtime{DecodeRequest: decodeRequest}, func() (switchapi.API, error) { return nil, factoryError() })
 						args := []string{"iaas-api", commandName, strings.ToLower(operation.Name)}
-						if input == "missing Zone JSON" {
+						switch input {
+						case "missing Zone JSON":
 							args = append(args, "--request", `{}`)
-						} else if input == "JSON" {
+						case "JSON":
 							args = append(args, "--request", `{"Zone":"`+zone+`"}`)
-						} else {
+						default:
 							args = append(args, "--zone", zone)
 							for _, flag := range operation.Flags {
 								if !flag.Required || flag.Name == "zone" {
