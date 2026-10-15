@@ -369,6 +369,9 @@ func (c Config) Validate() error {
 		commandTypes[name] = true
 	}
 	runtimeFields := map[string]bool{"DecodeRequest": true, "ValidateOutput": true, "WriteOutput": true}
+	requestValidatorReservedNames := map[string]bool{
+		"c": true, "ctx": true, "flagsSet": true, "request": true,
+	}
 	requestValidators := make(map[string]string)
 	for i, operation := range c.Operations {
 		if !token.IsIdentifier(operation.Name) || token.Lookup(operation.Name).IsKeyword() {
@@ -412,6 +415,9 @@ func (c Config) Validate() error {
 			return fmt.Errorf("operation %q request_validator requires a request_type", operation.Name)
 		}
 		if operation.RequestValidator != "" {
+			if requestValidatorReservedNames[operation.RequestValidator] {
+				return fmt.Errorf("request_validator %q conflicts with a generated local name", operation.RequestValidator)
+			}
 			if aliases[operation.RequestValidator] {
 				return fmt.Errorf("request_validator %q conflicts with an import alias", operation.RequestValidator)
 			}

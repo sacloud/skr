@@ -495,6 +495,18 @@ func TestValidateRequestTransform(t *testing.T) {
 		{"request validator transform collision", func(c *Config) {
 			c.Operations[0].RequestValidator = "TransformCreateRequest"
 		}, "conflicts with a generated Runtime field"},
+		{"request validator c collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "c"
+		}, "conflicts with a generated local name"},
+		{"request validator ctx collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "ctx"
+		}, "conflicts with a generated local name"},
+		{"request validator flagsSet collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "flagsSet"
+		}, "conflicts with a generated local name"},
+		{"request validator request collision", func(c *Config) {
+			c.Operations[0].RequestValidator = "request"
+		}, "conflicts with a generated local name"},
 		{"validator reused for different request types", func(c *Config) {
 			op := c.Operations[0]
 			op.Name, op.CommandType, op.Method, op.RequestType, op.RequestTransform, op.RepeatedFlags =
