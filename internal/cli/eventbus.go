@@ -17,31 +17,25 @@ package cli
 import "github.com/sacloud/skr/internal/eventbusapi"
 
 func (c *cli) initEventbusAPI() {
-	processConfigurationRuntime := eventbusapi.ProcessConfigurationRuntime{
+	c.EventbusAPI.ProcessConfiguration = eventbusapi.NewProcessConfigurationCommands(eventbusapi.ProcessConfigurationRuntime{
 		DecodeRequest:  eventbusapi.DecodeRequest,
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
-	}
-	scheduleRuntime := eventbusapi.ScheduleRuntime{
-		DecodeRequest:  eventbusapi.DecodeRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}
-	triggerRuntime := eventbusapi.TriggerRuntime{
-		DecodeRequest:  eventbusapi.DecodeRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}
-	c.EventbusAPI.ProcessConfiguration.SetRuntime(processConfigurationRuntime)
-	c.EventbusAPI.ProcessConfiguration.SetFactory(func() (eventbusapi.ProcessConfigurationAPI, error) {
+	}, func() (eventbusapi.ProcessConfigurationAPI, error) {
 		return eventbusapi.NewProcessConfigurationAPI(c.Trace)
 	})
-	c.EventbusAPI.Schedule.SetRuntime(scheduleRuntime)
-	c.EventbusAPI.Schedule.SetFactory(func() (eventbusapi.ScheduleAPI, error) {
+	c.EventbusAPI.Schedule = eventbusapi.NewScheduleCommands(eventbusapi.ScheduleRuntime{
+		DecodeRequest:  eventbusapi.DecodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
+	}, func() (eventbusapi.ScheduleAPI, error) {
 		return eventbusapi.NewScheduleAPI(c.Trace)
 	})
-	c.EventbusAPI.Trigger.SetRuntime(triggerRuntime)
-	c.EventbusAPI.Trigger.SetFactory(func() (eventbusapi.TriggerAPI, error) {
+	c.EventbusAPI.Trigger = eventbusapi.NewTriggerCommands(eventbusapi.TriggerRuntime{
+		DecodeRequest:  eventbusapi.DecodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
+	}, func() (eventbusapi.TriggerAPI, error) {
 		return eventbusapi.NewTriggerAPI(c.Trace)
 	})
 }

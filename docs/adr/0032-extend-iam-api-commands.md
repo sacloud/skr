@@ -14,7 +14,7 @@ IAM の利用者がこれらの操作も CLI から実行できるようにし�
 - `skr iam-api` に SDK の残り 13 API 群を追加します。
 - 対象には `auth`、`folder`、`iam-role`、`id-policy`、`id-role`、`organization`、`project` を含めます。
 - `project-api-key`、`scim`、`service-policy`、`service-principal`、`sso`、`user-2fa` も追加します。
-- SDK の公開操作とリクエスト型を確認し、各 API 群の操作範囲、CLI 引数、説明を `api/commands/iam-*.json` に明示して `cmd/apigen-api` から生成します。CLI 登録、Runtime、SDK factory は `internal/cli` と `internal/iamapi` で接続します。
+- SDK の公開操作とリクエスト型を確認し、各 API 群の操作範囲、CLI 引数、説明を `api/commands/iam-*.json` に明示して `cmd/apigen-api` から生成します。CLI 登録、Runtime、SDK factory は `internal/cli` と `internal/iamapi` で接続し、コマンド群への依存注入は constructor で一括して行います。
 - サービスプリンシパルの公開鍵とアサーションは通常の引数やインライン JSON に含めず、ファイルまたは標準入力から読み込む手書きコマンドにします。シークレットを含む API 応答を使う場合は、利用者が出力を安全に保存できるヘルプとチュートリアルを用意します。
 - `folder move` と `project move` は対象 ID のリストと移動先フォルダを必須指定にし、SDK の移動操作を利用します。
 - IAM のライブ E2E は、選択中プロファイルの表示後にランダムな識別子でユーザー、グループ、フォルダ、プロジェクト、サービスプリンシパルを作成し、読み取り・更新・所属・メールアドレス操作を確認して、依存関係の逆順で削除します。名前の衝突やリソース識別の不一致を検出した場合は既存リソースを変更せず停止します。

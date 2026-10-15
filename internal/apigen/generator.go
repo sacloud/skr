@@ -140,16 +140,13 @@ type {{.RuntimeType}} struct {
 {{- end }}
 }
 
-func (c *{{.CommandType}}) SetRuntime(runtime {{.RuntimeType}}) {
+func New{{.CommandType}}(runtime {{.RuntimeType}}, factory {{.FactoryType}}) {{.CommandType}} {
+	var commands {{.CommandType}}
 {{- range .Operations }}
-	c.{{.Name}}.runtime = runtime
+	commands.{{.Name}}.runtime = runtime
+	commands.{{.Name}}.factory = factory
 {{- end }}
-}
-
-func (c *{{.CommandType}}) SetFactory(factory {{.FactoryType}}) {
-{{- range .Operations }}
-	c.{{.Name}}.factory = factory
-{{- end }}
+	return commands
 }
 
 {{range .Operations}}

@@ -29,14 +29,13 @@ type IDPolicyRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *IDPolicyCommands) SetRuntime(runtime IDPolicyRuntime) {
-	c.ReadOrganization.runtime = runtime
-	c.UpdateOrganization.runtime = runtime
-}
-
-func (c *IDPolicyCommands) SetFactory(factory IDPolicyAPIFactory) {
-	c.ReadOrganization.factory = factory
-	c.UpdateOrganization.factory = factory
+func NewIDPolicyCommands(runtime IDPolicyRuntime, factory IDPolicyAPIFactory) IDPolicyCommands {
+	var commands IDPolicyCommands
+	commands.ReadOrganization.runtime = runtime
+	commands.ReadOrganization.factory = factory
+	commands.UpdateOrganization.runtime = runtime
+	commands.UpdateOrganization.factory = factory
+	return commands
 }
 
 type IDPolicyReadOrganizationCommand struct {

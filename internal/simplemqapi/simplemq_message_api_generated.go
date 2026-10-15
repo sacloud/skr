@@ -33,18 +33,17 @@ type MessageRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *MessageCommands) SetRuntime(runtime MessageRuntime) {
-	c.Send.runtime = runtime
-	c.Receive.runtime = runtime
-	c.ExtendTimeout.runtime = runtime
-	c.Delete.runtime = runtime
-}
-
-func (c *MessageCommands) SetFactory(factory MessageAPIFactory) {
-	c.Send.factory = factory
-	c.Receive.factory = factory
-	c.ExtendTimeout.factory = factory
-	c.Delete.factory = factory
+func NewMessageCommands(runtime MessageRuntime, factory MessageAPIFactory) MessageCommands {
+	var commands MessageCommands
+	commands.Send.runtime = runtime
+	commands.Send.factory = factory
+	commands.Receive.runtime = runtime
+	commands.Receive.factory = factory
+	commands.ExtendTimeout.runtime = runtime
+	commands.ExtendTimeout.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	return commands
 }
 
 type MessageSendCommand struct {

@@ -17,19 +17,17 @@ package cli
 import "github.com/sacloud/skr/internal/simplemqapi"
 
 func (c *cli) initSimpleMQAPI() {
-	c.SimpleMQAPI.Queue.SetRuntime(simplemqapi.QueueRuntime{
+	c.SimpleMQAPI.Queue = simplemqapi.NewQueueCommands(simplemqapi.QueueRuntime{
 		DecodeRequest:  decodeRequest,
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
-	})
-	c.SimpleMQAPI.Queue.SetFactory(func() (simplemqapi.QueueAPI, error) {
+	}, func() (simplemqapi.QueueAPI, error) {
 		return simplemqapi.NewQueueAPI(c.Trace)
 	})
-	c.SimpleMQAPI.Message.SetRuntime(simplemqapi.MessageRuntime{
+	c.SimpleMQAPI.Message = simplemqapi.NewMessageCommands(simplemqapi.MessageRuntime{
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
-	})
-	c.SimpleMQAPI.Message.SetFactory(func(queueName, apiKeyFile string) (simplemqapi.MessageAPI, error) {
+	}, func(queueName, apiKeyFile string) (simplemqapi.MessageAPI, error) {
 		return simplemqapi.NewMessageAPI(queueName, apiKeyFile, c.Trace)
 	})
 }

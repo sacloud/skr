@@ -40,24 +40,23 @@ type SSORuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *SSOCommands) SetRuntime(runtime SSORuntime) {
-	c.List.runtime = runtime
-	c.Create.runtime = runtime
-	c.Read.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-	c.Link.runtime = runtime
-	c.Unlink.runtime = runtime
-}
-
-func (c *SSOCommands) SetFactory(factory SSOAPIFactory) {
-	c.List.factory = factory
-	c.Create.factory = factory
-	c.Read.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
-	c.Link.factory = factory
-	c.Unlink.factory = factory
+func NewSSOCommands(runtime SSORuntime, factory SSOAPIFactory) SSOCommands {
+	var commands SSOCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	commands.Link.runtime = runtime
+	commands.Link.factory = factory
+	commands.Unlink.runtime = runtime
+	commands.Unlink.factory = factory
+	return commands
 }
 
 type SSOListCommand struct {

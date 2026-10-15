@@ -33,7 +33,7 @@ func TestOutputFlagIsRejectedBeforeAPICall(t *testing.T) {
 		for _, query := range []bool{false, true} {
 			t.Run(format+map[bool]string{false: "", true: "-query"}[query], func(t *testing.T) {
 				commandLine := newCLI()
-				commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
+				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) {
 					t.Fatal("API factory called for unsupported --output")
 					return nil, nil
 				})
@@ -75,7 +75,7 @@ func TestJSONOutputIgnoresLegacyProfileFormat(t *testing.T) {
 			runCommand := func(args ...string) []byte {
 				t.Helper()
 				commandLine := newCLI()
-				commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) { return swytch.New(server), nil })
+				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return swytch.New(server), nil })
 				var stdout, stderr bytes.Buffer
 				if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
 					t.Fatalf("run(%v): code %d, stderr %s", args, code, stderr.String())
@@ -105,7 +105,7 @@ func TestQueryErrorsBeforeAPICall(t *testing.T) {
 	for _, expression := range []string{"(", "unknown_function"} {
 		t.Run(expression, func(t *testing.T) {
 			commandLine := newCLI()
-			commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
+			setSwitchAPIFactory(commandLine, func() (switchapi.API, error) {
 				t.Fatal("API factory called with invalid query")
 				return nil, nil
 			})

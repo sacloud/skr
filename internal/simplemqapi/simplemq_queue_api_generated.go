@@ -41,26 +41,25 @@ type QueueRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *QueueCommands) SetRuntime(runtime QueueRuntime) {
-	c.List.runtime = runtime
-	c.Read.runtime = runtime
-	c.Create.runtime = runtime
-	c.Config.runtime = runtime
-	c.Delete.runtime = runtime
-	c.CountMessages.runtime = runtime
-	c.RotateAPIKey.runtime = runtime
-	c.ClearMessages.runtime = runtime
-}
-
-func (c *QueueCommands) SetFactory(factory QueueAPIFactory) {
-	c.List.factory = factory
-	c.Read.factory = factory
-	c.Create.factory = factory
-	c.Config.factory = factory
-	c.Delete.factory = factory
-	c.CountMessages.factory = factory
-	c.RotateAPIKey.factory = factory
-	c.ClearMessages.factory = factory
+func NewQueueCommands(runtime QueueRuntime, factory QueueAPIFactory) QueueCommands {
+	var commands QueueCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Config.runtime = runtime
+	commands.Config.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	commands.CountMessages.runtime = runtime
+	commands.CountMessages.factory = factory
+	commands.RotateAPIKey.runtime = runtime
+	commands.RotateAPIKey.factory = factory
+	commands.ClearMessages.runtime = runtime
+	commands.ClearMessages.factory = factory
+	return commands
 }
 
 type QueueListCommand struct {

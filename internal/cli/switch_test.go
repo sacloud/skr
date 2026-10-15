@@ -117,7 +117,7 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
+		setSwitchAPIFactory(commandLine, func() (switchapi.API, error) {
 			return swytch.New(server), nil
 		})
 		if exitCode := runCLI(args, &stdout, &stderr, commandLine); exitCode != 0 {
@@ -223,7 +223,7 @@ func TestGeneratedFindRejectsInvalidZoneBeforeCallingAPI(t *testing.T) {
 			api := &switchFindRecordAPI{}
 			factoryCalled := false
 			commandLine := newCLI()
-			commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
+			setSwitchAPIFactory(commandLine, func() (switchapi.API, error) {
 				factoryCalled = true
 				return api, nil
 			})
@@ -249,7 +249,7 @@ func TestSwitchFlagInputs(t *testing.T) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) { return swytch.New(server), nil })
+		setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return swytch.New(server), nil })
 		code := runCLI(append([]string{"iaas-api", "switch"}, args...), &stdout, &stderr, commandLine)
 		return stdout.Bytes(), stderr.String(), code
 	}

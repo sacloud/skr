@@ -38,22 +38,21 @@ type ProjectRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *ProjectCommands) SetRuntime(runtime ProjectRuntime) {
-	c.List.runtime = runtime
-	c.Create.runtime = runtime
-	c.Read.runtime = runtime
-	c.Update.runtime = runtime
-	c.Move.runtime = runtime
-	c.Delete.runtime = runtime
-}
-
-func (c *ProjectCommands) SetFactory(factory ProjectAPIFactory) {
-	c.List.factory = factory
-	c.Create.factory = factory
-	c.Read.factory = factory
-	c.Update.factory = factory
-	c.Move.factory = factory
-	c.Delete.factory = factory
+func NewProjectCommands(runtime ProjectRuntime, factory ProjectAPIFactory) ProjectCommands {
+	var commands ProjectCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Move.runtime = runtime
+	commands.Move.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	return commands
 }
 
 type ProjectListCommand struct {

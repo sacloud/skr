@@ -37,22 +37,21 @@ type PolicyRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *PolicyCommands) SetRuntime(runtime PolicyRuntime) {
-	c.ReadOrganization.runtime = runtime
-	c.UpdateOrganization.runtime = runtime
-	c.ReadProject.runtime = runtime
-	c.UpdateProject.runtime = runtime
-	c.ReadFolder.runtime = runtime
-	c.UpdateFolder.runtime = runtime
-}
-
-func (c *PolicyCommands) SetFactory(factory PolicyAPIFactory) {
-	c.ReadOrganization.factory = factory
-	c.UpdateOrganization.factory = factory
-	c.ReadProject.factory = factory
-	c.UpdateProject.factory = factory
-	c.ReadFolder.factory = factory
-	c.UpdateFolder.factory = factory
+func NewPolicyCommands(runtime PolicyRuntime, factory PolicyAPIFactory) PolicyCommands {
+	var commands PolicyCommands
+	commands.ReadOrganization.runtime = runtime
+	commands.ReadOrganization.factory = factory
+	commands.UpdateOrganization.runtime = runtime
+	commands.UpdateOrganization.factory = factory
+	commands.ReadProject.runtime = runtime
+	commands.ReadProject.factory = factory
+	commands.UpdateProject.runtime = runtime
+	commands.UpdateProject.factory = factory
+	commands.ReadFolder.runtime = runtime
+	commands.ReadFolder.factory = factory
+	commands.UpdateFolder.runtime = runtime
+	commands.UpdateFolder.factory = factory
+	return commands
 }
 
 type PolicyReadOrganizationCommand struct {

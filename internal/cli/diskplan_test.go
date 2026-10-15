@@ -81,7 +81,7 @@ func TestIaaSDiskPlanCommandsUseSDKRequests(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	api := &diskPlanAPITestDouble{}
 	commandLine := newCLI()
-	commandLine.IaaSAPI.DiskPlan.SetFactory(func() (diskplanapi.API, error) { return api, nil })
+	setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return api, nil })
 	run := func(args ...string) (string, string, int) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
@@ -151,7 +151,7 @@ func TestIaaSDiskPlanRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 	} {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.DiskPlan.SetFactory(func() (diskplanapi.API, error) { return api, nil })
+		setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "disk-plan"}, args...), &stdout, &stderr, commandLine)
 		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
 			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
@@ -165,7 +165,7 @@ func TestIaaSDiskPlanRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 func TestIaaSDiskPlanJSONUnknownFieldsAndTrailingValues(t *testing.T) {
 	api := &diskPlanAPITestDouble{}
 	commandLine := newCLI()
-	commandLine.IaaSAPI.DiskPlan.SetFactory(func() (diskplanapi.API, error) { return api, nil })
+	setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return api, nil })
 
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "disk-plan", "find", "--request", `{"Zone":"test-zone","Unknown":"ignored"}`}, &stdout, &stderr, commandLine)
@@ -184,7 +184,7 @@ func TestIaaSDiskPlanJSONUnknownFieldsAndTrailingValues(t *testing.T) {
 func TestIaaSDiskPlanPropagatesAPIErrors(t *testing.T) {
 	api := &diskPlanAPITestDouble{findErr: errors.New("disk plan API failure")}
 	commandLine := newCLI()
-	commandLine.IaaSAPI.DiskPlan.SetFactory(func() (diskplanapi.API, error) { return api, nil })
+	setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return api, nil })
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "disk-plan", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
 	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "disk plan API failure") {

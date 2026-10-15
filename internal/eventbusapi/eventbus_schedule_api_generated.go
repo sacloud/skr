@@ -35,20 +35,19 @@ type ScheduleRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *ScheduleCommands) SetRuntime(runtime ScheduleRuntime) {
-	c.List.runtime = runtime
-	c.Read.runtime = runtime
-	c.Create.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-}
-
-func (c *ScheduleCommands) SetFactory(factory ScheduleAPIFactory) {
-	c.List.factory = factory
-	c.Read.factory = factory
-	c.Create.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
+func NewScheduleCommands(runtime ScheduleRuntime, factory ScheduleAPIFactory) ScheduleCommands {
+	var commands ScheduleCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	return commands
 }
 
 type ScheduleListCommand struct {

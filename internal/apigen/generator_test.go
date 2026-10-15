@@ -99,7 +99,8 @@ func TestGenerate(t *testing.T) {
 		"return op.DeleteWithContext(context.Background(), request)",
 		"if err := ValidateDeleteRequest(request); err != nil",
 		"switchFindCommand",
-		"c.Find.runtime = runtime",
+		"commands.Find.runtime = runtime",
+		"commands.Find.factory = factory",
 		"op.SearchWithContext(context.Background(), request)",
 	} {
 		if !strings.Contains(string(source), want) {
@@ -307,6 +308,7 @@ func TestGenerateFactoryArgumentsAndNamedMethodArguments(t *testing.T) {
 	}
 	for _, want := range []string{
 		"type APIFactory func(QueueName string, APIKeyFile string) (API, error)",
+		"func NewCommands(runtime Runtime, factory APIFactory) Commands",
 		`name:\"queue-name\" help:\"対象キュー名。\" required:\"\"`,
 		`name:\"content\" help:\"本文。\" required:\"\"`,
 		"op.Send(context.Background(), c.Content)",
@@ -315,6 +317,9 @@ func TestGenerateFactoryArgumentsAndNamedMethodArguments(t *testing.T) {
 		if !strings.Contains(string(source), want) {
 			t.Errorf("generated source does not contain %q", want)
 		}
+	}
+	if strings.Contains(string(source), ".SetRuntime(") || strings.Contains(string(source), ".SetFactory(") {
+		t.Fatal("generated source contains dependency setters")
 	}
 }
 

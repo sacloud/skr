@@ -29,14 +29,13 @@ type IAMRoleRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *IAMRoleCommands) SetRuntime(runtime IAMRoleRuntime) {
-	c.List.runtime = runtime
-	c.Read.runtime = runtime
-}
-
-func (c *IAMRoleCommands) SetFactory(factory IAMRoleAPIFactory) {
-	c.List.factory = factory
-	c.Read.factory = factory
+func NewIAMRoleCommands(runtime IAMRoleRuntime, factory IAMRoleAPIFactory) IAMRoleCommands {
+	var commands IAMRoleCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	return commands
 }
 
 type IAMRoleListCommand struct {

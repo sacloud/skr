@@ -35,20 +35,19 @@ type TriggerRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *TriggerCommands) SetRuntime(runtime TriggerRuntime) {
-	c.List.runtime = runtime
-	c.Read.runtime = runtime
-	c.Create.runtime = runtime
-	c.Update.runtime = runtime
-	c.Delete.runtime = runtime
-}
-
-func (c *TriggerCommands) SetFactory(factory TriggerAPIFactory) {
-	c.List.factory = factory
-	c.Read.factory = factory
-	c.Create.factory = factory
-	c.Update.factory = factory
-	c.Delete.factory = factory
+func NewTriggerCommands(runtime TriggerRuntime, factory TriggerAPIFactory) TriggerCommands {
+	var commands TriggerCommands
+	commands.List.runtime = runtime
+	commands.List.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Create.runtime = runtime
+	commands.Create.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.Delete.runtime = runtime
+	commands.Delete.factory = factory
+	return commands
 }
 
 type TriggerListCommand struct {

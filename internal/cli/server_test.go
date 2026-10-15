@@ -96,7 +96,7 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) { return api, nil })
+		setServerAPIFactory(commandLine, func() (serverapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "server"}, args...), &stdout, &stderr, commandLine)
 		return stdout.String(), stderr.String(), code
 	}
@@ -265,7 +265,7 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 	} {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		commandLine.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) { return api, nil })
+		setServerAPIFactory(commandLine, func() (serverapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "server"}, args...), &stdout, &stderr, commandLine)
 		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
 			t.Errorf("%v: code %d stdout %q stderr %q; want an error before API call", args, code, stdout.String(), stderr.String())
@@ -281,7 +281,7 @@ func TestIaaSServerRejectsNoWaitWithBootAfterCreateBeforeCreatingAPIClient(t *te
 	var stdout, stderr bytes.Buffer
 	factoryCalled := false
 	commandLine := newCLI()
-	commandLine.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) {
+	setServerAPIFactory(commandLine, func() (serverapi.API, error) {
 		factoryCalled = true
 		return &serverAPITestDouble{}, nil
 	})
@@ -304,7 +304,7 @@ func TestIaaSServerFindUsesSDKCaller(t *testing.T) {
 	caller := &serverAPICaller{}
 	var stdout, stderr bytes.Buffer
 	commandLine := newCLI()
-	commandLine.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) {
+	setServerAPIFactory(commandLine, func() (serverapi.API, error) {
 		return server.New(caller), nil
 	})
 	code := runCLI([]string{"iaas-api", "server", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)

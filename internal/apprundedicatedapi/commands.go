@@ -54,15 +54,17 @@ type Runtime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *Commands) SetRuntime(runtime Runtime) {
-	c.Cluster.setRuntime(runtime)
-	c.Application.setRuntime(runtime)
-	c.Version.setRuntime(runtime)
-	c.AutoScalingGroup.setRuntime(runtime)
-	c.WorkerNode.setRuntime(runtime)
-	c.LoadBalancer.setRuntime(runtime)
-	c.Certificate.setRuntime(runtime)
-	c.ServiceClass.setRuntime(runtime)
+func NewCommands(runtime Runtime) Commands {
+	var commands Commands
+	commands.Cluster.setRuntime(runtime)
+	commands.Application.setRuntime(runtime)
+	commands.Version.setRuntime(runtime)
+	commands.AutoScalingGroup.setRuntime(runtime)
+	commands.WorkerNode.setRuntime(runtime)
+	commands.LoadBalancer.setRuntime(runtime)
+	commands.Certificate.setRuntime(runtime)
+	commands.ServiceClass.setRuntime(runtime)
+	return commands
 }
 
 func NewClient(trace bool) (*v1.Client, error) {

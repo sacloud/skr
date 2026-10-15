@@ -43,12 +43,11 @@ type iaasAPICommand struct {
 }
 
 func (c *cli) initIaaSAPI() {
-	c.IaaSAPI.Archive.SetRuntime(archiveapi.Runtime{
+	c.IaaSAPI.Archive = archiveapi.NewCommands(archiveapi.Runtime{
 		DecodeRequest:  decodeRequest,
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
-	})
-	c.IaaSAPI.Archive.SetFactory(func() (archiveapi.API, error) {
+	}, func() (archiveapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
@@ -56,12 +55,11 @@ func (c *cli) initIaaSAPI() {
 		return archiveSDK.New(client), nil
 	})
 
-	c.IaaSAPI.Zone.SetRuntime(zoneapi.Runtime{
+	c.IaaSAPI.Zone = zoneapi.NewCommands(zoneapi.Runtime{
 		DecodeRequest:  decodeRequest,
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
-	})
-	c.IaaSAPI.Zone.SetFactory(func() (zoneapi.API, error) {
+	}, func() (zoneapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
@@ -69,63 +67,56 @@ func (c *cli) initIaaSAPI() {
 		return zoneSDK.New(client), nil
 	})
 
-	c.IaaSAPI.Disk.SetRuntime(diskapi.Runtime{
+	c.IaaSAPI.Disk = diskapi.NewCommands(diskapi.Runtime{
 		DecodeRequest:  decodeRequest,
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
-	})
-	c.IaaSAPI.Disk.SetFactory(func() (diskapi.API, error) {
+	}, func() (diskapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
 		}
 		return diskSDK.New(client), nil
 	})
-	c.IaaSAPI.DiskPlan.SetRuntime(diskplanapi.Runtime{
-		DecodeRequest:  decodeRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	})
-	c.IaaSAPI.DiskPlan.SetFactory(func() (diskplanapi.API, error) {
+	c.IaaSAPI.DiskPlan = diskplanapi.NewCommands(diskplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (diskplanapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
 		}
 		return diskplanSDK.New(client), nil
 	})
-	c.IaaSAPI.PacketFilter.SetRuntime(packetfilterapi.Runtime{
+	c.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 		DecodeRequest:          decodeRequest,
 		ValidateOutput:         validateOutput,
 		WriteOutput:            writeOutput,
 		TransformCreateRequest: transformPacketFilterCreateRequest,
 		TransformUpdateRequest: transformPacketFilterUpdateRequest,
-	})
-	c.IaaSAPI.PacketFilter.SetFactory(func() (packetfilterapi.API, error) {
+	}, func() (packetfilterapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
 		}
 		return packetfilterSDK.New(client), nil
 	})
-	c.IaaSAPI.Switch.SetRuntime(switchapi.Runtime{
+	c.IaaSAPI.Switch = switchapi.NewCommands(switchapi.Runtime{
 		DecodeRequest:  decodeRequest,
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
-	})
-	c.IaaSAPI.Switch.SetFactory(func() (switchapi.API, error) {
+	}, func() (switchapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
 		}
 		return swytch.New(client), nil
 	})
-	c.IaaSAPI.Server.SetRuntime(serverapi.Runtime{
+	c.IaaSAPI.Server = serverapi.NewCommands(serverapi.Runtime{
 		DecodeRequest:          decodeRequest,
 		ValidateOutput:         validateOutput,
 		WriteOutput:            writeOutput,
 		TransformCreateRequest: serverapi.TransformCreateRequest,
-	})
-	c.IaaSAPI.Server.SetFactory(func() (serverapi.API, error) {
+	}, func() (serverapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err

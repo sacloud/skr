@@ -31,14 +31,13 @@ type Runtime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *Commands) SetRuntime(runtime Runtime) {
-	c.Find.runtime = runtime
-	c.Read.runtime = runtime
-}
-
-func (c *Commands) SetFactory(factory APIFactory) {
-	c.Find.factory = factory
-	c.Read.factory = factory
+func NewCommands(runtime Runtime, factory APIFactory) Commands {
+	var commands Commands
+	commands.Find.runtime = runtime
+	commands.Find.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	return commands
 }
 
 type FindCommand struct {

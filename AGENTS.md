@@ -38,7 +38,7 @@
 - 生成器では、コマンド、API、factory、Runtime、操作ごとの型を含む生成型名全体の衝突を設定検証で拒否してください。検証のテストに加え、再生成したコードのビルドと設定との一致を確認してください。
 - 生成された IaaS リソースコマンド、リソース固有の検証、手書きハンドラーは同じ `internal/iaas/<resource>api/` package に配置します。たとえば Switch 固有の処理は `internal/iaas/switchapi/` に置きます。複数リソースで共有するクライアントとゾーン名の検証は `internal/iaas/client/` と `internal/iaas/zones/` に配置します。
 - Ogen 系の非 IaaS API コマンドは `internal/<domain>api/` に配置します。SimpleMQ のように生成コマンドとドメイン固有の手書きハンドラーが混在する場合は、両方を同じドメインパッケージに置き、公開する Commands 型、API interface、factory、Runtime を通じて接続します。生成コードは設定から再生成し、直接編集しません。
-- `cmd/skr` の `package main` は `internal/cli` の CLI 実行関数を呼び出すエントリーポイントです。CLI の登録と Runtime callback／SDK factory の接続は `internal/cli` が担当し、生成パッケージから CLI の非公開処理へ依存させません。
+- `cmd/skr` の `package main` は `internal/cli` の CLI 実行関数を呼び出すエントリーポイントです。CLI の登録と Runtime callback／SDK factory の接続は `internal/cli` が担当し、生成パッケージから CLI の非公開処理へ依存させません。生成コマンド群の依存は `New...Commands(runtime, factory)` で一括注入し、setter による段階的な初期化は使いません。
 - ドメイン固有のコマンド実装と単体テストはドメインパッケージに置きます。CLI のコマンド構成、接続処理と CLI 全体の登録・実行を検証するテストは `internal/cli` に置きます。
 - 個別パッケージの単体テストは、検証対象のパッケージと同じディレクトリに配置します。
 - 手書きの入力処理やリクエスト検証には、同じパッケージで正常系とエラー系の単体テストを追加してください。CLI 全体のテストだけで代替せず、秘密情報のインライン入力拒否と非表示、ファイルや標準入力の読み込み失敗、型違い、必須項目、相互排他も対象にしてください。

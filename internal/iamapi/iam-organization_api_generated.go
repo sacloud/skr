@@ -34,18 +34,17 @@ type OrganizationRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func (c *OrganizationCommands) SetRuntime(runtime OrganizationRuntime) {
-	c.Read.runtime = runtime
-	c.Update.runtime = runtime
-	c.ReadServicePolicy.runtime = runtime
-	c.UpdateServicePolicy.runtime = runtime
-}
-
-func (c *OrganizationCommands) SetFactory(factory OrganizationAPIFactory) {
-	c.Read.factory = factory
-	c.Update.factory = factory
-	c.ReadServicePolicy.factory = factory
-	c.UpdateServicePolicy.factory = factory
+func NewOrganizationCommands(runtime OrganizationRuntime, factory OrganizationAPIFactory) OrganizationCommands {
+	var commands OrganizationCommands
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
+	commands.Update.runtime = runtime
+	commands.Update.factory = factory
+	commands.ReadServicePolicy.runtime = runtime
+	commands.ReadServicePolicy.factory = factory
+	commands.UpdateServicePolicy.runtime = runtime
+	commands.UpdateServicePolicy.factory = factory
+	return commands
 }
 
 type OrganizationReadCommand struct {

@@ -76,7 +76,7 @@ func TestIaaSZoneFindWithLocalMockAndQuery(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	commandLine := newCLI()
-	commandLine.IaaSAPI.Zone.SetFactory(func() (zoneapi.API, error) {
+	setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
 		return zone.New(server), nil
 	})
 	runCommand := func(args ...string) string {
