@@ -171,9 +171,6 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
-	if err := ValidateReadRequest(request); err != nil {
-		return err
-	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
@@ -265,9 +262,6 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 		}
 	}
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
-		return err
-	}
-	if err := ValidateCreateRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -369,9 +363,6 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
-	if err := ValidateUpdateRequest(request); err != nil {
-		return err
-	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
@@ -457,9 +448,6 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 		}
 	}
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
-		return err
-	}
-	if err := ValidateDeleteRequest(request); err != nil {
 		return err
 	}
 	if c.factory == nil {

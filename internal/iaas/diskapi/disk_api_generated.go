@@ -171,9 +171,6 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
-	if err := ValidateReadRequest(request); err != nil {
-		return err
-	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
@@ -324,9 +321,6 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
-	if err := ValidateCreateRequest(request); err != nil {
-		return err
-	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
@@ -351,7 +345,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID、変更する項目を1つ以上。Name、Description、Tags、IconID、Connection、NoWait は個別フラグまたは JSON で指定できます。EditParameter は JSON で指定します。省略した項目は変更しません。JSON 例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-DISK-NAME\\\"}'。Zone と ID は実際の値に置き換えます。\""
+	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description、Tags、IconID、Connection、NoWait は個別フラグまたは JSON で指定できます。EditParameter は JSON で指定します。省略した項目は変更しません。JSON 例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-DISK-NAME\\\"}'。Zone と ID は実際の値に置き換えます。\""
 	Zone        *string   "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID          *int64    "name:\"id\" help:\"必須: 更新対象のディスク ID (数値)。\""
 	Name        *string   "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
@@ -425,9 +419,6 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 		}
 	}
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
-		return err
-	}
-	if err := ValidateUpdateRequest(request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -515,9 +506,6 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 		}
 	}
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
-		return err
-	}
-	if err := ValidateDeleteRequest(request); err != nil {
 		return err
 	}
 	if c.factory == nil {

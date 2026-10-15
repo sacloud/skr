@@ -32,7 +32,7 @@ $ skr iaas-api archive find --zone ZONE --os-type ubuntu2404 --query 'map({ID,Na
 
 `ZONE` は検索対象のゾーンに置き換えます。`--os-type` には `ubuntu2404`、`debian12`、`almalinux9` などの公開アーカイブ OS 種別を指定できます。OS 種別の指定では、SDK が提供する[アーカイブ OS 種別](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/api/iaas/ostype)を使います。
 
-名前またはタグで検索する場合は `--os-type` を併用できません。名前の検索は `Names` 配列を JSON で渡します。次を `archive-find.json` に保存し、`ZONE` とアーカイブ名を置き換えてください。
+名前またはタグは OS 種別と併用できます。OS 種別から構築した検索条件のうち、名前の条件は `Names`、タグの条件は `Tags` の指定で上書きされます。その他の条件は残ります（[検索条件の変換](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/archive#FindRequest.ToRequestParameter)）。名前の検索は `Names` 配列を JSON で渡します。次を `archive-find.json` に保存し、`ZONE` とアーカイブ名を置き換えてください。
 
 ```json
 {

@@ -153,9 +153,6 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
 	}
-	if err := ValidateReadRequest(request); err != nil {
-		return err
-	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}

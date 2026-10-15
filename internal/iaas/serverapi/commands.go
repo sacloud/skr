@@ -76,9 +76,6 @@ func (c *BootCommand) Run(_ *kong.Context) error {
 		ID:       types.ID(c.ID),
 		UserData: userData,
 	}
-	if err := ValidateBootRequest(request); err != nil {
-		return err
-	}
 	if c.factory == nil {
 		return fmt.Errorf("API クライアントが設定されていません")
 	}

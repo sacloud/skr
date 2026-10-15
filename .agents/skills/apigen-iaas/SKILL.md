@@ -41,6 +41,8 @@ description: cmd/apigen-iaas を使って IaaS API コマンドの設定を更�
 
 ## 設定と生成物の境界
 
+[ADR 0047](../../../docs/adr/0047-minimize-cli-request-body-validation.md) に従い、本文の必須項目、値の範囲、サービス上の相関制約を CLI で重複検証しません。SDK と API に委ね、エラーを利用者へ返します。CLI の必須オプション、相互排他、ファイル・JSON・独自構文、秘密情報の入力制約は検証します。例外は `validate_zone` と、SDK が無視する Archive の未知 OSType です。EventBus の Provider 補完など、検証ではない入力処理は残します。
+
 - 設定 JSON はコマンドの公開範囲とユーザー向け説明の根拠です。SDK の型だけでは決まらないフラグ、必須条件、ヘルプ、検証関数を明示します。
 - 単一ゾーンを対象とする生成操作には `validate_zone: true` を指定します。共通検証はリクエスト構築後、`request_validator` の前に空文字列と `all` を拒否します。リソース固有の validator でゾーン検証を重複させず、手書きハンドラーでは `zones.ValidateSingleZone` を直接呼び出します。詳細は [ADR 0046](../../../docs/adr/0046-common-iaas-zone-validation.md) を参照してください。
 - `request_type` がある操作は `--request` と個別フラグを併用させず、JSON とフラグの経路を混ぜません。個別フラグの必須性はフラグ経路だけに適用します。

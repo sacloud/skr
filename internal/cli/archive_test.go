@@ -61,7 +61,7 @@ func TestIaaSArchiveHelp(t *testing.T) {
 	}{
 		{args: []string{"iaas-api", "--help"}, want: []string{"archive", "disk-plan"}},
 		{args: []string{"iaas-api", "archive", "--help"}, want: []string{"find", "read"}},
-		{args: []string{"iaas-api", "archive", "find", "--help"}, want: []string{"--zone", "--os-type", "--tags", "--count", "--from", "--request", "Names", "DiskPlanName", "SizeMB", "Tags", "併用できません"}, notWant: []string{"--zone all"}},
+		{args: []string{"iaas-api", "archive", "find", "--help"}, want: []string{"--zone", "--os-type", "--tags", "--count", "--from", "--request", "Names", "DiskPlanName", "SizeMB", "Tags", "上書き"}, notWant: []string{"--zone all", "併用できません"}},
 		{args: []string{"iaas-api", "archive", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -157,14 +157,11 @@ func TestIaaSArchiveRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		{"find"},
 		{"find", "--zone", "all"},
 		{"find", "--zone", "test-zone", "--os-type", "not-a-supported-os"},
-		{"find", "--zone", "test-zone", "--os-type", "ubuntu2404", "--tags", "public"},
 		{"find", "--request", `{"Zone":"all"}`},
 		{"find", "--request", `{"Zone":"test-zone","OSType":1000}`},
-		{"find", "--request", `{"Zone":"test-zone","OSType":2,"Names":["image"]}`},
 		{"find", "--request", `{"Zone":123}`},
 		{"find", "--zone", "test-zone", "--unknown"},
 		{"read", "--zone", "all", "--id", "123"},
-		{"read", "--zone", "test-zone", "--id", "0"},
 		{"read", "--zone", "test-zone"},
 		{"read", "--request", `{"Zone":123,"ID":"invalid"}`},
 		{"read", "--zone", "test-zone", "--id", "123", "--request", `{"Zone":"test-zone","ID":123}`},

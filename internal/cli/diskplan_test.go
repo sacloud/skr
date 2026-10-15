@@ -143,7 +143,6 @@ func TestIaaSDiskPlanRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		{"find", "--request", `{"Zone":123}`},
 		{"find", "--zone", "test-zone", "--unknown"},
 		{"read", "--zone", "all", "--id", "4"},
-		{"read", "--zone", "test-zone", "--id", "0"},
 		{"read", "--zone", "test-zone"},
 		{"read", "--request", `{"Zone":123,"ID":"invalid"}`},
 		{"read", "--zone", "test-zone", "--id", "4", "--request", `{"Zone":"test-zone","ID":4}`},

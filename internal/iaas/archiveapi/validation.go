@@ -22,22 +22,8 @@ import (
 )
 
 func ValidateFindRequest(request *archive.FindRequest) error {
-	return validateFindRequest(request)
-}
-
-func ValidateReadRequest(request *archive.ReadRequest) error {
-	if request.ID == 0 {
-		return fmt.Errorf("ID が必要です (--request JSON も指定できます)")
-	}
-	return nil
-}
-
-func validateFindRequest(request *archive.FindRequest) error {
 	if request.OSType < 0 || !validOSType(request.OSType) {
 		return fmt.Errorf("OSType が不正です")
-	}
-	if request.OSType != ostype.Custom && (len(request.Names) > 0 || len(request.Tags) > 0) {
-		return fmt.Errorf("OSType は Names または Tags と併用できません")
 	}
 	return nil
 }
