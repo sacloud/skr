@@ -512,6 +512,18 @@ func TestValidateRequestTransform(t *testing.T) {
 		{"request validator request collision", func(c *Config) {
 			c.Operations[0].RequestValidator = "request"
 		}, "conflicts with a generated local name"},
+		{"constructor conflicts with top-level type", func(c *Config) {
+			c.APIType = "NewCommands"
+		}, "constructor \"NewCommands\" conflicts with a generated type name"},
+		{"constructor conflicts with operation type", func(c *Config) {
+			c.Operations[0].CommandType = "NewCommands"
+		}, "constructor \"NewCommands\" conflicts with a generated type name"},
+		{"constructor conflicts with request validator", func(c *Config) {
+			c.Operations[0].RequestValidator = "NewCommands"
+		}, "constructor \"NewCommands\" conflicts with a request_validator"},
+		{"constructor conflicts with import alias", func(c *Config) {
+			c.Imports = map[string]string{"NewCommands": "example/sdk"}
+		}, "constructor \"NewCommands\" conflicts with an import alias"},
 		{"validator reused for different request types", func(c *Config) {
 			op := c.Operations[0]
 			op.Name, op.CommandType, op.Method, op.RequestType, op.RequestTransform, op.RepeatedFlags =

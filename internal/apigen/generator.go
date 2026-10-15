@@ -541,6 +541,16 @@ func (c Config) Validate() error {
 			return fmt.Errorf("request_validator %q conflicts with a generated Runtime field", name)
 		}
 	}
+	constructorName := "New" + c.CommandType
+	if commandTypes[constructorName] {
+		return fmt.Errorf("generated constructor %q conflicts with a generated type name", constructorName)
+	}
+	if requestValidators[constructorName] != "" {
+		return fmt.Errorf("generated constructor %q conflicts with a request_validator", constructorName)
+	}
+	if aliases[constructorName] {
+		return fmt.Errorf("generated constructor %q conflicts with an import alias", constructorName)
+	}
 	return nil
 }
 
