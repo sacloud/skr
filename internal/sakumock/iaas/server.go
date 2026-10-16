@@ -36,6 +36,7 @@ type Server struct {
 	mu            sync.Mutex
 	switches      map[string]map[string]json.RawMessage
 	packetFilters map[string]map[string]json.RawMessage
+	icons         map[string]map[string]json.RawMessage
 	zones         []string
 	nextID        int
 }
@@ -45,6 +46,7 @@ func NewTestServer(config Config) *Server {
 	return &Server{
 		switches:      make(map[string]map[string]json.RawMessage),
 		packetFilters: make(map[string]map[string]json.RawMessage),
+		icons:         make(map[string]map[string]json.RawMessage),
 		zones:         append([]string(nil), config.Zones...),
 		nextID:        1000,
 	}
@@ -81,6 +83,9 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 	for _, part := range parts {
 		if part == "packetfilter" {
 			return s.doPacketFilter(method, parts, uri, body)
+		}
+		if part == "icon" {
+			return s.doIcon(method, parts, uri, body)
 		}
 	}
 	switchIndex := -1
@@ -153,6 +158,77 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 			return nil, fmt.Errorf("switch %s in zone %s not found", id, zone)
 		}
 		delete(s.switches, key)
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("unsupported IaaS operation: %s %s", method, uri)
+	}
+}
+
+func (s *Server) doIcon(method string, parts []string, uri string, body any) ([]byte, error) {
+	iconIndex := -1
+	for i, part := range parts {
+		if part == "icon" {
+			iconIndex = i
+			break
+		}
+	}
+	if iconIndex < 0 || iconIndex+2 < len(parts) {
+		return nil, fmt.Errorf("unsupported IaaS request URL: %s", uri)
+	}
+	id := ""
+	if iconIndex+1 < len(parts) {
+		id = parts[iconIndex+1]
+	}
+	request, err := requestIcon(body)
+	if err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch {
+	case method == "GET" && id == "":
+		items := s.iconsAsSlice()
+		return marshalJSON(map[string]any{
+			"Total": len(items),
+			"Count": len(items),
+			"Icons": items,
+		})
+	case method == "GET":
+		item, ok := s.icons[id]
+		if !ok {
+			return nil, fmt.Errorf("icon %s not found", id)
+		}
+		return marshalJSON(map[string]any{"Icon": item})
+	case method == "POST" && id == "":
+		if request == nil {
+			return nil, errors.New("create icon request body is required")
+		}
+		s.nextID++
+		id = fmt.Sprint(s.nextID)
+		delete(request, "Image")
+		request["ID"], err = json.Marshal(s.nextID)
+		if err != nil {
+			return nil, fmt.Errorf("encode mock Icon ID: %w", err)
+		}
+		s.icons[id] = request
+		return marshalJSON(map[string]any{"Icon": request})
+	case method == "PUT" && id != "":
+		current, ok := s.icons[id]
+		if !ok {
+			return nil, fmt.Errorf("icon %s not found", id)
+		}
+		for field, value := range request {
+			current[field] = value
+		}
+		s.icons[id] = current
+		return marshalJSON(map[string]any{"Icon": current})
+	case method == "DELETE" && id != "":
+		if _, ok := s.icons[id]; !ok {
+			return nil, fmt.Errorf("icon %s not found", id)
+		}
+		delete(s.icons, id)
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("unsupported IaaS operation: %s %s", method, uri)
@@ -235,6 +311,37 @@ func (s *Server) doPacketFilter(method string, parts []string, uri string, body 
 	default:
 		return nil, fmt.Errorf("unsupported IaaS operation: %s %s", method, uri)
 	}
+}
+
+func (s *Server) iconsAsSlice() []map[string]json.RawMessage {
+	items := make([]map[string]json.RawMessage, 0, len(s.icons))
+	for _, item := range s.icons {
+		items = append(items, item)
+	}
+	return items
+}
+
+func requestIcon(value any) (map[string]json.RawMessage, error) {
+	var data []byte
+	if value != nil {
+		var err error
+		data, err = json.Marshal(value)
+		if err != nil {
+			return nil, fmt.Errorf("encode Icon request: %w", err)
+		}
+	}
+	var body map[string]json.RawMessage
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &body); err != nil {
+			return nil, fmt.Errorf("decode Icon request: %w", err)
+		}
+	}
+	if item, ok := body["Icon"]; ok {
+		if err := json.Unmarshal(item, &body); err != nil {
+			return nil, fmt.Errorf("decode Icon request body: %w", err)
+		}
+	}
+	return body, nil
 }
 
 func (s *Server) packetFiltersAsSlice(zone string) []map[string]json.RawMessage {

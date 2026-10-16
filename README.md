@@ -26,6 +26,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | コマンド | 操作できる API |
 | --- | --- |
 | `skr iaas-api disk` | ディスクの検索、参照、作成、更新、削除 |
+| `skr iaas-api icon` | ユーザー作成アイコンの検索、参照、作成、更新、削除 |
 | `skr iaas-api server` | サーバの検索、参照、作成、更新、削除 |
 | `skr iaas-api switch` | スイッチの検索、参照、作成、更新、削除 |
 | `skr iaas-api zone` | ゾーン一覧の取得 |
@@ -58,6 +59,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 ```console
 $ skr --help
 $ skr iaas-api disk --help
+$ skr iaas-api icon --help
 $ skr iaas-api switch --help
 $ skr simplemq-api --help
 $ skr eventbus-api --help
@@ -77,6 +79,12 @@ Disk の作成では `--zone`、`--name`、`--disk-plan-id`、`--connection`、`
 ```console
 $ skr iaas-api disk create --zone ZONE --name DISK-NAME --disk-plan-id 4 --connection virtio --size-gb 20 --tags production,web
 $ skr iaas-api disk update --zone ZONE --id DISK-ID --name UPDATED-DISK-NAME
+```
+
+Icon の作成では、PNG または JPEG の画像ファイルを `--image-file` で指定します。画像データをコマンド引数に直接渡さず、必要なときは `--request @path.json` で Base64 形式の `Image` を含む JSON ファイルを渡してください。`--request` と個別フラグは併用できません。詳しい手順は[Icon API チュートリアル](docs/manual/tutorials/iaas-api/icon.md)を参照してください。
+
+```console
+$ skr iaas-api icon create --name ICON-NAME --image-file ./icon.png --tags tutorial,managed
 ```
 
 ## 認証
