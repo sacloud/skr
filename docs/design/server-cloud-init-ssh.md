@@ -4,6 +4,8 @@
 
 この設計では、is1b に cloud-init 対応 Server を作成し、起動時に user-data を適用して、SSH 接続を確認する手順を扱います。任意の Server リクエストのネストフィールドを指定する汎用フラグは追加しません。
 
+cloud-init が動作しない場合の確認手順と検証用 Server でのログ観測結果は、[cloud-init トラブルシューティング](../cloud-init-troubleshooting.md)を参照してください。
+
 ## CLI の手順
 
 1. `iaas-api server create` は反復可能な `--disk 'archive-id=123,plan-id=4,size-gb=20'` を受け付けます。各指定は virtio ディスク1個に対応し、plan-id と size-gb は必須です。archive-id 省略時は空のディスクを作成します。
