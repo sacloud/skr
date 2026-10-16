@@ -17,7 +17,7 @@ import (
 type Commands struct {
 	Find          FindCommand          "cmd:\"\" name:\"find\" help:\"ルータ＋スイッチを指定したゾーンで検索して出力します。例: skr iaas-api internet find --zone is1b\""
 	Read          ReadCommand          "cmd:\"\" name:\"read\" help:\"ルータ＋スイッチを読み取って出力します。\""
-	Create        CreateCommand        "cmd:\"\" name:\"create\" help:\"ルータ＋スイッチを作成して出力します。課金対象になる場合があります。例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME\""
+	Create        CreateCommand        "cmd:\"\" name:\"create\" help:\"ルータ＋スイッチを作成して出力します。課金対象になる場合があります。例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100\""
 	Update        UpdateCommand        "cmd:\"\" name:\"update\" help:\"ルータ＋スイッチの設定を更新して出力します。例: skr iaas-api internet update --zone is1b --id 123456789012 --name UPDATED-NAME\""
 	Delete        DeleteCommand        "cmd:\"\" name:\"delete\" help:\"ルータ＋スイッチを削除します。--force は IPv6 の無効化と NextHop が設定された追加サブネットの削除も行います。例: skr iaas-api internet delete --zone is1b --id 123456789012\""
 	ListSubnet    ListSubnetCommand    "cmd:\"\" name:\"list-subnet\" help:\"ルータ＋スイッチに設定された IP アドレスブロックを一覧表示します。\""
@@ -232,14 +232,14 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request        *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (作成先ゾーン)、Name (名前)。任意: Description (最大512文字)、Tags (文字列配列)、IconID (数値)、NetworkMaskLen (プレフィクス長)、BandWidthMbps (帯域幅)。EnableIPv6 は作成時に IPv6 アドレス割り当てを有効にする設定です。料金と利用条件を確認してから実行してください。NoWait と NotFoundRetry は JSON でのみ指定できます。フラグ例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100。ゾーンと名前は実際の値に置き換えます。\""
+	Request        *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (作成先ゾーン)、Name (名前)、NetworkMaskLen (プレフィクス長)、BandWidthMbps (帯域幅)。任意: Description (最大512文字)、Tags (文字列配列)、IconID (数値)。EnableIPv6 は作成時に IPv6 アドレス割り当てを有効にする設定です。料金と利用条件を確認してから実行してください。NoWait と NotFoundRetry は JSON でのみ指定できます。フラグ例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100。ゾーンと名前は実際の値に置き換えます。\""
 	Zone           *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
 	Name           *string   "name:\"name\" help:\"必須: ルータ＋スイッチの名前。\""
 	Tags           *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
 	Description    *string   "name:\"description\" help:\"任意: 説明 (最大512文字)。\""
 	IconID         *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。\""
-	NetworkMaskLen *int      "name:\"network-mask-len\" help:\"任意: 割り当てる IPv4 アドレスブロックのプレフィクス長。\""
-	BandWidthMbps  *int      "name:\"band-width-mbps\" help:\"任意: 接続帯域 (Mbps)。\""
+	NetworkMaskLen *int      "name:\"network-mask-len\" help:\"必須: 割り当てる IPv4 アドレスブロックのプレフィクス長。\""
+	BandWidthMbps  *int      "name:\"band-width-mbps\" help:\"必須: 接続帯域 (Mbps)。\""
 	factory        APIFactory
 	runtime        Runtime
 }
@@ -291,8 +291,14 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 			value := types.ID(*c.IconID)
 			request.IconID = value
 		}
+		if c.NetworkMaskLen == nil {
+			return fmt.Errorf("--network-mask-len が必要です")
+		}
 		if c.NetworkMaskLen != nil {
 			request.NetworkMaskLen = *c.NetworkMaskLen
+		}
+		if c.BandWidthMbps == nil {
+			return fmt.Errorf("--band-width-mbps が必要です")
 		}
 		if c.BandWidthMbps != nil {
 			request.BandWidthMbps = *c.BandWidthMbps

@@ -45,8 +45,10 @@ const (
 	serverDesc      = "Temporary Server for skr router-switch SSH E2E"
 	sshUser         = "skr-e2e"
 	commandTimeout  = 90 * time.Second
+	createTimeout   = 35 * time.Minute
 	cleanupTimeout  = 5 * time.Minute
 	sshWaitTimeout  = 20 * time.Minute
+	scenarioTimeout = 2*createTimeout + sshWaitTimeout + 10*time.Minute
 	defaultDiskSize = 20
 )
 
@@ -113,7 +115,7 @@ func (r cliRunner) call(ctx context.Context, step string, request map[string]any
 	if err != nil {
 		return nil, err
 	}
-	timeout, cancel := context.WithTimeout(ctx, commandTimeout)
+	timeout, cancel := context.WithTimeout(ctx, timeoutForStep(step))
 	defer cancel()
 
 	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The caller selects a local skr binary; structured arguments are not passed through a shell.
@@ -131,6 +133,15 @@ func (r cliRunner) call(ctx context.Context, step string, request map[string]any
 		return nil, fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr)
 	}
 	return stdout.Bytes(), nil
+}
+
+func timeoutForStep(step string) time.Duration {
+	switch step {
+	case "test-create-internet", "test-create-server":
+		return createTimeout
+	default:
+		return commandTimeout
+	}
 }
 
 func internetArgs(step string, request map[string]any, userDataPath string) ([]string, error) {
@@ -338,17 +349,18 @@ func runSSH(ctx context.Context, args []string) (string, string, error) {
 }
 
 type scenario struct {
-	client       cli
-	archiveID    int64
-	diskPlanID   int64
-	diskSizeGB   int64
-	userDataPath string
-	publicKey    string
-	privateKey   string
-	knownHosts   string
-	connect      func(context.Context, string, string, string) error
-	pollInterval time.Duration
-	sshTimeout   time.Duration
+	client          cli
+	archiveID       int64
+	diskPlanID      int64
+	diskSizeGB      int64
+	userDataPath    string
+	publicKey       string
+	privateKey      string
+	knownHosts      string
+	connect         func(context.Context, string, string, string) error
+	pollInterval    time.Duration
+	sshTimeout      time.Duration
+	recoveryTimeout time.Duration
 }
 
 func (s scenario) call(ctx context.Context, step string, request map[string]any) ([]byte, error) {
@@ -639,10 +651,60 @@ func (s scenario) cleanup(name string, knownInternetID, knownSwitchID, knownServ
 	if len(disks) != 0 {
 		return errors.Join(deleteErr, fmt.Errorf("Disk %q remains after cleanup; manual cleanup required", name))
 	}
-	if deleteErr != nil {
-		return deleteErr
+	return errors.Join(deleteErr, s.cleanupInternet(ctx, name, knownInternetID, switchID))
+}
+
+func (s scenario) recoverInternet(name string) (internetItem, error) {
+	timeout := s.recoveryTimeout
+	if timeout <= 0 {
+		timeout = createTimeout
 	}
-	return s.cleanupInternet(ctx, name, knownInternetID, switchID)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	interval := s.pollInterval
+	if interval <= 0 {
+		interval = 10 * time.Second
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	var lastErr error
+	for {
+		items, err := s.findInternet(ctx, "cleanup-find-internet", name)
+		switch {
+		case err != nil:
+			lastErr = err
+		case len(items) > 1:
+			return internetItem{}, errors.New("cannot safely identify created Internet: multiple matches; manual cleanup required")
+		case len(items) == 1:
+			candidate := items[0]
+			if candidate.ID.IsEmpty() || candidate.Switch.ID.IsEmpty() {
+				lastErr = errors.New("created Internet or Switch ID is not available yet")
+			} else {
+				if err := internetIdentity(candidate, candidate.ID, name, candidate.Switch.ID); err != nil {
+					return internetItem{}, fmt.Errorf("Internet recovery refused: %w; manual cleanup required", err)
+				}
+				current, err := s.readInternet(ctx, "cleanup-read-internet", candidate.ID)
+				if err != nil {
+					lastErr = err
+				} else {
+					if err := internetIdentity(current, candidate.ID, name, candidate.Switch.ID); err != nil {
+						return internetItem{}, fmt.Errorf("Internet recovery refused: %w; manual cleanup required", err)
+					}
+					return current, nil
+				}
+			}
+		default:
+			lastErr = errors.New("possibly created Internet is not visible yet")
+		}
+		select {
+		case <-ctx.Done():
+			return internetItem{}, errors.Join(
+				fmt.Errorf("cannot recover possibly created Internet %q in %s within %s; manual cleanup required: %w", name, zone, timeout, ctx.Err()),
+				lastErr,
+			)
+		case <-ticker.C:
+		}
+	}
 }
 
 func (s scenario) cleanupInternet(ctx context.Context, name string, knownID, knownSwitchID types.ID) error {
@@ -710,7 +772,16 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	}
 
 	var internetID, switchID, serverID types.ID
+	internetCreateUncertain := true
 	defer func() {
+		if internetCreateUncertain {
+			recovered, err := s.recoverInternet(name)
+			if err != nil {
+				result = errors.Join(result, fmt.Errorf("cleanup failed: %w", err))
+				return
+			}
+			internetID, switchID = recovered.ID, recovered.Switch.ID
+		}
 		if cleanupErr := s.cleanup(name, internetID, switchID, serverID); cleanupErr != nil {
 			result = errors.Join(result, fmt.Errorf("cleanup failed: %w", cleanupErr))
 		}
@@ -730,6 +801,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := internetIdentity(router, internetID, name, switchID); err != nil {
 		return err
 	}
+	internetCreateUncertain = false
 
 	serverOutput, err := s.call(ctx, "test-create-server", map[string]any{
 		"Zone": zone, "Name": name, "CloudimgArchiveID": s.archiveID,
@@ -868,7 +940,7 @@ func runMain() (exitCode int) {
 	name := namePrefix + hex.EncodeToString(suffix[:])
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, scenarioTimeout)
 	defer cancel()
 	runner := cliRunner{binary: path, evidence: recorder, userDataPath: userDataPath}
 	ssh := sshRunner{evidence: recorder, run: runSSH}

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -213,8 +214,188 @@ func testScenario(fake *fakeCLI, dir string) scenario {
 		connect: func(context.Context, string, string, string) error {
 			return nil
 		},
-		pollInterval: time.Millisecond,
-		sshTimeout:   20 * time.Millisecond,
+		pollInterval:    time.Millisecond,
+		sshTimeout:      20 * time.Millisecond,
+		recoveryTimeout: 100 * time.Millisecond,
+	}
+}
+
+type cliFunc func(context.Context, string, map[string]any) ([]byte, error)
+
+func (f cliFunc) call(ctx context.Context, step string, request map[string]any) ([]byte, error) {
+	return f(ctx, step, request)
+}
+
+func TestOperationTimeoutBudgets(t *testing.T) {
+	for _, step := range []string{"test-create-internet", "test-create-server"} {
+		if got := timeoutForStep(step); got <= 30*time.Minute {
+			t.Fatalf("%s timeout = %s, want more than SDK's 30 minute visibility retry window", step, got)
+		}
+	}
+	if timeoutForStep("test-read-server") != commandTimeout {
+		t.Fatal("normal operations must retain their short timeout")
+	}
+	if scenarioTimeout <= 2*createTimeout+sshWaitTimeout {
+		t.Fatal("scenario timeout must allow both creates, SSH waiting, and other operations")
+	}
+}
+
+func TestScenarioRecoversInterruptedInternetCreation(t *testing.T) {
+	for _, mode := range []string{"cancelled", "invalid output"} {
+		t.Run(mode, func(t *testing.T) {
+			fake := &fakeCLI{}
+			test := testScenario(fake, t.TempDir())
+			test.recoveryTimeout = time.Second
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			searches, reads := 0, 0
+			test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
+				switch step {
+				case "test-create-internet":
+					data, err := fake.call(ctx, step, request)
+					if err != nil {
+						return nil, err
+					}
+					if mode == "invalid output" {
+						return []byte("{"), nil
+					}
+					cancel()
+					return data, context.Canceled
+				case "cleanup-find-internet":
+					if ctx.Err() != nil {
+						t.Fatal("recovery reused cancelled scenario context")
+					}
+					searches++
+					if searches == 1 {
+						return nil, errors.New("temporary search failure")
+					}
+					if searches == 2 {
+						return []byte("[]"), nil
+					}
+				case "cleanup-read-internet":
+					reads++
+					if reads == 1 {
+						return nil, errors.New("created Internet temporarily unreadable")
+					}
+				}
+				return fake.call(ctx, step, request)
+			})
+			err := test.run(ctx, namePrefix+"test")
+			if err == nil || (mode == "cancelled" && !errors.Is(err, context.Canceled)) {
+				t.Fatalf("original failure was lost: %v", err)
+			}
+			if strings.Contains(err.Error(), "cleanup failed") || searches < 4 || reads < 2 {
+				t.Fatalf("recovery did not complete: searches=%d reads=%d error=%v", searches, reads, err)
+			}
+			if fake.internet != nil || fake.server != nil || fake.disk || !containsStep(fake.calls, "cleanup-delete-internet") {
+				t.Fatalf("resources not cleaned: %+v", fake)
+			}
+		})
+	}
+}
+
+func TestInternetRecoveryRefusesUnsafeMatches(t *testing.T) {
+	for _, mode := range []string{"ambiguous", "identity", "read identity"} {
+		t.Run(mode, func(t *testing.T) {
+			fake := &fakeCLI{}
+			test := testScenario(fake, t.TempDir())
+			test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
+				data, err := fake.call(ctx, step, request)
+				if step == "test-create-internet" {
+					return nil, context.DeadlineExceeded
+				}
+				if step == "cleanup-find-internet" {
+					switch mode {
+					case "ambiguous":
+						return json.Marshal([]internetItem{*fake.internet, *fake.internet})
+					case "identity":
+						item := *fake.internet
+						item.Description = "unrelated"
+						return json.Marshal([]internetItem{item})
+					}
+				}
+				if step == "cleanup-read-internet" && mode == "read identity" {
+					item := *fake.internet
+					item.Name = "unrelated"
+					return json.Marshal(item)
+				}
+				return data, err
+			})
+			err := test.run(context.Background(), namePrefix+"test")
+			if !errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "manual cleanup required") {
+				t.Fatalf("error = %v", err)
+			}
+			if fake.internet == nil || containsStep(fake.calls, "cleanup-delete-internet") {
+				t.Fatal("unsafe match was deleted")
+			}
+		})
+	}
+}
+
+func TestInternetRecoveryExpiresWithExplicitFailure(t *testing.T) {
+	for _, mode := range []string{"empty", "search error", "read error"} {
+		t.Run(mode, func(t *testing.T) {
+			fake := &fakeCLI{}
+			test := testScenario(fake, t.TempDir())
+			attempts := 0
+			test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
+				if step == "test-create-internet" {
+					if mode == "read error" {
+						if _, err := fake.call(ctx, step, request); err != nil {
+							return nil, err
+						}
+					}
+					return nil, context.Canceled
+				}
+				if step == "cleanup-find-internet" {
+					attempts++
+					if mode == "search error" {
+						return nil, errors.New("search unavailable")
+					}
+				}
+				if step == "cleanup-read-internet" && mode == "read error" {
+					return nil, errors.New("read unavailable")
+				}
+				return fake.call(ctx, step, request)
+			})
+			err := test.run(context.Background(), namePrefix+"test")
+			if !errors.Is(err, context.Canceled) || !errors.Is(err, context.DeadlineExceeded) ||
+				!strings.Contains(err.Error(), "manual cleanup required") || attempts < 2 {
+				t.Fatalf("attempts = %d, error = %v", attempts, err)
+			}
+			if containsStep(fake.calls, "cleanup-delete-internet") {
+				t.Fatal("deleted an unverified resource")
+			}
+		})
+	}
+}
+
+func TestCleanupContinuesAfterServerDeletionResponseFailure(t *testing.T) {
+	for _, internetFails := range []bool{false, true} {
+		t.Run(fmt.Sprint(internetFails), func(t *testing.T) {
+			fake := &fakeCLI{}
+			test := testScenario(fake, t.TempDir())
+			deleteErr := errors.New("Server deletion response or evidence failed")
+			internetErr := errors.New("Internet deletion failed")
+			test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
+				if step == "cleanup-delete-internet" && internetFails {
+					return nil, internetErr
+				}
+				data, err := fake.call(ctx, step, request)
+				if step == "cleanup-delete-server" && err == nil {
+					return nil, deleteErr
+				}
+				return data, err
+			})
+			err := test.run(context.Background(), namePrefix+"test")
+			if !errors.Is(err, deleteErr) || errors.Is(err, internetErr) != internetFails {
+				t.Fatalf("cleanup errors were not preserved: %v", err)
+			}
+			if fake.server != nil || fake.disk || (fake.internet != nil) != internetFails ||
+				!containsStep(fake.calls, "cleanup-read-internet") {
+				t.Fatalf("unexpected cleanup state: %+v", fake)
+			}
+		})
 	}
 }
 

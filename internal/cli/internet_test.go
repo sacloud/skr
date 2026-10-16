@@ -384,6 +384,9 @@ func TestIaaSInternetRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		{"find", "--zone", "test-zone", "--request", `{"Zone":"test-zone"}`},
 		{"read", "--zone", "test-zone"},
 		{"create", "--zone", "test-zone"},
+		{"create", "--zone", "test-zone", "--name", "router"},
+		{"create", "--zone", "test-zone", "--name", "router", "--network-mask-len", "28"},
+		{"create", "--zone", "test-zone", "--name", "router", "--band-width-mbps", "100"},
 		{"monitor-router"},
 		{"add-subnet", "--zone", "test-zone", "--id", "123", "--network-mask-len", "28"},
 	} {
@@ -407,7 +410,8 @@ func TestIaaSInternetPropagatesAPIErrors(t *testing.T) {
 	commandLine := newCLI()
 	setInternetAPIFactory(commandLine, func() (internetapi.API, error) { return api, nil })
 	var stdout, stderr bytes.Buffer
-	code := runCLI([]string{"iaas-api", "internet", "create", "--zone", "test-zone", "--name", "router"},
+	code := runCLI([]string{"iaas-api", "internet", "create", "--zone", "test-zone", "--name", "router",
+		"--network-mask-len", "28", "--band-width-mbps", "100"},
 		&stdout, &stderr, commandLine)
 	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), apiFailure.Error()) {
 		t.Fatalf("create error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
