@@ -1,0 +1,88 @@
+{
+  "package": "iconapi",
+  "resource": "IaaS Icon",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "icon": "github.com/sacloud/sacloud-sdk-go/service/iaas/icon",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_type": "FindCommand",
+      "help": "アイコンを検索して出力します。Names、Tags、Scope、Sort は --request JSON で指定できます。条件を省略すると一覧を取得します。例: skr iaas-api icon find --request @icon-find.json",
+      "method": "FindWithContext",
+      "request_type": "icon.FindRequest",
+      "response_type": "[]*iaas.Icon",
+      "request_help": "FindRequest JSON を直接または @path.json で指定できます。Names、Tags、Scope、Sort は JSON で指定します。Count と From は --count、--from でも指定できます。--request と個別フラグは併用できません。条件を省略するとアイコン一覧を取得します。",
+      "handwritten": true
+    },
+    {
+      "name": "Read",
+      "command_type": "ReadCommand",
+      "help": "ID を指定してアイコンを読み取って出力します。例: skr iaas-api icon read --id 123456789012",
+      "method": "ReadWithContext",
+      "request_type": "icon.ReadRequest",
+      "response_type": "*iaas.Icon",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: ID (数値)。例: --request='{\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 読み取るアイコンの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "command_type": "CreateCommand",
+      "help": "画像ファイルからアイコンを作成して出力します。例: skr iaas-api icon create --name example --image-file ./icon.png",
+      "method": "CreateWithContext",
+      "request_type": "icon.CreateRequest",
+      "response_type": "*iaas.Icon",
+      "request_help": "JSON の CreateRequest を直接または @path.json で指定できます。Name と Base64 形式の Image が必要です。Tags は任意です。個別フラグでは Name、Image の代わりに画像ファイルを読む --image-file、Tags を指定できます。--request と個別フラグは併用できません。",
+      "handwritten": true
+    },
+    {
+      "name": "Update",
+      "command_type": "UpdateCommand",
+      "help": "アイコンの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api icon update --id 123456789012 --name updated",
+      "method": "UpdateWithContext",
+      "request_type": "icon.UpdateRequest",
+      "response_type": "*iaas.Icon",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: ID (数値)。任意: Name、Tags。省略した項目は変更しません。例: --request='{\"ID\":123456789012,\"Name\":\"updated\"}'。ID は実際の値に置き換えます。",
+      "handwritten": true
+    },
+    {
+      "name": "Delete",
+      "command_type": "DeleteCommand",
+      "help": "アイコンを削除します。成功時は出力しません。例: skr iaas-api icon delete --id 123456789012",
+      "method": "DeleteWithContext",
+      "request_type": "icon.DeleteRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: ID (数値)。FailIfNotFound は任意です。例: --request='{\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 削除するアイコンの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "fail-if-not-found",
+          "field": "FailIfNotFound",
+          "type": "bool",
+          "help": "任意: 対象が見つからない場合にエラーにします。"
+        }
+      ]
+    }
+  ]
+}
