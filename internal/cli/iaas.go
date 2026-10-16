@@ -18,6 +18,7 @@ import (
 	archiveSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 	diskSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	diskplanSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/diskplan"
+	internetSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
 	packetfilterSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
@@ -26,6 +27,7 @@ import (
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
 	diskplanapi "github.com/sacloud/skr/internal/iaas/diskplanapi"
+	internetapi "github.com/sacloud/skr/internal/iaas/internetapi"
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
@@ -36,6 +38,7 @@ type iaasAPICommand struct {
 	Archive      archiveapi.Commands      `cmd:"" help:"さくらのクラウドのアーカイブを検索・参照します。検索では対象ゾーン、タグまたは OS 種別を指定できます。"`
 	Disk         diskapi.Commands         `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
 	DiskPlan     diskplanapi.Commands     `cmd:"" help:"指定したゾーンのディスクプランを検索・参照します。プランの利用可否とサイズを確認できます。"`
+	Internet     internetapi.Commands     `cmd:"" help:"さくらのクラウドのルータ＋スイッチと、関連する IP アドレスブロックおよび IPv6 設定を操作します。"`
 	PacketFilter packetfilterapi.Commands `cmd:"" name:"packetfilter" help:"さくらのクラウドのパケットフィルタを検索、参照、作成、更新、削除します。ルール配列は --expressions JSON または --request JSON で指定します。"`
 	Switch       switchapi.Commands       `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
 	Server       serverapi.Commands       `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、起動、削除します。作成時はcloud-init用ディスクやNICを個別フラグで指定できます。"`
@@ -86,6 +89,15 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return diskplanSDK.New(client), nil
+	})
+	c.IaaSAPI.Internet = internetapi.NewCommands(internetapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (internetapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return internetSDK.New(client), nil
 	})
 	c.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 		DecodeRequest:          decodeRequest,

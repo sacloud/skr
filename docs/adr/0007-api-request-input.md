@@ -17,6 +17,8 @@
 
 ## Consequences
 
+[ADR 0049](0049-internet-workflow-options.md) により、Internet、Server、Disk の Find では単一名の部分一致検索を `--name` で指定できます。文字列を分割せず1要素の `Names` に変換し、複数名の指定は JSON に残します。また、Internet Delete の `--force` と `--fail-if-not-found` は API フィールドではなく削除の動作オプションとして公開します。
+
 Server Create の限定的なディスクと NIC の指定は、[ADR 0041](0041-server-repeatable-disk-and-nic-options.md) により反復可能な構造化オプションを使う例外とします。その他の複雑な入力を JSON に残す方針は維持します。
 
 - SDK v0.3.0 の Switch `CreateRequest` には7フィールドあり、`Zone` と `Name` が必須です。Server の作成には20フィールド、Disk の作成には18フィールドあり、任意値や複雑な型も含まれます。Database の作成には33フィールドあり、配列、秘密情報、条件付きの必須値も含まれます。フィールド総数や検証タグの数でフラグ経路を決めません。

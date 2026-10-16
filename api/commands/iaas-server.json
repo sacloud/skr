@@ -19,8 +19,15 @@
       "request_type": "server.FindRequest",
       "response_type": "[]*iaas.Server",
       "validate_zone": true,
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'。フラグ例: skr iaas-api server find --zone tk1v --tags production,web",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: 単一名の部分一致検索は --name、複数名の Names と Sort は JSON で指定します。Tags は --tags のカンマ区切りまたは JSON 配列、Count と From は個別フラグでも指定できます。例: skr iaas-api server find --zone is1b --name example",
       "flags": [
+        {
+          "name": "name",
+          "field": "Names",
+          "type": "string",
+          "singleton": true,
+          "help": "任意: 部分一致で検索する単一の名前。カンマを含めて1つの名前として扱います。API の名前検索条件に対応し、JSON では Names 配列で指定します。"
+        },
         {
           "name": "zone",
           "field": "Zone",
@@ -212,7 +219,7 @@
         {
           "name": "nic",
           "field": "NICs",
-          "help": "任意: NIC 1個を upstream=shared または upstream=disconnected で指定します。共有セグメントまたは未接続です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。shared は先頭の NIC にだけ指定できます。"
+          "help": "任意: NIC 1個を upstream=shared、upstream=disconnected、または upstream=SWITCH_ID で指定します。共有セグメント、未接続、指定スイッチへの接続です。SWITCH_ID は正の整数です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。shared は先頭の NIC にだけ指定できます。ルータ＋スイッチに接続する場合も先頭の NIC を指定してください。OS の IP アドレスは設定しません。"
         }
       ]
     },

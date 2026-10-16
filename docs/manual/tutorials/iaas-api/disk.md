@@ -75,11 +75,11 @@ $ skr iaas-api disk create --request @disk-create.json
 成功すると Disk の情報が出力されます。2つの入力例からは同じフィールドを持つリクエストが作られます。以降の操作で使う `ID` を控えてください。`123456789012` は仮の値です。作成結果の ID に置き換えて検索・参照してください。
 
 ```console
-$ skr iaas-api disk find --request='{"Zone":"is1b","Names":["TEST-DISK-NAME"],"Tags":["tutorial"]}' --query 'map({ID,Name,SizeMB})'
+$ skr iaas-api disk find --zone is1b --name TEST-DISK-NAME --tags tutorial --query 'map({ID,Name,SizeMB})'
 $ skr iaas-api disk find --zone is1b --tags tutorial --query 'map({ID,Name,SizeMB})'
 ```
 
-`--request` を使う検索では `Tags` を JSON の文字列配列で指定できます。上の1行目のように名前とタグの両方で検索する場合は JSON を使います。2行目のようにタグだけで検索する場合は、`--tags` にカンマ区切りで指定できます。`--request` と個別フラグは併用できません。
+`--name` は単一名の部分一致検索です。カンマを含む値も1つの名前として扱います。上の1行目のように名前とタグの両方を個別フラグで指定できます。複数名の検索条件は `--request` の `Names` 配列を使います。JSON では `Tags` も文字列配列で指定し、個別フラグとは併用できません。
 
 次は CLI テストで確認した出力形式の例です。ID と名前は置き換えています。
 
@@ -135,7 +135,7 @@ $ skr iaas-api disk read --zone is1b --id 123456789012
 
 ```console
 $ skr iaas-api disk delete --zone is1b --id 123456789012 --fail-if-not-found
-$ skr iaas-api disk find --request='{"Zone":"is1b","Names":["UPDATED-TEST-DISK-NAME"]}' --query 'map({ID,Name})'
+$ skr iaas-api disk find --zone is1b --name UPDATED-TEST-DISK-NAME --query 'map({ID,Name})'
 ```
 
 削除成功時、`delete` は標準出力に何も出しません。検索結果に削除した ID が含まれないことを確認してください。

@@ -299,6 +299,31 @@ func TestIaaSServerPassesNoWaitWithBootAfterCreateToSDK(t *testing.T) {
 	}
 }
 
+func TestServerSwitchNICFlagsMatchJSON(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	var requests []*server.CreateRequest
+	for _, args := range [][]string{
+		{"--zone", "is1b", "--name", "router-server", "--cpu", "1", "--memory-gb", "1",
+			"--disk", "archive-id=123,plan-id=4,size-gb=20", "--nic", "upstream=456"},
+		{"--request", `{"Zone":"is1b","Name":"router-server","CPU":1,"MemoryGB":1,"Disks":[{"Name":"router-server","DiskPlanID":4,"SizeGB":20,"SourceArchiveID":123,"Connection":"virtio"}],"NetworkInterfaces":[{"Upstream":"456"}]}`},
+	} {
+		api := &serverAPITestDouble{}
+		commandLine := newCLI()
+		setServerAPIFactory(commandLine, func() (serverapi.API, error) { return api, nil })
+		var stdout, stderr bytes.Buffer
+		if code := runCLI(append([]string{"iaas-api", "server", "create"}, args...), &stdout, &stderr, commandLine); code != 0 {
+			t.Fatalf("code = %d, stderr = %s", code, &stderr)
+		}
+		if api.createRequest == nil {
+			t.Fatal("Create was not called")
+		}
+		requests = append(requests, api.createRequest)
+	}
+	if !reflect.DeepEqual(requests[0], requests[1]) {
+		t.Fatalf("flags = %+v, JSON = %+v", requests[0], requests[1])
+	}
+}
+
 func TestIaaSServerFindUsesSDKCaller(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	caller := &serverAPICaller{}

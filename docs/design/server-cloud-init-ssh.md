@@ -7,7 +7,7 @@
 ## CLI の手順
 
 1. `iaas-api server create` は反復可能な `--disk 'archive-id=123,plan-id=4,size-gb=20'` を受け付けます。各指定は virtio ディスク1個に対応し、plan-id と size-gb は必須です。archive-id 省略時は空のディスクを作成します。
-2. `--nic 'upstream=shared'` または `--nic 'upstream=disconnected'` を反復して NIC を指定します。ディスクと NIC はそれぞれ指定順に配列を組み立てます。shared は先頭の NIC にだけ指定でき、2個目以降では API 呼び出し前に拒否します。チュートリアルでは共有 NIC を1個指定します。
+2. `--nic 'upstream=shared'`、`--nic 'upstream=disconnected'`、または `--nic 'upstream=SWITCH_ID'` を反復して NIC を指定します。スイッチ ID は正の整数です。ディスクと NIC はそれぞれ指定順に配列を組み立てます。shared は先頭の NIC にだけ指定でき、2個目以降では API 呼び出し前に拒否します。チュートリアルでは共有 NIC を1個指定します。スイッチ ID の追加は [ADR 0049](../adr/0049-internet-workflow-options.md) に記録しています。
 3. cloud-init 用の手順では Create 時に起動しません。archive-id を指定したディスクと `--boot-after-create=true` は併用できません。
 4. `iaas-api server boot` は user-data を省略して通常どおり起動できます。指定する場合は `--user-data @path.yaml` または `--user-data -` を受け付けます。明示的な空値やインラインの user-data は拒否します。Boot はサーバ起動時に user-data を適用する SDK 操作を呼び出します。
 5. チュートリアルでは SSH 鍵をローカルで生成し、公開鍵だけを cloud-config に記載します。SSH 接続の前に、共有 NIC の IP アドレスを確認します。

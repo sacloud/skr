@@ -22,7 +22,6 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
 - [ ] `database`
 - [ ] `icon`
 - [ ] `iface`
-- [ ] `internet`
 - [ ] `ipaddress`
 - [ ] `ipv6addr`
 - [ ] `ipv6net`
@@ -44,11 +43,12 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - `iaas-api archive` の Find / Read を実装済みです。Find はゾーン、タグ、公開アーカイブの OS 種別で検索できます。
     - SDK の Create / Update / Delete / Upload / Download / OpenFTP / CloseFTP / WaitReady は未対応です。
     - 読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/archive.md)があります。is1b で検索・参照を確認済みです。
-- [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。Create は必須・任意の単純値とタグ、Update はゾーン・ID・変更する単純値とタグを個別フラグで指定でき、複雑な入力には JSON を使います。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
+- [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。Create は必須・任意の単純値とタグ、Update はゾーン・ID・変更する単純値とタグを個別フラグで指定でき、複雑な入力には JSON を使います。Find は `--name` による単一名の部分一致検索に対応します。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
+- [x] `internet` — `iaas-api internet` の Find / Read / Create / Update / Delete、サブネット操作、IPv6 操作、MonitorRouter を実装済みです。Find は `--name` による単一名の部分一致検索、Delete は `--force` と `--fail-if-not-found` に対応します。ルータ＋スイッチ、Server、起動 Disk を作成し、サブネットから選んだ IPv4 アドレスを NIC の OS 設定へ適用して SSH 接続する [ライブ E2E runner](test/e2e/internet/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet.md)があります。個別オプションだけの操作で is1b の作成・NIC 接続・名前検索・サブネット参照・SSH ログイン・削除後の不在を確認済みです。Update、追加サブネット、IPv6、MonitorRouter のライブ検証は未実施です。
 - [x] `packetfilter` — `iaas-api packetfilter` の Find / Read / Create / Update / Delete を実装済みです。ルールの Expression 配列は `--expressions` の JSON 値または `--request` で指定し、ゾーン、名前、ID などの単純値はフラグで指定できます。is1b で作成・検索・参照・ルール更新・削除を確認する [ライブ E2E runner](test/e2e/packetfilter/) と[チュートリアル](docs/manual/tutorials/iaas-api/packetfilter.md)があります。ライブ E2E で各操作と削除後の不在を確認済みです。NIC への適用とパケット通信の検証は対象外です。
 - [x] `server`
     - [x] Find / Read / Create / Boot / Update / Delete を実装済みです。
-    - Create では基本項目に加え、反復可能な `--disk` と `--nic` で複数ディスクと共有／未接続 NIC を指定できます。Boot は user-data のファイル／標準入力に対応します。
+    - Create では基本項目に加え、反復可能な `--disk` と `--nic` で複数ディスクと共有／未接続／スイッチ ID 接続の NIC を指定できます。Find は `--name` による単一名の部分一致検索に対応します。Boot は user-data のファイル／標準入力に対応します。
     - Create の定型的な入力処理・検証・API 呼び出しは生成し、ディスク／NIC の固有変換だけを型付き callback に接続します。生成への移行後も is1b のライブ E2E で作成・起動・SSH 接続・削除後の不在を確認済みです。生成器との境界は [ADR 0042](docs/adr/0042-generated-request-transform.md) に記載しています。Boot は手書きを維持します。
     - [ ] SDK の Apply / ChangePlan / EjectCDROM / InsertCDROM / MonitorCPU / Reset / SendNMI / Shutdown / WaitBoot / WaitShutdown は **未対応**です。
     - is1b で新記法による cloud-init 起動・SSH 接続・削除・一時 SSH ファイルの後始末を確認済みです。[ライブ E2E runner](test/e2e/server/) と[チュートリアル](docs/manual/tutorials/iaas-api/server.md)があります。設計は [ADR 0040](docs/adr/0040-server-cloud-init-and-ssh-tutorial.md)、[ADR 0041](docs/adr/0041-server-repeatable-disk-and-nic-options.md) と[設計文書](docs/design/server-cloud-init-ssh.md)を参照してください。
