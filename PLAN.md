@@ -103,7 +103,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 - [ ] `dedicated-storage`
 - [ ] `kms`
 - [ ] `monitoring-suite`
-- [ ] `networking-suite`
+- [x] `networking-suite` — `networking-suite-api` でサブネットグループ、サブネット、インターフェースコネクション、アドレスの SDK 公開14操作を実装済みです。別サブネット間の TCP 疎通を確認する is1b [ライブ E2E runner](test/e2e/networking-suite/) と[チュートリアル](docs/manual/tutorials/networking-suite-api.md)があります。cloudimg Archive の Server A から Server B へ TCP 接続し、`PONG networking-suite` を受信するライブ検証を完了し、一時リソースを削除しました。共有 NIC と Networking Suite NIC を併用する Server A では、ゲスト OS 側で NWS NIC の DHCP と経路を設定する必要があるため、runner とチュートリアルで MAC アドレスに一致する netplan を設定します。Server A は利用者の状態確認用に起動したまま保持しています
 - [ ] `nosql`
 - [ ] `object-storage`
 - [ ] `secretmanager`
