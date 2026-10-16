@@ -756,8 +756,7 @@ func (s *scenario) readAddresses(ctx context.Context, index int) ([]addressItem,
 	return items, nil
 }
 
-func (s *scenario) cleanup(ctx context.Context, name string) error {
-	var result error
+func (s *scenario) cleanup(ctx context.Context, name string) (result error) {
 	defer func() {
 		if s.tempDir != "" {
 			if err := os.RemoveAll(s.tempDir); err != nil {
@@ -823,20 +822,13 @@ func (s *scenario) cleanup(ctx context.Context, name string) error {
 		if i == 1 {
 			serverName = name + "-peer"
 		}
-		var items []serverItem
-		if err := s.call(ctx, fmt.Sprintf("cleanup-find-server-%d", i), []string{
-			"iaas-api", "server", "find", "--zone", zone, "--name", serverName, "--query", "map({ID,Name,Description})",
-		}, nil, &items); err != nil {
+		item, err := s.findTemporaryServer(ctx, i, serverName)
+		if err != nil {
 			result = errors.Join(result, err)
 			continue
 		}
-		for _, item := range items {
-			if item.Name == serverName && item.Description == description && !item.ID.IsEmpty() {
-				if !s.servers[i].ID.IsEmpty() {
-					return errors.Join(result, errors.New("multiple matching temporary Servers; manual cleanup required"))
-				}
-				s.servers[i] = item
-			}
+		if !item.ID.IsEmpty() {
+			s.servers[i] = item
 		}
 	}
 	stopErr := s.stopServers(ctx)
@@ -909,22 +901,20 @@ func (s *scenario) cleanup(ctx context.Context, name string) error {
 			}
 		}
 	}
-	for i, subnet := range s.subnets {
-		if subnet.SRN == "" {
+	for i := len(s.subnets) - 1; i >= 0; i-- {
+		item := s.subnets[i]
+		if item.SRN == "" {
 			continue
 		}
 		var addresses []addressItem
 		if err := s.call(ctx, fmt.Sprintf("cleanup-list-addresses-%d", i), []string{
-			"networking-suite-api", "address", "list", subnet.SRN, "--query", "map({SRN,IPAddress,Subnet})",
+			"networking-suite-api", "address", "list", item.SRN, "--query", "map({SRN,IPAddress,Subnet})",
 		}, nil, &addresses); err != nil {
-			result = errors.Join(result, err)
-		} else if len(addresses) != 0 {
-			result = errors.Join(result, fmt.Errorf("subnet %s still has assigned addresses; refusing cleanup", subnet.SRN))
+			result = errors.Join(result, fmt.Errorf("list addresses for subnet %s; refusing cleanup: %w", item.SRN, err))
+			continue
 		}
-	}
-	for i := len(s.subnets) - 1; i >= 0; i-- {
-		item := s.subnets[i]
-		if item.SRN == "" {
+		if len(addresses) != 0 {
+			result = errors.Join(result, fmt.Errorf("subnet %s still has assigned addresses; refusing cleanup", item.SRN))
 			continue
 		}
 		var current subnetItem
@@ -986,6 +976,26 @@ func (s *scenario) cleanup(ctx context.Context, name string) error {
 		}
 	}
 	return result
+}
+
+func (s *scenario) findTemporaryServer(ctx context.Context, index int, name string) (serverItem, error) {
+	var items []serverItem
+	if err := s.call(ctx, fmt.Sprintf("cleanup-find-server-%d", index), []string{
+		"iaas-api", "server", "find", "--zone", zone, "--name", name,
+		"--query", "map({ID,Name,Description,Interfaces})",
+	}, nil, &items); err != nil {
+		return serverItem{}, err
+	}
+	var found serverItem
+	for _, item := range items {
+		if item.Name == name && item.Description == description && !item.ID.IsEmpty() {
+			if !found.ID.IsEmpty() {
+				return serverItem{}, errors.New("multiple matching temporary Servers; manual cleanup required")
+			}
+			found = item
+		}
+	}
+	return found, nil
 }
 
 func checkGroup(item groupItem, name string) error {

@@ -31,14 +31,24 @@ import (
 )
 
 type fakeCLI struct {
-	groups        []groupItem
-	deleted       []string
-	calls         []string
-	subnetsRemain bool
+	groups           []groupItem
+	subnets          []subnetItem
+	foundServers     map[int][]serverItem
+	addresses        map[string][]addressItem
+	addressListError map[string]error
+	args             map[string][]string
+	deleted          []string
+	deletedSubnets   []string
+	calls            []string
+	subnetsRemain    bool
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args []string, _ any) ([]byte, error) {
 	f.calls = append(f.calls, step)
+	if f.args == nil {
+		f.args = make(map[string][]string)
+	}
+	f.args[step] = append([]string(nil), args...)
 	switch step {
 	case "cleanup-read-subnet-group":
 		if len(f.groups) != 1 || len(args) < 4 || args[3] != f.groups[0].SRN {
@@ -61,9 +71,37 @@ func (f *fakeCLI) call(_ context.Context, step string, args []string, _ any) ([]
 		if f.subnetsRemain {
 			return []byte(`[{"SRN":"remaining"}]`), nil
 		}
+		if f.subnets == nil {
+			return []byte("[]"), nil
+		}
+		return json.Marshal(f.subnets)
+	case "cleanup-find-subnet-0", "cleanup-find-subnet-1":
 		return []byte("[]"), nil
-	case "cleanup-find-subnet-0", "cleanup-find-subnet-1", "cleanup-find-server-0", "cleanup-find-server-1":
-		return []byte("[]"), nil
+	case "cleanup-find-server-0":
+		return json.Marshal(f.foundServers[0])
+	case "cleanup-find-server-1":
+		return json.Marshal(f.foundServers[1])
+	case "cleanup-list-addresses-0", "cleanup-list-addresses-1":
+		if err := f.addressListError[step]; err != nil {
+			return nil, err
+		}
+		return json.Marshal(f.addresses[step])
+	case "cleanup-read-subnet-0", "cleanup-read-subnet-1":
+		for _, subnet := range f.subnets {
+			if subnet.SRN == args[3] {
+				return json.Marshal(subnet)
+			}
+		}
+		return nil, errors.New("unexpected subnet read")
+	case "cleanup-delete-subnet-0", "cleanup-delete-subnet-1":
+		f.deletedSubnets = append(f.deletedSubnets, args[3])
+		for i := range f.subnets {
+			if f.subnets[i].SRN == args[3] {
+				f.subnets = append(f.subnets[:i], f.subnets[i+1:]...)
+				break
+			}
+		}
+		return nil, nil
 	default:
 		return nil, errors.New("unexpected CLI call: " + step)
 	}
@@ -226,6 +264,91 @@ func TestCleanupDoesNotDeleteGroupWithRemainingSubnets(t *testing.T) {
 	}
 	if len(fake.deleted) != 0 {
 		t.Fatalf("cleanup deleted a group with remaining subnets: %v", fake.deleted)
+	}
+}
+
+func TestFindTemporaryServerRetainsNICIdentityForCleanup(t *testing.T) {
+	expected := serverItem{
+		ID:          123,
+		Name:        namePrefix + "run-entry",
+		Description: description,
+		Interfaces: []serverInterface{
+			{ID: 456, UpstreamType: "shared"},
+			{ID: 789, UpstreamType: "none"},
+		},
+	}
+	fake := &fakeCLI{foundServers: map[int][]serverItem{0: {expected}}}
+	test := &scenario{client: fake}
+	got, err := test.findTemporaryServer(context.Background(), 0, expected.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got.Interfaces, expected.Interfaces) {
+		t.Fatalf("recovered interfaces = %v, want %v", got.Interfaces, expected.Interfaces)
+	}
+	if !sameInterfaceIDs(got.Interfaces, expected.Interfaces) {
+		t.Fatal("recovered NIC identity cannot authorize cleanup of the created Server")
+	}
+	if args := strings.Join(fake.args["cleanup-find-server-0"], " "); !strings.Contains(args, "map({ID,Name,Description,Interfaces})") {
+		t.Fatalf("server recovery query omitted Interfaces: %q", args)
+	}
+}
+
+func TestCleanupDoesNotDeleteSubnetWhenAddressCheckFails(t *testing.T) {
+	assertSubnetCleanupBlocked(t, true)
+}
+
+func TestCleanupDoesNotDeleteSubnetWithAssignedAddresses(t *testing.T) {
+	assertSubnetCleanupBlocked(t, false)
+}
+
+func assertSubnetCleanupBlocked(t *testing.T, failAddressList bool) {
+	t.Helper()
+	group := groupItem{
+		SRN: "temporary-srn", Name: namePrefix + "run-updated",
+		Description: description, IPv4AddressRangeCIDR: "10.0.0.0/16",
+		Region: struct{ Code string }{Code: "is1"},
+	}
+	subnets := [2]subnetItem{
+		{
+			SRN: "entry-subnet-srn", Name: namePrefix + "run-subnet-1-updated",
+			Description: description, IPv4AddressRangeCIDR: "10.0.1.0/24",
+			Zone:        struct{ Code string }{Code: zone},
+			SubnetGroup: struct{ SRN string }{SRN: group.SRN},
+		},
+		{
+			SRN: "peer-subnet-srn", Name: namePrefix + "run-subnet-2",
+			Description: description, IPv4AddressRangeCIDR: "10.0.2.0/24",
+			Zone:        struct{ Code string }{Code: zone},
+			SubnetGroup: struct{ SRN string }{SRN: group.SRN},
+		},
+	}
+	fake := &fakeCLI{
+		groups:  []groupItem{group},
+		subnets: []subnetItem{subnets[0], subnets[1]},
+		addressListError: map[string]error{
+			"cleanup-list-addresses-0": func() error {
+				if failAddressList {
+					return errors.New("address list unavailable")
+				}
+				return nil
+			}(),
+		},
+		addresses: map[string][]addressItem{
+			"cleanup-list-addresses-0": {
+				{SRN: "assigned-address-srn", IPAddress: "10.0.1.4"},
+			},
+		},
+	}
+	test := &scenario{client: fake, group: group, subnets: subnets}
+	if err := test.cleanup(context.Background(), namePrefix+"run"); err == nil {
+		t.Fatal("cleanup succeeded while the address safety check did not pass")
+	}
+	if !reflect.DeepEqual(fake.deletedSubnets, []string{subnets[1].SRN}) {
+		t.Fatalf("deleted subnets = %v, want only the verified empty subnet %q", fake.deletedSubnets, subnets[1].SRN)
+	}
+	if len(fake.groups) != 1 {
+		t.Fatal("cleanup deleted the subnet group while a subnet remained")
 	}
 }
 
