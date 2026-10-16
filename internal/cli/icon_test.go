@@ -128,6 +128,11 @@ func TestIaaSIconAPIWithLocalMock(t *testing.T) {
 	if created.ID == 0 || created.Name != "TEST-ICON-NAME" || len(created.Tags) != 2 {
 		t.Fatalf("create returned %+v, want icon fields", created)
 	}
+	var other iaas.Icon
+	if err := json.Unmarshal(runCommand("iaas-api", "icon", "create",
+		"--name", "OTHER-ICON", "--image-file", imagePath, "--tags", "other"), &other); err != nil {
+		t.Fatal(err)
+	}
 
 	var found []*iaas.Icon
 	if err := json.Unmarshal(runCommand("iaas-api", "icon", "find", "--request", `{"Names":["TEST-ICON-NAME"]}`), &found); err != nil {
@@ -135,6 +140,34 @@ func TestIaaSIconAPIWithLocalMock(t *testing.T) {
 	}
 	if len(found) != 1 || found[0].ID != created.ID {
 		t.Fatalf("find returned %+v, want icon %s", found, created.ID)
+	}
+	for _, test := range []struct {
+		name string
+		args []string
+		want []iaas.Icon
+	}{
+		{"tags", []string{"--request", `{"Tags":["test","tutorial"]}`}, []iaas.Icon{created}},
+		{"no name match", []string{"--request", `{"Names":["MISSING"]}`}, nil},
+		{"no tag match", []string{"--request", `{"Tags":["test","other"]}`}, nil},
+		{"partial name", []string{"--request", `{"Names":["TEST","NAME"]}`}, []iaas.Icon{created}},
+		{"page", []string{"--count", "1", "--from", "1"}, []iaas.Icon{other}},
+		{"past end", []string{"--count", "1", "--from", "2"}, nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			args := append([]string{"iaas-api", "icon", "find"}, test.args...)
+			var items []iaas.Icon
+			if err := json.Unmarshal(runCommand(args...), &items); err != nil {
+				t.Fatal(err)
+			}
+			if len(items) != len(test.want) {
+				t.Fatalf("find returned %+v, want %+v", items, test.want)
+			}
+			for i := range items {
+				if items[i].ID != test.want[i].ID {
+					t.Fatalf("find returned %+v, want %+v", items, test.want)
+				}
+			}
+		})
 	}
 
 	readArgs := []string{"iaas-api", "icon", "read", "--id", created.ID.String()}
@@ -158,6 +191,17 @@ func TestIaaSIconAPIWithLocalMock(t *testing.T) {
 	if output := runCommand("iaas-api", "icon", "delete", "--id", created.ID.String(), "--fail-if-not-found"); len(output) != 0 {
 		t.Fatalf("delete output = %s, want empty", output)
 	}
+	runCommand("iaas-api", "icon", "delete", "--id", created.ID.String())
+	commandLine := newCLI()
+	commandLine.IaaSAPI.Icon = iconapi.NewCommands(iconapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (iconapi.API, error) { return iconSDK.New(server), nil })
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"iaas-api", "icon", "delete", "--id", created.ID.String(), "--fail-if-not-found"},
+		&stdout, &stderr, commandLine); code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "not_found") {
+		t.Fatalf("repeat delete code=%d stdout=%q stderr=%q; want not_found error", code, stdout.String(), stderr.String())
+	}
+	runCommand("iaas-api", "icon", "delete", "--id", other.ID.String())
 
 	found = nil
 	if err := json.Unmarshal(runCommand("iaas-api", "icon", "find", "--query", "map({ID,Name,Tags})"), &found); err != nil {

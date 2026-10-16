@@ -21,9 +21,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
+
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 )
 
 // Config holds mock options.
@@ -189,16 +193,20 @@ func (s *Server) doIcon(method string, parts []string, uri string, body any) ([]
 
 	switch {
 	case method == "GET" && id == "":
-		items := s.iconsAsSlice()
+		items, total, err := s.findIcons(request)
+		if err != nil {
+			return nil, err
+		}
 		return marshalJSON(map[string]any{
-			"Total": len(items),
+			"Total": total,
 			"Count": len(items),
+			"From":  request["From"],
 			"Icons": items,
 		})
 	case method == "GET":
 		item, ok := s.icons[id]
 		if !ok {
-			return nil, fmt.Errorf("icon %s not found", id)
+			return nil, iconNotFound(method, uri, id)
 		}
 		return marshalJSON(map[string]any{"Icon": item})
 	case method == "POST" && id == "":
@@ -208,6 +216,7 @@ func (s *Server) doIcon(method string, parts []string, uri string, body any) ([]
 		s.nextID++
 		id = fmt.Sprint(s.nextID)
 		delete(request, "Image")
+		request["Scope"] = json.RawMessage(`"user"`)
 		request["ID"], err = json.Marshal(s.nextID)
 		if err != nil {
 			return nil, fmt.Errorf("encode mock Icon ID: %w", err)
@@ -217,7 +226,7 @@ func (s *Server) doIcon(method string, parts []string, uri string, body any) ([]
 	case method == "PUT" && id != "":
 		current, ok := s.icons[id]
 		if !ok {
-			return nil, fmt.Errorf("icon %s not found", id)
+			return nil, iconNotFound(method, uri, id)
 		}
 		for field, value := range request {
 			current[field] = value
@@ -226,13 +235,122 @@ func (s *Server) doIcon(method string, parts []string, uri string, body any) ([]
 		return marshalJSON(map[string]any{"Icon": current})
 	case method == "DELETE" && id != "":
 		if _, ok := s.icons[id]; !ok {
-			return nil, fmt.Errorf("icon %s not found", id)
+			return nil, iconNotFound(method, uri, id)
 		}
 		delete(s.icons, id)
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("unsupported IaaS operation: %s %s", method, uri)
 	}
+}
+
+func iconNotFound(method, uri, id string) error {
+	requestURL, err := url.Parse(uri)
+	if err != nil {
+		return fmt.Errorf("parse Icon request URL: %w", err)
+	}
+	return iaas.NewAPIError(method, requestURL, http.StatusNotFound, &iaas.APIErrorResponse{
+		ErrorCode: "not_found", ErrorMessage: fmt.Sprintf("icon %s not found", id),
+	})
+}
+
+func (s *Server) findIcons(request map[string]json.RawMessage) ([]map[string]json.RawMessage, int, error) {
+	var condition struct {
+		Count  int
+		From   int
+		Sort   []string
+		Filter struct {
+			Name  string
+			Tags  [][]string `json:"Tags.Name"`
+			Scope []string
+		}
+	}
+	data, err := json.Marshal(request)
+	if err != nil {
+		return nil, 0, fmt.Errorf("encode Icon search: %w", err)
+	}
+	if err := json.Unmarshal(data, &condition); err != nil {
+		return nil, 0, fmt.Errorf("decode Icon search: %w", err)
+	}
+	if condition.Count < 0 || condition.From < 0 {
+		return nil, 0, errors.New("Icon search Count and From must not be negative")
+	}
+	name, err := url.QueryUnescape(condition.Filter.Name)
+	if err != nil {
+		return nil, 0, fmt.Errorf("decode Icon name filter: %w", err)
+	}
+	items := make([]map[string]json.RawMessage, 0)
+	for _, item := range s.iconsAsSlice() {
+		var icon struct {
+			Name  string
+			Tags  []string
+			Scope string
+		}
+		data, err := json.Marshal(item)
+		if err != nil {
+			return nil, 0, err
+		}
+		if err := json.Unmarshal(data, &icon); err != nil {
+			return nil, 0, fmt.Errorf("decode stored Icon: %w", err)
+		}
+		matches := true
+		for _, part := range strings.Fields(name) {
+			matches = matches && strings.Contains(icon.Name, part)
+		}
+		for _, group := range condition.Filter.Tags {
+			for _, tag := range group {
+				found := false
+				for _, actual := range icon.Tags {
+					found = found || actual == tag
+				}
+				matches = matches && found
+			}
+		}
+		if len(condition.Filter.Scope) != 0 {
+			found := false
+			for _, scope := range condition.Filter.Scope {
+				found = found || icon.Scope == scope
+			}
+			matches = matches && found
+		}
+		if matches {
+			items = append(items, item)
+		}
+	}
+	sortKeys := append(append([]string(nil), condition.Sort...), "ID")
+	for _, key := range sortKeys {
+		switch strings.TrimLeft(key, "+-") {
+		case "ID", "Name", "Scope":
+		default:
+			return nil, 0, fmt.Errorf("unsupported Icon mock sort key %q", key)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		for _, key := range sortKeys {
+			field := strings.TrimLeft(key, "+-")
+			a, b := string(items[i][field]), string(items[j][field])
+			if a != b {
+				if field == "ID" && len(a) != len(b) {
+					if strings.HasPrefix(key, "-") {
+						return len(a) > len(b)
+					}
+					return len(a) < len(b)
+				}
+				if strings.HasPrefix(key, "-") {
+					return a > b
+				}
+				return a < b
+			}
+		}
+		return false
+	})
+	total := len(items)
+	from := min(condition.From, total)
+	end := total
+	if condition.Count > 0 {
+		end = from + min(condition.Count, total-from)
+	}
+	return items[from:end], total, nil
 }
 
 func (s *Server) doPacketFilter(method string, parts []string, uri string, body any) ([]byte, error) {

@@ -34,6 +34,7 @@ type fakeCLI struct {
 	calls          []string
 	badCreate      bool
 	changeIdentity bool
+	updateFailure  string
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) ([]byte, error) {
@@ -79,6 +80,16 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 		}
 		f.item.Name = request["Name"].(string)
 		f.item.Tags = request["Tags"].([]string)
+		switch f.updateFailure {
+		case "error":
+			return nil, errors.New("update applied but response failed")
+		case "json":
+			return []byte("{"), nil
+		case "wrong-id":
+			item := *f.item
+			item.ID = 9876
+			return json.Marshal(item)
+		}
 		return json.Marshal(f.item)
 	case "cleanup-delete":
 		if f.item == nil || f.item.ID != request["ID"].(types.ID) {
@@ -106,6 +117,22 @@ func TestScenarioCreatesUpdatesAndCleansIcon(t *testing.T) {
 }
 
 func TestScenarioRefusesExistingIconAndCleansAfterFailure(t *testing.T) {
+	for _, failure := range []string{"error", "json", "wrong-id"} {
+		t.Run("applied update "+failure, func(t *testing.T) {
+			fake := &fakeCLI{updateFailure: failure}
+			err := (scenario{client: fake}).run(context.Background(), "skr-e2e-icon-test", "/tmp/icon.png")
+			if err == nil || fake.item != nil || len(fake.deleted) != 1 || fake.deleted[0] != 1234 {
+				t.Fatalf("err=%v item=%+v deleted=%v; want error and cleanup of original ID", err, fake.item, fake.deleted)
+			}
+		})
+	}
+	t.Run("applied update with unrelated identity", func(t *testing.T) {
+		fake := &fakeCLI{updateFailure: "error", changeIdentity: true}
+		err := (scenario{client: fake}).run(context.Background(), "skr-e2e-icon-test", "/tmp/icon.png")
+		if err == nil || !strings.Contains(err.Error(), "refusing to delete") || len(fake.deleted) != 0 {
+			t.Fatalf("err=%v deleted=%v; want refusal to delete unrelated identity", err, fake.deleted)
+		}
+	})
 	t.Run("pre-existing", func(t *testing.T) {
 		fake := &fakeCLI{existing: []iconItem{{ID: 9876, Name: "skr-e2e-icon-test"}}}
 		err := (scenario{client: fake}).run(context.Background(), "skr-e2e-icon-test", "/tmp/icon.png")

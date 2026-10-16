@@ -184,13 +184,14 @@ func (s scenario) run(ctx context.Context, name, imageFile string) (result error
 		return fmt.Errorf("created Icon identity does not match the test request")
 	}
 	expected := *created
+	cleanupIdentities := []iconItem{expected}
 	deleted := false
 	defer func() {
 		if deleted {
 			return
 		}
-		if err := s.cleanup(ctx, expected); err != nil {
-			result = errors.Join(result, fmt.Errorf("cleanup failed; verify Icon ID %s manually: %w", expected.ID, err))
+		if err := s.cleanup(ctx, cleanupIdentities...); err != nil {
+			result = errors.Join(result, fmt.Errorf("cleanup failed; verify Icon ID %s manually: %w", created.ID, err))
 		}
 	}()
 
@@ -202,16 +203,18 @@ func (s scenario) run(ctx context.Context, name, imageFile string) (result error
 		return fmt.Errorf("read Icon identity does not match the created resource")
 	}
 
+	requestedUpdate := iconItem{ID: created.ID, Name: name + "-updated", Tags: []string{"skr-e2e", "updated"}}
+	cleanupIdentities = append(cleanupIdentities, requestedUpdate)
 	updated, err := s.item(ctx, "test-update", map[string]any{
 		"ID": created.ID, "Name": name + "-updated", "Tags": []string{"skr-e2e", "updated"},
 	})
 	if err != nil {
 		return err
 	}
-	expected = *updated
-	if updated.Name != name+"-updated" || !sameTags(updated.Tags, []string{"skr-e2e", "updated"}) {
+	if !sameIcon(*updated, requestedUpdate) {
 		return fmt.Errorf("updated Icon fields do not match the request")
 	}
+	expected = requestedUpdate
 
 	read, err = s.item(ctx, "test-read-updated", map[string]any{"ID": created.ID})
 	if err != nil {
@@ -288,14 +291,19 @@ func (s scenario) find(ctx context.Context, step, name string) ([]iconItem, erro
 	return items, nil
 }
 
-func (s scenario) cleanup(ctx context.Context, expected iconItem) error {
+func (s scenario) cleanup(ctx context.Context, identities ...iconItem) error {
+	expected := identities[0]
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 60*time.Second)
 	defer cancel()
 	current, err := s.item(cleanupCtx, "cleanup-read", map[string]any{"ID": expected.ID})
 	if err != nil {
 		return err
 	}
-	if !sameIcon(*current, expected) {
+	matches := false
+	for _, identity := range identities {
+		matches = matches || (identity.ID == expected.ID && sameIcon(*current, identity))
+	}
+	if !matches {
 		return fmt.Errorf("Icon identity changed for ID %s; refusing to delete", expected.ID)
 	}
 	_, err = s.client.call(cleanupCtx, "cleanup-delete", map[string]any{"ID": expected.ID})
