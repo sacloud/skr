@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.0.3](https://github.com/sacloud/skr/compare/v0.0.2...v0.0.3) - 2026-10-16
+
+### 🚀 Changes
+- API コマンド生成器に反復入力と型付きリクエスト変換を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/106
+- Disk API の create/update にフラグ入力を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/110
+- Server 作成時の NoWait と BootAfterCreate を早期検証 by @tokuhirom in https://github.com/sacloud/skr/pull/111
+- Server update のヘルプを実際のフラグと JSON 専用項目に合わせる by @tokuhirom in https://github.com/sacloud/skr/pull/112
+- IaaS PacketFilter コマンド・ライブ E2E・チュートリアルを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/113
+- API コマンド検証を同一パッケージ内で直接呼び出す by @tokuhirom in https://github.com/sacloud/skr/pull/115
+- API コマンド初期化を constructor に統一 by @tokuhirom in https://github.com/sacloud/skr/pull/116
+- IaaS のゾーン検証を共通化し、本文検証を SDK／API に委ねる by @tokuhirom in https://github.com/sacloud/skr/pull/117
+- Internet API とルータ経由の SSH E2E・チュートリアルを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/118
+- feat: IaaS Icon API コマンドを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/119
+### 📦 Dependency Updates
+- ci: bump Songmu/tagpr from 1.21.1 to 1.21.2 by @dependabot[bot] in https://github.com/sacloud/skr/pull/109
+- go: bump golang.org/x/term from 0.46.0 to 0.47.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/108
+
 ## [v0.0.2](https://github.com/sacloud/skr/compare/v0.0.1...v0.0.2) - 2026-10-14
 
 ### 🚀 Changes
