@@ -35,6 +35,7 @@ func TestGenerate(t *testing.T) {
 		Operations: []Operation{
 			{
 				Name:         "Find",
+				CommandName:  "find",
 				CommandType:  "switchFindCommand",
 				Help:         "Find `switches`.",
 				Method:       "FindWithContext",
@@ -44,6 +45,7 @@ func TestGenerate(t *testing.T) {
 			},
 			{
 				Name:         "Search",
+				CommandName:  "search",
 				CommandType:  "switchSearchCommand",
 				Help:         "Search with generated flags.",
 				Method:       "SearchWithContext",
@@ -57,6 +59,7 @@ func TestGenerate(t *testing.T) {
 			},
 			{
 				Name:             "Delete",
+				CommandName:      "delete",
 				CommandType:      "switchDeleteCommand",
 				Help:             "Delete a switch.",
 				Method:           "DeleteWithContext",
@@ -65,6 +68,7 @@ func TestGenerate(t *testing.T) {
 			},
 			{
 				Name:         "Version",
+				CommandName:  "version",
 				CommandType:  "switchVersionCommand",
 				Help:         "Print the API version.",
 				Method:       "VersionWithContext",
@@ -99,6 +103,7 @@ func TestGenerate(t *testing.T) {
 		"return op.DeleteWithContext(context.Background(), request)",
 		"if err := ValidateDeleteRequest(request); err != nil",
 		"switchFindCommand",
+		`name:\"find\"`,
 		"commands.Find.runtime = runtime",
 		"commands.Find.factory = factory",
 		"op.SearchWithContext(context.Background(), request)",
@@ -126,6 +131,42 @@ func TestGenerate(t *testing.T) {
 	}
 	if string(source) != string(second) {
 		t.Fatal("Generate() output is not deterministic")
+	}
+}
+
+func TestValidateOperationCommandNames(t *testing.T) {
+	config := Config{
+		Package: "exampleapi", Resource: "Example",
+		CommandType: "Commands", APIType: "API", FactoryType: "APIFactory", RuntimeType: "Runtime",
+		Operations: []Operation{
+			{Name: "ReadIPv6", CommandName: "read-ipv6", CommandType: "ReadIPv6Command", Help: "IPv6 を読み取ります。", Method: "ReadIPv6"},
+			{Name: "EnableIPv6", CommandName: "enable-ipv6", CommandType: "EnableIPv6Command", Help: "IPv6 を有効にします。", Method: "EnableIPv6"},
+		},
+	}
+	if err := config.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`name:\"read-ipv6\"`, `name:\"enable-ipv6\"`} {
+		if !strings.Contains(string(source), want) {
+			t.Errorf("generated source does not contain %q", want)
+		}
+	}
+
+	config.Operations[1].CommandName = "read-ipv6"
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "duplicate command name") {
+		t.Fatalf("Validate() error = %v, want duplicate command name", err)
+	}
+	config.Operations[1].CommandName = ""
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "every operation or none") {
+		t.Fatalf("Validate() error = %v, want all operations to specify command_name", err)
+	}
+	config.Operations[1].CommandName = "Enable-IPv6"
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "command_name must be kebab-case") {
+		t.Fatalf("Validate() error = %v, want kebab-case command name", err)
 	}
 }
 
@@ -450,6 +491,7 @@ func TestValidateRejectsUnsupportedFlagsAndDuplicateNames(t *testing.T) {
 			},
 		},
 	}
+
 	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "unsupported type") {
 		t.Fatalf("Validate() error = %v, want unsupported flag type error", err)
 	}
@@ -495,6 +537,44 @@ func TestValidateRejectsUnsupportedFlagsAndDuplicateNames(t *testing.T) {
 	config.Operations = append(config.Operations, config.Operations[0])
 	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "duplicate operation") {
 		t.Fatalf("Validate() error = %v, want duplicate operation error", err)
+	}
+}
+
+func TestSingletonNameFlag(t *testing.T) {
+	config := transformTestConfig()
+	config.Operations[0].Name = "Find"
+	config.Operations[0].Flags = []Flag{{Name: "name", Field: "Names", Type: "string", Help: "名前です。", Singleton: true}}
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(source), "request.Names = []string{*c.Names}") {
+		t.Fatalf("singleton assignment missing: %s", source)
+	}
+	second, err := Generate(config)
+	if err != nil || string(source) != string(second) {
+		t.Fatalf("non-deterministic generation: %v", err)
+	}
+	valid := config.Operations[0].Flags[0]
+	for _, mutate := range []func(*Flag){
+		func(f *Flag) { f.Name = "names" },
+		func(f *Flag) { f.Field = "Other" },
+		func(f *Flag) { f.Type = "int" },
+		func(f *Flag) { f.Pointer = true },
+		func(f *Flag) { f.Conversion = "string" },
+		func(f *Flag) { f.Separator = "," },
+	} {
+		flag := valid
+		mutate(&flag)
+		config.Operations[0].Flags[0] = flag
+		if err := config.Validate(); err == nil {
+			t.Fatalf("accepted invalid singleton flag: %+v", flag)
+		}
+	}
+	config.Operations[0].Flags[0] = valid
+	config.Operations[0].Name = "Create"
+	if err := config.Validate(); err == nil {
+		t.Fatal("accepted singleton outside Find")
 	}
 }
 

@@ -59,7 +59,7 @@ func TestRunIaaSDiskHelp(t *testing.T) {
 	}{
 		{args: []string{"iaas-api", "--help"}, want: []string{"disk", "server", "switch"}},
 		{args: []string{"iaas-api", "disk", "--help"}, want: []string{"find", "read", "create", "update", "delete"}},
-		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "--request", "JSON 例", `"Names":["example"]`, "併用不可"}, notWant: []string{"--zone all"}},
+		{args: []string{"iaas-api", "disk", "find", "--help"}, want: []string{"--zone", "--name", "--tags", "カンマ区切り", "Count", "From", "Names", "--request", "部分一致", "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "disk", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
 		{args: []string{"iaas-api", "disk", "create", "--help"}, want: []string{"--zone", "--name", "--disk-plan-id", "--connection", "--size-gb", "--tags", "--request", "DistantFrom", "OSType", "API フィールドではありません", "EditParameter", "@path.json", "併用不可"}},
 		{args: []string{"iaas-api", "disk", "update", "--help"}, want: []string{"--zone", "--id", "--name", "--description", "--tags", "--icon-id", "--connection", "--no-wait", "--request", "省略した項目", "EditParameter", "@path.json", "併用不可"}},

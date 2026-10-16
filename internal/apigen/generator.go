@@ -44,6 +44,7 @@ type Config struct {
 
 type Operation struct {
 	Name             string         `json:"name"`
+	CommandName      string         `json:"command_name,omitempty"`
 	CommandType      string         `json:"command_type"`
 	Help             string         `json:"help"`
 	Method           string         `json:"method"`
@@ -85,6 +86,7 @@ type Flag struct {
 	Pointer    bool   `json:"pointer,omitempty"`
 	Conversion string `json:"conversion,omitempty"`
 	Separator  string `json:"separator,omitempty"`
+	Singleton  bool   `json:"singleton,omitempty"`
 }
 
 type importSpec struct {
@@ -118,7 +120,7 @@ import (
 
 type {{.CommandType}} struct {
 {{- range .Operations }}
-	{{.Name}} {{.CommandType}} {{commandTag .Help}}
+	{{.Name}} {{.CommandType}} {{commandTag .CommandName .Help}}
 {{- end }}
 }
 
@@ -215,7 +217,9 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 		}
 {{- end }}
 		if c.{{.Field}} != nil {
-{{- if .Conversion }}
+{{- if .Singleton }}
+			request.{{.Field}} = []string{*c.{{.Field}}}
+{{- else if .Conversion }}
 			value := {{.Conversion}}(*c.{{.Field}})
 {{- if .Pointer }}
 			request.{{.Field}} = &value
@@ -369,6 +373,8 @@ func (c Config) Validate() error {
 
 	operations := make(map[string]bool, len(c.Operations))
 	methods := make(map[string]bool, len(c.Operations))
+	commandNames := make(map[string]bool, len(c.Operations))
+	commandNamesSet := 0
 	commandTypes := make(map[string]bool)
 	for _, name := range []string{c.CommandType, c.APIType, c.FactoryType, c.RuntimeType} {
 		if commandTypes[name] {
@@ -384,6 +390,16 @@ func (c Config) Validate() error {
 	for i, operation := range c.Operations {
 		if !token.IsIdentifier(operation.Name) || token.Lookup(operation.Name).IsKeyword() {
 			return fmt.Errorf("operation %d name must be a valid Go identifier", i)
+		}
+		if operation.CommandName != "" {
+			if !isKebabName(operation.CommandName) {
+				return fmt.Errorf("operation %q command_name must be kebab-case", operation.Name)
+			}
+			if commandNames[operation.CommandName] {
+				return fmt.Errorf("duplicate command name %q", operation.CommandName)
+			}
+			commandNames[operation.CommandName] = true
+			commandNamesSet++
 		}
 		if !token.IsIdentifier(operation.CommandType) || token.Lookup(operation.CommandType).IsKeyword() {
 			return fmt.Errorf("operation %q command_type must be a valid Go identifier", operation.Name)
@@ -517,6 +533,10 @@ func (c Config) Validate() error {
 			if flag.Separator != "" && flag.Type != "[]string" {
 				return fmt.Errorf("operation %q flag %q separator requires []string type", operation.Name, flag.Name)
 			}
+			if flag.Singleton && (operation.Name != "Find" || flag.Name != "name" || flag.Field != "Names" ||
+				flag.Type != "string" || flag.Pointer || flag.Conversion != "" || flag.Separator != "") {
+				return fmt.Errorf("operation %q flag %q: singleton supports only a string name flag mapped to Find Names without pointer, conversion, or separator", operation.Name, flag.Name)
+			}
 			if strings.TrimSpace(flag.Help) == "" {
 				return fmt.Errorf("operation %q flag %q help must not be empty", operation.Name, flag.Name)
 			}
@@ -546,6 +566,9 @@ func (c Config) Validate() error {
 		operations[operation.Name] = true
 		methods[operation.Method] = true
 		commandTypes[operation.CommandType] = true
+	}
+	if commandNamesSet != 0 && commandNamesSet != len(c.Operations) {
+		return fmt.Errorf("command_name must be specified for every operation or none")
 	}
 	if aliases["zones"] && commandTypes["zones"] {
 		return fmt.Errorf("generated type %q conflicts with an import alias", "zones")
@@ -620,8 +643,13 @@ func Generate(config Config) ([]byte, error) {
 	}
 
 	tmpl, err := template.New("api").Funcs(template.FuncMap{
-		"commandTag": func(help string) string {
-			return strconv.Quote("cmd:\"\" help:" + strconv.Quote(help))
+		"commandTag": func(name, help string) string {
+			tag := "cmd:\"\""
+			if name != "" {
+				tag += " name:" + strconv.Quote(name)
+			}
+			tag += " help:" + strconv.Quote(help)
+			return strconv.Quote(tag)
 		},
 		"flagTag": func(name, help, separator string) string {
 			tag := "name:" + strconv.Quote(name) + " help:" + strconv.Quote(help)

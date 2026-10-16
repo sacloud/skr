@@ -19,6 +19,7 @@ import (
 	"github.com/sacloud/skr/internal/iaas/archiveapi"
 	"github.com/sacloud/skr/internal/iaas/diskapi"
 	"github.com/sacloud/skr/internal/iaas/diskplanapi"
+	"github.com/sacloud/skr/internal/iaas/internetapi"
 	"github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	"github.com/sacloud/skr/internal/iaas/serverapi"
 	"github.com/sacloud/skr/internal/iaas/switchapi"
@@ -39,6 +40,12 @@ func setDiskAPIFactory(commandLine *cli, factory diskapi.APIFactory) {
 
 func setDiskPlanAPIFactory(commandLine *cli, factory diskplanapi.APIFactory) {
 	commandLine.IaaSAPI.DiskPlan = diskplanapi.NewCommands(diskplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, factory)
+}
+
+func setInternetAPIFactory(commandLine *cli, factory internetapi.APIFactory) {
+	commandLine.IaaSAPI.Internet = internetapi.NewCommands(internetapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 	}, factory)
 }

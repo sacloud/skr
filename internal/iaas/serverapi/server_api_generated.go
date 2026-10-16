@@ -59,7 +59,8 @@ func NewCommands(runtime Runtime, factory APIFactory) Commands {
 }
 
 type FindCommand struct {
-	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"Names\\\":[\\\"example\\\"]}'。フラグ例: skr iaas-api server find --zone tk1v --tags production,web\""
+	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: 単一名の部分一致検索は --name、複数名の Names と Sort は JSON で指定します。Tags は --tags のカンマ区切りまたは JSON 配列、Count と From は個別フラグでも指定できます。例: skr iaas-api server find --zone is1b --name example\""
+	Names   *string   "name:\"name\" help:\"任意: 部分一致で検索する単一の名前。カンマを含めて1つの名前として扱います。API の名前検索条件に対応し、JSON では Names 配列で指定します。\""
 	Zone    *string   "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone tk1v\""
 	Tags    *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
 	Count   *int      "name:\"count\" help:\"任意: 取得件数 (整数)。\""
@@ -70,6 +71,7 @@ type FindCommand struct {
 
 func (c *FindCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
+	flagsSet = flagsSet || c.Names != nil
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Count != nil
@@ -88,6 +90,9 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	} else {
 		if !flagsSet {
 			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.Names != nil {
+			request.Names = []string{*c.Names}
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -219,7 +224,7 @@ type CreateCommand struct {
 	CDROMID         *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
 	PrivateHostID   *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
 	Disks           []string  "name:\"disk\" help:\"任意: ディスク1個を key=value のカンマ区切りで指定します。必須キー: plan-id、size-gb (GB)。任意キー: archive-id。すべて正の整数です。例: --disk 'archive-id=123,plan-id=4,size-gb=20'。繰り返し指定でき、指定順に API の Disks 配列を組み立てます。接続は virtio です。archive-id 省略時は空のディスクを作成します。\" sep:\"none\""
-	NICs            []string  "name:\"nic\" help:\"任意: NIC 1個を upstream=shared または upstream=disconnected で指定します。共有セグメントまたは未接続です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。shared は先頭の NIC にだけ指定できます。\" sep:\"none\""
+	NICs            []string  "name:\"nic\" help:\"任意: NIC 1個を upstream=shared、upstream=disconnected、または upstream=SWITCH_ID で指定します。共有セグメント、未接続、指定スイッチへの接続です。SWITCH_ID は正の整数です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。shared は先頭の NIC にだけ指定できます。ルータ＋スイッチに接続する場合も先頭の NIC を指定してください。OS の IP アドレスは設定しません。\" sep:\"none\""
 	factory         APIFactory
 	runtime         Runtime
 }

@@ -27,6 +27,7 @@
   "operations": [
     {
       "name": "Find",
+      "command_name": "find",
       "command_type": "exampleFindCommand",
       "help": "項目を検索します。",
       "method": "FindWithContext",
@@ -47,6 +48,8 @@
 ```
 
 SDK のメソッドは `context.Context` と、指定した場合は `*request_type` を受け取ります。結果を返す操作には `response_type` を指定し、戻り値と `error` を出力します。`response_type` を省略した操作は `error` のみを返し、成功時に出力しません。`request_type` を省略した操作は入力なしで呼び出します。インポートの別名を含む型名は、`imports` に定義します。
+
+Kong の既定のコマンド名で表記できない略語を含む場合は、各操作に `command_name` を指定して利用者向けの kebab-case 名を明示します。指定する場合は、すべての操作に指定し、コマンド名が重複しないようにします。省略時は Go フィールド名から Kong が生成する名前を使います。
 
 ## IaaS 以外の API ドメイン
 
@@ -93,9 +96,11 @@ $ make generate-api API_CONFIG=api/commands/eventbus-schedule.json API_OUTPUT=in
 $ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=internal/eventbusapi/eventbus_trigger_api_generated.go
 ```
 
-生成器は操作名とフィールド名を Go 識別子として扱います。Kong のコマンド名は操作名の小文字表記です。フラグ型は `string`、`bool`、`int`、`int64` に加えて、IaaS API のトップレベル `Tags` 専用の `[]string` をサポートします。配列フラグは `name: "tags"`、`field: "Tags"`、`type: "[]string"`、`separator: ","` の組み合わせだけを受け付けます。これは配列入力全般をフラグ化するものではなく、他の配列は JSON 経路に残します。`pointer: true` は明示指定された値だけをリクエストのポインター項目へ設定します。更新時の `Tags` がポインター型なら `pointer: true` を指定し、省略時の未指定状態を維持します。`conversion` を指定すると、その型へ変換してから設定します。`required: true` はフラグ経路での指定有無を検証します。`request_validator` を指定すると、JSON／フラグからリクエストを構築した後、SDK 呼び出し前にサービス固有の検証関数を実行します。
+生成器は操作名とフィールド名を Go 識別子として扱います。Kong のコマンド名は既定で Go フィールド名から生成し、略語など既定表記が適切でない場合は設定の `command_name` で明示します。フラグ型は `string`、`bool`、`int`、`int64` に加えて、IaaS API のトップレベル `Tags` 専用の `[]string` をサポートします。配列フラグは `name: "tags"`、`field: "Tags"`、`type: "[]string"`、`separator: ","` の組み合わせだけを受け付けます。これは配列入力全般をフラグ化するものではなく、他の配列は JSON 経路に残します。`pointer: true` は明示指定された値だけをリクエストのポインター項目へ設定します。更新時の `Tags` がポインター型なら `pointer: true` を指定し、省略時の未指定状態を維持します。`conversion` を指定すると、その型へ変換してから設定します。`required: true` はフラグ経路での指定有無を検証します。`request_validator` を指定すると、JSON／フラグからリクエストを構築した後、SDK 呼び出し前にサービス固有の検証関数を実行します。
 
 リクエストを持つ操作では `--request` にインライン JSON または `@path.json` を指定できます。個別フラグを設定した場合は `--request` と併用できません。JSON 経路では個別フラグの必須指定を要求せず、フラグ経路では必須フラグと、少なくとも 1 つのフラグの指定を確認してから SDK を呼び出します。IaaS API のトップレベル `Tags` 配列は例外として `--tags` でも指定できますが、JSON 経路での `Tags` 配列も引き続き利用でき、両経路を混在させることはできません。その他の配列、map、union、nullable 値、秘密情報など生成器の単純な型で表現しない入力は `--request` に残します。
+
+[ADR 0049](../adr/0049-internet-workflow-options.md) の単一名検索では、`name: "name"`、`field: "Names"`、`type: "string"`、`singleton: true` を指定します。Find 操作だけに許可し、`pointer`、`conversion`、`separator` との併用を拒否します。コマンドでは任意の単一文字列として受け取り、明示された場合だけ `[]string{value}` を設定します。カンマや空白を分割せず、空文字列も明示入力として保持します。複数名は JSON に残します。現在の適用対象は Internet、Server、Disk で、JSON の `Names` と同じ部分一致検索です。
 
 IaaS の検索では、フラグと `--request` JSON のどちらでも対象ゾーンを明示します。`Zone` に `all` を指定したゾーン横断検索はサポートせず、生成コードにゾーン列挙や複数ゾーンの結果集約を含めません。
 

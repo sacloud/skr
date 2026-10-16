@@ -91,6 +91,8 @@ Server 名には重複しない値を指定します。`CLOUDIMG_ARCHIVE_ID`、`
 
 `--disk` の plan-id と size-gb は必須です。archive-id を省略すると空のディスクを作成します。`--disk` と `--nic` は繰り返して指定でき、それぞれ指定順に接続します。`upstream=shared` は先頭の NIC にだけ指定できます。この手順ではディスクと共有 NIC を1個ずつ指定します。`--request` とは併用できません。
 
+`--nic "upstream=$SWITCH_ID"` で、正の整数の ID を持つスイッチへの接続も指定できます。ルータ＋スイッチに接続し、ゲスト OS の IP アドレスを設定して SSH 接続する手順は [Internet API チュートリアル](internet.md)を参照してください。
+
 ```console
 $ SERVER_NAME="skr-tutorial-cloudinit-$(date +%s)"
 $ skr iaas-api server create \

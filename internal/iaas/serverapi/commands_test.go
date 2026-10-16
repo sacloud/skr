@@ -48,7 +48,7 @@ func TestParseDevices(t *testing.T) {
 			t.Fatalf("unexpected disk: %+v", value)
 		}
 	}
-	for _, upstream := range []string{"shared", "disconnected"} {
+	for _, upstream := range []string{"shared", "disconnected", "123", "9223372036854775807"} {
 		value, err := parseNIC("upstream=" + upstream)
 		if err != nil || value.Upstream != upstream {
 			t.Fatalf("NIC = %+v, error = %v", value, err)
@@ -77,7 +77,8 @@ func TestParseDevicesRejectInvalidInputsWithoutEcho(t *testing.T) {
 		}
 	}
 	for _, input := range []string{
-		"", "upstream=", "upstream=123", "upstream=secret-value",
+		"", "upstream=", "upstream=0", "upstream=-1", "upstream=+123",
+		"upstream=9223372036854775808", "upstream=123\n", "upstream=secret-value",
 		"upstream=shared,upstream=disconnected", "upstream=shared,",
 		"password=secret-value", "upstream=shared=secret-value",
 	} {
@@ -104,6 +105,7 @@ func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
 		wantError bool
 	}{
 		{"multiple", []string{"--disk", "archive-id=123,plan-id=4,size-gb=20", "--disk", "plan-id=4,size-gb=100", "--nic", "upstream=shared", "--nic", "upstream=disconnected"}, false},
+		{"switch NIC", []string{"--nic", "upstream=123", "--nic", "upstream=456"}, false},
 		{"archive boot conflict", []string{"--disk", "archive-id=123,plan-id=4,size-gb=20", "--boot-after-create"}, true},
 		{"empty disk boot", []string{"--disk", "plan-id=4,size-gb=20", "--boot-after-create"}, false},
 		{"partial disk", []string{"--disk", "archive-id=123"}, true},
@@ -156,6 +158,10 @@ func TestCreateCommandDevicesAndExclusivity(t *testing.T) {
 					api.request.NetworkInterfaces[0].Upstream != "shared" || api.request.NetworkInterfaces[1].Upstream != "disconnected" {
 					t.Fatalf("unexpected request: %+v", api.request)
 				}
+			}
+			if test.name == "switch NIC" && (len(api.request.NetworkInterfaces) != 2 ||
+				api.request.NetworkInterfaces[0].Upstream != "123" || api.request.NetworkInterfaces[1].Upstream != "456") {
+				t.Fatalf("unexpected switch NIC request: %+v", api.request)
 			}
 		})
 	}

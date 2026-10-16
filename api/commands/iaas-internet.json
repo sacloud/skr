@@ -1,0 +1,492 @@
+{
+  "package": "internetapi",
+  "resource": "IaaS Internet",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types",
+    "internet": "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_name": "find",
+      "command_type": "FindCommand",
+      "help": "ルータ＋スイッチを指定したゾーンで検索して出力します。例: skr iaas-api internet find --zone is1b",
+      "method": "FindWithContext",
+      "request_type": "internet.FindRequest",
+      "response_type": "[]*iaas.Internet",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: 単一名の部分一致検索は --name、複数名の Names、SwitchIDs、SwitchNames、Sort は JSON で指定します。Tags は --tags のカンマ区切りまたは JSON 配列、Count と From は個別フラグでも指定できます。例: skr iaas-api internet find --zone is1b --name ROUTER-SWITCH-NAME。名前は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "name",
+          "field": "Names",
+          "type": "string",
+          "singleton": true,
+          "help": "任意: 部分一致で検索する単一の名前。カンマを含めて1つの名前として扱います。API の名前検索条件に対応し、JSON では Names 配列で指定します。"
+        },
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。例: --zone is1b",
+          "required": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
+          "conversion": "types.Tags",
+          "separator": ","
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数 (整数)。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置 (整数)。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "command_name": "read",
+      "command_type": "ReadCommand",
+      "help": "ルータ＋スイッチを読み取って出力します。",
+      "method": "ReadWithContext",
+      "request_type": "internet.ReadRequest",
+      "response_type": "*iaas.Internet",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012}'。ゾーンと ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: ルータ＋スイッチの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "command_name": "create",
+      "command_type": "CreateCommand",
+      "help": "ルータ＋スイッチを作成して出力します。課金対象になる場合があります。例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100",
+      "method": "CreateWithContext",
+      "request_type": "internet.CreateRequest",
+      "response_type": "*iaas.Internet",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (作成先ゾーン)、Name (名前)、NetworkMaskLen (プレフィクス長)、BandWidthMbps (帯域幅)。任意: Description (最大512文字)、Tags (文字列配列)、IconID (数値)。EnableIPv6 は作成時に IPv6 アドレス割り当てを有効にする設定です。料金と利用条件を確認してから実行してください。NoWait と NotFoundRetry は JSON でのみ指定できます。フラグ例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100。ゾーンと名前は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 作成先のゾーン名。",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "必須: ルータ＋スイッチの名前。",
+          "required": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
+          "conversion": "types.Tags",
+          "separator": ","
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 説明 (最大512文字)。"
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコンの ID (数値)。",
+          "conversion": "types.ID"
+        },
+        {
+          "name": "network-mask-len",
+          "field": "NetworkMaskLen",
+          "type": "int",
+          "help": "必須: 割り当てる IPv4 アドレスブロックのプレフィクス長。",
+          "required": true
+        },
+        {
+          "name": "band-width-mbps",
+          "field": "BandWidthMbps",
+          "type": "int",
+          "help": "必須: 接続帯域 (Mbps)。",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "command_name": "update",
+      "command_type": "UpdateCommand",
+      "help": "ルータ＋スイッチの設定を更新して出力します。例: skr iaas-api internet update --zone is1b --id 123456789012 --name UPDATED-NAME",
+      "method": "UpdateWithContext",
+      "request_type": "internet.UpdateRequest",
+      "response_type": "*iaas.Internet",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。Name、Description、Tags、IconID は API フィールドです。BandWidthMbps と EnableIPv6 は JSON のみで指定でき、帯域または IPv6 の設定も変更します。省略した項目は変更しません。帯域変更の制約と IPv6 利用料を確認してください。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012,\"Name\":\"UPDATED-NAME\"}'。ゾーン、ID、名前は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 更新対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。",
+          "pointer": true,
+          "conversion": "types.Tags",
+          "separator": ","
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 新しい名前。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 新しい説明。未指定なら変更しません。",
+          "pointer": true
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコン ID (数値)。未指定なら変更しません。",
+          "pointer": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_name": "delete",
+      "command_type": "DeleteCommand",
+      "help": "ルータ＋スイッチを削除します。--force は IPv6 の無効化と NextHop が設定された追加サブネットの削除も行います。例: skr iaas-api internet delete --zone is1b --id 123456789012",
+      "method": "DeleteWithContext",
+      "request_type": "internet.DeleteRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。Force と FailIfNotFound は --force と --fail-if-not-found でも指定できます。これらは API 本文のフィールドではなく削除の動作オプションです。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "force",
+          "field": "Force",
+          "type": "bool",
+          "help": "任意: IPv6 を無効化し、NextHop が設定された追加サブネットも削除します。既定は false です。削除範囲を確認して指定してください。"
+        },
+        {
+          "name": "fail-if-not-found",
+          "field": "FailIfNotFound",
+          "type": "bool",
+          "help": "任意: 対象が存在しない場合にエラーにします。既定は false で、不在でも成功として扱います。"
+        },
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 削除対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "ListSubnet",
+      "command_name": "list-subnet",
+      "command_type": "ListSubnetCommand",
+      "help": "ルータ＋スイッチに設定された IP アドレスブロックを一覧表示します。",
+      "method": "ListSubnetWithContext",
+      "request_type": "internet.ListSubnetRequest",
+      "response_type": "[]*iaas.Subnet",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (ルータ＋スイッチの数値 ID)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: ルータ＋スイッチの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "AddSubnet",
+      "command_name": "add-subnet",
+      "command_type": "AddSubnetCommand",
+      "help": "ルータ＋スイッチに IP アドレスブロックを追加します。ネクストホップとなるサーバを先に用意してください。",
+      "method": "AddSubnetWithContext",
+      "request_type": "internet.AddSubnetRequest",
+      "response_type": "*iaas.Subnet",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID、NetworkMaskLen、NextHop。NetworkMaskLen はプレフィクス長、NextHop はネクストホップの IPv4 アドレスです。例: skr iaas-api internet add-subnet --zone is1b --id 123456789012 --network-mask-len 28 --next-hop 192.0.2.1。ゾーン、ID、IP アドレスは実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: ルータ＋スイッチの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "network-mask-len",
+          "field": "NetworkMaskLen",
+          "type": "int",
+          "help": "必須: 追加する IP アドレスブロックのプレフィクス長。",
+          "required": true
+        },
+        {
+          "name": "next-hop",
+          "field": "NextHop",
+          "type": "string",
+          "help": "必須: ネクストホップの IPv4 アドレス。",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "UpdateSubnet",
+      "command_name": "update-subnet",
+      "command_type": "UpdateSubnetCommand",
+      "help": "追加した IP アドレスブロックのネクストホップを更新します。",
+      "method": "UpdateSubnetWithContext",
+      "request_type": "internet.UpdateSubnetRequest",
+      "response_type": "*iaas.Subnet",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID (ルータ＋スイッチ ID)、SubnetID、NextHop (IPv4 アドレス)。例: skr iaas-api internet update-subnet --zone is1b --id 123456789012 --subnet-id 234567890123 --next-hop 192.0.2.2。ID とアドレスは実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: ルータ＋スイッチの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "subnet-id",
+          "field": "SubnetID",
+          "type": "int64",
+          "help": "必須: 更新する IP アドレスブロックの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "next-hop",
+          "field": "NextHop",
+          "type": "string",
+          "help": "必須: ネクストホップの IPv4 アドレス。",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "DeleteSubnet",
+      "command_name": "delete-subnet",
+      "command_type": "DeleteSubnetCommand",
+      "help": "ルータ＋スイッチに追加した IP アドレスブロックを削除します。",
+      "method": "DeleteSubnetWithContext",
+      "request_type": "internet.DeleteSubnetRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID (ルータ＋スイッチ ID)、SubnetID (削除するブロックの ID)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012,\"SubnetID\":234567890123}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: ルータ＋スイッチの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "subnet-id",
+          "field": "SubnetID",
+          "type": "int64",
+          "help": "必須: 削除する IP アドレスブロックの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "ReadIpv6",
+      "command_name": "read-ipv6",
+      "command_type": "ReadIPv6Command",
+      "help": "ルータ＋スイッチに割り当てられた IPv6 ネットワークを読み取ります。",
+      "method": "ReadIPv6WithContext",
+      "request_type": "internet.ReadIPv6Request",
+      "response_type": "*iaas.IPv6Net",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (ルータ＋スイッチ ID)。IPv6 が有効でない場合はエラーになります。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: ルータ＋スイッチの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "EnableIpv6",
+      "command_name": "enable-ipv6",
+      "command_type": "EnableIPv6Command",
+      "help": "ルータ＋スイッチの IPv6 アドレス割り当てを有効にして、割り当て結果を出力します。",
+      "method": "EnableIPv6WithContext",
+      "request_type": "internet.EnableIPv6Request",
+      "response_type": "*iaas.IPv6Net",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (ルータ＋スイッチ ID)。IPv6 の有効化は無償ですが、ルータ＋スイッチの利用料は別途必要です。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: ルータ＋スイッチの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "DisableIpv6",
+      "command_name": "disable-ipv6",
+      "command_type": "DisableIPv6Command",
+      "help": "ルータ＋スイッチの IPv6 アドレス割り当てを無効にします。",
+      "method": "DisableIPv6WithContext",
+      "request_type": "internet.DisableIPv6Request",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (ルータ＋スイッチ ID)。割り当て済み IPv6 アドレスブロックを削除します。同じブロックを再度割り当てられるとは限らないため、無効化前に内容を確認してください。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: ルータ＋スイッチの ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "MonitorRouter",
+      "command_name": "monitor-router",
+      "command_type": "MonitorRouterCommand",
+      "help": "ルータ＋スイッチのトラフィックを指定期間で取得して出力します。",
+      "method": "MonitorRouterWithContext",
+      "request_type": "internet.MonitorRouterRequest",
+      "response_type": "[]*iaas.MonitorRouterValue",
+      "validate_zone": true,
+      "request_help": "この操作は JSON 入力専用です。--request に JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、ID (ルータ＋スイッチ ID)、Start、End (RFC3339 形式の日時)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012,\"Start\":\"2026-10-14T00:00:00Z\",\"End\":\"2026-10-15T00:00:00Z\"}'。ゾーン、ID、日時は実際の値に置き換えます。"
+    }
+  ]
+}

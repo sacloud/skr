@@ -7,6 +7,7 @@
 - [IaaS Archive API: ゾーン内のアーカイブを検索・参照する](tutorials/iaas-api/archive.md)
 - [IaaS Disk API: ディスクを作成・確認・削除する](tutorials/iaas-api/disk.md)
 - [IaaS DiskPlan API: ゾーン別のディスクプランとサイズを確認する](tutorials/iaas-api/disk-plan.md)
+- [IaaS Internet API: ルータ＋スイッチに Server を接続して SSH 接続する](tutorials/iaas-api/internet.md)
 - [IaaS PacketFilter API: ルールを設定・管理する](tutorials/iaas-api/packetfilter.md)
 - [IaaS Server API: cloud-init でサーバを起動して SSH 接続する](tutorials/iaas-api/server.md)
 - [IaaS Switch API: Sandbox でスイッチの管理手順を確認する](tutorials/iaas-api/switch.md)

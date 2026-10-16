@@ -54,7 +54,8 @@ func NewCommands(runtime Runtime, factory APIFactory) Commands {
 }
 
 type FindCommand struct {
-	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。JSON 例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Names\\\":[\\\"example\\\"]}'。タグのフラグ例: skr iaas-api disk find --zone ZONE --tags production,web\""
+	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: 単一名の部分一致検索は --name、複数名の Names と Sort は JSON で指定します。Tags は --tags のカンマ区切りまたは JSON 配列、Count と From は個別フラグでも指定できます。例: skr iaas-api disk find --zone is1b --name example\""
+	Names   *string   "name:\"name\" help:\"任意: 部分一致で検索する単一の名前。カンマを含めて1つの名前として扱います。API の名前検索条件に対応し、JSON では Names 配列で指定します。\""
 	Zone    *string   "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone is1b\""
 	Tags    *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
 	Count   *int      "name:\"count\" help:\"任意: 取得件数 (整数)。\""
@@ -65,6 +66,7 @@ type FindCommand struct {
 
 func (c *FindCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
+	flagsSet = flagsSet || c.Names != nil
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.Count != nil
@@ -83,6 +85,9 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	} else {
 		if !flagsSet {
 			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.Names != nil {
+			request.Names = []string{*c.Names}
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")

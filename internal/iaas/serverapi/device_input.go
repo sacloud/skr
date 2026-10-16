@@ -99,7 +99,9 @@ func parseNIC(input string) (*server.NetworkInterface, error) {
 		return nil, fmt.Errorf("upstream が必要です")
 	}
 	if upstream != "shared" && upstream != "disconnected" {
-		return nil, fmt.Errorf("upstream は shared または disconnected で指定してください")
+		if _, err := positiveDeviceInteger(fields, "upstream", 64); err != nil {
+			return nil, fmt.Errorf("upstream は shared、disconnected、または正の整数のスイッチ ID で指定してください")
+		}
 	}
 	return &server.NetworkInterface{Upstream: upstream}, nil
 }
