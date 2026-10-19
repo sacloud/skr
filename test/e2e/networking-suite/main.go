@@ -861,9 +861,11 @@ func (s *scenario) cleanup(ctx context.Context, name string) (result error) {
 			result = errors.Join(result, errors.New("refusing to delete Server with unexpected identity"))
 			continue
 		}
-		if _, err := s.waitForDisk(ctx, fmt.Sprintf("cleanup-wait-server-disk-%d", i), current); err != nil {
-			result = errors.Join(result, err)
-			continue
+		if len(current.Disks) != 0 {
+			if _, err := s.waitForDisk(ctx, fmt.Sprintf("cleanup-wait-server-disk-%d", i), current); err != nil {
+				result = errors.Join(result, err)
+				continue
+			}
 		}
 		if !sameInterfaceIDs(item.Interfaces, current.Interfaces) {
 			result = errors.Join(result, fmt.Errorf("refusing to delete Server %s after its NICs changed", item.ID))
@@ -925,7 +927,15 @@ func (s *scenario) cleanup(ctx context.Context, name string) (result error) {
 			result = errors.Join(result, err)
 			continue
 		}
-		if err := checkSubnet(current, item.Name, item.IPv4AddressRangeCIDR, s.group.SRN); err != nil {
+		expectedName := fmt.Sprintf("%s-subnet-%d", name, i+1)
+		if i == 0 && current.Name == name+"-subnet-1-updated" {
+			expectedName = current.Name
+		}
+		if current.SRN != item.SRN {
+			result = errors.Join(result, errors.New("refusing to delete subnet after its SRN changed"))
+			continue
+		}
+		if err := checkSubnet(current, expectedName, item.IPv4AddressRangeCIDR, s.group.SRN); err != nil {
 			result = errors.Join(result, fmt.Errorf("refusing to delete subnet: %w", err))
 			continue
 		}
@@ -956,7 +966,9 @@ func (s *scenario) cleanup(ctx context.Context, name string) (result error) {
 			"--query", "{SRN,Name,Description,IPv4AddressRangeCIDR,Region}",
 		}, nil, &current); err != nil {
 			result = errors.Join(result, err)
-		} else if err := checkGroup(current, s.group.Name); err != nil {
+		} else if current.SRN != s.group.SRN {
+			result = errors.Join(result, errors.New("refusing to delete subnet group after its SRN changed"))
+		} else if err := checkGroup(current, name); err != nil && checkGroup(current, name+"-updated") != nil {
 			result = errors.Join(result, fmt.Errorf("refusing to delete subnet group: %w", err))
 		} else if _, err := s.client.call(ctx, "cleanup-delete-subnet-group", []string{
 			"networking-suite-api", "subnet-group", "delete", s.group.SRN,
@@ -1044,8 +1056,9 @@ func checkCloudimgArchive(item archiveItem, expectedID int64) error {
 	if int64(item.ID) != expectedID {
 		return fmt.Errorf("Archive read returned ID %s, want %d", item.ID, expectedID)
 	}
-	if !strings.Contains(strings.ToLower(item.Name+" "+item.Description), "cloudimg") {
-		return fmt.Errorf("Archive %s (%q) is not marked cloudimg; select a cloud-init cloudimg Archive", item.ID, item.Name)
+	name := strings.ToLower(item.Name)
+	if !strings.HasPrefix(name, "ubuntu server 24.04") || !strings.Contains(name, "(cloudimg)") {
+		return fmt.Errorf("Archive %s (%q) is not supported; select an Ubuntu Server 24.04 LTS (cloudimg) Archive", item.ID, item.Name)
 	}
 	return nil
 }
@@ -1100,7 +1113,7 @@ func writePrivateFile(path, content string) error {
 
 func runMain() (exitCode int) {
 	binary := flag.String("skr", "./skr", "Path to a built skr binary")
-	archiveID := flag.Int64("cloudimg-archive-id", 0, "Cloud-init Archive ID available in is1b")
+	archiveID := flag.Int64("cloudimg-archive-id", 0, "Ubuntu Server 24.04 LTS (cloudimg) Archive ID available in is1b")
 	diskPlanID := flag.Int64("disk-plan-id", 0, "Disk plan ID available in is1b")
 	diskSizeGB := flag.Int64("disk-size-gb", 20, "Temporary Disk size in GB")
 	confirmed := flag.Bool("confirm-is1b-live", false, "Confirm creating and deleting a subnet group, two subnets, and two temporary Servers in is1b")

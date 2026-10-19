@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"os/exec"
 	"reflect"
@@ -41,6 +42,9 @@ type fakeCLI struct {
 	deletedSubnets   []string
 	calls            []string
 	subnetsRemain    bool
+	failStep         string
+	operationError   error
+	deletedServers   []string
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args []string, _ any) ([]byte, error) {
@@ -50,6 +54,49 @@ func (f *fakeCLI) call(_ context.Context, step string, args []string, _ any) ([]
 	}
 	f.args[step] = append([]string(nil), args...)
 	switch step {
+	case "profile-current":
+		return nil, nil
+	case "preflight-read-cloudimg-archive":
+		return json.Marshal(archiveItem{ID: 12, Name: "Ubuntu Server 24.04.2 LTS 64bit (cloudimg)"})
+	case "preflight-list-groups", "preflight-find-entry", "preflight-find-peer":
+		return []byte("[]"), nil
+	case "create-subnet-group", "read-subnet-group":
+		return json.Marshal(f.groups[0])
+	case "update-subnet-group":
+		f.groups[0].Name += "-updated"
+		if f.failStep == step {
+			return nil, f.operationError
+		}
+		return nil, nil
+	case "create-subnet-0":
+		return json.Marshal(f.subnets[0])
+	case "create-subnet-1":
+		return json.Marshal(f.subnets[1])
+	case "update-subnet":
+		f.subnets[0].Name += "-updated"
+		if f.failStep == step {
+			return nil, f.operationError
+		}
+		return nil, nil
+	case "list-subnets":
+		return json.Marshal(f.subnets)
+	case "read-subnet":
+		return json.Marshal(f.subnets[0])
+	case "create-server-0":
+		return nil, f.operationError
+	case "cleanup-check-server-0", "cleanup-read-server-0":
+		return json.Marshal(f.foundServers[0][0])
+	case "cleanup-wait-server-disk-0":
+		return json.Marshal(diskItem{
+			ID: 999, Name: namePrefix + "run-entry", ServerID: 123,
+			DiskPlanID: 4, SourceArchiveID: 14, SizeMB: 20 * 1024, Availability: "available",
+		})
+	case "cleanup-delete-server-0":
+		f.deletedServers = append(f.deletedServers, args[6])
+		f.foundServers[0] = nil
+		return nil, nil
+	case "cleanup-find-server-after-0", "cleanup-find-disk-after-0":
+		return []byte("[]"), nil
 	case "cleanup-read-subnet-group":
 		if len(f.groups) != 1 || len(args) < 4 || args[3] != f.groups[0].SRN {
 			return nil, errors.New("unexpected group read")
@@ -146,6 +193,9 @@ func TestCheckCloudimgArchive(t *testing.T) {
 	}{
 		{name: "wrong id", item: archiveItem{ID: 1, Name: "Ubuntu cloudimg"}},
 		{name: "not cloudimg", item: archiveItem{ID: 113701786718, Name: "Ubuntu Server 24.04.2 LTS 64bit"}},
+		{name: "other OS", item: archiveItem{ID: 113701786718, Name: "Debian 12 (cloudimg)"}},
+		{name: "other Ubuntu release", item: archiveItem{ID: 113701786718, Name: "Ubuntu Server 22.04 LTS (cloudimg)"}},
+		{name: "Ubuntu only in description", item: archiveItem{ID: 113701786718, Name: "Debian (cloudimg)", Description: "Ubuntu Server 24.04 LTS (cloudimg)"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -294,8 +344,134 @@ func TestFindTemporaryServerRetainsNICIdentityForCleanup(t *testing.T) {
 	}
 }
 
+func TestRunCleansUpAfterPartiallyAppliedOperations(t *testing.T) {
+	for _, failStep := range []string{"update-subnet-group", "update-subnet", "create-server-0"} {
+		t.Run(failStep, func(t *testing.T) {
+			t.Setenv("SAKURA_ENDPOINTS_NETWORKING_SUITE", "https://secure.sakura.ad.jp/cloud/zone/is1b/api/cloud/1.1/")
+			name := namePrefix + "run"
+			operationError := errors.New("operation applied but response failed")
+			group := groupItem{
+				SRN: "group-srn", Name: name, Description: description,
+				IPv4AddressRangeCIDR: "10.0.0.0/16",
+				Region:               struct{ Code string }{Code: "is1"},
+			}
+			fake := &fakeCLI{
+				groups: []groupItem{group}, failStep: failStep, operationError: operationError,
+			}
+			if failStep != "update-subnet-group" {
+				for i, cidr := range []string{"10.0.1.0/24", "10.0.2.0/24"} {
+					fake.subnets = append(fake.subnets, subnetItem{
+						SRN: fmt.Sprintf("subnet-%d", i), Name: fmt.Sprintf("%s-subnet-%d", name, i+1),
+						Description: description, IPv4AddressRangeCIDR: cidr,
+						Zone:        struct{ Code string }{Code: zone},
+						SubnetGroup: struct{ SRN string }{SRN: group.SRN},
+					})
+				}
+			}
+			if failStep == "create-server-0" {
+				fake.foundServers = map[int][]serverItem{0: {{
+					ID: 123, Name: name + "-entry", Description: description, InstanceStatus: "down",
+					Interfaces: []serverInterface{{ID: 456, UpstreamType: "shared"}, {ID: 789, UpstreamType: "none"}},
+				}}}
+			}
+			test := &scenario{client: fake, archiveID: 12, diskPlanID: 4, diskSizeGB: 20}
+			err := test.run(context.Background(), name)
+			if !errors.Is(err, operationError) {
+				t.Fatalf("run error = %v, want original operation error", err)
+			}
+			if strings.Contains(err.Error(), "cleanup failed") {
+				t.Fatalf("cleanup after partial operation failed: %v", err)
+			}
+			if len(fake.groups) != 0 || len(fake.subnets) != 0 {
+				t.Fatalf("resources remain: groups=%v subnets=%v", fake.groups, fake.subnets)
+			}
+			if failStep == "create-server-0" {
+				if !reflect.DeepEqual(fake.deletedServers, []string{"123"}) {
+					t.Fatalf("diskless Server was not deleted: %v", fake.deletedServers)
+				}
+				if _, called := fake.args["cleanup-wait-server-disk-0"]; called {
+					t.Fatal("cleanup tried to wait for a missing Disk")
+				}
+			}
+		})
+	}
+}
+
 func TestCleanupDoesNotDeleteSubnetWhenAddressCheckFails(t *testing.T) {
 	assertSubnetCleanupBlocked(t, true)
+}
+
+func TestCleanupRejectsUnexpectedNamesAfterUpdate(t *testing.T) {
+	for _, resource := range []string{"group", "first subnet", "second subnet"} {
+		t.Run(resource, func(t *testing.T) {
+			name := namePrefix + "run"
+			group := groupItem{
+				SRN: "group-srn", Name: name, Description: description,
+				IPv4AddressRangeCIDR: "10.0.0.0/16",
+				Region:               struct{ Code string }{Code: "is1"},
+			}
+			subnets := [2]subnetItem{}
+			for i, cidr := range []string{"10.0.1.0/24", "10.0.2.0/24"} {
+				subnets[i] = subnetItem{
+					SRN: fmt.Sprintf("subnet-%d", i), Name: fmt.Sprintf("%s-subnet-%d", name, i+1),
+					Description: description, IPv4AddressRangeCIDR: cidr,
+					Zone:        struct{ Code string }{Code: zone},
+					SubnetGroup: struct{ SRN string }{SRN: group.SRN},
+				}
+			}
+			fake := &fakeCLI{groups: []groupItem{group}, subnets: []subnetItem{subnets[0], subnets[1]}}
+			switch resource {
+			case "group":
+				fake.groups[0].Name = name + "-unplanned"
+			case "first subnet":
+				fake.subnets[0].Name = subnets[0].Name + "-unplanned"
+			case "second subnet":
+				fake.subnets[1].Name += "-updated"
+			}
+			test := &scenario{client: fake, group: group, subnets: subnets}
+			if err := test.cleanup(context.Background(), name); err == nil {
+				t.Fatal("cleanup accepted an unplanned name")
+			}
+			if len(fake.deleted) != 0 {
+				t.Fatalf("cleanup deleted group: %v", fake.deleted)
+			}
+			if resource != "group" && len(fake.subnets) != 1 {
+				t.Fatalf("cleanup modified renamed subnet: %v", fake.subnets)
+			}
+		})
+	}
+}
+
+func TestCleanupDisklessServerStillRequiresIdentity(t *testing.T) {
+	for _, field := range []string{"name", "description", "NICs", "Disk"} {
+		t.Run(field, func(t *testing.T) {
+			name := namePrefix + "run"
+			expected := serverItem{
+				ID: 123, Name: name + "-entry", Description: description, InstanceStatus: "down",
+				Interfaces: []serverInterface{{ID: 456, UpstreamType: "shared"}},
+			}
+			current := expected
+			switch field {
+			case "name":
+				current.Name += "-unplanned"
+			case "description":
+				current.Description = "not the temporary Server"
+			case "NICs":
+				current.Interfaces = []serverInterface{{ID: 789, UpstreamType: "shared"}}
+			case "Disk":
+				current.Disks = []diskItem{{ID: 999}}
+			}
+			fake := &fakeCLI{foundServers: map[int][]serverItem{0: {current}}}
+			test := &scenario{client: fake, archiveID: 12, diskPlanID: 4, diskSizeGB: 20}
+			test.servers[0] = expected
+			if err := test.cleanup(context.Background(), name); err == nil {
+				t.Fatalf("cleanup accepted a Server with changed %s", field)
+			}
+			if len(fake.deletedServers) != 0 {
+				t.Fatalf("cleanup deleted changed Server: %v", fake.deletedServers)
+			}
+		})
+	}
 }
 
 func TestCleanupDoesNotDeleteSubnetWithAssignedAddresses(t *testing.T) {

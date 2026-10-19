@@ -9,7 +9,7 @@
 
 - `skr`、`ssh`、`ssh-keygen` が利用でき、さくらのクラウドの認証プロファイルが設定済みであること
 - is1b で Server と Disk を作成・起動・削除でき、ネットワークスイートのサブネットグループ、サブネット、インターフェースコネクションを管理できること
-- is1b で利用可能な Cloud-init 対応 Archive と、20 GB の Disk を作成できる DiskPlan があること
+- is1b で利用可能な Ubuntu Server 24.04 LTS の `(cloudimg)` Archive と、20 GB の Disk を作成できる DiskPlan があること
 - `SAKURA_ENDPOINTS_NETWORKING_SUITE` が is1b のネットワークスイート API endpoint を指していること。SDK の既定 endpoint は is1c です
 - 操作対象として使い捨ての Server を2台作成できること。Server A は `shared` NIC と未接続 NIC を1つずつ、Server B は未接続 NIC を1つ持ちます
 
@@ -59,14 +59,14 @@ $ skr iaas-api server find --help
 $ skr iaas-api disk find --help
 ```
 
-使用する Archive を読み取り、`Name` または `Description` に `cloudimg` が含まれることを確認します。通常の OS Archive では cloud-init user-data が処理されないことがあります。
+使用する Archive を読み取り、`Name` が `Ubuntu Server 24.04` で始まり、`(cloudimg)` を含むことを確認します。この手順は Ubuntu Server 24.04 LTS の `ubuntu` ユーザーと netplan を前提にしています。通常の OS Archive では cloud-init user-data が処理されないことがあります。
 
 ```console
 $ skr iaas-api archive read --zone is1b --id "$CLOUDIMG_ARCHIVE_ID" \
     --query '{ID,Name,Description,Tags,SizeMB}'
 ```
 
-表示された Archive の `ID`、`Name`、`Description` を確認してください。`cloudimg` を含まない Archive は使わず、[Server API チュートリアル](iaas-api/server.md)の手順で cloud-init 対応 Archive を選び直します。
+表示された Archive の `ID`、`Name`、`Description` を確認してください。通常の OS Archive や他の OS の cloudimg は使わず、[Server API チュートリアル](iaas-api/server.md)の手順で Ubuntu Server 24.04 LTS の `(cloudimg)` Archive を選び直します。
 
 ネットワークスイートの SDK endpoint は is1c が既定です。ここでは環境変数で is1b に切り替え、IaaS の Server コマンドにも `--zone is1b` を指定します。
 

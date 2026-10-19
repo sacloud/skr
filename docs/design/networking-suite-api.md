@@ -33,11 +33,15 @@ InterfaceConnection Create は SDK のパラメーター型を通して NIC SRN�
 
 runner は `test/e2e/networking-suite/` にあり、`--confirm-is1b-live` を必須にします。実行前に `SAKURA_ENDPOINTS_NETWORKING_SUITE` が is1b を指すこと、SDK プロファイル／プロジェクトの対象を確認します。Archive ID と DiskPlan ID は同じ is1b 環境で利用できる値を指定します。Disk の読み取りで Archive、DiskPlan、Server、サイズを照合し、利用可能になるまで待ってから Server を起動します。
 
+SSH の `ubuntu` ユーザーと netplan を使うため、Archive の事前検証では Ubuntu Server 24.04 LTS の `(cloudimg)` に限定します。他の OS やリリースの cloudimg は受け付けません。
+
 runner はランダムな名前と固定の説明で、サブネットグループ `10.0.0.0/16`、2 個の `/24` サブネット、Cloud-init Archive から作る Server 2 台と Disk を作成します。Server A は最初の NIC を共有セグメント、追加 NIC をネットワークスイートへ接続し、Server B はネットワークスイートだけへ接続します。接続前に各 Server の NIC ID を読み、同一ゾーンのインターフェース SRN を構成します。
 
 両 NIC のネットワークスイートアドレスを Address API で確認し、Server A の共有側 IP へ SSH 接続して、Server B の別サブネット IPv4 address に TCP 接続します。Server A の user-data で `openssh-server` を導入し、認証鍵はテスト中だけローカルの private temp directory に置きます。応答を受信できた場合にだけ疎通確認を成功とします。
 
 既存の同名リソースを変更または削除しません。Server の停止後に接続を解除し、Server／Disk、アドレス、サブネット、サブネットグループを照合して削除します。SSH による停止が失敗した場合も、作成した Server／Disk の全識別情報を再確認してから `--force` で Server と Disk を削除し、関連アドレスの不在を確認します。削除直前は ID、名前、説明、CIDR、親 SRN、NIC ID、Disk の Archive／Plan／サイズを照合し、削除後の不在も確認します。証跡は `test/e2e/internal/evidence` を用いて `tmp/networking-suite-api/` に private 権限で保存します。秘密鍵は一時ディレクトリにのみ置き、証跡へ含めません。
+
+Disk 作成前に失敗して Server だけが残った場合も、名前、説明、ID、NIC ID を照合して削除します。Disk が存在する場合は従来どおり Disk の照合を必須にします。Update の適用後に応答や証跡保存が失敗する場合に備え、サブネットグループと最初のサブネットは、この実行で予定した更新前後の名前だけを後始末時に許可します。2個目のサブネットでは更新後の名前を許可しません。名前以外の識別情報の照合は維持します。
 
 ## 参照
 
