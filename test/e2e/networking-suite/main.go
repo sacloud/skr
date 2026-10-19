@@ -152,8 +152,10 @@ type scenario struct {
 	group      groupItem
 	subnets    [2]subnetItem
 	servers    [2]serverItem
+	diskIDs    [2]types.ID
 	connects   [2]connectionItem
 	booted     [2]bool
+	sshCommand func(context.Context, string, string, string) (string, string, error)
 }
 
 func (s *scenario) call(ctx context.Context, step string, args []string, request any, out any) error {
@@ -326,6 +328,9 @@ func (s *scenario) stopServers(ctx context.Context) error {
 }
 
 func (s *scenario) ssh(ctx context.Context, step, ip, remoteCommand string) (string, string, error) {
+	if s.sshCommand != nil {
+		return s.sshCommand(ctx, step, ip, remoteCommand)
+	}
 	timeout, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	args := []string{
@@ -523,10 +528,15 @@ func (s *scenario) run(ctx context.Context, name string) (result error) {
 		if s.servers[i].ID.IsEmpty() || s.servers[i].Name != serverName || s.servers[i].Description != description {
 			return fmt.Errorf("created Server %d does not match its temporary identity", i)
 		}
-		s.servers[i], err = s.server(ctx, fmt.Sprintf("read-server-%d", i), serverName, s.servers[i].ID)
+		if len(s.servers[i].Disks) != 1 || s.servers[i].Disks[0].ID.IsEmpty() {
+			return errors.New("Server create response did not identify its Disk; manual cleanup required")
+		}
+		s.diskIDs[i] = s.servers[i].Disks[0].ID
+		current, err := s.server(ctx, fmt.Sprintf("read-server-%d", i), serverName, s.servers[i].ID)
 		if err != nil {
 			return err
 		}
+		s.servers[i] = current
 		if _, err := s.waitForDisk(ctx, fmt.Sprintf("wait-server-disk-%d", i), s.servers[i]); err != nil {
 			return err
 		}
@@ -862,10 +872,22 @@ func (s *scenario) cleanup(ctx context.Context, name string) (result error) {
 			continue
 		}
 		if len(current.Disks) != 0 {
-			if _, err := s.waitForDisk(ctx, fmt.Sprintf("cleanup-wait-server-disk-%d", i), current); err != nil {
+			if s.diskIDs[i].IsEmpty() || len(current.Disks) != 1 || current.Disks[0].ID != s.diskIDs[i] {
+				result = errors.Join(result, fmt.Errorf("refusing to delete Server %s: Disk ID does not match its create response; manual cleanup required", item.ID))
+				continue
+			}
+			disk, err := s.waitForDisk(ctx, fmt.Sprintf("cleanup-wait-server-disk-%d", i), current)
+			if err != nil {
 				result = errors.Join(result, err)
 				continue
 			}
+			if disk.ID != s.diskIDs[i] {
+				result = errors.Join(result, fmt.Errorf("refusing to delete Server %s: Disk read returned a different ID", item.ID))
+				continue
+			}
+		} else if !s.diskIDs[i].IsEmpty() {
+			result = errors.Join(result, fmt.Errorf("refusing to delete Server %s: created Disk %s is no longer attached; manual cleanup required", item.ID, s.diskIDs[i]))
+			continue
 		}
 		if !sameInterfaceIDs(item.Interfaces, current.Interfaces) {
 			result = errors.Join(result, fmt.Errorf("refusing to delete Server %s after its NICs changed", item.ID))

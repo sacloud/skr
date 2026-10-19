@@ -19,6 +19,7 @@ SDK v0.3.0 はネットワークスイート API として、サブネットグ�
 - InterfaceConnection Create は `--interface-srn`、`--subnet-srn`、任意の `--ephemeral-ipv4-address` を受け付けます。NIC SRN はサーバ詳細の NIC ID と配置ゾーンから組み立てます。アドレス一覧はサブネット SRN を位置引数にし、任意の接続 SRN で絞り込みます。
 - ライブ E2E は is1b にテスト専用サブネットグループ、別 CIDR のサブネット 2 個、一時 Server 2 台を作成します。Server A は共有セグメントとネットワークスイート、Server B はネットワークスイートだけへ接続し、A から B の TCP 応答を確認します。生成した資源だけを内容と ID で照合して停止・削除し、不在を確認します。実行には専用の確認フラグ、is1b のネットワークスイート endpoint、利用可能な Archive と DiskPlan が必要です。
 - ライブ E2E の Archive は、疎通確認で使用する `ubuntu` ユーザーと netplan に合わせ、Ubuntu Server 24.04 LTS の `(cloudimg)` に限定します。途中失敗時は Disk がない Server も識別情報を照合して回収し、Update の応答が失敗した場合は、この実行で予定した更新前後の名前だけを許可します。Disk がある場合の照合や、名前以外の識別情報の照合は省略しません。
+- Disk は作成応答の ID を独立して保持し、削除直前の接続情報と Disk read の ID に一致することを必須にします。作成応答を失った場合は、属性による Disk の推定復元をせず、Disk を持つ Server の自動削除を拒否して手動確認を必要とします。
 
 ## Consequences
 

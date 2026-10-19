@@ -45,6 +45,13 @@ type fakeCLI struct {
 	failStep         string
 	operationError   error
 	deletedServers   []string
+	disks            map[types.ID]diskItem
+}
+
+type cliFunc func(context.Context, string, []string, any) ([]byte, error)
+
+func (f cliFunc) call(ctx context.Context, step string, args []string, request any) ([]byte, error) {
+	return f(ctx, step, args, request)
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args []string, _ any) ([]byte, error) {
@@ -83,10 +90,18 @@ func (f *fakeCLI) call(_ context.Context, step string, args []string, _ any) ([]
 	case "read-subnet":
 		return json.Marshal(f.subnets[0])
 	case "create-server-0":
+		if f.failStep == "read-server-0" {
+			return json.Marshal(f.foundServers[0][0])
+		}
+		return nil, f.operationError
+	case "read-server-0":
 		return nil, f.operationError
 	case "cleanup-check-server-0", "cleanup-read-server-0":
 		return json.Marshal(f.foundServers[0][0])
 	case "cleanup-wait-server-disk-0":
+		if disk, ok := f.disks[types.ID(300)]; ok {
+			return json.Marshal(disk)
+		}
 		return json.Marshal(diskItem{
 			ID: 999, Name: namePrefix + "run-entry", ServerID: 123,
 			DiskPlanID: 4, SourceArchiveID: 14, SizeMB: 20 * 1024, Availability: "available",
@@ -345,7 +360,7 @@ func TestFindTemporaryServerRetainsNICIdentityForCleanup(t *testing.T) {
 }
 
 func TestRunCleansUpAfterPartiallyAppliedOperations(t *testing.T) {
-	for _, failStep := range []string{"update-subnet-group", "update-subnet", "create-server-0"} {
+	for _, failStep := range []string{"update-subnet-group", "update-subnet", "create-server-0", "read-server-0", "lost create response with Disk"} {
 		t.Run(failStep, func(t *testing.T) {
 			t.Setenv("SAKURA_ENDPOINTS_NETWORKING_SUITE", "https://secure.sakura.ad.jp/cloud/zone/is1b/api/cloud/1.1/")
 			name := namePrefix + "run"
@@ -368,16 +383,29 @@ func TestRunCleansUpAfterPartiallyAppliedOperations(t *testing.T) {
 					})
 				}
 			}
-			if failStep == "create-server-0" {
+			if failStep == "create-server-0" || failStep == "read-server-0" || failStep == "lost create response with Disk" {
 				fake.foundServers = map[int][]serverItem{0: {{
 					ID: 123, Name: name + "-entry", Description: description, InstanceStatus: "down",
 					Interfaces: []serverInterface{{ID: 456, UpstreamType: "shared"}, {ID: 789, UpstreamType: "none"}},
 				}}}
 			}
+			if failStep == "read-server-0" || failStep == "lost create response with Disk" {
+				fake.foundServers[0][0].Disks = []diskItem{{ID: 300}}
+				fake.disks = map[types.ID]diskItem{300: {
+					ID: 300, Name: name + "-entry", ServerID: 123, DiskPlanID: 4,
+					SourceArchiveID: 12, SizeMB: 20 * 1024, Availability: "available",
+				}}
+			}
 			test := &scenario{client: fake, archiveID: 12, diskPlanID: 4, diskSizeGB: 20}
 			err := test.run(context.Background(), name)
 			if !errors.Is(err, operationError) {
 				t.Fatalf("run error = %v, want original operation error", err)
+			}
+			if failStep == "lost create response with Disk" {
+				if !strings.Contains(err.Error(), "manual cleanup required") || len(fake.deletedServers) != 0 {
+					t.Fatalf("unknown Disk must require manual cleanup without deletion: err=%v deleted=%v", err, fake.deletedServers)
+				}
+				return
 			}
 			if strings.Contains(err.Error(), "cleanup failed") {
 				t.Fatalf("cleanup after partial operation failed: %v", err)
@@ -385,12 +413,15 @@ func TestRunCleansUpAfterPartiallyAppliedOperations(t *testing.T) {
 			if len(fake.groups) != 0 || len(fake.subnets) != 0 {
 				t.Fatalf("resources remain: groups=%v subnets=%v", fake.groups, fake.subnets)
 			}
-			if failStep == "create-server-0" {
+			if failStep == "create-server-0" || failStep == "read-server-0" {
 				if !reflect.DeepEqual(fake.deletedServers, []string{"123"}) {
-					t.Fatalf("diskless Server was not deleted: %v", fake.deletedServers)
+					t.Fatalf("created Server was not deleted: %v", fake.deletedServers)
 				}
-				if _, called := fake.args["cleanup-wait-server-disk-0"]; called {
+				if _, called := fake.args["cleanup-wait-server-disk-0"]; called && failStep == "create-server-0" {
 					t.Fatal("cleanup tried to wait for a missing Disk")
+				}
+				if failStep == "read-server-0" && test.diskIDs[0] != 300 {
+					t.Fatalf("Disk ID from create response was lost: %v", test.diskIDs)
 				}
 			}
 		})
@@ -469,6 +500,136 @@ func TestCleanupDisklessServerStillRequiresIdentity(t *testing.T) {
 			}
 			if len(fake.deletedServers) != 0 {
 				t.Fatalf("cleanup deleted changed Server: %v", fake.deletedServers)
+			}
+		})
+	}
+}
+
+func TestCleanupRunningServers(t *testing.T) {
+	for _, outcome := range []string{
+		"stopped", "SSH failure", "wait failure", "NIC mismatch", "Disk ID mismatch",
+		"Disk attributes mismatch", "unknown Disk ID", "Disk read ID mismatch", "detached Disk",
+		"SSH failure with NIC mismatch", "SSH failure with Disk ID mismatch",
+	} {
+		t.Run(outcome, func(t *testing.T) {
+			name := namePrefix + "run"
+			stopError := errors.New("shutdown failed")
+			var calls []string
+			sshCalls := 0
+			sshFailed := strings.HasPrefix(outcome, "SSH failure")
+			test := &scenario{archiveID: 12, diskPlanID: 4, diskSizeGB: 20, publicIP: "192.0.2.1", bAddress: "10.0.2.4"}
+			for i, suffix := range []string{"entry", "peer"} {
+				test.servers[i] = serverItem{
+					ID: types.ID(100 + i), Name: name + "-" + suffix, Description: description,
+					Interfaces: []serverInterface{{ID: types.ID(200 + i)}},
+					Disks:      []diskItem{{ID: types.ID(300 + i)}},
+				}
+				test.diskIDs[i] = types.ID(300 + i)
+				test.connects[i] = connectionItem{SRN: fmt.Sprintf("connection-%d", i)}
+			}
+			if outcome == "unknown Disk ID" {
+				test.diskIDs[0] = 0
+			}
+			test.sshCommand = func(_ context.Context, step, _, _ string) (string, string, error) {
+				calls = append(calls, step)
+				sshCalls++
+				if sshFailed {
+					return "", "", stopError
+				}
+				return "", "", nil
+			}
+			test.client = cliFunc(func(_ context.Context, step string, args []string, _ any) ([]byte, error) {
+				calls = append(calls, step)
+				switch {
+				case step == "cleanup-find-subnet-group":
+					return []byte("[]"), nil
+				case strings.HasPrefix(step, "cleanup-check-server-"), strings.HasPrefix(step, "cleanup-read-server-"):
+					i := int(step[len(step)-1] - '0')
+					current := test.servers[i]
+					current.InstanceStatus = "up"
+					if sshCalls == 2 && !sshFailed {
+						current.InstanceStatus = "down"
+					}
+					if strings.HasPrefix(step, "cleanup-read-server-") {
+						// Fail the first stop-poll read, but allow the subsequent deletion identity read.
+						if outcome == "wait failure" && sshCalls == 2 {
+							sshCalls++
+							return nil, stopError
+						}
+						if i == 0 {
+							switch outcome {
+							case "NIC mismatch", "SSH failure with NIC mismatch":
+								current.Interfaces = []serverInterface{{ID: 999}}
+							case "Disk ID mismatch", "SSH failure with Disk ID mismatch":
+								current.Disks = []diskItem{{ID: 999}}
+							case "detached Disk":
+								current.Disks = nil
+							}
+						}
+					}
+					return json.Marshal(current)
+				case strings.HasPrefix(step, "cleanup-wait-server-disk-"):
+					i := int(step[len(step)-1] - '0')
+					disk := diskItem{
+						ID: types.ID(300 + i), Name: test.servers[i].Name, ServerID: test.servers[i].ID,
+						DiskPlanID: 4, SourceArchiveID: 12, SizeMB: 20 * 1024, Availability: "available",
+					}
+					if i == 0 && outcome == "Disk attributes mismatch" {
+						disk.SourceArchiveID = 999
+					}
+					if i == 0 && outcome == "Disk read ID mismatch" {
+						disk.ID = 999
+					}
+					return json.Marshal(disk)
+				case strings.HasPrefix(step, "cleanup-delete-connection-"):
+					if sshFailed || outcome == "wait failure" {
+						t.Fatal("connection detached after shutdown failure")
+					}
+					return nil, nil
+				case strings.HasPrefix(step, "cleanup-delete-server-"):
+					if !strings.Contains(strings.Join(args, " "), "--with-disks --force --fail-if-not-found") {
+						t.Fatalf("missing forced cleanup options: %v", args)
+					}
+					return nil, nil
+				case strings.HasPrefix(step, "cleanup-find-server-after-"), strings.HasPrefix(step, "cleanup-find-disk-after-"):
+					return []byte("[]"), nil
+				default:
+					return nil, fmt.Errorf("unexpected call %s", step)
+				}
+			})
+			err := test.cleanup(context.Background(), name)
+			if outcome == "stopped" && err != nil {
+				t.Fatal(err)
+			}
+			if outcome != "stopped" && err == nil {
+				t.Fatal("cleanup failure was not propagated")
+			}
+			stopFailed := sshFailed || outcome == "wait failure"
+			if stopFailed && !errors.Is(err, stopError) {
+				t.Fatalf("shutdown error was lost: %v", err)
+			}
+			deletedEntry := false
+			deletedPeer := false
+			lastConnection := -1
+			connectionCount := 0
+			firstDeletion := -1
+			for i, step := range calls {
+				if strings.HasPrefix(step, "cleanup-delete-connection-") {
+					lastConnection = i
+					connectionCount++
+				}
+				if strings.HasPrefix(step, "cleanup-delete-server-") && firstDeletion == -1 {
+					firstDeletion = i
+				}
+				deletedEntry = deletedEntry || step == "cleanup-delete-server-0"
+				deletedPeer = deletedPeer || step == "cleanup-delete-server-1"
+			}
+			expectEntryDeleted := outcome == "stopped" || outcome == "SSH failure" || outcome == "wait failure"
+			if deletedEntry != expectEntryDeleted || !deletedPeer {
+				t.Fatalf("unexpected Server deletions: %v", calls)
+			}
+			if !stopFailed && (connectionCount != 2 || lastConnection >= firstDeletion) {
+				t.Fatalf("connections must be detached before Server deletion: %v", calls)
 			}
 		})
 	}
