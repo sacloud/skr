@@ -269,6 +269,9 @@ func (s *scenario) stopServers(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		if !sameInterfaceIDs(s.servers[i].Interfaces, item.Interfaces) {
+			return fmt.Errorf("refusing to stop Server %s after its NICs changed", item.ID)
+		}
 		s.booted[i] = s.booted[i] || item.InstanceStatus.IsUp()
 		if i == 0 && s.publicIP == "" {
 			for _, iface := range item.Interfaces {
@@ -309,6 +312,9 @@ func (s *scenario) stopServers(ctx context.Context) error {
 			item, err := s.server(ctx, fmt.Sprintf("cleanup-read-server-%d", i), s.servers[i].Name, s.servers[i].ID)
 			if err != nil {
 				return err
+			}
+			if !sameInterfaceIDs(s.servers[i].Interfaces, item.Interfaces) {
+				return fmt.Errorf("refusing connection cleanup for Server %s after its NICs changed", item.ID)
 			}
 			if !item.InstanceStatus.IsDown() {
 				allStopped = false
@@ -721,7 +727,9 @@ func (s *scenario) waitForEntrySSH(ctx context.Context) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		s.servers[0] = item
+		if !sameInterfaceIDs(s.servers[0].Interfaces, item.Interfaces) {
+			return "", fmt.Errorf("refusing SSH access to Server %s after its NICs changed", item.ID)
+		}
 		if item.InstanceStatus.IsUp() {
 			for _, nic := range item.Interfaces {
 				if strings.EqualFold(nic.UpstreamType, "shared") && net.ParseIP(nic.IPAddress) != nil {

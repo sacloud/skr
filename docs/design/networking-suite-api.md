@@ -47,6 +47,8 @@ Disk ID は Server の作成応答から独立した状態に保存し、後続�
 
 非ライブテストでは SSH 実行を差し替え、停止待機中の Server read を制御します。停止成功後の接続解除から Server／Disk 削除への順序、SSH または停止待機の失敗後の接続解除抑止と照合済み Server の強制削除、識別不一致時の削除抑止、停止エラーの伝播を確認します。
 
+NIC ID は SSH 待機、停止要求前、停止待機中にも保存値と照合します。SSH 待機の読み取り結果で保存済みの NIC 一覧を上書きしません。変更を検知した場合は SSH と接続解除を拒否し、Server 削除時にも元の NIC 一覧との照合を維持します。
+
 ## 参照
 
 - [Networking Suite API チュートリアル](../manual/tutorials/networking-suite-api.md)

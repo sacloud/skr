@@ -510,6 +510,7 @@ func TestCleanupRunningServers(t *testing.T) {
 		"stopped", "SSH failure", "wait failure", "NIC mismatch", "Disk ID mismatch",
 		"Disk attributes mismatch", "unknown Disk ID", "Disk read ID mismatch", "detached Disk",
 		"SSH failure with NIC mismatch", "SSH failure with Disk ID mismatch",
+		"pre-stop NIC mismatch", "stop-poll NIC mismatch",
 	} {
 		t.Run(outcome, func(t *testing.T) {
 			name := namePrefix + "run"
@@ -550,6 +551,9 @@ func TestCleanupRunningServers(t *testing.T) {
 					if sshCalls == 2 && !sshFailed {
 						current.InstanceStatus = "down"
 					}
+					if i == 0 && (outcome == "pre-stop NIC mismatch" || outcome == "stop-poll NIC mismatch" && strings.HasPrefix(step, "cleanup-read-server-")) {
+						current.Interfaces = []serverInterface{{ID: 999}}
+					}
 					if strings.HasPrefix(step, "cleanup-read-server-") {
 						// Fail the first stop-poll read, but allow the subsequent deletion identity read.
 						if outcome == "wait failure" && sshCalls == 2 {
@@ -582,7 +586,7 @@ func TestCleanupRunningServers(t *testing.T) {
 					}
 					return json.Marshal(disk)
 				case strings.HasPrefix(step, "cleanup-delete-connection-"):
-					if sshFailed || outcome == "wait failure" {
+					if sshFailed || outcome == "wait failure" || outcome == "NIC mismatch" || outcome == "pre-stop NIC mismatch" || outcome == "stop-poll NIC mismatch" {
 						t.Fatal("connection detached after shutdown failure")
 					}
 					return nil, nil
@@ -604,8 +608,8 @@ func TestCleanupRunningServers(t *testing.T) {
 			if outcome != "stopped" && err == nil {
 				t.Fatal("cleanup failure was not propagated")
 			}
-			stopFailed := sshFailed || outcome == "wait failure"
-			if stopFailed && !errors.Is(err, stopError) {
+			stopFailed := sshFailed || outcome == "wait failure" || outcome == "NIC mismatch" || outcome == "pre-stop NIC mismatch" || outcome == "stop-poll NIC mismatch"
+			if (sshFailed || outcome == "wait failure") && !errors.Is(err, stopError) {
 				t.Fatalf("shutdown error was lost: %v", err)
 			}
 			deletedEntry := false
@@ -630,6 +634,50 @@ func TestCleanupRunningServers(t *testing.T) {
 			}
 			if !stopFailed && (connectionCount != 2 || lastConnection >= firstDeletion) {
 				t.Fatalf("connections must be detached before Server deletion: %v", calls)
+			}
+			if outcome == "pre-stop NIC mismatch" && sshCalls != 0 {
+				t.Fatalf("SSH attempted after NIC identity changed: %v", calls)
+			}
+		})
+	}
+}
+
+func TestWaitForEntrySSHRetainsNICIdentity(t *testing.T) {
+	for _, change := range []string{"exchange", "addition"} {
+		t.Run(change, func(t *testing.T) {
+			name := namePrefix + "run"
+			expected := serverItem{
+				ID: 123, Name: name + "-entry", Description: description, InstanceStatus: "up",
+				Interfaces: []serverInterface{{ID: 456, UpstreamType: "shared", IPAddress: "192.0.2.1"}},
+			}
+			current := expected
+			current.Interfaces = []serverInterface{{ID: 789, UpstreamType: "shared", IPAddress: "192.0.2.2"}}
+			if change == "addition" {
+				current.Interfaces = append(current.Interfaces, expected.Interfaces...)
+			}
+			fake := &fakeCLI{foundServers: map[int][]serverItem{0: {current}}}
+			test := &scenario{client: cliFunc(func(ctx context.Context, step string, args []string, request any) ([]byte, error) {
+				if step == "poll-entry-server" {
+					return json.Marshal(current)
+				}
+				return fake.call(ctx, step, args, request)
+			})}
+			test.servers[0] = expected
+			test.sshCommand = func(context.Context, string, string, string) (string, string, error) {
+				t.Fatal("SSH attempted after NIC identity changed")
+				return "", "", nil
+			}
+			if _, err := test.waitForEntrySSH(context.Background()); err == nil {
+				t.Fatal("SSH wait accepted changed NICs")
+			}
+			if !reflect.DeepEqual(test.servers[0], expected) {
+				t.Fatalf("saved Server identity was overwritten: %+v", test.servers[0])
+			}
+			if err := test.cleanup(context.Background(), name); err == nil {
+				t.Fatal("cleanup accepted changed NICs after SSH wait")
+			}
+			if len(fake.deletedServers) != 0 {
+				t.Fatalf("cleanup deleted changed Server: %v", fake.deletedServers)
 			}
 		})
 	}

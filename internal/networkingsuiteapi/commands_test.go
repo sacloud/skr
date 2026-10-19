@@ -34,6 +34,17 @@ const (
 	testSubnetSRN = "srnv1:sakura-is1b:sakura.networking-suite.subnet:2345678901"
 )
 
+func TestInterfaceConnectionMissingFlagsDoesNotSuggestUnsupportedRequest(t *testing.T) {
+	command := InterfaceConnectionCreateCommand{}
+	err := command.Run(&kong.Context{})
+	if err == nil || !strings.Contains(err.Error(), "--interface-srn") || !strings.Contains(err.Error(), "--subnet-srn") {
+		t.Fatalf("missing required flags were not reported: %v", err)
+	}
+	if strings.Contains(err.Error(), "--request") {
+		t.Fatalf("required flag error suggests unsupported JSON input: %v", err)
+	}
+}
+
 func TestNetworkingSuiteCommandsUseSDKRequests(t *testing.T) {
 	const (
 		connectionSRN = "srnv1:sakura-is1b:sakura.networking-suite.interface-connection:3456789012"

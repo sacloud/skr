@@ -149,7 +149,7 @@ func requireFlags(values ...requiredFlag) error {
 		}
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("%s が必要です (--request JSON も指定できます)", strings.Join(missing, " と "))
+		return fmt.Errorf("%s が必要です", strings.Join(missing, " と "))
 	}
 	return nil
 }

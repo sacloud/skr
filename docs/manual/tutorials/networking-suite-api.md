@@ -449,10 +449,16 @@ $ skr networking-suite-api subnet list "$GROUP_SRN" \
 ```console
 $ skr networking-suite-api subnet-group delete "$GROUP_SRN"
 $ skr networking-suite-api subnet-group list \
-    --query 'map({SRN,Name,Description,IPv4AddressRangeCIDR,Region})'
+    --query "map(select(.SRN == \"$GROUP_SRN\") | {SRN,Name,Description,IPv4AddressRangeCIDR,Region})"
 ```
 
-グループ一覧も `[]` であることを確認します。最後に、Disk が残っていないことを検索します。
+今回作成した `GROUP_SRN` に絞った一覧が `[]` であることを確認します。他のグループは削除しません。
+
+```json
+[]
+```
+
+最後に、Disk が残っていないことを検索します。
 
 ```console
 $ skr iaas-api disk find --zone is1b --name "$PEER_NAME" \
