@@ -26,10 +26,16 @@ import (
 )
 
 func TestNewTraceMode(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "trace-test-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "trace-test-secret")
 	t.Setenv("SAKURACLOUD_TRACE", "error")
 
 	client, err := New(false)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Populate(); err != nil {
 		t.Fatal(err)
 	}
 	if got := client.JSON()["TraceMode"]; got != "error" {
@@ -38,6 +44,9 @@ func TestNewTraceMode(t *testing.T) {
 
 	client, err = New(true)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Populate(); err != nil {
 		t.Fatal(err)
 	}
 	if got := client.JSON()["TraceMode"]; got != "all" {

@@ -77,7 +77,18 @@ $ skr config show <profile-name>
 
 `skr` は API キー（`access_token` と `access_token_secret`）を対話的に入力・保存するフローを提供しません。API キーで認証する場合は、 sacloud-sdk-go が読み込める形式で profile ファイルを手動で編集してください。これは API キー認証そのものを禁止するものではありません。
 
+## API リクエストのレート制限
+
+sacloud-sdk-go v0.4.0 では、JSON 形式の既存プロファイルの `HTTPRequestRateLimit` もレート制限の設定として読み込みます。値が `0` の場合は `APIRequestRateLimit can't be zero` エラーになります。正の整数を設定するか、項目を削除して既定値の毎秒 5 リクエストを使ってください。
+
+プロファイルを変更せず、一時的に毎秒 5 リクエストを指定できます。
+
+```console
+$ SAKURA_RATE_LIMIT=5 skr iaas-api zone find
+```
+
 ## 関連項目
 
 - [さくらのクラウド サービスプリンシパル](https://manual.sakura.ad.jp/cloud/controlpanel/service-principal.html)
-- [sacloud-sdk-go v0.3.0: プロファイル操作 `saclient.ProfileOp`](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/common/saclient#ProfileOp)
+- [sacloud-sdk-go v0.4.0: プロファイル操作 `saclient.ProfileOp`](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.4.0/common/saclient#ProfileOp)
+- [sacloud-sdk-go v0.4.0: 設定の読み込みと既定値](https://github.com/sacloud/sacloud-sdk-go/blob/v0.4.0/common/saclient/parameter.go)
