@@ -13,6 +13,7 @@
 - [IaaS Server API: cloud-init でサーバを起動して SSH 接続する](tutorials/iaas-api/server.md)
 - [IaaS Switch API: Sandbox でスイッチの管理手順を確認する](tutorials/iaas-api/switch.md)
 - [IaaS Zone API: ゾーン一覧を jq で加工する](tutorials/iaas-api/zone.md)
+- [GSLB API: 実サーバーを監視して DNS 応答先を制御する](tutorials/gslb-api.md)
 - [SimpleMQ API: キューを作成してメッセージを送受信する](tutorials/simplemq-api.md)
 - [Container Registry API: レジストリと認証ユーザーを管理する](tutorials/container-registry-api.md)
 - [EventBus API: スイッチ作成イベントを SimpleMQ で受信する](tutorials/eventbus-api.md)

@@ -2,7 +2,7 @@
 
 ## 対象と方針
 
-対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.3.0](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.0) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。`service/iaas` に含まれる API でも、CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
+対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.3.1](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。`service/iaas` に含まれる API でも、CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
 
 一覧は SDK の提供範囲を把握するためのもので、すべてのパッケージをそのまま CLI コマンドにすることを決めるものではありません。各パッケージで公開操作、入力、出力、固有の検証を確認し、対応範囲を明示して段階的に実装します。コマンドの階層は `<domain>-api <resource>` とし、SDK の型だけから公開操作や入力の意味を推測しません。詳細は [ADR 0016](docs/adr/0016-generate-low-level-api-commands.md) に従います。
 
@@ -66,7 +66,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `dns`
 - [ ] `enhanceddb`
 - [ ] `esme`
-- [ ] `gslb`
+- [x] `gslb` — `gslb-api` で Find / Read / Create / Update / Delete を実装済みです。単純値、ヘルスチェックのフラットなフラグ、反復可能な `--destination-server` と JSON 入力に対応します。[is1b ライブ E2E runner](test/e2e/gslb/) で一時サーバーとディスクを作成し、ping ヘルスチェックによる稼働中・停止中・再起動後の DNS 応答先の変化を確認済みです。GSLB の CRUD と、GSLB・サーバー・ディスクの削除後の不在も確認済みです。[チュートリアル](docs/manual/tutorials/gslb-api.md)では cloud-init 対応サーバーの準備、ping 監視と停止・復帰時の DNS 応答確認、更新、全リソースの削除を説明します
 - [ ] `localrouter`
 - [ ] `proxylb`
 - [ ] `simplemonitor`
