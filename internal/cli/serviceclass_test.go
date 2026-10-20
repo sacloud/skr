@@ -159,7 +159,8 @@ func TestIaaSServiceClassFindUsesSDKCaller(t *testing.T) {
 			if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 				t.Fatalf("decode SDK result %q: %v", stdout.String(), err)
 			}
-			if len(result) != 1 || result[0].ServiceClassName != "decoded-class" ||
+			if len(result) != 1 || result[0].ID != 17 ||
+				result[0].ServiceClassName != "decoded-class" ||
 				result[0].ServiceClassPath != "cloud/decoded-class" ||
 				result[0].DisplayName != "Decoded Class" || !result[0].IsPublic {
 				t.Fatalf("SDK-decoded result = %+v", result)
@@ -272,5 +273,5 @@ func (caller *serviceClassAPICaller) Do(_ context.Context, method, uri string, b
 	caller.calls = append(caller.calls, serviceClassAPICall{
 		method: method, uri: uri, count: condition.Count, from: condition.From, sort: condition.Sort,
 	})
-	return []byte(`{"Total":1,"Count":1,"ServiceClasses":[{"ID":"17","ServiceClassName":"decoded-class","ServiceClassPath":"cloud/decoded-class","DisplayName":"Decoded Class","IsPublic":true}]}`), nil
+	return []byte(`{"Total":1,"Count":1,"ServiceClasses":[{"ServiceClassID":"17","ServiceClassName":"decoded-class","ServiceClassPath":"cloud/decoded-class","DisplayName":"Decoded Class","IsPublic":true}]}`), nil
 }
