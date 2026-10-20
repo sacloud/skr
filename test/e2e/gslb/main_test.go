@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -63,7 +64,7 @@ func (f *fakeGSLBCLI) call(_ context.Context, step string, args []string, reques
 		return []byte(`{"ID":234,"Tags":["cloud-init"],"SizeMB":20480}`), nil
 	case "server-before-find", "disk-before-find":
 		return []byte("[]"), nil
-	case "disk-cleanup-find-after", "disk-cleanup-find-final":
+	case "disk-created-find", "disk-cleanup-find-after", "disk-cleanup-find-final":
 		if f.disk != nil {
 			return json.Marshal([]diskItem{*f.disk})
 		}
@@ -411,6 +412,7 @@ func TestCleanupRefusesUnverifiedDisk(t *testing.T) {
 		{"size", func(d *diskItem) { d.SizeMB++ }},
 		{"attached", func(d *diskItem) { d.ServerID = 999 }},
 		{"missing ID", func(d *diskItem) { d.ID = 0 }},
+		{"replacement ID", func(d *diskItem) { d.ID++ }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -499,6 +501,79 @@ func TestScenarioCleansUpBothServersAfterSorryBootFailure(t *testing.T) {
 		t.Fatal("temporary server resources remain after sorry server boot failure")
 	}
 }
+func TestDiskIdentityMustBeCapturedBeforeCleanup(t *testing.T) {
+	fake := &fakeGSLBCLI{}
+	test := fake.testScenario()
+	test.call = func(ctx context.Context, step string, args []string, request any) ([]byte, error) {
+		if step == "disk-created-find" {
+			return nil, errors.New("disk lookup failed")
+		}
+		return fake.call(ctx, step, args, request)
+	}
+	err := test.run(context.Background(), namePrefix+"test")
+	if err == nil || !strings.Contains(err.Error(), "manual cleanup required") {
+		t.Fatalf("error = %v, want manual cleanup requirement", err)
+	}
+	if fake.disk == nil || containsStep(fake.calls, "disk-cleanup-delete") {
+		t.Fatal("deleted a disk without capturing its ID")
+	}
+}
+
+func TestFinalizeRunRecordsCleanupFailure(t *testing.T) {
+	for _, cleanupFails := range []bool{false, true} {
+		t.Run(fmt.Sprint(cleanupFails), func(t *testing.T) {
+			recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var stderr bytes.Buffer
+			cleaned := false
+			code := finalizeRun(0, func() error {
+				cleaned = true
+				if cleanupFails {
+					return errors.New("cleanup failed")
+				}
+				return nil
+			}, func(result string) error {
+				if !cleaned {
+					t.Fatal("saved result before cleanup")
+				}
+				return recorder.SetResult(result, time.Now())
+			}, &stderr)
+			want := "passed"
+			if cleanupFails {
+				want = "failed"
+				if code != 1 || !strings.Contains(stderr.String(), "cleanup failed") {
+					t.Fatalf("code=%d stderr=%s", code, stderr.String())
+				}
+			} else if code != 0 {
+				t.Fatalf("code=%d, want success", code)
+			}
+			for _, file := range []string{"RESULT.txt", "REPORT.md"} {
+				data, err := os.ReadFile(filepath.Join(recorder.Dir(), file)) //nolint:gosec // Fixed evidence filenames inside this test's temporary directory.
+				if err != nil || !strings.Contains(string(data), want) {
+					t.Fatalf("%s: data=%s error=%v, want %s", file, data, err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestFinalizeRunPreservesEarlyFailureAndRunsCleanup(t *testing.T) {
+	var stderr bytes.Buffer
+	cleaned := false
+	code := finalizeRun(1, func() error { cleaned = true; return nil },
+		func(result string) error {
+			if !cleaned || result != "failed" {
+				t.Fatalf("cleaned=%v result=%s", cleaned, result)
+			}
+			return nil
+		}, &stderr)
+	if code != 1 || !cleaned {
+		t.Fatalf("code=%d cleaned=%v", code, cleaned)
+	}
+}
+
 func TestDNSRunnerRecordsResponseFailures(t *testing.T) {
 	binDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(binDir, "dig"), []byte("#!/bin/sh\nprintf '%s\\n' \"$GSLB_TEST_DNS\"\n"), 0o700); err != nil { //nolint:gosec // The test helper must be executable and is created under t.TempDir.

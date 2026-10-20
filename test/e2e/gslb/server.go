@@ -360,18 +360,37 @@ func (s scenario) ownsServer(server serverItem, name string) bool {
 	return server.Name == s.serverName && server.Description == serverDescription+" ("+name+")"
 }
 
+func (s *scenario) captureDisk(ctx context.Context, serverID types.ID) error {
+	disks, err := s.findDisk(ctx, "disk-created-find", s.serverName)
+	if err != nil {
+		return err
+	}
+	if len(disks) != 1 || disks[0].ID.IsEmpty() || disks[0].ServerID != serverID ||
+		!s.matchesDisk(disks[0]) {
+		return errors.New("cannot safely identify created Disk; manual cleanup required")
+	}
+	s.diskID = disks[0].ID
+	return nil
+}
+
+func (s scenario) matchesDisk(disk diskItem) bool {
+	return disk.Name == s.serverName && disk.DiskPlanID == types.ID(s.diskPlanID) &&
+		disk.SourceArchiveID == types.ID(s.archiveID) && disk.SizeMB == s.diskSizeGB*1024
+}
+
 func (s scenario) cleanupOrphanDisk(ctx context.Context) error {
 	disks, err := s.findDisk(ctx, "disk-cleanup-find-after", s.serverName)
 	if err != nil {
 		return err
 	}
 	if len(disks) == 0 {
+		if !s.diskID.IsEmpty() {
+			return errors.New("created Disk not found by its recorded name; manual cleanup required")
+		}
 		return nil
 	}
-	if len(disks) != 1 || disks[0].ID.IsEmpty() || disks[0].Name != s.serverName ||
-		!disks[0].ServerID.IsEmpty() || disks[0].DiskPlanID != types.ID(s.diskPlanID) ||
-		disks[0].SourceArchiveID != types.ID(s.archiveID) ||
-		disks[0].SizeMB/1024 != s.diskSizeGB || disks[0].SizeMB%1024 != 0 {
+	if len(disks) != 1 || s.diskID.IsEmpty() || disks[0].ID != s.diskID ||
+		!disks[0].ServerID.IsEmpty() || !s.matchesDisk(disks[0]) {
 		return errors.New("cannot safely identify orphan Disk; manual cleanup required")
 	}
 	disk := disks[0]

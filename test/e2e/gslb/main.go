@@ -23,6 +23,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -96,6 +97,7 @@ type scenario struct {
 	archiveID     int64
 	diskPlanID    int64
 	diskSizeGB    int64
+	diskID        types.ID
 	userDataPath  string
 	privateKey    string
 	knownHosts    string
@@ -213,6 +215,9 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		return err
 	}
 	serverID = server.ID
+	if err := s.captureDisk(ctx, serverID); err != nil {
+		return err
+	}
 	if err := s.bootAndWaitForSSH(ctx, server.ID); err != nil {
 		return err
 	}
@@ -226,6 +231,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	}
 
 	sorry := s
+	sorry.diskID = 0
 	sorry.serverName = s.serverName + "-sorry"
 	sorry.call = func(ctx context.Context, step string, args []string, request any) ([]byte, error) {
 		return s.call(ctx, "sorry-"+step, args, request)
@@ -244,6 +250,9 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		return err
 	}
 	sorryID = sorryServer.ID
+	if err := sorry.captureDisk(ctx, sorryID); err != nil {
+		return err
+	}
 	if err := sorry.bootAndWaitForSSH(ctx, sorryID); err != nil {
 		return err
 	}
@@ -395,11 +404,14 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "create temporary SSH material directory:", err)
 		return 1
 	}
+	var recorder *evidence.Recorder
 	defer func() {
-		if err := os.RemoveAll(materialDir); err != nil {
-			fmt.Fprintln(os.Stderr, "remove temporary SSH material:", err)
-			exitCode = 1
-		}
+		exitCode = finalizeRun(exitCode, func() error { return os.RemoveAll(materialDir) }, func(result string) error {
+			if recorder == nil {
+				return nil
+			}
+			return recorder.SetResult(result, time.Now())
+		}, os.Stderr)
 	}()
 	userDataPath, privateKey, knownHosts, err := createSSHMaterial(materialDir)
 	if err != nil {
@@ -422,22 +434,12 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	recorder, err := evidence.New("gslb-api")
+	recorder, err = evidence.New("gslb-api")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
-	defer func() {
-		result := "failed"
-		if exitCode == 0 {
-			result = "passed"
-		}
-		if err := recorder.SetResult(result, time.Now()); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			exitCode = 1
-		}
-	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -459,6 +461,22 @@ func runMain() (exitCode int) {
 	fmt.Println("GSLB E2E passed; DNS switched primary -> sorry server -> primary, and GSLB, both Servers and their Disks were deleted.")
 	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
+}
+
+func finalizeRun(exitCode int, cleanup func() error, saveResult func(string) error, stderr io.Writer) int {
+	if err := cleanup(); err != nil {
+		_, _ = fmt.Fprintln(stderr, "remove temporary SSH material:", err)
+		exitCode = 1
+	}
+	result := "failed"
+	if exitCode == 0 {
+		result = "passed"
+	}
+	if err := saveResult(result); err != nil {
+		_, _ = fmt.Fprintln(stderr, "save E2E result:", err)
+		exitCode = 1
+	}
+	return exitCode
 }
 
 func main() {
