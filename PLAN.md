@@ -77,7 +77,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `privatehostplan`
 - [x] `region` — `iaas-api region` の Find / Read を実装済みです。Find は件数・開始位置をフラグで指定でき、検索名・Sort は JSON で指定します。Read は ID で参照します。Region API はゾーン指定を受け付けません。SDK の公開操作はすべて CLI にあります。読み取り専用の[ライブ E2E runner](test/e2e/region/) と[チュートリアル](docs/manual/tutorials/iaas-api/region.md)を追加し、実環境で Find / Read の結果一致を確認済みです
 - [ ] `serverplan`
-- [ ] `serviceclass`
+- [x] `serviceclass` — `iaas-api service-class` の Find を実装済みです。指定ゾーンのサービスクラス一覧を取得できます。読み取り専用の [ライブ E2E runner](test/e2e/serviceclass/) と[チュートリアル](docs/manual/tutorials/iaas-api/serviceclass.md)があります。`is1b` でライブ E2E を実行し、517 件のサービスクラスを取得して、各項目の ID・名前・パスを検証済みです
 - [x] `zone` — `iaas-api zone` の Find のみ実装済みです。SDK の Read は未対応です。ゾーン一覧を取得して jq で名前を抽出する読み取り専用の [ライブ E2E runner](test/e2e/zone/) と[チュートリアル](docs/manual/tutorials/iaas-api/zone.md)があります
 - [x] `diskplan` — `iaas-api disk-plan` の Find / Read を実装済みです。検索結果の API `Availability` と `Size` から、指定ゾーンの利用可否とサイズを確認できます。SDK の公開操作はすべて CLI にあります。Archive と合わせて検証する読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk-plan.md)があります。is1b で検索・参照を確認済みです
 

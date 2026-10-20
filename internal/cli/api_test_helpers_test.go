@@ -23,6 +23,7 @@ import (
 	"github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	"github.com/sacloud/skr/internal/iaas/regionapi"
 	"github.com/sacloud/skr/internal/iaas/serverapi"
+	"github.com/sacloud/skr/internal/iaas/serviceclassapi"
 	"github.com/sacloud/skr/internal/iaas/switchapi"
 	"github.com/sacloud/skr/internal/iaas/zoneapi"
 )
@@ -80,6 +81,12 @@ func setZoneAPIFactory(commandLine *cli, factory zoneapi.APIFactory) {
 
 func setRegionAPIFactory(commandLine *cli, factory regionapi.APIFactory) {
 	commandLine.IaaSAPI.Region = regionapi.NewCommands(regionapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, factory)
+}
+
+func setServiceClassAPIFactory(commandLine *cli, factory serviceclassapi.APIFactory) {
+	commandLine.IaaSAPI.ServiceClass = serviceclassapi.NewCommands(serviceclassapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 	}, factory)
 }

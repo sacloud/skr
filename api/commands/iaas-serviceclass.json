@@ -1,0 +1,45 @@
+{
+  "package": "serviceclassapi",
+  "resource": "IaaS ServiceClass",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "serviceclass": "github.com/sacloud/sacloud-sdk-go/service/iaas/serviceclass"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_type": "FindCommand",
+      "help": "指定したゾーンのサービスクラスを検索します。例: skr iaas-api service-class find --zone is1b",
+      "method": "FindWithContext",
+      "request_type": "serviceclass.FindRequest",
+      "response_type": "[]*iaas.ServiceClass",
+      "validate_zone": true,
+      "request_help": "必須: Zone (単一ゾーン名)。Count と From は個別フラグ、Sort は JSON で指定します。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 検索対象のゾーン名です。例: --zone is1b",
+          "required": true
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数です。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置です。"
+        }
+      ]
+    }
+  ]
+}

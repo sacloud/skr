@@ -29,6 +29,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr iaas-api icon` | ユーザー作成アイコンの検索、参照、作成、更新、削除 |
 | `skr iaas-api region` | リージョン情報の検索、参照 |
 | `skr iaas-api server` | サーバの検索、参照、作成、更新、削除 |
+| `skr iaas-api service-class` | 指定したゾーンのサービスクラスの検索 |
 | `skr iaas-api switch` | スイッチの検索、参照、作成、更新、削除 |
 | `skr iaas-api zone` | ゾーン一覧の取得 |
 | `skr gslb-api` | GSLB の検索、参照、作成、更新、削除 |
@@ -63,6 +64,7 @@ $ skr --help
 $ skr iaas-api disk --help
 $ skr iaas-api icon --help
 $ skr iaas-api region --help
+$ skr iaas-api service-class --help
 $ skr iaas-api switch --help
 $ skr gslb-api --help
 $ skr simplemq-api --help
