@@ -23,6 +23,7 @@ import (
 	packetfilterSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	regionSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/region"
 	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
+	serviceclassSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/serviceclass"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	zoneSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	archiveapi "github.com/sacloud/skr/internal/iaas/archiveapi"
@@ -34,6 +35,7 @@ import (
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	regionapi "github.com/sacloud/skr/internal/iaas/regionapi"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
+	serviceclassapi "github.com/sacloud/skr/internal/iaas/serviceclassapi"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	zoneapi "github.com/sacloud/skr/internal/iaas/zoneapi"
 )
@@ -48,6 +50,7 @@ type iaasAPICommand struct {
 	Region       regionapi.Commands       `cmd:"" help:"リージョン情報を検索・参照します。"`
 	Switch       switchapi.Commands       `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
 	Server       serverapi.Commands       `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、起動、削除します。作成時はcloud-init用ディスクやNICを個別フラグで指定できます。"`
+	ServiceClass serviceclassapi.Commands `cmd:"" help:"指定したゾーンのサービスクラスを検索します。"`
 	Zone         zoneapi.Commands         `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
 }
 
@@ -104,6 +107,15 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return regionSDK.New(client), nil
+	})
+	c.IaaSAPI.ServiceClass = serviceclassapi.NewCommands(serviceclassapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (serviceclassapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return serviceclassSDK.New(client), nil
 	})
 	c.IaaSAPI.Icon = iconapi.NewCommands(iconapi.Runtime{
 		DecodeRequest:  decodeRequest,

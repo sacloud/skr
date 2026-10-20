@@ -11,6 +11,7 @@
 - [IaaS Icon API: 画像ファイルからユーザー作成アイコンを管理する](tutorials/iaas-api/icon.md)
 - [IaaS PacketFilter API: ルールを設定・管理する](tutorials/iaas-api/packetfilter.md)
 - [IaaS Region API: リージョン情報を検索・参照する](tutorials/iaas-api/region.md)
+- [IaaS ServiceClass API: ゾーン内のサービスクラスを検索する](tutorials/iaas-api/serviceclass.md)
 - [IaaS Server API: cloud-init でサーバを起動して SSH 接続する](tutorials/iaas-api/server.md)
 - [IaaS Switch API: Sandbox でスイッチの管理手順を確認する](tutorials/iaas-api/switch.md)
 - [IaaS Zone API: ゾーン一覧を jq で加工する](tutorials/iaas-api/zone.md)
