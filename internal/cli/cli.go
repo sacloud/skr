@@ -25,6 +25,7 @@ import (
 	"github.com/sacloud/skr/internal/apprundedicatedapi"
 	"github.com/sacloud/skr/internal/containerregistryapi"
 	"github.com/sacloud/skr/internal/eventbusapi"
+	"github.com/sacloud/skr/internal/gslbapi"
 	"github.com/sacloud/skr/internal/iamapi"
 	"github.com/sacloud/skr/internal/networkingsuiteapi"
 	"github.com/sacloud/skr/internal/simplemqapi"
@@ -38,6 +39,7 @@ type cli struct {
 	VersionCmd           versionCommand                `cmd:"" name:"version" help:"Print version information."`
 	Config               configCommand                 `cmd:"" help:"Manage configuration profiles."`
 	IaaSAPI              iaasAPICommand                `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
+	GSLBAPI              gslbapi.Commands              `cmd:"" name:"gslb-api" help:"さくらのクラウド GSLB を操作します。実サーバーへのヘルスチェックを行い、DNS 応答先を制御します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/gslb/index.html"`
 	EventbusAPI          eventbusapi.Commands          `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。実行先を process-configuration で定義し、schedule または trigger から参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。--query で必要な項目を抽出できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
 	SimpleMQAPI          simplemqapi.Commands          `cmd:"" name:"simplemq-api" help:"SimpleMQ のキュー管理 API とメッセージ API を操作します。キュー管理 API は SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。メッセージ API はキューの API キーを --api-key-file から読み込みます。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
 	NetworkingSuiteAPI   networkingsuiteapi.Commands   `cmd:"" name:"networking-suite-api" help:"ネットワークスイートのサブネットグループ、サブネット、サーバ NIC 接続、IP アドレスを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。API エンドポイントは SDK の既定値を使います。対象ゾーンに合わせる場合は SAKURA_ENDPOINTS_NETWORKING_SUITE を設定してください。Create/Update はフラグまたは --request JSON で入力します。SRN はリソース一覧や参照結果から取得します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/network/networking-suite/index.html"`
@@ -91,6 +93,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 func newCLI() *cli {
 	result := &cli{}
 	result.initIaaSAPI()
+	result.initGSLBAPI()
 	result.initEventbusAPI()
 	result.initSimpleMQAPI()
 	result.initNetworkingSuiteAPI()
