@@ -29,24 +29,26 @@ import (
 	"github.com/sacloud/skr/internal/iamapi"
 	"github.com/sacloud/skr/internal/networkingsuiteapi"
 	"github.com/sacloud/skr/internal/simplemqapi"
+	"github.com/sacloud/skr/internal/simplenotificationapi"
 	"github.com/sacloud/skr/version"
 )
 
 type cli struct {
-	Trace                bool                          `name:"trace" help:"SDK の HTTP リクエストとレスポンスをトレースします。認証情報などが出力される場合があります。"`
-	Version              kong.VersionFlag              `name:"version" help:"Print version information and quit."`
-	Query                *string                       `name:"query" help:"jq 式で API の JSON 出力を加工します。例: --query 'map({ID,Name})'"`
-	VersionCmd           versionCommand                `cmd:"" name:"version" help:"Print version information."`
-	Config               configCommand                 `cmd:"" help:"Manage configuration profiles."`
-	IaaSAPI              iaasAPICommand                `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
-	GSLBAPI              gslbapi.Commands              `cmd:"" name:"gslb-api" help:"さくらのクラウド GSLB を操作します。実サーバーへのヘルスチェックを行い、DNS 応答先を制御します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/gslb/index.html"`
-	EventbusAPI          eventbusapi.Commands          `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。実行先を process-configuration で定義し、schedule または trigger から参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。--query で必要な項目を抽出できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
-	SimpleMQAPI          simplemqapi.Commands          `cmd:"" name:"simplemq-api" help:"SimpleMQ のキュー管理 API とメッセージ API を操作します。キュー管理 API は SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。メッセージ API はキューの API キーを --api-key-file から読み込みます。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
-	NetworkingSuiteAPI   networkingsuiteapi.Commands   `cmd:"" name:"networking-suite-api" help:"ネットワークスイートのサブネットグループ、サブネット、サーバ NIC 接続、IP アドレスを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。API エンドポイントは SDK の既定値を使います。対象ゾーンに合わせる場合は SAKURA_ENDPOINTS_NETWORKING_SUITE を設定してください。Create/Update はフラグまたは --request JSON で入力します。SRN はリソース一覧や参照結果から取得します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/network/networking-suite/index.html"`
-	AppRunDedicatedAPI   apprundedicatedapi.Commands   `cmd:"" name:"apprun-dedicated-api" help:"専用ワーカノード上でコンテナを実行する AppRun 専有型のクラスタ、アプリケーションなどを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html"`
-	ContainerRegistryAPI containerregistryapi.Commands `cmd:"" name:"container-registry-api" help:"さくらのクラウドのコンテナレジストリと認証ユーザーを管理します。2026年6月25日以降の新規レジストリは非公開です。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。ユーザーのパスワードは保護されたファイルまたは標準入力から読み込みます。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/container-registry/index.html"`
-	IAMAPI               iamapi.Commands               `cmd:"" name:"iam-api" help:"さくらのクラウド IAM のユーザー、グループ、組織、プロジェクト、フォルダ、ポリシーなどを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。各機能を利用するには、対象機能の権限を付与したサービスプリンシパルが必要です。詳細: https://manual.sakura.ad.jp/cloud/controlpanel/iam-policy.html"`
-	HTTP                 httpCommand                   `cmd:"" name:"http" help:"SDK の認証情報を使って HTTPS URL に直接リクエストを送ります。指定したホストへアカウントの認証情報が送信されるため、信頼できる API エンドポイントだけを指定してください。レスポンス本文は形式を変えずに出力し、--query による加工は行いません。例: skr http 'https://api.example.test/path' --method GET"`
+	Trace                 bool                           `name:"trace" help:"SDK の HTTP リクエストとレスポンスをトレースします。認証情報などが出力される場合があります。"`
+	Version               kong.VersionFlag               `name:"version" help:"Print version information and quit."`
+	Query                 *string                        `name:"query" help:"jq 式で API の JSON 出力を加工します。例: --query 'map({ID,Name})'"`
+	VersionCmd            versionCommand                 `cmd:"" name:"version" help:"Print version information."`
+	Config                configCommand                  `cmd:"" help:"Manage configuration profiles."`
+	IaaSAPI               iaasAPICommand                 `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
+	GSLBAPI               gslbapi.Commands               `cmd:"" name:"gslb-api" help:"さくらのクラウド GSLB を操作します。実サーバーへのヘルスチェックを行い、DNS 応答先を制御します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/gslb/index.html"`
+	EventbusAPI           eventbusapi.Commands           `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。実行先を process-configuration で定義し、schedule または trigger から参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。--query で必要な項目を抽出できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
+	SimpleMQAPI           simplemqapi.Commands           `cmd:"" name:"simplemq-api" help:"SimpleMQ のキュー管理 API とメッセージ API を操作します。キュー管理 API は SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。メッセージ API はキューの API キーを --api-key-file から読み込みます。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
+	SimpleNotificationAPI simplenotificationapi.Commands `cmd:"" name:"simple-notification-api" help:"さくらのクラウド シンプル通知の通知先、通知先グループ、ルーティング設定、通知履歴を操作します。グループへの通知送信は実際の通知を発生させます。通知の到達は保証されず、結果は通知履歴でも確認してください。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/simplenotification/about.html"`
+	NetworkingSuiteAPI    networkingsuiteapi.Commands    `cmd:"" name:"networking-suite-api" help:"ネットワークスイートのサブネットグループ、サブネット、サーバ NIC 接続、IP アドレスを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。API エンドポイントは SDK の既定値を使います。対象ゾーンに合わせる場合は SAKURA_ENDPOINTS_NETWORKING_SUITE を設定してください。Create/Update はフラグまたは --request JSON で入力します。SRN はリソース一覧や参照結果から取得します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/network/networking-suite/index.html"`
+	AppRunDedicatedAPI    apprundedicatedapi.Commands    `cmd:"" name:"apprun-dedicated-api" help:"専用ワーカノード上でコンテナを実行する AppRun 専有型のクラスタ、アプリケーションなどを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html"`
+	ContainerRegistryAPI  containerregistryapi.Commands  `cmd:"" name:"container-registry-api" help:"さくらのクラウドのコンテナレジストリと認証ユーザーを管理します。2026年6月25日以降の新規レジストリは非公開です。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。ユーザーのパスワードは保護されたファイルまたは標準入力から読み込みます。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/container-registry/index.html"`
+	IAMAPI                iamapi.Commands                `cmd:"" name:"iam-api" help:"さくらのクラウド IAM のユーザー、グループ、組織、プロジェクト、フォルダ、ポリシーなどを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。各機能を利用するには、対象機能の権限を付与したサービスプリンシパルが必要です。詳細: https://manual.sakura.ad.jp/cloud/controlpanel/iam-policy.html"`
+	HTTP                  httpCommand                    `cmd:"" name:"http" help:"SDK の認証情報を使って HTTPS URL に直接リクエストを送ります。指定したホストへアカウントの認証情報が送信されるため、信頼できる API エンドポイントだけを指定してください。レスポンス本文は形式を変えずに出力し、--query による加工は行いません。例: skr http 'https://api.example.test/path' --method GET"`
 }
 
 type configCommand struct {
@@ -96,6 +98,7 @@ func newCLI() *cli {
 	result.initGSLBAPI()
 	result.initEventbusAPI()
 	result.initSimpleMQAPI()
+	result.initSimpleNotificationAPI()
 	result.initNetworkingSuiteAPI()
 	result.initAppRunDedicatedAPI()
 	result.initContainerRegistryAPI()
