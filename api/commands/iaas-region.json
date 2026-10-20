@@ -1,0 +1,44 @@
+{
+  "package": "regionapi",
+  "resource": "IaaS Region",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "region": "github.com/sacloud/sacloud-sdk-go/service/iaas/region",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_type": "FindCommand",
+      "help": "リージョン一覧を取得します。必要な項目だけを表示する例: skr iaas-api region find --query 'map({ID,Name,Description})'",
+      "method": "FindWithContext",
+      "request_type": "region.FindRequest",
+      "response_type": "[]*iaas.Region",
+      "request_help": "任意: FindRequest JSON を直接または @path.json で指定します。Names と Sort は JSON、Count と From は個別フラグで指定できます。省略時は一覧を取得します。--request と個別フラグは併用できません。",
+      "handwritten": true
+    },
+    {
+      "name": "Read",
+      "command_type": "ReadCommand",
+      "help": "指定した ID のリージョン情報を取得します。例: skr iaas-api region read --id REGION-ID",
+      "method": "ReadWithContext",
+      "request_type": "region.ReadRequest",
+      "response_type": "*iaas.Region",
+      "request_help": "必須: ID (数値)。--id または ReadRequest JSON を直接／@path.json で指定します。個別フラグと --request は併用できません。",
+      "flags": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 参照するリージョン ID です。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    }
+  ]
+}

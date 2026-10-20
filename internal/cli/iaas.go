@@ -21,6 +21,7 @@ import (
 	iconSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
 	internetSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
 	packetfilterSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
+	regionSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/region"
 	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	zoneSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
@@ -31,6 +32,7 @@ import (
 	iconapi "github.com/sacloud/skr/internal/iaas/iconapi"
 	internetapi "github.com/sacloud/skr/internal/iaas/internetapi"
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
+	regionapi "github.com/sacloud/skr/internal/iaas/regionapi"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	zoneapi "github.com/sacloud/skr/internal/iaas/zoneapi"
@@ -43,6 +45,7 @@ type iaasAPICommand struct {
 	Icon         iconapi.Commands         `cmd:"" help:"ユーザー作成アイコンを検索、参照、作成、更新、削除します。"`
 	Internet     internetapi.Commands     `cmd:"" help:"さくらのクラウドのルータ＋スイッチと、関連する IP アドレスブロックおよび IPv6 設定を操作します。"`
 	PacketFilter packetfilterapi.Commands `cmd:"" name:"packetfilter" help:"さくらのクラウドのパケットフィルタを検索、参照、作成、更新、削除します。ルール配列は --expressions JSON または --request JSON で指定します。"`
+	Region       regionapi.Commands       `cmd:"" help:"リージョン情報を検索・参照します。"`
 	Switch       switchapi.Commands       `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
 	Server       serverapi.Commands       `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、起動、削除します。作成時はcloud-init用ディスクやNICを個別フラグで指定できます。"`
 	Zone         zoneapi.Commands         `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
@@ -92,6 +95,15 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return diskplanSDK.New(client), nil
+	})
+	c.IaaSAPI.Region = regionapi.NewCommands(regionapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (regionapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return regionSDK.New(client), nil
 	})
 	c.IaaSAPI.Icon = iconapi.NewCommands(iconapi.Runtime{
 		DecodeRequest:  decodeRequest,

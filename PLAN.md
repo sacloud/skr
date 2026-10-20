@@ -81,7 +81,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `internetplan`
 - [ ] `licenseinfo`
 - [ ] `privatehostplan`
-- [ ] `region`
+- [x] `region` — `iaas-api region` の Find / Read を実装済みです。Find は件数・開始位置をフラグで指定でき、検索名・Sort は JSON で指定します。Read は ID で参照します。Region API はゾーン指定を受け付けません。SDK の公開操作はすべて CLI にあります。読み取り専用の[ライブ E2E runner](test/e2e/region/) と[チュートリアル](docs/manual/tutorials/iaas-api/region.md)を追加し、実環境で Find / Read の結果一致を確認済みです
 - [ ] `serverplan`
 - [ ] `serviceclass`
 - [x] `zone` — `iaas-api zone` の Find のみ実装済みです。SDK の Read は未対応です。ゾーン一覧を取得して jq で名前を抽出する読み取り専用の [ライブ E2E runner](test/e2e/zone/) と[チュートリアル](docs/manual/tutorials/iaas-api/zone.md)があります
