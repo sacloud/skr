@@ -89,7 +89,7 @@ func TestRunGSLBAPIHelp(t *testing.T) {
 	}{
 		{[]string{"gslb-api", "--help"}, []string{"find", "read", "create", "update", "delete", "ヘルスチェック"}},
 		{[]string{"gslb-api", "create", "--help"}, []string{"--name", "--health-check-protocol", "--destination-server", "--request", "@path.json"}},
-		{[]string{"gslb-api", "update", "--help"}, []string{"--id", "--monitoring-suite-log-enabled", "一覧全体を置き換えます"}},
+		{[]string{"gslb-api", "update", "--help"}, []string{"--id", "--monitoring-suite-log-enabled", "一覧全体を置き換えます", "監視設定全体を置き換える", "保持したい監視項目も再指定"}},
 	} {
 		t.Run(strings.Join(test.args, "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer

@@ -15,6 +15,7 @@
 package gslbapi
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -152,3 +153,40 @@ func stringPointer(value string) *string { return &value }
 func intPointer(value int) *int          { return &value }
 func int64Pointer(value int64) *int64    { return &value }
 func boolPointer(value bool) *bool       { return &value }
+
+func TestUpdateHealthCheckReplacesWholeSetting(t *testing.T) {
+	for _, preserve := range []bool{false, true} {
+		t.Run(fmt.Sprint(preserve), func(t *testing.T) {
+			command := &UpdateCommand{
+				ID: int64Pointer(42), HealthCheckProtocol: stringPointer("http"),
+				HealthCheckPath: stringPointer("/ready"),
+			}
+			if preserve {
+				command.HealthCheckPort = intPointer(8080)
+				command.HealthCheckHostHeader = stringPointer("example.test")
+			}
+			request, err := updateRequestFromFlags(command)
+			if err != nil {
+				t.Fatal(err)
+			}
+			current := &iaas.GSLB{HealthCheck: &iaas.GSLBHealthCheck{
+				Protocol: types.GSLBHealthCheckProtocols.HTTP, Path: "/old",
+				Port: 8080, HostHeader: "example.test",
+			}}
+			params, err := request.ToRequestParameter(current)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if params.HealthCheck.Path != "/ready" {
+				t.Fatalf("health check = %+v", params.HealthCheck)
+			}
+			if preserve {
+				if params.HealthCheck.Port != 8080 || params.HealthCheck.HostHeader != "example.test" {
+					t.Fatalf("explicit settings lost: %+v", params.HealthCheck)
+				}
+			} else if params.HealthCheck.Port != 0 || params.HealthCheck.HostHeader != "" {
+				t.Fatalf("omitted settings were unexpectedly merged: %+v", params.HealthCheck)
+			}
+		})
+	}
+}

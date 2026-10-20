@@ -66,7 +66,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `dns`
 - [ ] `enhanceddb`
 - [ ] `esme`
-- [x] `gslb` — `gslb-api` で Find / Read / Create / Update / Delete を実装済みです。単純値、ヘルスチェックのフラットなフラグ、反復可能な `--destination-server` と JSON 入力に対応します。[is1b ライブ E2E runner](test/e2e/gslb/) で一時サーバーとディスクを作成し、ping ヘルスチェックによる稼働中・停止中・再起動後の DNS 応答先の変化を確認済みです。GSLB の CRUD と、GSLB・サーバー・ディスクの削除後の不在も確認済みです。[チュートリアル](docs/manual/tutorials/gslb-api.md)では cloud-init 対応サーバーの準備、ping 監視と停止・復帰時の DNS 応答確認、更新、全リソースの削除を説明します
+- [x] `gslb` — `gslb-api` で Find / Read / Create / Update / Delete を実装済みです。単純値、ヘルスチェックのフラットなフラグ、反復可能な `--destination-server` と JSON 入力に対応します。[is1b ライブ E2E runner](test/e2e/gslb/) で実サーバーとソーリーサーバーを各1台作成し、ping 監視による停止・復帰時の応答先切り替えを `NOERROR` と期待 IP の完全一致で確認済みです。GSLB の CRUD、両サーバーの削除、ディスクの個別削除と各リソースの不在も確認済みです。以前の単一宛先・空応答による停止確認は不十分なため、この構成で置き換えました。[チュートリアル](docs/manual/tutorials/gslb-api.md)では両サーバーの準備、ソーリーサーバーへの切り替えと復帰、更新、ディスクの個別削除を説明します
 - [ ] `localrouter`
 - [ ] `proxylb`
 - [ ] `simplemonitor`

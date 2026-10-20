@@ -285,7 +285,7 @@ func (s scenario) waitForServerDown(ctx context.Context, id types.ID) error {
 	}
 }
 
-func (s scenario) waitForDNS(ctx context.Context, step, fqdn, ip string, wantPresent bool) error {
+func (s scenario) waitForDNS(ctx context.Context, step, fqdn, ip string) error {
 	timeout := s.dnsTimeout
 	if timeout <= 0 {
 		timeout = 10 * time.Minute
@@ -300,23 +300,13 @@ func (s scenario) waitForDNS(ctx context.Context, step, fqdn, ip string, wantPre
 	defer ticker.Stop()
 	for {
 		answers, err := s.lookupDNS(ctx, step, fqdn)
-		if err != nil {
-			return err
-		}
-		hasIP := false
-		for _, answer := range answers {
-			if answer == ip {
-				hasIP = true
-				break
-			}
-		}
-		if hasIP == wantPresent {
+		if err == nil && len(answers) == 1 && answers[0] == ip {
 			return nil
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("DNS answers for %s did not %s %s: got %v: %w",
-				fqdn, map[bool]string{true: "include", false: "exclude"}[wantPresent], ip, answers, ctx.Err())
+			return fmt.Errorf("DNS answers for %s did not become exactly [%s]: got %v, last query error: %v: %w",
+				fqdn, ip, answers, err, ctx.Err())
 		case <-ticker.C:
 		}
 	}

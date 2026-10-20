@@ -44,7 +44,7 @@ type Commands struct {
 	Find   FindCommand   `cmd:"" help:"GSLB を検索します。Name は完全一致です。例: skr gslb-api find --name example"`
 	Read   ReadCommand   `cmd:"" help:"指定した ID の GSLB を読み取ります。例: skr gslb-api read --id 123456789012"`
 	Create CreateCommand `cmd:"" help:"GSLB を作成します。監視方法には --health-check-protocol を指定します。実サーバーは --destination-server を繰り返して指定できます。複雑な設定には --request JSON を使います。"`
-	Update UpdateCommand `cmd:"" help:"GSLB の指定項目を更新します。省略した項目は変更しません。実サーバーを指定すると一覧全体を置き換えます。"`
+	Update UpdateCommand `cmd:"" help:"GSLB の指定項目を更新します。省略した設定は変更しません。ヘルスチェックのフラグを指定すると監視設定全体を置き換えるため、保持したい監視項目も再指定してください。実サーバーを指定すると一覧全体を置き換えます。"`
 	Delete DeleteCommand `cmd:"" help:"指定した ID の GSLB を削除します。"`
 }
 

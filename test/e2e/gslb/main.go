@@ -41,7 +41,7 @@ const (
 	namePrefix      = "skr-e2e-gslb-"
 	description     = "Temporary GSLB created by skr live E2E"
 	updatedDesc     = "Temporary GSLB updated by skr live E2E"
-	projectionQuery = "map({ID,Name,Description,FQDN,DelayLoop,HealthCheck,DestinationServers})"
+	projectionQuery = "map({ID,Name,Description,FQDN,DelayLoop,HealthCheck,DestinationServers,SorryServer})"
 )
 
 type gslbItem struct {
@@ -50,6 +50,7 @@ type gslbItem struct {
 	Description        string
 	FQDN               string
 	DelayLoop          int
+	SorryServer        string
 	HealthCheck        *iaas.GSLBHealthCheck
 	DestinationServers iaas.GSLBServers
 }
@@ -64,7 +65,7 @@ func (r cliRunner) call(ctx context.Context, step string, args []string, request
 		return nil, err
 	}
 	timeoutDuration := 60 * time.Second
-	if strings.HasPrefix(step, "server-") {
+	if strings.HasPrefix(step, "server-") || strings.HasPrefix(step, "sorry-server-") {
 		timeoutDuration = 20 * time.Minute
 	}
 	timeout, cancel := context.WithTimeout(ctx, timeoutDuration)
@@ -224,6 +225,40 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		return err
 	}
 
+	sorry := s
+	sorry.serverName = s.serverName + "-sorry"
+	sorry.call = func(ctx context.Context, step string, args []string, request any) ([]byte, error) {
+		return s.call(ctx, "sorry-"+step, args, request)
+	}
+	if err := sorry.prepareServer(ctx, name); err != nil {
+		return err
+	}
+	var sorryID types.ID
+	defer func() {
+		if cleanupErr := sorry.cleanupServer(name, sorryID); cleanupErr != nil {
+			result = errors.Join(result, fmt.Errorf("sorry server cleanup failed: %w", cleanupErr))
+		}
+	}()
+	sorryServer, err := sorry.createServer(ctx, name)
+	if err != nil {
+		return err
+	}
+	sorryID = sorryServer.ID
+	if err := sorry.bootAndWaitForSSH(ctx, sorryID); err != nil {
+		return err
+	}
+	sorryServer, err = sorry.readServer(ctx, "server-read-up", sorryID)
+	if err != nil {
+		return err
+	}
+	sorryIP, err := sorryServer.sharedIP()
+	if err != nil {
+		return err
+	}
+	if sorryIP == serverIP {
+		return errors.New("primary and sorry server must have different IP addresses")
+	}
+
 	before, err := s.find(ctx, "before-find", name)
 	if err != nil {
 		return err
@@ -243,10 +278,11 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		"gslb-api", "create", "--name", name, "--description", description,
 		"--health-check-protocol", "ping", "--delay-loop", "10", "--tags", "skr-e2e",
 		"--destination-server", "ip-address=" + serverIP,
+		"--sorry-server", sorryIP,
 	}
 	created, err := s.item(ctx, "test-create", createArgs, map[string]any{
 		"Name": name, "Description": description, "HealthCheck": map[string]string{"Protocol": "ping"},
-		"DelayLoop": 10, "Tags": []string{"skr-e2e"}, "DestinationServers": []string{serverIP},
+		"DelayLoop": 10, "Tags": []string{"skr-e2e"}, "DestinationServers": []string{serverIP}, "SorryServer": sorryIP,
 	})
 	if err != nil {
 		return err
@@ -257,10 +293,10 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	}
 	if created.FQDN == "" || created.DelayLoop != 10 || created.HealthCheck == nil ||
 		created.HealthCheck.Protocol != types.GSLBHealthCheckProtocols.Ping || len(created.DestinationServers) != 1 ||
-		created.DestinationServers[0].IPAddress != serverIP {
+		created.DestinationServers[0].IPAddress != serverIP || created.SorryServer != sorryIP {
 		return fmt.Errorf("created GSLB %s does not match the requested settings", id)
 	}
-	if err := s.waitForDNS(ctx, "test-dns-healthy", created.FQDN, serverIP, true); err != nil {
+	if err := s.waitForDNS(ctx, "test-dns-healthy", created.FQDN, serverIP); err != nil {
 		return err
 	}
 
@@ -280,7 +316,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		return err
 	}
 	if read.FQDN != created.FQDN || read.DelayLoop != 10 || read.HealthCheck == nil ||
-		read.HealthCheck.Protocol != types.GSLBHealthCheckProtocols.Ping {
+		read.HealthCheck.Protocol != types.GSLBHealthCheckProtocols.Ping || read.SorryServer != sorryIP {
 		return fmt.Errorf("read settings do not match created GSLB %s", id)
 	}
 
@@ -293,7 +329,10 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := s.waitForServerDown(ctx, server.ID); err != nil {
 		return err
 	}
-	if err := s.waitForDNS(ctx, "test-dns-unhealthy", created.FQDN, serverIP, false); err != nil {
+	if err := sorry.waitForSSH(ctx, sorryID); err != nil {
+		return err
+	}
+	if err := s.waitForDNS(ctx, "test-dns-unhealthy", created.FQDN, sorryIP); err != nil {
 		return err
 	}
 	if err := s.bootServer(ctx, server.ID, false); err != nil {
@@ -302,7 +341,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := s.waitForSSH(ctx, server.ID); err != nil {
 		return err
 	}
-	if err := s.waitForDNS(ctx, "test-dns-recovered", created.FQDN, serverIP, true); err != nil {
+	if err := s.waitForDNS(ctx, "test-dns-recovered", created.FQDN, serverIP); err != nil {
 		return err
 	}
 
@@ -316,7 +355,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := checkIdentity(updated, id, name, updatedDesc); err != nil {
 		return err
 	}
-	if updated.DelayLoop != 20 || updated.FQDN != created.FQDN {
+	if updated.DelayLoop != 20 || updated.FQDN != created.FQDN || updated.SorryServer != sorryIP {
 		return fmt.Errorf("update result does not match requested GSLB settings for %s", id)
 	}
 
@@ -327,7 +366,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := checkIdentity(read, id, name, updatedDesc); err != nil {
 		return err
 	}
-	if read.DelayLoop != 20 || read.FQDN != created.FQDN {
+	if read.DelayLoop != 20 || read.FQDN != created.FQDN || read.SorryServer != sorryIP {
 		return fmt.Errorf("read did not return updated GSLB %s", id)
 	}
 	return nil
@@ -338,7 +377,7 @@ func runMain() (exitCode int) {
 	archiveID := flag.Int64("cloudimg-archive-id", 0, "Cloud-init archive ID available in is1b")
 	diskPlanID := flag.Int64("disk-plan-id", 0, "Disk plan ID available in is1b")
 	diskSizeGB := flag.Int64("disk-size-gb", 20, "Temporary server disk size in GB")
-	confirmed := flag.Bool("confirm-is1b-live", false, "Confirm creating, booting, stopping, restarting, and deleting a temporary Server and GSLB in is1b")
+	confirmed := flag.Bool("confirm-is1b-live", false, "Confirm creating two temporary Servers with disks and a GSLB in is1b, stopping/restarting the primary, and deleting all test resources")
 	flag.Parse()
 	if flag.NArg() != 0 || !*confirmed || *archiveID <= 0 || *diskPlanID <= 0 || *diskSizeGB <= 0 {
 		fmt.Fprintln(os.Stderr, "usage: go run ./test/e2e/gslb --skr ./skr --cloudimg-archive-id ID --disk-plan-id ID [--disk-size-gb 20] --confirm-is1b-live")
@@ -417,7 +456,7 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
 	}
-	fmt.Println("GSLB E2E passed; ping health check followed Server shutdown and recovery, and both temporary resources were deleted.")
+	fmt.Println("GSLB E2E passed; DNS switched primary -> sorry server -> primary, and GSLB, both Servers and their Disks were deleted.")
 	fmt.Println("Evidence retained at:", recorder.Dir())
 	return 0
 }

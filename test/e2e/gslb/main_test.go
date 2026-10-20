@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,8 @@ type fakeGSLBCLI struct {
 	changeOnCleanupRead bool
 	server              *serverItem
 	disk                *diskItem
+	sorry               *fakeGSLBCLI
+	sorryRole           bool
 	calls               []string
 }
 
@@ -43,6 +46,12 @@ const testServerIP = "203.0.113.10"
 
 func (f *fakeGSLBCLI) call(_ context.Context, step string, args []string, request any) ([]byte, error) {
 	f.calls = append(f.calls, step)
+	if strings.HasPrefix(step, "sorry-") {
+		if f.sorry == nil {
+			f.sorry = &fakeGSLBCLI{sorryRole: true}
+		}
+		return f.sorry.call(context.Background(), strings.TrimPrefix(step, "sorry-"), args, request)
+	}
 	if step == "profile-current" {
 		return []byte("test-profile\n"), nil
 	}
@@ -69,6 +78,12 @@ func (f *fakeGSLBCLI) call(_ context.Context, step string, args []string, reques
 		f.disk = &diskItem{
 			ID: 567, Name: f.server.Name, ServerID: f.server.ID,
 			DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 20480,
+		}
+		if f.sorryRole {
+			f.server.ID = 789
+			f.server.Interfaces[0].IPAddress = testSorryIP
+			f.disk.ID = 890
+			f.disk.ServerID = f.server.ID
 		}
 		return json.Marshal(f.server)
 	case "server-boot":
@@ -121,6 +136,7 @@ func (f *fakeGSLBCLI) call(_ context.Context, step string, args []string, reques
 			Description: argAfter(args, "--description"),
 			FQDN:        "site-123.gslbN.sakura.ne.jp",
 			DelayLoop:   10,
+			SorryServer: argAfter(args, "--sorry-server"),
 			HealthCheck: &iaas.GSLBHealthCheck{Protocol: types.GSLBHealthCheckProtocols.Ping},
 			DestinationServers: iaas.GSLBServers{
 				&iaas.GSLBServer{IPAddress: testServerIP},
@@ -156,12 +172,18 @@ func (f *fakeGSLBCLI) call(_ context.Context, step string, args []string, reques
 	}
 }
 
+const testSorryIP = "203.0.113.20"
+
 func (f *fakeGSLBCLI) lookupDNS(_ context.Context, step, _ string) ([]string, error) {
 	f.calls = append(f.calls, step)
 	if f.server != nil && f.server.InstanceStatus.IsUp() {
 		return []string{testServerIP}, nil
 	}
-	return nil, nil
+	if f.item != nil && f.item.SorryServer != "" {
+		return []string{f.item.SorryServer}, nil
+	}
+	// Without a sorry server, all-down returns all registered addresses.
+	return []string{testServerIP}, nil
 }
 
 func (f *fakeGSLBCLI) connectSSH(_ context.Context, step, _, _, _ string) error {
@@ -203,6 +225,9 @@ func TestScenarioCleansUpAfterSuccess(t *testing.T) {
 	}
 	if fake.item != nil || fake.server != nil || fake.disk != nil {
 		t.Fatal("temporary resources were not deleted")
+	}
+	if fake.sorry == nil || fake.sorry.server != nil || fake.sorry.disk != nil {
+		t.Fatal("sorry server resources were not deleted")
 	}
 	if !containsStep(fake.calls, "test-create") || !containsStep(fake.calls, "test-update") ||
 		!containsStep(fake.calls, "test-dns-healthy") || !containsStep(fake.calls, "server-shutdown") ||
@@ -426,6 +451,54 @@ func TestCleanupRefusesDiskChangedBeforeDelete(t *testing.T) {
 	}
 }
 
+func TestWaitForDNSRequiresExactDestination(t *testing.T) {
+	for _, answers := range [][]string{nil, {testServerIP}, {testSorryIP, testServerIP}} {
+		t.Run(fmt.Sprint(answers), func(t *testing.T) {
+			test := scenario{
+				pollInterval: time.Millisecond, dnsTimeout: 5 * time.Millisecond,
+				lookupDNS: func(context.Context, string, string) ([]string, error) { return answers, nil },
+			}
+			if err := test.waitForDNS(context.Background(), "down", "example.test", testSorryIP); err == nil {
+				t.Fatalf("accepted %v as a sorry-server response", answers)
+			}
+		})
+	}
+}
+
+func TestWaitForDNSRetriesPropagationErrors(t *testing.T) {
+	calls := 0
+	test := scenario{
+		pollInterval: time.Millisecond, dnsTimeout: time.Second,
+		lookupDNS: func(context.Context, string, string) ([]string, error) {
+			calls++
+			switch calls {
+			case 1:
+				return nil, errors.New("NXDOMAIN")
+			case 2:
+				return nil, errors.New("SERVFAIL")
+			default:
+				return []string{testSorryIP}, nil
+			}
+		},
+	}
+	if err := test.waitForDNS(context.Background(), "down", "example.test", testSorryIP); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("calls = %d, want 3", calls)
+	}
+}
+
+func TestScenarioCleansUpBothServersAfterSorryBootFailure(t *testing.T) {
+	fake := &fakeGSLBCLI{sorry: &fakeGSLBCLI{sorryRole: true, failAt: "server-boot"}}
+	err := fake.testScenario().run(context.Background(), namePrefix+"test")
+	if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
+		t.Fatalf("error = %v, want sorry boot failure", err)
+	}
+	if fake.server != nil || fake.disk != nil || fake.sorry.server != nil || fake.sorry.disk != nil {
+		t.Fatal("temporary server resources remain after sorry server boot failure")
+	}
+}
 func TestDNSRunnerRecordsResponseFailures(t *testing.T) {
 	binDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(binDir, "dig"), []byte("#!/bin/sh\nprintf '%s\\n' \"$GSLB_TEST_DNS\"\n"), 0o700); err != nil { //nolint:gosec // The test helper must be executable and is created under t.TempDir.
