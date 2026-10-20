@@ -16,7 +16,11 @@ package cli
 
 import (
 	"bytes"
+	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -94,6 +98,7 @@ func TestRunSimpleNotificationAPIHelp(t *testing.T) {
 			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
 				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, exitCode, stderr.String())
 			}
+
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
 				if !strings.Contains(help, text) {
@@ -101,5 +106,71 @@ func TestRunSimpleNotificationAPIHelp(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSimpleNotificationTraceUsesParsedFlag(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "test-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "test-secret")
+	t.Setenv("SAKURA_TRACE_MODE", "")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"From":0,"Count":0,"Total":0,"CommonServiceItems":[]}`))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_SIMPLE_NOTIFICATION", server.URL+"/")
+	previous := log.Writer()
+	t.Cleanup(func() { log.SetOutput(previous) })
+	for _, trace := range []bool{false, true} {
+		var output, stderr, logs bytes.Buffer
+		log.SetOutput(&logs)
+		args := []string{"simple-notification-api", "destination", "list"}
+		if trace {
+			args = append([]string{"--trace"}, args...)
+		}
+		if code := run(args, &output, &stderr); code != 0 {
+			t.Fatalf("exit = %d, stderr = %s", code, &stderr)
+		}
+		if strings.Contains(logs.String(), "[TRACE]") != trace {
+			t.Fatalf("trace output enabled = %v, want %v", strings.Contains(logs.String(), "[TRACE]"), trace)
+		}
+	}
+}
+
+func TestDestinationSDKValidationDoesNotExposeFileValues(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "test-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "test-secret")
+	t.Setenv("SAKURA_TRACE_MODE", "")
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		http.Error(w, "unexpected request", http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_SIMPLE_NOTIFICATION", server.URL+"/")
+	const webhookURL = "https://example.invalid/private-webhook-value"
+	path := filepath.Join(t.TempDir(), "request.json")
+	for _, operation := range []string{"create", "update"} {
+		data := `{"CommonServiceItem":{"Name":"test","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"` + webhookURL + `","Value":"webhook"}}}`
+		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		args := []string{"simple-notification-api", "destination", operation}
+		if operation == "update" {
+			args = append(args, "123456789012")
+		}
+		args = append(args, "--request", "@"+path)
+		var output, stderr bytes.Buffer
+		if code := run(args, &output, &stderr); code != 1 {
+			t.Fatalf("%s exit = %d, want 1", operation, code)
+		}
+		if strings.Contains(stderr.String()+output.String(), webhookURL) || stderr.Len() == 0 {
+			t.Fatalf("%s did not return a nonempty safe error", operation)
+		}
+	}
+	if calls != 0 {
+		t.Fatalf("invalid request reached the server %d times", calls)
 	}
 }

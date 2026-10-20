@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
 	"slices"
@@ -43,6 +44,7 @@ type crudResponse struct {
 type ownedItem struct {
 	resource string
 	item     crudItem
+	attempts []crudItem
 }
 
 type crudScenario struct {
@@ -166,7 +168,7 @@ func (s crudScenario) cleanupItems(items []*ownedItem) error {
 		if owned.item.ID == "" {
 			return errors.New("cleanup refused: created resource ID unavailable; manual cleanup required")
 		}
-		if err := s.verifyItem(ctx, "crud-cleanup-read-"+owned.resource, owned.resource, owned.item); err != nil {
+		if err := s.verifyOwnedItem(ctx, owned); err != nil {
 			return fmt.Errorf("cleanup refused: %w", err)
 		}
 		_, deleteErr := s.call(ctx, "crud-cleanup-delete-"+owned.resource, nil, owned.resource, "delete", owned.item.ID)
@@ -181,6 +183,19 @@ func (s crudScenario) cleanupItems(items []*ownedItem) error {
 		}
 	}
 	return nil
+}
+
+func (s crudScenario) verifyOwnedItem(ctx context.Context, owned *ownedItem) error {
+	actual, err := s.readItem(ctx, "crud-cleanup-read-"+owned.resource, owned.resource, owned.item.ID)
+	if err != nil {
+		return err
+	}
+	for _, expected := range append([]crudItem{owned.item}, owned.attempts...) {
+		if matchesCRUDItem(actual, expected) {
+			return nil
+		}
+	}
+	return errors.New("resource identity or settings do not match a known state of this E2E run")
 }
 
 func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error) {
@@ -274,6 +289,11 @@ func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error)
 		item := entry.item
 		item.Settings = settings
 		item.Tags = []string{"skr-e2e", suffix, "updated"}
+		expected := item
+		if settings == nil {
+			expected.Settings = entry.item.Settings
+		}
+		entry.attempts = []crudItem{entry.item, expected}
 		_, err := s.writeItem(ctx, step, entry.resource, "update", item)
 		if err != nil {
 			return err
@@ -282,7 +302,11 @@ func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error)
 		if settings != nil {
 			entry.item.Settings = settings
 		}
-		return s.verifyItem(ctx, step+"-read", entry.resource, entry.item)
+		if err := s.verifyItem(ctx, step+"-read", entry.resource, entry.item); err != nil {
+			return err
+		}
+		entry.attempts = nil
+		return nil
 	}
 
 	destination, err := create("destination", map[string]any{"Type": "email", "Value": address, "Disabled": true})
@@ -361,13 +385,18 @@ func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error)
 			return err
 		}
 		step := fmt.Sprintf("crud-routing-reorder-%d", rank)
+		expected := routing.item
+		expected.Settings = maps.Clone(routing.item.Settings)
+		expected.Settings["PriorityRank"] = float64(rank)
+		routing.attempts = []crudItem{routing.item, expected}
 		if _, err := s.writeRequest(ctx, step, "routing", "reorder", "", data); err != nil {
 			return err
 		}
-		routing.item.Settings["PriorityRank"] = float64(rank)
+		routing.item = expected
 		if err := s.verifyItem(ctx, step+"-read", "routing", routing.item); err != nil {
 			return err
 		}
+		routing.attempts = nil
 	}
 	after, err := s.listItems(ctx, "crud-routing-after", "routing")
 	if err != nil {

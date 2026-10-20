@@ -29,11 +29,13 @@ import (
 )
 
 type crudFake struct {
-	items        map[string][]crudItem
-	calls        []string
-	failStep     string
-	missingID    bool
-	cleanupOther bool
+	items              map[string][]crudItem
+	calls              []string
+	failStep           string
+	failAfterStep      string
+	changeAfterFailure bool
+	missingID          bool
+	cleanupOther       bool
 }
 
 func newCRUDFake() *crudFake {
@@ -113,6 +115,12 @@ func (f *crudFake) call(_ context.Context, step string, input any, args ...strin
 					item := &f.items["routing"][i]
 					if item.ID == order.RoutingID && item.Description != "existing" {
 						item.Settings["PriorityRank"] = order.PriorityRank
+						if step == f.failAfterStep {
+							if f.changeAfterFailure {
+								item.Description = "not-this-run"
+							}
+							return nil, errors.New("injected failure after applying change")
+						}
 						return []byte(`{"is_ok":true}`), nil
 					}
 				}
@@ -143,6 +151,12 @@ func (f *crudFake) call(_ context.Context, step string, input any, args ...strin
 						item.Settings = previous.Settings
 					}
 					f.items[resource][i] = item
+					if step == f.failAfterStep {
+						if f.changeAfterFailure {
+							f.items[resource][i].Description = "not-this-run"
+						}
+						return nil, errors.New("injected failure after applying change")
+					}
 					found = true
 				}
 			}
@@ -260,7 +274,46 @@ func TestCRUDScenarioRejectsNameCollision(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "name already exists") {
 		t.Fatalf("error = %v", err)
 	}
+
 	if len(fake.items["destination"]) != 1 || len(fake.items["group"]) != 1 {
 		t.Fatal("name collision cleanup affected an existing resource or left the temporary destination")
+	}
+}
+
+func TestCRUDScenarioCleansUpAfterAppliedChangeFails(t *testing.T) {
+	for _, step := range []string{
+		"crud-destination-metadata", "crud-destination-enable", "crud-destination-disable",
+		"crud-group-metadata", "crud-group-enable", "crud-group-disable",
+		"crud-routing-metadata", "crud-routing-match-label", "crud-routing-reorder-99", "crud-routing-reorder-100",
+	} {
+		t.Run(step, func(t *testing.T) {
+			fake := newCRUDFake()
+			fake.failAfterStep = step
+			err := runCRUDTest(t, fake)
+			if err == nil || !strings.Contains(err.Error(), "after applying change") {
+				t.Fatalf("error = %v", err)
+			}
+			if strings.Contains(err.Error(), "cleanup refused") {
+				t.Fatalf("cleanup refused the applied E2E change: %v", err)
+			}
+			if len(fake.items["destination"]) != 1 || len(fake.items["group"]) != 0 || len(fake.items["routing"]) != 1 {
+				t.Fatal("temporary resources remain after an applied change failed")
+			}
+		})
+	}
+}
+
+func TestCRUDScenarioRefusesUnownedStateAfterAppliedChangeFails(t *testing.T) {
+	fake := newCRUDFake()
+	fake.failAfterStep = "crud-routing-reorder-99"
+	fake.changeAfterFailure = true
+	err := runCRUDTest(t, fake)
+	if err == nil || !strings.Contains(err.Error(), "cleanup refused") {
+		t.Fatalf("error = %v", err)
+	}
+	for _, step := range fake.calls {
+		if strings.HasPrefix(step, "crud-cleanup-delete") {
+			t.Fatalf("deleted an unverified resource: %s", step)
+		}
 	}
 }

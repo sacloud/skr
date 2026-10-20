@@ -21,5 +21,5 @@ func (c *cli) initSimpleNotificationAPI() {
 		DecodeRequest:  decodeRequest,
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,
-	}, c.Trace)
+	}, func() bool { return c.Trace })
 }

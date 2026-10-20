@@ -39,7 +39,7 @@ type Runtime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func NewCommands(runtime Runtime, trace bool) Commands {
+func NewCommands(runtime Runtime, trace func() bool) Commands {
 	destinationRuntime := DestinationRuntime{
 		DecodeRequest: func(input string, destination any) error {
 			return decodeDestinationRequest(input, destination, runtime.DecodeRequest,
@@ -74,28 +74,28 @@ func NewCommands(runtime Runtime, trace bool) Commands {
 	}
 	return Commands{
 		Destination: NewDestinationCommands(destinationRuntime, func() (DestinationAPI, error) {
-			client, err := NewClient(trace)
+			client, err := NewClient(trace())
 			if err != nil {
 				return nil, err
 			}
-			return simplenotification.NewDestinationOp(client), nil
+			return destinationAdapter{simplenotification.NewDestinationOp(client)}, nil
 		}),
 		Group: NewGroupCommands(groupRuntime, func() (GroupAPI, error) {
-			client, err := NewClient(trace)
+			client, err := NewClient(trace())
 			if err != nil {
 				return nil, err
 			}
 			return simplenotification.NewGroupOp(client), nil
 		}),
 		Routing: NewRoutingCommands(routingRuntime, func() (RoutingAPI, error) {
-			client, err := NewClient(trace)
+			client, err := NewClient(trace())
 			if err != nil {
 				return nil, err
 			}
 			return simplenotification.NewRoutingOp(client), nil
 		}),
 		History: NewHistoryCommands(historyRuntime, func() (HistoryAPI, error) {
-			client, err := NewClient(trace)
+			client, err := NewClient(trace())
 			if err != nil {
 				return nil, err
 			}
@@ -124,7 +124,8 @@ func decodeDestinationRequest(input string, destination any, decode func(string,
 	if requiresFile && !strings.HasPrefix(input, "@") {
 		return fmt.Errorf("通知先のメールアドレスやWebhook URLを保護するため、--request は @path.json で指定してください")
 	}
-	return decodeResourceRequest(input, destination, decode, provider, serviceClass)
+	return protectDestinationError("通知先リクエストを読み込めません。JSON の形式と入力ファイルを確認してください",
+		decodeResourceRequest(input, destination, decode, provider, serviceClass))
 }
 
 func decodeResourceRequest(input string, destination any, decode func(string, any) error, provider v1.CommonServiceItemProviderClass, serviceClass v1.CommonServiceItemServiceClass) error {
