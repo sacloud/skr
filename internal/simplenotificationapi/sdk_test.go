@@ -41,6 +41,7 @@ func TestGroupCommandsUseSDKRequestAndResponse(t *testing.T) {
 		if err != nil {
 			t.Errorf("read request body: %v", err)
 		}
+
 		requests = append(requests, request.Method+" "+request.URL.Path)
 		switch request.Method + " " + request.URL.Path {
 		case "POST /api/cloud/1.1/commonserviceitem":
@@ -153,5 +154,97 @@ func TestGroupCommandsUseSDKRequestAndResponse(t *testing.T) {
 	}
 	if !reflect.DeepEqual(requests, wantRequests) {
 		t.Errorf("SDK requests = %#v, want %#v", requests, wantRequests)
+	}
+}
+
+func TestGroupUpdateSettingsThroughSDK(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		settings string
+		want     map[string]any
+	}{
+		{name: "omitted settings"},
+		{
+			name:     "omitted disabled",
+			settings: `,"Settings":{"Destinations":["123456789012"]}`,
+			want:     map[string]any{"Destinations": []any{"123456789012"}},
+		},
+		{
+			name:     "preserved disabled",
+			settings: `,"Settings":{"Destinations":["123456789012"],"Disabled":true}`,
+			want:     map[string]any{"Destinations": []any{"123456789012"}, "Disabled": true},
+		},
+		{
+			name:     "explicit enabled",
+			settings: `,"Settings":{"Destinations":["123456789012"],"Disabled":false}`,
+			want:     map[string]any{"Destinations": []any{"123456789012"}, "Disabled": false},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+			t.Setenv("SAKURA_ACCESS_TOKEN", "test-token")
+			t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "test-secret")
+			var bodies []map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method != http.MethodPut || request.URL.Path != "/api/cloud/1.1/commonserviceitem/123456789013" {
+					t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
+					http.Error(writer, "unexpected request", http.StatusBadRequest)
+					return
+				}
+				var body map[string]any
+				if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+					t.Errorf("decode update body: %v", err)
+					http.Error(writer, "invalid request", http.StatusBadRequest)
+					return
+				}
+				bodies = append(bodies, body)
+				writer.Header().Set("Content-Type", "application/json")
+				_, _ = fmt.Fprint(writer, `{"CommonServiceItem":{"ID":"123456789013","Name":"updated-group","Description":"kept description","Settings":{"Destinations":["123456789012"],"Disabled":true},"Provider":{"Class":"saknoticegroup"},"Icon":null,"Tags":["kept-tag"],"CreatedAt":"2026-10-20T00:00:00Z","ModifiedAt":"2026-10-20T00:00:00Z"}}`)
+			}))
+			t.Cleanup(server.Close)
+			client, err := clientconfig.New(false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			apiClient, err := simplenotification.NewClientWithAPIRootURL(client, server.URL+"/api/cloud/1.1/")
+			if err != nil {
+				t.Fatal(err)
+			}
+			input := `{"CommonServiceItem":{"Name":"updated-group","Description":"kept description","Tags":["kept-tag"],"Icon":null` + test.settings + `}}`
+			var output any
+			command := GroupUpdateCommand{
+				ID: "123456789013", Request: &input,
+				runtime: GroupRuntime{
+					DecodeRequest: func(input string, destination any) error {
+						return json.Unmarshal([]byte(input), destination)
+					},
+					ValidateOutput: func(*kong.Context) error { return nil },
+					WriteOutput: func(_ *kong.Context, value any) error {
+						output = value
+						return nil
+					},
+				},
+				factory: func() (GroupAPI, error) {
+					return simplenotification.NewGroupOp(apiClient), nil
+				},
+			}
+			if err := command.Run(&kong.Context{}); err != nil {
+				t.Fatal(err)
+			}
+			wantItem := map[string]any{
+				"Name": "updated-group", "Description": "kept description", "Tags": []any{"kept-tag"}, "Icon": nil,
+			}
+			if test.want != nil {
+				wantItem["Settings"] = test.want
+			}
+			wantBodies := []map[string]any{{"CommonServiceItem": wantItem}}
+			if !reflect.DeepEqual(bodies, wantBodies) {
+				t.Errorf("update requests = %#v, want %#v", bodies, wantBodies)
+			}
+			response, ok := output.(*v1.UpdateCommonServiceItemOK)
+			if !ok || response.CommonServiceItem.ID != "123456789013" {
+				t.Fatalf("update output = %#v", output)
+			}
+		})
 	}
 }

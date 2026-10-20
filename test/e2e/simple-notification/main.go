@@ -371,7 +371,7 @@ func (s scenario) waitForNotificationHistory(ctx context.Context, groupID string
 				foundStatus = true
 				switch status.Status {
 				case 2:
-					return nil
+					return s.verifyNotificationHistory(waitCtx, *matching)
 				case 0, 1:
 					continue
 				case 3, 9:
@@ -396,6 +396,24 @@ func (s scenario) waitForNotificationHistory(ctx context.Context, groupID string
 	}
 }
 
+func (s scenario) verifyNotificationHistory(ctx context.Context, expected notificationHistory) error {
+	data, err := s.call(ctx, "e2e-read-notification-history", nil, "history", "read", expected.RequestID,
+		"--query", ".NotificationHistory | {request_id,message:.message.body,statuses:[.statuses[] | {group_id,destination_id,status}]}")
+	if err != nil {
+		return err
+	}
+	var actual notificationHistory
+	if err := json.Unmarshal(data, &actual); err != nil {
+		return fmt.Errorf("decode individual notification history: %w", err)
+	}
+	if actual.RequestID != expected.RequestID || actual.Message != expected.Message ||
+		len(actual.Statuses) != 1 || len(expected.Statuses) != 1 ||
+		actual.Statuses[0] != expected.Statuses[0] {
+		return errors.New("individual notification history does not match the list entry")
+	}
+	return nil
+}
+
 func randomSuffix() (string, error) {
 	var value [8]byte
 	if _, err := rand.Read(value[:]); err != nil {
@@ -407,10 +425,11 @@ func randomSuffix() (string, error) {
 func runMain() (exitCode int) {
 	binary := flag.String("skr", "./skr", "Path to a built skr binary")
 	destinationID := flag.String("destination-id", "", "ID of an existing verified, enabled notification destination")
-	confirmed := flag.Bool("confirm-simple-notification-live", false, "Confirm creating and deleting a group and sending a real test notification to the specified destination")
+	crudOnly := flag.Bool("crud-only", false, "Test temporary email destination, disabled group and isolated routing CRUD without sending a test notification; registration may send a verification email")
+	confirmed := flag.Bool("confirm-simple-notification-live", false, "Confirm live resource changes; the default scenario sends a test notification, while --crud-only may send a registration verification email")
 	flag.Parse()
 	if flag.NArg() != 0 || !*confirmed || *destinationID == "" {
-		fmt.Fprintln(os.Stderr, "usage: go run ./test/e2e/simple-notification --skr ./skr --destination-id DESTINATION-ID --confirm-simple-notification-live")
+		fmt.Fprintln(os.Stderr, "usage: go run ./test/e2e/simple-notification --skr ./skr --destination-id DESTINATION-ID [--crud-only] --confirm-simple-notification-live")
 		return 2
 	}
 	path, err := filepath.Abs(*binary)
@@ -473,12 +492,21 @@ func runMain() (exitCode int) {
 	name := "skr-e2e-notify-" + suffix
 	description := "skr-e2e-simple-notification/" + suffix
 	message := "skr E2E test notification " + suffix
-	fmt.Println("Group to create:", name)
-	fmt.Println("A real notification will be sent to the supplied destination ID. Only the created group will be deleted.")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	runner := cliRunner{binary: path, evidence: recorder}
+	if *crudOnly {
+		fmt.Println("CRUD-only: temporary resources will be created and deleted; no test notification will be sent.")
+		if err := (crudScenario{scenario{client: runner, destinationID: *destinationID, requestPath: requestPath}}).runCRUD(ctx, suffix); err != nil {
+			fmt.Fprintln(os.Stderr, "Simple Notification CRUD E2E failed:", err)
+			return 1
+		}
+		fmt.Println("Simple Notification CRUD E2E passed: temporary resources were verified and deleted.")
+		return 0
+	}
+	fmt.Println("Group to create:", name)
+	fmt.Println("A real notification will be sent to the supplied destination ID. Only the created group will be deleted.")
 	if err := (scenario{
 		client: runner, destinationID: *destinationID, requestPath: requestPath, message: message,
 	}).run(ctx, name, description); err != nil {

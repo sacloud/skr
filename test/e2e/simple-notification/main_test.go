@@ -36,6 +36,7 @@ type fakeCLI struct {
 	invalidDestination    bool
 	historyStatuses       []int
 	historyCalls          int
+	historyReadMismatch   bool
 	message               string
 	calls                 []string
 	args                  map[string][]string
@@ -116,6 +117,17 @@ func (f *fakeCLI) call(_ context.Context, step string, input any, args ...string
 	case "e2e-cleanup-delete":
 		f.item = nil
 		return nil, nil
+	case "e2e-read-notification-history":
+		message := f.message
+		if f.historyReadMismatch {
+			message = "not-the-test-message"
+		}
+		return json.Marshal(notificationHistory{
+			RequestID: "request-123", Message: message,
+			Statuses: []notificationStatus{{
+				GroupID: f.item.ID, DestinationID: f.item.Settings.Destinations[0], Status: 2,
+			}},
+		})
 	default:
 		if strings.HasPrefix(step, "e2e-notification-history-") {
 			if f.item == nil {
@@ -213,6 +225,25 @@ func TestScenarioCleansUpAfterSendFailure(t *testing.T) {
 	}
 	if fake.item != nil || !contains(fake.calls, "e2e-cleanup-delete") {
 		t.Fatal("temporary group was not deleted after send failure")
+	}
+}
+
+func TestScenarioChecksIndividualHistoryAndCleansUpOnFailure(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		fake fakeCLI
+	}{
+		{name: "read failure", fake: fakeCLI{failStep: "e2e-read-notification-history"}},
+		{name: "read mismatch", fake: fakeCLI{historyReadMismatch: true}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := testScenario(t, &test.fake); err == nil {
+				t.Fatal("individual history verification failure was ignored")
+			}
+			if test.fake.item != nil || !contains(test.fake.calls, "e2e-cleanup-delete") {
+				t.Fatal("temporary group was not deleted after history verification failed")
+			}
+		})
 	}
 }
 
