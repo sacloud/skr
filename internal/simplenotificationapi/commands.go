@@ -116,7 +116,10 @@ func decodeDestinationRequest(input string, destination any, decode func(string,
 					Settings json.RawMessage `json:"Settings"`
 				} `json:"CommonServiceItem"`
 			}
-			if err := json.Unmarshal([]byte(input), &request); err == nil && len(request.CommonServiceItem.Settings) != 0 {
+			if err := json.Unmarshal([]byte(input), &request); err != nil {
+				return fmt.Errorf("通知先リクエストを読み込めません。JSON の形式と入力ファイルを確認してください")
+			}
+			if len(request.CommonServiceItem.Settings) != 0 {
 				requiresFile = true
 			}
 		}

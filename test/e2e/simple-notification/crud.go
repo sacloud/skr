@@ -163,26 +163,28 @@ func (s crudScenario) verifyItem(ctx context.Context, step, resource string, exp
 func (s crudScenario) cleanupItems(items []*ownedItem) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+	var cleanupErr error
 	for i := len(items) - 1; i >= 0; i-- {
 		owned := items[i]
 		if owned.item.ID == "" {
-			return errors.New("cleanup refused: created resource ID unavailable; manual cleanup required")
+			return errors.Join(cleanupErr, errors.New("cleanup refused: created resource ID unavailable; manual cleanup required"))
 		}
 		if err := s.verifyOwnedItem(ctx, owned); err != nil {
-			return fmt.Errorf("cleanup refused: %w", err)
+			return errors.Join(cleanupErr, fmt.Errorf("cleanup refused: %w", err))
 		}
 		_, deleteErr := s.call(ctx, "crud-cleanup-delete-"+owned.resource, nil, owned.resource, "delete", owned.item.ID)
 		remaining, listErr := s.listItems(ctx, "crud-cleanup-list-"+owned.resource, owned.resource)
-		if deleteErr != nil || listErr != nil {
-			return errors.Join(deleteErr, listErr)
+		if listErr != nil {
+			return errors.Join(cleanupErr, deleteErr, listErr)
 		}
 		for _, item := range remaining {
 			if item.ID == owned.item.ID || item.Name == owned.item.Name {
-				return fmt.Errorf("cleanup failed: temporary %s remains", owned.resource)
+				return errors.Join(cleanupErr, deleteErr, fmt.Errorf("cleanup failed: temporary %s remains", owned.resource))
 			}
 		}
+		cleanupErr = errors.Join(cleanupErr, deleteErr)
 	}
-	return nil
+	return cleanupErr
 }
 
 func (s crudScenario) verifyOwnedItem(ctx context.Context, owned *ownedItem) error {

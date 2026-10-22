@@ -247,23 +247,33 @@ func TestDestinationRequestRequiresFileForAddressSettings(t *testing.T) {
 		destination any
 		input       string
 		wantError   bool
+		wantMessage string
 	}{
 		{
 			name:        "create",
 			destination: &v1.PostCommonServiceItemRequest{},
 			input:       `{"CommonServiceItem":{"Name":"destination","Settings":{"Type":"webhook","Value":"https://example.test/secret"}}}`,
 			wantError:   true,
+			wantMessage: "@path.json",
 		},
 		{
 			name:        "update settings",
 			destination: &v1.PutCommonServiceItemRequest{},
 			input:       `{"CommonServiceItem":{"Name":"destination","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"webhook","Value":"https://example.test/secret"}}}`,
 			wantError:   true,
+			wantMessage: "@path.json",
 		},
 		{
 			name:        "metadata update",
 			destination: &v1.PutCommonServiceItemRequest{},
 			input:       `{"CommonServiceItem":{"Name":"destination","Description":"","Tags":[],"Icon":null}}`,
+		},
+		{
+			name:        "malformed update cannot bypass file requirement",
+			destination: &v1.PutCommonServiceItemRequest{},
+			input:       `{"CommonServiceItem":{"Name":"destination","Settings":{"Type":"webhook","Value":"https://example.test/secret"}},"commonserviceitem":0}`,
+			wantError:   true,
+			wantMessage: "通知先リクエストを読み込めません",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -273,8 +283,8 @@ func TestDestinationRequestRequiresFileForAddressSettings(t *testing.T) {
 				return nil
 			}, v1.CommonServiceItemProviderClassSaknoticedestination, v1.CommonServiceItemServiceClassCloudSaknoticedestination2)
 			if test.wantError {
-				if err == nil || !strings.Contains(err.Error(), "@path.json") || strings.Contains(err.Error(), "https://example.test/secret") {
-					t.Fatalf("error = %v, want safe @path.json instruction", err)
+				if err == nil || !strings.Contains(err.Error(), test.wantMessage) || strings.Contains(err.Error(), "https://example.test/secret") {
+					t.Fatalf("error = %v, want safe message containing %q", err, test.wantMessage)
 				}
 				if called {
 					t.Fatal("inline address was passed to the JSON decoder")

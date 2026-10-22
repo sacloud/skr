@@ -171,6 +171,9 @@ func (f *crudFake) call(_ context.Context, step string, input any, args ...strin
 			return nil, errors.New("refused deletion of an existing resource")
 		}
 		f.items[resource] = slices.DeleteFunc(f.items[resource], func(item crudItem) bool { return item.ID == id })
+		if step == f.failAfterStep {
+			return nil, errors.New("injected failure after applying change")
+		}
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("unexpected operation: %s", operation)
@@ -253,6 +256,21 @@ func TestCRUDScenarioReportsCleanupFailure(t *testing.T) {
 	fake.failStep = "crud-cleanup-delete-routing"
 	if err := runCRUDTest(t, fake); err == nil {
 		t.Fatal("cleanup failure was ignored")
+	}
+}
+
+func TestCRUDScenarioContinuesCleanupAfterAppliedDeleteFails(t *testing.T) {
+	fake := newCRUDFake()
+	fake.failAfterStep = "crud-cleanup-delete-routing"
+	err := runCRUDTest(t, fake)
+	if err == nil || !strings.Contains(err.Error(), "after applying change") {
+		t.Fatalf("error = %v, want retained delete error", err)
+	}
+	if len(fake.items["destination"]) != 1 || len(fake.items["group"]) != 0 || len(fake.items["routing"]) != 1 {
+		t.Fatalf("cleanup did not remove dependent temporary resources: %#v", fake.items)
+	}
+	if !slices.Contains(fake.calls, "crud-cleanup-delete-group") || !slices.Contains(fake.calls, "crud-cleanup-delete-destination") {
+		t.Fatalf("cleanup stopped before removing dependencies: %v", fake.calls)
 	}
 }
 
