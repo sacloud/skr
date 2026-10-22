@@ -149,20 +149,21 @@ func TestIaaSServerPlanFilterIsPassedToLowLevelAPI(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	code := runCLI([]string{"iaas-api", "product", "server", "find", "--request", `{"Zone":"test-zone","Filter":{"Name":"test-plan"}}`}, &stdout, &stderr, commandLine)
+	code := runCLI([]string{"iaas-api", "product", "server", "find", "--request", `{"Zone":"test-zone","Filter":{"Name":"test-plan","CPU>=":4}}`}, &stdout, &stderr, commandLine)
 	if code != 0 || stderr.Len() != 0 || len(caller.calls) != 1 {
 		t.Fatalf("find: code %d, stderr %q, calls %+v", code, stderr.String(), caller.calls)
 	}
-	var condition map[string]any
+	var condition struct {
+		Filter map[string]json.RawMessage
+	}
 	if err := json.Unmarshal(caller.calls[0].body, &condition); err != nil {
 		t.Fatalf("decode SDK find condition %q: %v", caller.calls[0].body, err)
 	}
-	filter, ok := condition["Filter"].(map[string]any)
-	if !ok || filter["Name"] == nil {
-		t.Fatalf("SDK FindCondition = %s, want Name filter", caller.calls[0].body)
+	if got := string(condition.Filter["Name"]); got != `"test-plan"` {
+		t.Fatalf("SDK Name filter = %s, want partial-match string", got)
 	}
-	if _, ok := condition["Names"]; ok {
-		t.Fatalf("API FindCondition contains non-API field Names: %s", caller.calls[0].body)
+	if got := string(condition.Filter["CPU>="]); got != `"4"` {
+		t.Fatalf("SDK CPU filter = %s, want comparison value", got)
 	}
 }
 
@@ -261,6 +262,39 @@ func TestIaaSServerPlanFindUsesSDKCaller(t *testing.T) {
 	}
 }
 
+func TestIaaSServerPlanEmptyFindPreservesEnvelopeAndQueryArray(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	caller := &serverPlanAPICaller{findResponse: []byte(`{"Total":0,"From":0,"Count":0,"ServerPlans":[]}`)}
+	commandLine := newCLI()
+	setServerPlanAPIFactory(commandLine, func() (serverplanapi.API, error) {
+		return serverplanapi.NewSDKAPI(caller), nil
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"iaas-api", "product", "server", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("find: code %d, stderr %q", code, stderr.String())
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode empty Find envelope %q: %v", stdout.String(), err)
+	}
+	for key, want := range map[string]string{
+		"Total": "0", "From": "0", "Count": "0", "ServerPlans": "[]",
+	} {
+		if got := strings.TrimSpace(string(envelope[key])); got != want {
+			t.Errorf("empty Find field %s = %q, want %q", key, got, want)
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"iaas-api", "product", "server", "find", "--zone", "test-zone", "--query", ".ServerPlans | map({ID,Name})"}, &stdout, &stderr, commandLine)
+	if code != 0 || stderr.Len() != 0 || stdout.String() != "[]\n" {
+		t.Fatalf("empty Find query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestIaaSServerPlanReadUsesSDKCaller(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	caller := &serverPlanAPICaller{}
@@ -300,12 +334,12 @@ type serverPlanAPITestDouble struct {
 	readErr     error
 }
 
-func (api *serverPlanAPITestDouble) FindWithContext(_ context.Context, request *serverplanapi.FindRequest) (*iaas.ServerPlanFindResult, error) {
+func (api *serverPlanAPITestDouble) FindWithContext(_ context.Context, request *serverplanapi.FindRequest) (*serverplanapi.FindResult, error) {
 	api.findRequest = request
 	if api.findErr != nil {
 		return nil, api.findErr
 	}
-	return &iaas.ServerPlanFindResult{
+	return &serverplanapi.FindResult{
 		Total: 1, From: 0, Count: 1,
 		ServerPlans: []*iaas.ServerPlan{{
 			ID: 17, Name: "test-plan", CPU: 4, MemoryMB: 8192, CPUModel: "test-cpu",
@@ -322,7 +356,8 @@ func (api *serverPlanAPITestDouble) ReadWithContext(_ context.Context, request *
 }
 
 type serverPlanAPICaller struct {
-	calls []serverPlanAPICall
+	calls        []serverPlanAPICall
+	findResponse []byte
 }
 
 type serverPlanAPICall struct {
@@ -339,6 +374,9 @@ func (caller *serverPlanAPICaller) Do(_ context.Context, method, uri string, bod
 	caller.calls = append(caller.calls, serverPlanAPICall{method: method, uri: uri, body: data})
 	if strings.HasSuffix(uri, "/api/cloud/1.1/product/server/17") {
 		return []byte(`{"ServerPlan":{"ID":"17","Name":"test-plan","CPU":4,"MemoryMB":8192}}`), nil
+	}
+	if caller.findResponse != nil {
+		return caller.findResponse, nil
 	}
 	return []byte(`{"Total":1,"From":0,"Count":1,"ServerPlans":[{"ID":"17","Name":"test-plan","CPU":4,"MemoryMB":8192}]}`), nil
 }

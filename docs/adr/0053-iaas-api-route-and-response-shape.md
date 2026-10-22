@@ -15,6 +15,7 @@
 - 生成設定ファイル名も `iaas-api` とその配下のコマンド階層に合わせます。たとえば `iaas-api product server` は `api/commands/iaas-product-server.json`、`iaas-api product disk` は `api/commands/iaas-product-disk.json` を使います。
 - 低レベル操作が `sacloud-sdk-go/api/iaas` にある場合は、その公開 API 操作を利用します。操作の入力変換は必要な SDK の公開変換処理を利用できます。
 - JSON 出力は低レベル API の応答モデルを使い、Find の応答 envelope と API が返すフィールドを維持します。`--query` は応答モデル全体に適用します。出力は SDK の型から JSON に再エンコードするため、HTTP response body のバイト列そのものとは保証しません。
+- SDK の Find 応答モデルに `omitempty` がある場合も API の envelope を維持するため、出力型で `Total`、`From`、`Count` とリソース配列を明示し、空の配列は `[]` として出力します。API `Filter` は SDK の検索式に変換し、文字列を部分一致、配列を OR 条件として扱います。比較演算子付きのキーはそのまま保持します。
 - 移行は `PLAN.md` に記録し、対象を絞って段階的に行います。この決定は、既存のすべての IaaS コマンドを一度に移行することを要求しません。
 
 ## Consequences

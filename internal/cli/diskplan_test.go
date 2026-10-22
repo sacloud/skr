@@ -203,6 +203,39 @@ func TestIaaSDiskPlanUsesLowLevelAPIResponse(t *testing.T) {
 	}
 }
 
+func TestIaaSDiskPlanEmptyFindPreservesEnvelopeAndQueryArray(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	caller := &diskPlanAPICaller{findResponse: []byte(`{"Total":0,"From":0,"Count":0,"DiskPlans":[]}`)}
+	commandLine := newCLI()
+	setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) {
+		return diskplanapi.NewSDKAPI(caller), nil
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"iaas-api", "product", "disk", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("find: code %d, stderr %q", code, stderr.String())
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode empty Find envelope %q: %v", stdout.String(), err)
+	}
+	for key, want := range map[string]string{
+		"Total": "0", "From": "0", "Count": "0", "DiskPlans": "[]",
+	} {
+		if got := strings.TrimSpace(string(envelope[key])); got != want {
+			t.Errorf("empty Find field %s = %q, want %q", key, got, want)
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"iaas-api", "product", "disk", "find", "--zone", "test-zone", "--query", ".DiskPlans | map({ID,Name})"}, &stdout, &stderr, commandLine)
+	if code != 0 || stderr.Len() != 0 || stdout.String() != "[]\n" {
+		t.Fatalf("empty Find query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestIaaSDiskPlanRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 	api := &diskPlanAPITestDouble{}
 	for _, args := range [][]string{
@@ -267,7 +300,8 @@ type diskPlanAPITestDouble struct {
 }
 
 type diskPlanAPICaller struct {
-	calls []diskPlanAPICall
+	calls        []diskPlanAPICall
+	findResponse []byte
 }
 
 type diskPlanAPICall struct {
@@ -285,15 +319,18 @@ func (caller *diskPlanAPICaller) Do(_ context.Context, method, uri string, body 
 	if strings.HasSuffix(uri, "/api/cloud/1.1/product/disk/4") {
 		return []byte(`{"DiskPlan":{"ID":"4","Name":"ssd","StorageClass":"ssd","Availability":"available","Size":[{"Availability":"available","DisplaySize":20,"DisplaySuffix":"GB","SizeMB":20480}]}}`), nil
 	}
+	if caller.findResponse != nil {
+		return caller.findResponse, nil
+	}
 	return []byte(`{"Total":1,"From":0,"Count":1,"DiskPlans":[{"ID":"4","Name":"ssd","StorageClass":"ssd","Availability":"available","Size":[{"Availability":"available","DisplaySize":20,"DisplaySuffix":"GB","SizeMB":20480}]}]}`), nil
 }
 
-func (api *diskPlanAPITestDouble) FindWithContext(_ context.Context, request *diskplanapi.FindRequest) (*iaas.DiskPlanFindResult, error) {
+func (api *diskPlanAPITestDouble) FindWithContext(_ context.Context, request *diskplanapi.FindRequest) (*diskplanapi.FindResult, error) {
 	api.findRequest = request
 	if api.findErr != nil {
 		return nil, api.findErr
 	}
-	return &iaas.DiskPlanFindResult{
+	return &diskplanapi.FindResult{
 		Total: 1, From: 0, Count: 1,
 		DiskPlans: []*iaas.DiskPlan{{
 			ID: 4, Name: "ssd", StorageClass: "ssd", Availability: types.EAvailability("available"),

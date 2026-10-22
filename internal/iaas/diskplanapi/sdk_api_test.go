@@ -29,10 +29,14 @@ func TestSDKAPIFindUsesLowLevelOperationAndPreservesResponse(t *testing.T) {
 	api := NewSDKAPI(caller)
 
 	result, err := api.FindWithContext(context.Background(), &FindRequest{
-		Zone:   "test-zone",
-		Filter: map[string]any{"Name": "ssd"},
-		Count:  1,
-		From:   1,
+		Zone: "test-zone",
+		Filter: map[string]any{
+			"Name":         "ss",
+			"StorageClass": []any{"ssd", "hdd"},
+			"Size>=":       20,
+		},
+		Count: 1,
+		From:  1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -47,13 +51,22 @@ func TestSDKAPIFindUsesLowLevelOperationAndPreservesResponse(t *testing.T) {
 	var condition struct {
 		Count  int
 		From   int
-		Filter map[string]any
+		Filter map[string]json.RawMessage
 	}
 	if err := json.Unmarshal(caller.calls[0].body, &condition); err != nil {
 		t.Fatal(err)
 	}
-	if condition.Count != 1 || condition.From != 1 || condition.Filter["Name"] == nil {
+	if condition.Count != 1 || condition.From != 1 {
 		t.Fatalf("Find condition = %+v", condition)
+	}
+	for key, want := range map[string]string{
+		"Name":         `"ss"`,
+		"StorageClass": `["ssd","hdd"]`,
+		"Size>=":       `"20"`,
+	} {
+		if got := string(condition.Filter[key]); got != want {
+			t.Errorf("Find filter %s = %s, want %s", key, got, want)
+		}
 	}
 }
 

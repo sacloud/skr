@@ -19,7 +19,7 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *FindRequest) (*iaas.DiskPlanFindResult, error)
+	FindWithContext(context.Context, *FindRequest) (*FindResult, error)
 	ReadWithContext(context.Context, *ReadRequest) (*iaas.DiskPlan, error)
 }
 
@@ -41,7 +41,7 @@ func NewCommands(runtime Runtime, factory APIFactory) Commands {
 }
 
 type FindCommand struct {
-	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (対象ゾーン名)。API の Filter、Sort、Include、Exclude は JSON で指定します。Count と From は個別フラグです。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Filter\\\":{\\\"Name\\\":\\\"PLAN-NAME\\\"}}'。ZONE と名前は実際の値に置き換えます。\""
+	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (対象ゾーン名)。API の Filter、Sort、Include、Exclude は JSON で指定します。Filter の文字列値は部分一致、配列値は OR 条件です。Count と From は個別フラグです。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Filter\\\":{\\\"Name\\\":\\\"PLAN-NAME\\\"}}'。ZONE と名前は実際の値に置き換えます。\""
 	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone is1b\""
 	Count   *int    "name:\"count\" help:\"任意: 取得件数 (整数)。\""
 	From    *int    "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""

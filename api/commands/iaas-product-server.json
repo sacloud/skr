@@ -16,9 +16,9 @@
       "help": "指定したゾーンのサーバプランを検索します。API 応答の Total、From、Count、ServerPlans を含む JSON を出力します。CPU、メモリ、GPU、CPUコミットメント、世代、利用可否を確認できます。例: skr iaas-api product server find --zone is1b",
       "method": "FindWithContext",
       "request_type": "FindRequest",
-      "response_type": "*iaas.ServerPlanFindResult",
+      "response_type": "*FindResult",
       "validate_zone": true,
-      "request_help": "必須: Zone (対象ゾーン名)。API の Filter、Sort、Include、Exclude は JSON で指定します。Count と From は個別フラグです。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。",
+      "request_help": "必須: Zone (対象ゾーン名)。API の Filter、Sort、Include、Exclude は JSON で指定します。Filter の文字列値は部分一致、配列値は OR 条件です。Count と From は個別フラグです。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。",
       "flags": [
         {
           "name": "zone",

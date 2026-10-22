@@ -19,7 +19,7 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *FindRequest) (*iaas.ServerPlanFindResult, error)
+	FindWithContext(context.Context, *FindRequest) (*FindResult, error)
 	ReadWithContext(context.Context, *ReadRequest) (*iaas.ServerPlan, error)
 }
 
@@ -41,7 +41,7 @@ func NewCommands(runtime Runtime, factory APIFactory) Commands {
 }
 
 type FindCommand struct {
-	Request *string "help:\"必須: Zone (対象ゾーン名)。API の Filter、Sort、Include、Exclude は JSON で指定します。Count と From は個別フラグです。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。\""
+	Request *string "help:\"必須: Zone (対象ゾーン名)。API の Filter、Sort、Include、Exclude は JSON で指定します。Filter の文字列値は部分一致、配列値は OR 条件です。Count と From は個別フラグです。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。\""
 	Zone    *string "name:\"zone\" help:\"必須: 検索対象のゾーン名です。例: --zone is1b\""
 	Count   *int    "name:\"count\" help:\"任意: 取得件数です。\""
 	From    *int    "name:\"from\" help:\"任意: 取得開始位置です。\""

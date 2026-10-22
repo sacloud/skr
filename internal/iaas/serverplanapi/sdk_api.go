@@ -16,6 +16,7 @@ package serverplanapi
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 )
@@ -28,8 +29,21 @@ func NewSDKAPI(caller iaas.APICaller) API {
 	return &sdkAPI{op: iaas.NewServerPlanOp(caller)}
 }
 
-func (api *sdkAPI) FindWithContext(ctx context.Context, request *FindRequest) (*iaas.ServerPlanFindResult, error) {
-	return api.op.Find(ctx, request.Zone, request.findCondition())
+func (api *sdkAPI) FindWithContext(ctx context.Context, request *FindRequest) (*FindResult, error) {
+	result, err := api.op.Find(ctx, request.Zone, request.findCondition())
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("ServerPlan Find returned no result")
+	}
+	plans := result.ServerPlans
+	if plans == nil {
+		plans = []*iaas.ServerPlan{}
+	}
+	return &FindResult{
+		Total: result.Total, From: result.From, Count: result.Count, ServerPlans: plans,
+	}, nil
 }
 
 func (api *sdkAPI) ReadWithContext(ctx context.Context, request *ReadRequest) (*iaas.ServerPlan, error) {

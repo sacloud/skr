@@ -43,7 +43,8 @@ func (request *FindRequest) findCondition() *iaas.FindCondition {
 	if len(request.Filter) > 0 {
 		condition.Filter = make(search.Filter, len(request.Filter))
 		for key, value := range request.Filter {
-			condition.Filter[filterKey(key)] = value
+			filterKey := filterKey(key)
+			condition.Filter[filterKey] = filterValue(filterKey, value)
 		}
 	}
 	if len(request.Sort) > 0 {
@@ -71,6 +72,26 @@ func filterKey(value string) search.FilterKey {
 		}
 	}
 	return search.Key(value)
+}
+
+func filterValue(key search.FilterKey, value any) any {
+	if key.Op != search.OpEqual {
+		return value
+	}
+	switch value := value.(type) {
+	case string:
+		return search.AndEqual(value)
+	case []any:
+		return search.OrEqual(value...)
+	case []string:
+		values := make([]any, len(value))
+		for i, item := range value {
+			values[i] = item
+		}
+		return search.OrEqual(values...)
+	default:
+		return search.OrEqual(value)
+	}
 }
 
 type ReadRequest struct {

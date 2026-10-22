@@ -41,6 +41,8 @@ $ skr iaas-api product disk find --zone ZONE --query '.DiskPlans | map({ID,Name,
 }
 ```
 
+`Filter` の文字列値は部分一致で検索し、配列値は OR 条件として検索します。
+
 ```console
 $ skr iaas-api product disk find --request @disk-plan-find.json --query '.DiskPlans | map({ID,Name,StorageClass,Availability,Size})'
 ```

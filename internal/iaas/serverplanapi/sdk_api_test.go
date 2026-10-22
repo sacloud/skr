@@ -50,18 +50,21 @@ func TestSDKAPIFindUsesLowLevelOperationAndPreservesResponse(t *testing.T) {
 	var condition struct {
 		Count   int
 		From    int
-		Filter  map[string]any
+		Filter  map[string]json.RawMessage
 		Include []string
 		Exclude []string
 	}
 	if err := json.Unmarshal(caller.calls[0].body, &condition); err != nil {
 		t.Fatal(err)
 	}
-	if condition.Count != 1 || condition.From != 1 || condition.Filter["Name"] == nil {
+	if condition.Count != 1 || condition.From != 1 {
 		t.Fatalf("Find condition = %+v", condition)
 	}
-	if condition.Filter["CPU>="] == nil {
-		t.Fatalf("Find condition lost API filter operator: %+v", condition.Filter)
+	if got := string(condition.Filter["Name"]); got != `"test-plan"` {
+		t.Fatalf("Find Name filter = %s, want partial-match string", got)
+	}
+	if got := string(condition.Filter["CPU>="]); got != `"4"` {
+		t.Fatalf("Find CPU filter = %s, want comparison value", got)
 	}
 	if len(condition.Include) != 1 || condition.Include[0] != "Name" ||
 		len(condition.Exclude) != 1 || condition.Exclude[0] != "Description" {
