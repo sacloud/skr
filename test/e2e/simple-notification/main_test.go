@@ -306,7 +306,7 @@ func TestScenarioRefusesCleanupWhenIdentityChanges(t *testing.T) {
 }
 
 func TestScenarioRefusesCleanupWithoutCreatedID(t *testing.T) {
-	fake := &fakeCLI{badCreateOutput: true, omitCreateID: true}
+	fake := &fakeCLI{omitCreateID: true}
 	err := testScenario(t, fake)
 	if err == nil || !strings.Contains(err.Error(), "cannot safely identify E2E group") {
 		t.Fatalf("scenario error = %v, want missing ID refusal", err)
