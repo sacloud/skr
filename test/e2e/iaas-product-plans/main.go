@@ -21,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -34,9 +35,9 @@ import (
 
 const (
 	productPlanZone      = "is1b"
-	internetPlanQuery    = ".InternetPlans | map({ID,Name,BandWidthMbps,Availability})"
-	licenseInfoQuery     = "{Total,From,Count,LicenseInfo:(.LicenseInfo | map({ID,Name}))}"
-	privateHostPlanQuery = ".PrivateHostPlans | map({ID,Name,Class,CPU,CPUModel,Dedicated,MemoryMB,Availability})"
+	internetPlanQuery    = "{Total,From,Count,InternetPlans:(if (.InternetPlans | type) == \"array\" then (.InternetPlans | map({ID,Name,BandWidthMbps,Availability})) else error(\"InternetPlans must be an array\") end)}"
+	licenseInfoQuery     = "{Total,From,Count,LicenseInfo:(if (.LicenseInfo | type) == \"array\" then (.LicenseInfo | map({ID,Name})) else error(\"LicenseInfo must be an array\") end)}"
+	privateHostPlanQuery = "{Total,From,Count,PrivateHostPlans:(if (.PrivateHostPlans | type) == \"array\" then (.PrivateHostPlans | map({ID,Name,Class,CPU,CPUModel,Dedicated,MemoryMB,Availability})) else error(\"PrivateHostPlans must be an array\") end)}"
 )
 
 type cli interface {
@@ -56,20 +57,27 @@ func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byt
 	defer cancel()
 
 	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The selected binary and structured arguments are not a shell command.
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
 	command.Stdout = &stdout
-	command.Stderr = &stderr
+	command.Stderr = io.Discard
 	runErr := command.Run()
-	if err := r.evidence.Record(step, r.binary, args, nil, stdout.String(), stderr.String(), runErr, false); err != nil {
+	if err := r.evidence.Record(step, r.binary, args, nil, stdout.String(), "", runErr, false); err != nil {
 		if runErr != nil {
-			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see private evidence for stderr)", step, runErr), err)
+			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (stderr is omitted from private evidence)", step, runErr), err)
 		}
 		return nil, err
 	}
 	if runErr != nil {
-		return nil, fmt.Errorf("%s: skr failed: %w (see private evidence for stderr)", step, runErr)
+		return nil, fmt.Errorf("%s: skr failed: %w", step, runErr)
 	}
 	return stdout.Bytes(), nil
+}
+
+type internetPlanFindSummary struct {
+	Total         *int                   `json:"Total"`
+	From          *int                   `json:"From"`
+	Count         *int                   `json:"Count"`
+	InternetPlans *[]internetPlanSummary `json:"InternetPlans"`
 }
 
 type internetPlanSummary struct {
@@ -85,10 +93,17 @@ type licenseInfoSummary struct {
 }
 
 type licenseInfoFindSummary struct {
-	Total       int
-	From        int
-	Count       int
-	LicenseInfo []licenseInfoSummary
+	Total       *int                  `json:"Total"`
+	From        *int                  `json:"From"`
+	Count       *int                  `json:"Count"`
+	LicenseInfo *[]licenseInfoSummary `json:"LicenseInfo"`
+}
+
+type privateHostPlanFindSummary struct {
+	Total            *int                      `json:"Total"`
+	From             *int                      `json:"From"`
+	Count            *int                      `json:"Count"`
+	PrivateHostPlans *[]privateHostPlanSummary `json:"PrivateHostPlans"`
 }
 
 type privateHostPlanSummary struct {
@@ -120,10 +135,14 @@ func (s scenario) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var internetPlans []internetPlanSummary
-	if err := json.Unmarshal(output, &internetPlans); err != nil {
+	var internetFind internetPlanFindSummary
+	if err := json.Unmarshal(output, &internetFind); err != nil {
 		return fmt.Errorf("decode InternetPlan find output: %w", err)
 	}
+	if err := validateFindResult(internetFind.Total, internetFind.From, internetFind.Count, sliceLength(internetFind.InternetPlans), 0, 1); err != nil {
+		return fmt.Errorf("InternetPlan Find returned an inconsistent result: %w", err)
+	}
+	internetPlans := *internetFind.InternetPlans
 	if len(internetPlans) != 1 || internetPlans[0].ID <= 0 || internetPlans[0].Name == "" {
 		return fmt.Errorf("InternetPlan Find returned %d records or an invalid ID/name; want one plan", len(internetPlans))
 	}
@@ -150,11 +169,10 @@ func (s scenario) run(ctx context.Context) error {
 	if err := json.Unmarshal(output, &licenseFind); err != nil {
 		return fmt.Errorf("decode LicenseInfo find output: %w", err)
 	}
-	if licenseFind.Total < 0 || licenseFind.Count < 0 || licenseFind.From < 0 ||
-		licenseFind.Total > 0 && len(licenseFind.LicenseInfo) == 0 {
-		return fmt.Errorf("LicenseInfo Find returned an inconsistent result: %+v", licenseFind)
+	if err := validateFindResult(licenseFind.Total, licenseFind.From, licenseFind.Count, sliceLength(licenseFind.LicenseInfo), 0, 1); err != nil {
+		return fmt.Errorf("LicenseInfo Find returned an inconsistent result: %w", err)
 	}
-	for _, license := range licenseFind.LicenseInfo {
+	for _, license := range *licenseFind.LicenseInfo {
 		if license.ID <= 0 || license.Name == "" {
 			return errors.New("LicenseInfo Find returned an item without a valid ID or name")
 		}
@@ -165,10 +183,14 @@ func (s scenario) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var privateHostPlans []privateHostPlanSummary
-	if err := json.Unmarshal(output, &privateHostPlans); err != nil {
+	var privateHostFind privateHostPlanFindSummary
+	if err := json.Unmarshal(output, &privateHostFind); err != nil {
 		return fmt.Errorf("decode PrivateHostPlan find output: %w", err)
 	}
+	if err := validateFindResult(privateHostFind.Total, privateHostFind.From, privateHostFind.Count, sliceLength(privateHostFind.PrivateHostPlans), 0, 1); err != nil {
+		return fmt.Errorf("PrivateHostPlan Find returned an inconsistent result: %w", err)
+	}
+	privateHostPlans := *privateHostFind.PrivateHostPlans
 	if len(privateHostPlans) != 1 || privateHostPlans[0].ID <= 0 || privateHostPlans[0].Name == "" {
 		return fmt.Errorf("PrivateHostPlan Find returned %d records or an invalid ID/name; want one plan", len(privateHostPlans))
 	}
@@ -184,6 +206,25 @@ func (s scenario) run(ctx context.Context) error {
 	}
 	if privateHostRead != privateHostPlan {
 		return fmt.Errorf("PrivateHostPlan Read did not match Find result for ID %d", privateHostPlan.ID)
+	}
+	return nil
+}
+
+func sliceLength[T any](items *[]T) int {
+	if items == nil {
+		return -1
+	}
+	return len(*items)
+}
+
+func validateFindResult(total, from, count *int, itemCount, expectedFrom, requestedCount int) error {
+	if total == nil || from == nil || count == nil || itemCount < 0 {
+		return errors.New("required pagination fields or result array are missing or null")
+	}
+	if *total < 0 || *from != expectedFrom || *count < 0 || *count > requestedCount ||
+		*from > *total || *count > *total-*from || itemCount != *count ||
+		(*count == 0 && *total > *from) {
+		return fmt.Errorf("pagination metadata does not match the requested page (total=%d, from=%d, count=%d, items=%d)", *total, *from, *count, itemCount)
 	}
 	return nil
 }

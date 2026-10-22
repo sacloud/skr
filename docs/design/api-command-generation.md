@@ -189,4 +189,4 @@ $ ./skr config current
 $ go run ./test/e2e/iaas-product-plans --skr ./skr --confirm-read-only-live
 ```
 
-runner は確認フラグを必須にします。入力・出力・エラーの記録先は `tmp/iaas-product-plans-api/<YYYYMMDDHHmm>/` です。証跡に対象プロファイル名を含むことがあるため、Git へ追加・共有しないでください。ライブ環境を使わないテストでは、検索条件、ID の一致、エラー伝播を確認します。
+runner は確認フラグを必須にします。標準出力と終了ステータスの記録先は `tmp/iaas-product-plans-api/<YYYYMMDDHHmm>/` です。SDK の HTTP トレースは認証情報や利用条件本文を含むことがあります。標準エラー出力は証跡へ記録しません。対象プロファイル名も証跡に記録される可能性があります。証跡を Git へ追加・共有しないでください。ライブ環境を使わないテストでは検索条件、ID の一致、エラー伝播を確認します。

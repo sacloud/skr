@@ -15,8 +15,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/itchyny/gojq"
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
@@ -51,7 +55,7 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		if data, ok := f.find[step]; ok {
 			return data, nil
 		}
-		return []byte(`[{"ID":11,"Name":"internet-plan","BandWidthMbps":100,"Availability":"available"}]`), nil
+		return []byte(`{"Total":1,"From":0,"Count":1,"InternetPlans":[{"ID":11,"Name":"internet-plan","BandWidthMbps":100,"Availability":"available"}]}`), nil
 	case "internetplan-read":
 		if data, ok := f.read[step]; ok {
 			return data, nil
@@ -66,7 +70,7 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		if data, ok := f.find[step]; ok {
 			return data, nil
 		}
-		return []byte(`[{"ID":8,"Name":"private-host-plan","Class":"standard","CPU":20,"CPUModel":"model","Dedicated":true,"MemoryMB":229376,"Availability":"available"}]`), nil
+		return []byte(`{"Total":1,"From":0,"Count":1,"PrivateHostPlans":[{"ID":8,"Name":"private-host-plan","Class":"standard","CPU":20,"CPUModel":"model","Dedicated":true,"MemoryMB":229376,"Availability":"available"}]}`), nil
 	case "privatehostplan-read":
 		if data, ok := f.read[step]; ok {
 			return data, nil
@@ -82,6 +86,7 @@ func TestScenarioFindsAndReadsProductPlans(t *testing.T) {
 	if err := (scenario{client: fake}).run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+
 	checks := []struct {
 		step string
 		want string
@@ -103,6 +108,47 @@ func TestScenarioFindsAndReadsProductPlans(t *testing.T) {
 	}
 }
 
+func TestFindQueryExpressionsCompile(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		query string
+		field string
+	}{
+		{name: "InternetPlan", query: internetPlanQuery, field: "InternetPlans"},
+		{name: "LicenseInfo", query: licenseInfoQuery, field: "LicenseInfo"},
+		{name: "PrivateHostPlan", query: privateHostPlanQuery, field: "PrivateHostPlans"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			parsed, err := gojq.Parse(test.query)
+			if err != nil {
+				t.Fatalf("gojq.Parse(): %v", err)
+			}
+			code, err := gojq.Compile(parsed)
+			if err != nil {
+				t.Fatalf("gojq.Compile(): %v", err)
+			}
+			for _, value := range []any{nil, map[string]any{}} {
+				input := map[string]any{"Total": 0, "From": 0, "Count": 0, test.field: value}
+				result, ok := code.Run(input).Next()
+				if !ok {
+					t.Fatalf("query returned no result for %s = %#v", test.field, value)
+				}
+				if _, isError := result.(error); !isError {
+					t.Errorf("query result for %s = %#v, want an error", test.field, value)
+				}
+			}
+			input := map[string]any{"Total": 0, "From": 0, "Count": 0, test.field: []any{}}
+			result, ok := code.Run(input).Next()
+			if !ok {
+				t.Fatal("query returned no result for an empty array")
+			}
+			if _, isError := result.(error); isError {
+				t.Errorf("query rejected an explicit empty array: %v", result)
+			}
+		})
+	}
+}
+
 func TestScenarioRejectsInvalidIdentityOrMismatchedReads(t *testing.T) {
 	for _, test := range []struct {
 		name    string
@@ -110,12 +156,22 @@ func TestScenarioRejectsInvalidIdentityOrMismatchedReads(t *testing.T) {
 		read    map[string][]byte
 		wantErr string
 	}{
-		{name: "empty InternetPlan", find: map[string][]byte{"internetplan-find": []byte(`[]`)}, wantErr: "InternetPlan Find returned"},
+		{name: "null InternetPlan output", find: map[string][]byte{"internetplan-find": []byte(`null`)}, wantErr: "inconsistent result"},
+		{name: "missing InternetPlan pagination", find: map[string][]byte{"internetplan-find": []byte(`{"InternetPlans":[]}`)}, wantErr: "inconsistent result"},
+		{name: "mismatched InternetPlan pagination", find: map[string][]byte{"internetplan-find": []byte(`{"Total":1,"From":5,"Count":1,"InternetPlans":[{"ID":11,"Name":"internet-plan","BandWidthMbps":100,"Availability":"available"}]}`)}, wantErr: "inconsistent result"},
+		{name: "empty InternetPlan", find: map[string][]byte{"internetplan-find": []byte(`{"Total":0,"From":0,"Count":0,"InternetPlans":[]}`)}, wantErr: "InternetPlan Find returned"},
 		{name: "invalid InternetPlan JSON", find: map[string][]byte{"internetplan-find": []byte("not-json")}, wantErr: "decode InternetPlan find"},
 		{name: "mismatched InternetPlan Read", read: map[string][]byte{"internetplan-read": []byte(`{"ID":12,"Name":"other","BandWidthMbps":100,"Availability":"available"}`)}, wantErr: "InternetPlan Read did not match"},
-		{name: "inconsistent empty LicenseInfo", find: map[string][]byte{"licenseinfo-find": []byte(`{"Total":1,"From":0,"Count":1,"LicenseInfo":[]}`)}, wantErr: "inconsistent result"},
+		{name: "null LicenseInfo output", find: map[string][]byte{"licenseinfo-find": []byte(`null`)}, wantErr: "inconsistent result"},
+		{name: "missing LicenseInfo pagination", find: map[string][]byte{"licenseinfo-find": []byte(`{"LicenseInfo":[]}`)}, wantErr: "inconsistent result"},
+		{name: "mismatched LicenseInfo offset", find: map[string][]byte{"licenseinfo-find": []byte(`{"Total":1,"From":5,"Count":0,"LicenseInfo":[]}`)}, wantErr: "inconsistent result"},
+		{name: "zero LicenseInfo count with item", find: map[string][]byte{"licenseinfo-find": []byte(`{"Total":1,"From":0,"Count":0,"LicenseInfo":[{"ID":42,"Name":"license-info"}]}`)}, wantErr: "inconsistent result"},
+		{name: "count differs from LicenseInfo items", find: map[string][]byte{"licenseinfo-find": []byte(`{"Total":1,"From":0,"Count":1,"LicenseInfo":[]}`)}, wantErr: "inconsistent result"},
 		{name: "valid empty LicenseInfo", find: map[string][]byte{"licenseinfo-find": []byte(`{"Total":0,"From":0,"Count":0,"LicenseInfo":[]}`)}},
-		{name: "empty PrivateHostPlan", find: map[string][]byte{"privatehostplan-find": []byte(`[]`)}, wantErr: "PrivateHostPlan Find returned"},
+		{name: "null LicenseInfo array", find: map[string][]byte{"licenseinfo-find": []byte(`{"Total":0,"From":0,"Count":0,"LicenseInfo":null}`)}, wantErr: "inconsistent result"},
+		{name: "empty PrivateHostPlan", find: map[string][]byte{"privatehostplan-find": []byte(`{"Total":0,"From":0,"Count":0,"PrivateHostPlans":[]}`)}, wantErr: "PrivateHostPlan Find returned"},
+		{name: "null PrivateHostPlan output", find: map[string][]byte{"privatehostplan-find": []byte(`null`)}, wantErr: "inconsistent result"},
+		{name: "mismatched PrivateHostPlan count", find: map[string][]byte{"privatehostplan-find": []byte(`{"Total":1,"From":0,"Count":0,"PrivateHostPlans":[{"ID":8,"Name":"private-host-plan","Class":"standard","CPU":20,"CPUModel":"model","Dedicated":true,"MemoryMB":229376,"Availability":"available"}]}`)}, wantErr: "inconsistent result"},
 		{name: "mismatched PrivateHostPlan Read", read: map[string][]byte{"privatehostplan-read": []byte(`{"ID":9,"Name":"other","MemoryMB":229376}`)}, wantErr: "PrivateHostPlan Read did not match"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -178,4 +234,56 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("evidence file permissions = %04o, want 0600", info.Mode().Perm())
 	}
+}
+
+func TestCLIRunnerDoesNotRecordTraceStderr(t *testing.T) {
+	t.Setenv("SAKURACLOUD_TRACE", "all")
+	t.Setenv("SKR_E2E_TRACE_HELPER", "1")
+	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "iaas-product-plans"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := cliRunner{binary: os.Args[0], evidence: recorder}
+	output, err := runner.call(context.Background(), "internetplan-find", "-test.run=TestCLIRunnerTraceHelper", "--")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(output) != "safe stdout\n" {
+		t.Fatalf("stdout = %q, want safe stdout", output)
+	}
+	data, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-internetplan-find.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sensitive := range []string{"trace-marker-secret", "TermsOfUse-private", "Authorization"} {
+		if bytes.Contains(data, []byte(sensitive)) {
+			t.Errorf("evidence contains stderr trace value %q: %s", sensitive, data)
+		}
+	}
+	var record struct {
+		Stderr string `json:"stderr"`
+	}
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatal(err)
+	}
+	if record.Stderr != "" {
+		t.Errorf("evidence stderr = %q, want empty", record.Stderr)
+	}
+}
+
+func TestCLIRunnerTraceHelper(t *testing.T) {
+	if os.Getenv("SKR_E2E_TRACE_HELPER") != "1" {
+		return
+	}
+	if os.Getenv("SAKURACLOUD_TRACE") != "all" {
+		fmt.Fprintln(os.Stderr, "trace environment was not inherited")
+		os.Exit(1)
+	}
+	if _, err := fmt.Fprintln(os.Stdout, "safe stdout"); err != nil {
+		os.Exit(1)
+	}
+	if _, err := fmt.Fprintln(os.Stderr, "Authorization: trace-marker-secret TermsOfUse-private"); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
