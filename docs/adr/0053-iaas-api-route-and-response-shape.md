@@ -12,6 +12,7 @@
 ## Decision
 
 - `iaas-api` のリソース階層は、SDK のサービスパッケージ名ではなく、API route のリソース階層に合わせます。route の API バージョンなど CLI の利用者に不要な要素はコマンド名に含めません。例として `/product/server` は `iaas-api product server`、`/product/disk` は `iaas-api product disk` とします。
+- 生成設定ファイル名も `iaas-api` とその配下のコマンド階層に合わせます。たとえば `iaas-api product server` は `api/commands/iaas-product-server.json`、`iaas-api product disk` は `api/commands/iaas-product-disk.json` を使います。
 - 低レベル操作が `sacloud-sdk-go/api/iaas` にある場合は、その公開 API 操作を利用します。操作の入力変換は必要な SDK の公開変換処理を利用できます。
 - JSON 出力は低レベル API の応答モデルを使い、Find の応答 envelope と API が返すフィールドを維持します。`--query` は応答モデル全体に適用します。出力は SDK の型から JSON に再エンコードするため、HTTP response body のバイト列そのものとは保証しません。
 - 移行は `PLAN.md` に記録し、対象を絞って段階的に行います。この決定は、既存のすべての IaaS コマンドを一度に移行することを要求しません。

@@ -32,7 +32,7 @@ import (
 )
 
 func TestDiskPlanGeneratedCodeMatchesConfig(t *testing.T) {
-	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-diskplan.json"))
+	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-product-disk.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestDiskPlanGeneratedCodeMatchesConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Fatal("generated DiskPlan commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-diskplan.json API_OUTPUT=internal/iaas/diskplanapi/diskplan_api_generated.go")
+		t.Fatal("generated DiskPlan commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-product-disk.json API_OUTPUT=internal/iaas/diskplanapi/diskplan_api_generated.go")
 	}
 }
 

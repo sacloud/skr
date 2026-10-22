@@ -41,8 +41,21 @@ import (
 )
 
 func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
-	for _, resource := range []string{"archive", "disk", "diskplan", "packetfilter", "server", "serverplan", "switch"} {
-		data, err := os.ReadFile(repositoryPath("api/commands/iaas-" + resource + ".json"))
+	resources := []struct {
+		name    string
+		config  string
+		command string
+	}{
+		{name: "archive", config: "iaas-archive", command: "archive"},
+		{name: "disk", config: "iaas-disk", command: "disk"},
+		{name: "diskplan", config: "iaas-product-disk", command: "product disk"},
+		{name: "packetfilter", config: "iaas-packetfilter", command: "packetfilter"},
+		{name: "server", config: "iaas-server", command: "server"},
+		{name: "serverplan", config: "iaas-product-server", command: "product server"},
+		{name: "switch", config: "iaas-switch", command: "switch"},
+	}
+	for _, resource := range resources {
+		data, err := os.ReadFile(repositoryPath("api/commands/" + resource.config + ".json"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -51,17 +64,17 @@ func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, operation := range config.Operations {
-			if resource == "archive" && operation.Name == "Find" {
+			if resource.name == "archive" && operation.Name == "Find" {
 				if operation.RequestValidator != "ValidateFindRequest" {
 					t.Fatal("Archive Find must retain unknown OSType validation")
 				}
 			} else if operation.RequestValidator != "" {
-				t.Fatalf("%s %s still configures a body validator", resource, operation.Name)
+				t.Fatalf("%s %s still configures a body validator", resource.name, operation.Name)
 			}
 			if operation.Handwritten {
 				continue
 			}
-			t.Run(resource+"/"+operation.Name, func(t *testing.T) {
+			t.Run(resource.name+"/"+operation.Name, func(t *testing.T) {
 				commandLine := newCLI()
 				failure := errors.New("API factory reached")
 				setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return nil, failure })
@@ -71,14 +84,8 @@ func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
 				setServerAPIFactory(commandLine, func() (serverapi.API, error) { return nil, failure })
 				setServerPlanAPIFactory(commandLine, func() (serverplanapi.API, error) { return nil, failure })
 				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return nil, failure })
-				command := resource
-				if command == "diskplan" {
-					command = "product disk"
-				} else if command == "serverplan" {
-					command = "product server"
-				}
 				var stdout, stderr bytes.Buffer
-				args := append([]string{"iaas-api"}, strings.Fields(command)...)
+				args := append([]string{"iaas-api"}, strings.Fields(resource.command)...)
 				args = append(args, strings.ToLower(operation.Name), "--request", `{"Zone":"test-zone"}`)
 				code := runCLI(args, &stdout, &stderr, commandLine)
 				if code != 1 || stdout.Len() != 0 || stderr.String() != failure.Error()+"\n" {

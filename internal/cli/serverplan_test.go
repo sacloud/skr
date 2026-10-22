@@ -32,7 +32,7 @@ import (
 )
 
 func TestServerPlanGeneratedCodeMatchesConfig(t *testing.T) {
-	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-serverplan.json"))
+	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-product-server.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestServerPlanGeneratedCodeMatchesConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Fatal("generated ServerPlan commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-serverplan.json API_OUTPUT=internal/iaas/serverplanapi/serverplan_api_generated.go")
+		t.Fatal("generated ServerPlan commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-product-server.json API_OUTPUT=internal/iaas/serverplanapi/serverplan_api_generated.go")
 	}
 }
 
