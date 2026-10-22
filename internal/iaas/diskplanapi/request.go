@@ -15,6 +15,8 @@
 package diskplanapi
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -31,6 +33,27 @@ type FindRequest struct {
 	Filter  map[string]any
 	Include []string
 	Exclude []string
+}
+
+func (request *FindRequest) UnmarshalJSON(data []byte) error {
+	type findRequestAlias FindRequest
+	var decoded struct {
+		*findRequestAlias
+		Filter json.RawMessage `json:"Filter"`
+	}
+	decoded.findRequestAlias = (*findRequestAlias)(request)
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if len(decoded.Filter) == 0 {
+		return nil
+	}
+	decoder := json.NewDecoder(bytes.NewReader(decoded.Filter))
+	decoder.UseNumber()
+	if err := decoder.Decode(&request.Filter); err != nil {
+		return fmt.Errorf("decode Filter: %w", err)
+	}
+	return nil
 }
 
 func (request *FindRequest) findCondition() *iaas.FindCondition {
@@ -76,13 +99,17 @@ func filterKey(value string) search.FilterKey {
 
 func filterValue(key search.FilterKey, value any) any {
 	if key.Op != search.OpEqual {
-		return value
+		return normalizeFilterNumbers(value)
 	}
 	switch value := value.(type) {
 	case string:
 		return search.AndEqual(value)
 	case []any:
-		return search.OrEqual(value...)
+		values := make([]any, len(value))
+		for i, item := range value {
+			values[i] = normalizeFilterNumbers(item)
+		}
+		return search.OrEqual(values...)
 	case []string:
 		values := make([]any, len(value))
 		for i, item := range value {
@@ -90,7 +117,28 @@ func filterValue(key search.FilterKey, value any) any {
 		}
 		return search.OrEqual(values...)
 	default:
-		return search.OrEqual(value)
+		return search.OrEqual(normalizeFilterNumbers(value))
+	}
+}
+
+func normalizeFilterNumbers(value any) any {
+	switch value := value.(type) {
+	case json.Number:
+		return value.String()
+	case []any:
+		values := make([]any, len(value))
+		for i, item := range value {
+			values[i] = normalizeFilterNumbers(item)
+		}
+		return values
+	case map[string]any:
+		values := make(map[string]any, len(value))
+		for key, item := range value {
+			values[key] = normalizeFilterNumbers(item)
+		}
+		return values
+	default:
+		return value
 	}
 }
 

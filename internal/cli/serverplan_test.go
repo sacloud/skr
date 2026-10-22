@@ -167,6 +167,51 @@ func TestIaaSServerPlanFilterIsPassedToLowLevelAPI(t *testing.T) {
 	}
 }
 
+func TestIaaSServerPlanJSONFilterPreservesLargeNumericIDs(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	caller := &serverPlanAPICaller{}
+	commandLine := newCLI()
+	setServerPlanAPIFactory(commandLine, func() (serverplanapi.API, error) {
+		return serverplanapi.NewSDKAPI(caller), nil
+	})
+
+	for _, test := range []struct {
+		name       string
+		filter     string
+		wantIDJSON string
+	}{
+		{
+			name:       "scalar",
+			filter:     `"ID":1234567890123456789`,
+			wantIDJSON: `["1234567890123456789"]`,
+		},
+		{
+			name:       "array",
+			filter:     `"ID":[1234567890123456789,1234567890123456790]`,
+			wantIDJSON: `["1234567890123456789","1234567890123456790"]`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			request := fmt.Sprintf(`{"Zone":"test-zone","Filter":{%s}}`, test.filter)
+			code := runCLI([]string{"iaas-api", "product", "server", "find", "--request", request}, &stdout, &stderr, commandLine)
+			if code != 0 || stderr.Len() != 0 {
+				t.Fatalf("find: code %d, stderr %q", code, stderr.String())
+			}
+			call := caller.calls[len(caller.calls)-1]
+			var condition struct {
+				Filter map[string]json.RawMessage
+			}
+			if err := json.Unmarshal(call.body, &condition); err != nil {
+				t.Fatalf("decode SDK find condition %q: %v", call.body, err)
+			}
+			if got := string(condition.Filter["ID"]); got != test.wantIDJSON {
+				t.Fatalf("SDK ID filter = %s, want %s", got, test.wantIDJSON)
+			}
+		})
+	}
+}
+
 func TestIaaSServerPlanRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 	api := &serverPlanAPITestDouble{}
 	for _, args := range [][]string{
