@@ -42,7 +42,7 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 		}
 		commandName := resource
 		if resource == "diskplan" {
-			commandName = "disk-plan"
+			commandName = "product disk"
 		}
 		for _, operation := range config.Operations {
 			if operation.Handwritten {
@@ -65,7 +65,7 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 						}
 						commandLine.IaaSAPI.Archive = archiveapi.NewCommands(archiveapi.Runtime{DecodeRequest: decodeRequest}, func() (archiveapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Disk = diskapi.NewCommands(diskapi.Runtime{DecodeRequest: decodeRequest}, func() (diskapi.API, error) { return nil, factoryError() })
-						commandLine.IaaSAPI.DiskPlan = diskplanapi.NewCommands(diskplanapi.Runtime{DecodeRequest: decodeRequest}, func() (diskplanapi.API, error) { return nil, factoryError() })
+						commandLine.IaaSAPI.Product.Disk = diskplanapi.NewCommands(diskplanapi.Runtime{DecodeRequest: decodeRequest}, func() (diskplanapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 							DecodeRequest: decodeRequest, TransformCreateRequest: transformPacketFilterCreateRequest, TransformUpdateRequest: transformPacketFilterUpdateRequest,
 						}, func() (packetfilterapi.API, error) { return nil, factoryError() })
@@ -73,7 +73,8 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 							DecodeRequest: decodeRequest, TransformCreateRequest: serverapi.TransformCreateRequest,
 						}, func() (serverapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Switch = switchapi.NewCommands(switchapi.Runtime{DecodeRequest: decodeRequest}, func() (switchapi.API, error) { return nil, factoryError() })
-						args := []string{"iaas-api", commandName, strings.ToLower(operation.Name)}
+						args := append([]string{"iaas-api"}, strings.Fields(commandName)...)
+						args = append(args, strings.ToLower(operation.Name))
 						switch input {
 						case "missing Zone JSON":
 							args = append(args, "--request", `{}`)

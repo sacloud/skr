@@ -10,18 +10,17 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	diskplan "github.com/sacloud/sacloud-sdk-go/service/iaas/diskplan"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
 type Commands struct {
-	Find FindCommand "cmd:\"\" help:\"指定したゾーンで利用できるディスクプランを検索して出力します。API の Availability と Size (サイズ、単位、利用可否) を確認できます。例: skr iaas-api disk-plan find --zone is1b\""
-	Read ReadCommand "cmd:\"\" help:\"指定したゾーンと ID のディスクプランを読み取って出力します。API の Availability と Size (サイズ、単位、利用可否) を確認できます。例: skr iaas-api disk-plan read --zone ZONE --id 4\""
+	Find FindCommand "cmd:\"\" help:\"指定したゾーンで利用できるディスクプランを検索します。API 応答の Total、From、Count、DiskPlans を含む JSON を出力します。Availability と Size (サイズ、単位、利用可否) を確認できます。例: skr iaas-api product disk find --zone is1b\""
+	Read ReadCommand "cmd:\"\" help:\"指定したゾーンと ID のディスクプランを読み取って出力します。API の Availability と Size (サイズ、単位、利用可否) を確認できます。例: skr iaas-api product disk read --zone ZONE --id 4\""
 }
 
 type API interface {
-	FindWithContext(context.Context, *diskplan.FindRequest) ([]*iaas.DiskPlan, error)
-	ReadWithContext(context.Context, *diskplan.ReadRequest) (*iaas.DiskPlan, error)
+	FindWithContext(context.Context, *FindRequest) (*iaas.DiskPlanFindResult, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.DiskPlan, error)
 }
 
 type APIFactory func() (API, error)
@@ -42,7 +41,7 @@ func NewCommands(runtime Runtime, factory APIFactory) Commands {
 }
 
 type FindCommand struct {
-	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。Names (名前の文字列配列) と Sort は JSON で指定します。Count と From は個別フラグです。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Names\\\":[\\\"PLAN-NAME\\\"]}'。ZONE と名前は実際の値に置き換えます。\""
+	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (対象ゾーン名)。API の Filter、Sort、Include、Exclude は JSON で指定します。Count と From は個別フラグです。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"Filter\\\":{\\\"Name\\\":\\\"PLAN-NAME\\\"}}'。ZONE と名前は実際の値に置き換えます。\""
 	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone is1b\""
 	Count   *int    "name:\"count\" help:\"任意: 取得件数 (整数)。\""
 	From    *int    "name:\"from\" help:\"任意: 取得開始位置 (整数)。\""
@@ -58,7 +57,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &diskplan.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -124,7 +123,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &diskplan.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

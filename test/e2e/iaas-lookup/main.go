@@ -35,7 +35,7 @@ import (
 
 const (
 	archiveQuery  = "map({ID,Name,Description,DiskPlanID,DiskPlanName,SizeMB,Tags})"
-	diskPlanQuery = "map({ID,Name,StorageClass,Availability,Size})"
+	diskPlanQuery = ".DiskPlans | map({ID,Name,StorageClass,Availability,Size})"
 )
 
 type cli interface {
@@ -158,7 +158,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("Archive read result does not match find result ID %d", archives[0].ID)
 	}
 
-	diskPlanArgs := []string{"iaas-api", "disk-plan", "find", "--zone", s.zone, "--query", diskPlanQuery}
+	diskPlanArgs := []string{"iaas-api", "product", "disk", "find", "--zone", s.zone, "--query", diskPlanQuery}
 	diskPlanOutput, err := s.client.call(ctx, "disk-plan-find", diskPlanArgs...)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func (s scenario) run(ctx context.Context) error {
 	if len(diskPlans[0].Size) == 0 {
 		return errors.New("DiskPlan find returned no size data")
 	}
-	readArgs := []string{"iaas-api", "disk-plan", "read", "--zone", s.zone, "--id", fmt.Sprint(diskPlans[0].ID)}
+	readArgs := []string{"iaas-api", "product", "disk", "read", "--zone", s.zone, "--id", fmt.Sprint(diskPlans[0].ID)}
 	diskPlanOutput, err = s.client.call(ctx, "disk-plan-read", readArgs...)
 	if err != nil {
 		return err

@@ -19,13 +19,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/diskplan"
 	"github.com/sacloud/skr/internal/apigen"
 	diskplanapi "github.com/sacloud/skr/internal/iaas/diskplanapi"
 )
@@ -57,10 +58,11 @@ func TestIaaSDiskPlanHelp(t *testing.T) {
 		args []string
 		want []string
 	}{
-		{args: []string{"iaas-api", "--help"}, want: []string{"archive", "disk-plan"}},
-		{args: []string{"iaas-api", "disk-plan", "--help"}, want: []string{"find", "read"}},
-		{args: []string{"iaas-api", "disk-plan", "find", "--help"}, want: []string{"--zone", "--count", "--from", "--request", "Names", "Availability", "Size"}},
-		{args: []string{"iaas-api", "disk-plan", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
+		{args: []string{"iaas-api", "--help"}, want: []string{"archive", "product"}},
+		{args: []string{"iaas-api", "product", "--help"}, want: []string{"disk", "server"}},
+		{args: []string{"iaas-api", "product", "disk", "--help"}, want: []string{"find", "read"}},
+		{args: []string{"iaas-api", "product", "disk", "find", "--help"}, want: []string{"--zone", "--count", "--from", "--request", "Filter", "Availability", "Size", "Total", "DiskPlans"}},
+		{args: []string{"iaas-api", "product", "disk", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
@@ -85,11 +87,11 @@ func TestIaaSDiskPlanCommandsUseSDKRequests(t *testing.T) {
 	run := func(args ...string) (string, string, int) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		code := runCLI(append([]string{"iaas-api", "disk-plan"}, args...), &stdout, &stderr, commandLine)
+		code := runCLI(append([]string{"iaas-api", "product", "disk"}, args...), &stdout, &stderr, commandLine)
 		return stdout.String(), stderr.String(), code
 	}
 
-	output, stderr, code := run("find", "--zone", "test-zone", "--count", "3", "--from", "1", "--query", "map({ID,Name,StorageClass,Availability,Size})")
+	output, stderr, code := run("find", "--zone", "test-zone", "--count", "3", "--from", "1", "--query", ".DiskPlans | map({ID,Name,StorageClass,Availability,Size})")
 	if code != 0 || stderr != "" {
 		t.Fatalf("find: code %d, stderr %q", code, stderr)
 	}
@@ -119,9 +121,9 @@ func TestIaaSDiskPlanCommandsUseSDKRequests(t *testing.T) {
 		t.Fatalf("projected DiskPlan = %s", output)
 	}
 
-	_, stderr, code = run("find", "--request", `{"Zone":"test-zone","Names":["ssd"]}`)
+	_, stderr, code = run("find", "--request", `{"Zone":"test-zone","Filter":{"Name":"ssd"}}`)
 	if code != 0 || stderr != "" || api.findRequest == nil ||
-		len(api.findRequest.Names) != 1 || api.findRequest.Names[0] != "ssd" {
+		api.findRequest.Filter["Name"] != "ssd" {
 		t.Fatalf("find JSON: code %d, stderr %q, request %+v", code, stderr, api.findRequest)
 	}
 
@@ -131,6 +133,73 @@ func TestIaaSDiskPlanCommandsUseSDKRequests(t *testing.T) {
 	}
 	if api.readRequest == nil || api.readRequest.Zone != "test-zone" || api.readRequest.ID != types.ID(4) {
 		t.Fatalf("Read request = %+v, want zone and ID", api.readRequest)
+	}
+}
+
+func TestIaaSDiskPlanUsesLowLevelAPIResponse(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	caller := &diskPlanAPICaller{}
+	commandLine := newCLI()
+	setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) {
+		return diskplanapi.NewSDKAPI(caller), nil
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"iaas-api", "product", "disk", "find", "--zone", "test-zone", "--count", "3", "--from", "1"}, &stdout, &stderr, commandLine)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("find: code %d, stderr %q", code, stderr.String())
+	}
+	var result iaas.DiskPlanFindResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode API Find result %q: %v", stdout.String(), err)
+	}
+	if result.Total != 1 || result.From != 0 || result.Count != 1 ||
+		len(result.DiskPlans) != 1 || result.DiskPlans[0].ID != types.ID(4) {
+		t.Fatalf("API Find result = %+v", result)
+	}
+	if len(caller.calls) != 1 || caller.calls[0].method != "GET" {
+		t.Fatalf("SDK caller requests = %+v, want one GET", caller.calls)
+	}
+	parsed, err := url.Parse(caller.calls[0].uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(parsed.Path, "/api/cloud/1.1/product/disk") {
+		t.Fatalf("SDK request path = %q, want DiskPlan endpoint", parsed.Path)
+	}
+	var condition struct {
+		Count int
+		From  int
+	}
+	if err := json.Unmarshal(caller.calls[0].body, &condition); err != nil {
+		t.Fatalf("decode API Find condition %q: %v", caller.calls[0].body, err)
+	}
+	if condition.Count != 3 || condition.From != 1 {
+		t.Fatalf("API Find condition = %+v, want Count 3 and From 1", condition)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"iaas-api", "product", "disk", "read", "--zone", "test-zone", "--id", "4"}, &stdout, &stderr, commandLine)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("read: code %d, stderr %q", code, stderr.String())
+	}
+	var read iaas.DiskPlan
+	if err := json.Unmarshal(stdout.Bytes(), &read); err != nil {
+		t.Fatalf("decode API Read result %q: %v", stdout.String(), err)
+	}
+	if read.ID != types.ID(4) || read.Name != "ssd" {
+		t.Fatalf("API Read result = %+v", read)
+	}
+	if len(caller.calls) != 2 || caller.calls[1].method != "GET" {
+		t.Fatalf("SDK caller requests = %+v, want two GETs", caller.calls)
+	}
+	parsed, err = url.Parse(caller.calls[1].uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(parsed.Path, "/api/cloud/1.1/product/disk/4") {
+		t.Fatalf("SDK request path = %q, want DiskPlan Read endpoint", parsed.Path)
 	}
 }
 
@@ -151,7 +220,7 @@ func TestIaaSDiskPlanRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
 		setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return api, nil })
-		code := runCLI(append([]string{"iaas-api", "disk-plan"}, args...), &stdout, &stderr, commandLine)
+		code := runCLI(append([]string{"iaas-api", "product", "disk"}, args...), &stdout, &stderr, commandLine)
 		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
 			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
 		}
@@ -167,14 +236,14 @@ func TestIaaSDiskPlanJSONUnknownFieldsAndTrailingValues(t *testing.T) {
 	setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return api, nil })
 
 	var stdout, stderr bytes.Buffer
-	code := runCLI([]string{"iaas-api", "disk-plan", "find", "--request", `{"Zone":"test-zone","Unknown":"ignored"}`}, &stdout, &stderr, commandLine)
+	code := runCLI([]string{"iaas-api", "product", "disk", "find", "--request", `{"Zone":"test-zone","Unknown":"ignored"}`}, &stdout, &stderr, commandLine)
 	if code != 0 || stderr.Len() != 0 || api.findRequest == nil || api.findRequest.Zone != "test-zone" {
 		t.Fatalf("unknown JSON field: code %d, stderr %q, request %+v", code, stderr.String(), api.findRequest)
 	}
 
 	stdout.Reset()
 	stderr.Reset()
-	code = runCLI([]string{"iaas-api", "disk-plan", "find", "--request", `{"Zone":"test-zone"} {}`}, &stdout, &stderr, commandLine)
+	code = runCLI([]string{"iaas-api", "product", "disk", "find", "--request", `{"Zone":"test-zone"} {}`}, &stdout, &stderr, commandLine)
 	if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
 		t.Fatalf("trailing JSON value: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
 	}
@@ -185,32 +254,57 @@ func TestIaaSDiskPlanPropagatesAPIErrors(t *testing.T) {
 	commandLine := newCLI()
 	setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return api, nil })
 	var stdout, stderr bytes.Buffer
-	code := runCLI([]string{"iaas-api", "disk-plan", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
+	code := runCLI([]string{"iaas-api", "product", "disk", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
 	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "disk plan API failure") {
 		t.Fatalf("find error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
 	}
 }
 
 type diskPlanAPITestDouble struct {
-	findRequest *diskplan.FindRequest
-	readRequest *diskplan.ReadRequest
+	findRequest *diskplanapi.FindRequest
+	readRequest *diskplanapi.ReadRequest
 	findErr     error
 }
 
-func (api *diskPlanAPITestDouble) FindWithContext(_ context.Context, request *diskplan.FindRequest) ([]*iaas.DiskPlan, error) {
+type diskPlanAPICaller struct {
+	calls []diskPlanAPICall
+}
+
+type diskPlanAPICall struct {
+	method string
+	uri    string
+	body   []byte
+}
+
+func (caller *diskPlanAPICaller) Do(_ context.Context, method, uri string, body any) ([]byte, error) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal SDK request body: %w", err)
+	}
+	caller.calls = append(caller.calls, diskPlanAPICall{method: method, uri: uri, body: data})
+	if strings.HasSuffix(uri, "/api/cloud/1.1/product/disk/4") {
+		return []byte(`{"DiskPlan":{"ID":"4","Name":"ssd","StorageClass":"ssd","Availability":"available","Size":[{"Availability":"available","DisplaySize":20,"DisplaySuffix":"GB","SizeMB":20480}]}}`), nil
+	}
+	return []byte(`{"Total":1,"From":0,"Count":1,"DiskPlans":[{"ID":"4","Name":"ssd","StorageClass":"ssd","Availability":"available","Size":[{"Availability":"available","DisplaySize":20,"DisplaySuffix":"GB","SizeMB":20480}]}]}`), nil
+}
+
+func (api *diskPlanAPITestDouble) FindWithContext(_ context.Context, request *diskplanapi.FindRequest) (*iaas.DiskPlanFindResult, error) {
 	api.findRequest = request
 	if api.findErr != nil {
 		return nil, api.findErr
 	}
-	return []*iaas.DiskPlan{{
-		ID: 4, Name: "ssd", StorageClass: "ssd", Availability: types.EAvailability("available"),
-		Size: []*iaas.DiskPlanSizeInfo{{
-			Availability: types.EAvailability("available"), DisplaySize: 20, DisplaySuffix: "GB", SizeMB: 20480,
+	return &iaas.DiskPlanFindResult{
+		Total: 1, From: 0, Count: 1,
+		DiskPlans: []*iaas.DiskPlan{{
+			ID: 4, Name: "ssd", StorageClass: "ssd", Availability: types.EAvailability("available"),
+			Size: []*iaas.DiskPlanSizeInfo{{
+				Availability: types.EAvailability("available"), DisplaySize: 20, DisplaySuffix: "GB", SizeMB: 20480,
+			}},
 		}},
-	}}, nil
+	}, nil
 }
 
-func (api *diskPlanAPITestDouble) ReadWithContext(_ context.Context, request *diskplan.ReadRequest) (*iaas.DiskPlan, error) {
+func (api *diskPlanAPITestDouble) ReadWithContext(_ context.Context, request *diskplanapi.ReadRequest) (*iaas.DiskPlan, error) {
 	api.readRequest = request
 	return &iaas.DiskPlan{ID: request.ID, Name: "ssd", StorageClass: "ssd"}, nil
 }
