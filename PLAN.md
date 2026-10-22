@@ -69,7 +69,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 
 ## IaaS の補助・プラン系サービス候補
 
-IaaS API のコマンド階層は SDK のサービスパッケージ名ではなく、実際の API route に合わせます。たとえば `/api/cloud/1.1/product/server` は `iaas-api product server`、`/api/cloud/1.1/public/price` は `iaas-api public price` です。低レベル API 操作が SDK にある場合は `sacloud-sdk-go/api/iaas` を直接使い、Find の応答 envelope を含む API 応答モデルを JSON 出力します。JSON は SDK の型から再エンコードするため HTTP body のバイト列そのものではありません。今回の範囲は DiskPlan と ServerPlan です。既存 IaaS コマンドの他の出力経路は別途段階的に見直します。
+IaaS API のコマンド階層は SDK のサービスパッケージ名ではなく、実際の API route に合わせます。たとえば `/api/cloud/1.1/product/server` は `iaas-api product server`、`/api/cloud/1.1/public/price` は `iaas-api public price` です。低レベル API 操作が SDK にある場合は `sacloud-sdk-go/api/iaas` を直接使い、Find の応答 envelope を含む API 応答モデルを JSON 出力します。JSON は SDK の型から再エンコードするため HTTP body のバイト列そのものではありません。既存 IaaS コマンドの他の出力経路は別途段階的に見直します。
 
 SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のように整理します。
 
@@ -84,14 +84,16 @@ SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のよう
 | Zone | `/api/cloud/1.1/zone` | `zone` |
 | DiskPlan | `/api/cloud/1.1/product/disk` | `product disk` |
 
-- [ ] `internetplan`
-- [ ] `licenseinfo`
-- [ ] `privatehostplan`
-- [x] `region` — `iaas-api region` の Find / Read を実装済みです。Find は件数・開始位置をフラグで指定でき、検索名・Sort は JSON で指定します。Read は ID で参照します。Region API はゾーン指定を受け付けません。SDK の公開操作はすべて CLI にあります。読み取り専用の[ライブ E2E runner](test/e2e/region/) と[チュートリアル](docs/manual/tutorials/iaas-api/region.md)を追加し、実環境で Find / Read の結果一致を確認済みです
-- [x] `serverplan` — `iaas-api product server` の Find / Read を実装済みです。`api/iaas.ServerPlanAPI` を使い、Find の API 応答 envelope を含む JSON を出力します。CPU、メモリ、GPU、CPU モデル、利用可否などを検索・参照できます。読み取り専用の [ライブ E2E runner](test/e2e/serverplan/) と[チュートリアル](docs/manual/tutorials/iaas-api/server-plan.md)があります。is1b のライブ E2E で Find の結果と Read の ID・プラン情報の一致を確認済みです
-- [x] `serviceclass` — 現在は `iaas-api service-class` の Find を実装済みです。指定ゾーンのサービスクラス一覧を取得できます。SDK route は `/public/price` のため、route に沿う `iaas-api public price` への移行は未対応です。読み取り専用の [ライブ E2E runner](test/e2e/serviceclass/) と[チュートリアル](docs/manual/tutorials/iaas-api/serviceclass.md)があります。`is1b` でライブ E2E を実行し、517 件のサービスクラスを取得して、各項目の ID・名前・パスを検証済みです
-- [x] `zone` — `iaas-api zone` の Find のみ実装済みです。SDK の Read は未対応です。ゾーン一覧を取得して jq で名前を抽出する読み取り専用の [ライブ E2E runner](test/e2e/zone/) と[チュートリアル](docs/manual/tutorials/iaas-api/zone.md)があります
-- [x] `diskplan` — `iaas-api product disk` の Find / Read を実装済みです。`api/iaas.DiskPlanAPI` を使い、Find の API 応答 envelope を含む JSON を出力します。検索結果の API `Availability` と `Size` から、指定ゾーンの利用可否とサイズを確認できます。SDK の公開操作はすべて CLI にあります。Archive と合わせて検証する読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk-plan.md)があります。is1b で検索・参照を確認済みです
+- [x] `region` — `iaas-api region` の Find / Read を実装済みです。Find は件数・開始位置をフラグで指定でき、検索名・Sort は JSON で指定します。Read は ID で参照します。Region API はゾーン指定を受け付けません。SDK の公開操作はすべて CLI にあります。読み取り専用の[ライブ E2E runner](test/e2e/region/) と[チュートリアル](docs/manual/tutorials/iaas-api/region.md)を追加し、実環境で Find / Read の結果一致を確認済みです。
+- [x] `serverplan` — `iaas-api product server` の Find / Read を実装済みです。`api/iaas.ServerPlanAPI` を使い、Find の API 応答 envelope を含む JSON を出力します。CPU、メモリ、GPU、CPU モデル、利用可否などを検索・参照できます。読み取り専用の [ライブ E2E runner](test/e2e/serverplan/) と[チュートリアル](docs/manual/tutorials/iaas-api/server-plan.md)があります。is1b のライブ E2E で Find の結果と Read の ID・プラン情報の一致を確認済みです。
+- [x] `serviceclass` — 現在は `iaas-api service-class` の Find を実装済みです。指定ゾーンのサービスクラス一覧を取得できます。SDK route は `/public/price` のため、route に沿う `iaas-api public price` への移行は未対応です。読み取り専用の [ライブ E2E runner](test/e2e/serviceclass/) と[チュートリアル](docs/manual/tutorials/iaas-api/serviceclass.md)があります。`is1b` でライブ E2E を実行し、517 件のサービスクラスを取得して、各項目の ID・名前・パスを検証済みです。
+- [x] `zone` — `iaas-api zone` の Find のみ実装済みです。SDK の Read は未対応です。ゾーン一覧を取得して jq で名前を抽出する読み取り専用の [ライブ E2E runner](test/e2e/zone/) と[チュートリアル](docs/manual/tutorials/iaas-api/zone.md)があります。
+- [x] `diskplan` — `iaas-api product disk` の Find / Read を実装済みです。`api/iaas.DiskPlanAPI` を使い、Find の API 応答 envelope を含む JSON を出力します。検索結果の API `Availability` と `Size` から、指定ゾーンの利用可否とサイズを確認できます。SDK の公開操作はすべて CLI にあります。Archive と合わせて検証する読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk-plan.md)があります。is1b で検索・参照を確認済みです。
+- [x] `internetplan` — `iaas-api product internet` の Find / Read を実装済みです。ゾーン別プランの帯域幅と利用可否を確認できます。
+- [x] `licenseinfo` — `iaas-api product license` の Find を実装済みです。API に Read 操作はありません。
+- [x] `privatehostplan` — `iaas-api product privatehost` の Find / Read を実装済みです。CPU、CPU モデル、メモリ、利用可否を確認できます。
+- 3 リソースの読み取り専用 [ライブ E2E runner](test/e2e/iaas-product-plans/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet-plan.md)、[チュートリアル](docs/manual/tutorials/iaas-api/license-info.md)、[チュートリアル](docs/manual/tutorials/iaas-api/private-host-plan.md)があります。is1b のライブ E2E で InternetPlan / PrivateHostPlan の Find と Read の一致を確認し、LicenseInfo の Find 応答を検証済みです。クラウドリソースの変更はありません。
+- コマンド範囲と読み取り専用 E2E の判断は [ADR 0055](docs/adr/0055-iaas-product-plan-api-commands.md) に記録しています。
 
 ## IaaS SDK に同居する System API 候補
 

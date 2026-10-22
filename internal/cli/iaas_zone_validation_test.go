@@ -25,7 +25,9 @@ import (
 	"github.com/sacloud/skr/internal/iaas/archiveapi"
 	"github.com/sacloud/skr/internal/iaas/diskapi"
 	"github.com/sacloud/skr/internal/iaas/diskplanapi"
+	"github.com/sacloud/skr/internal/iaas/internetplanapi"
 	"github.com/sacloud/skr/internal/iaas/packetfilterapi"
+	"github.com/sacloud/skr/internal/iaas/privatehostplanapi"
 	"github.com/sacloud/skr/internal/iaas/serverapi"
 	"github.com/sacloud/skr/internal/iaas/switchapi"
 )
@@ -39,7 +41,9 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 		{name: "archive", config: "iaas-archive", command: "archive"},
 		{name: "disk", config: "iaas-disk", command: "disk"},
 		{name: "diskplan", config: "iaas-product-disk", command: "product disk"},
+		{name: "internetplan", config: "iaas-product-internet", command: "product internet"},
 		{name: "packetfilter", config: "iaas-packetfilter", command: "packetfilter"},
+		{name: "privatehostplan", config: "iaas-product-privatehost", command: "product privatehost"},
 		{name: "server", config: "iaas-server", command: "server"},
 		{name: "serverplan", config: "iaas-product-server", command: "product server"},
 		{name: "switch", config: "iaas-switch", command: "switch"},
@@ -75,9 +79,11 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 						commandLine.IaaSAPI.Archive = archiveapi.NewCommands(archiveapi.Runtime{DecodeRequest: decodeRequest}, func() (archiveapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Disk = diskapi.NewCommands(diskapi.Runtime{DecodeRequest: decodeRequest}, func() (diskapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Product.Disk = diskplanapi.NewCommands(diskplanapi.Runtime{DecodeRequest: decodeRequest}, func() (diskplanapi.API, error) { return nil, factoryError() })
+						commandLine.IaaSAPI.Product.Internet = internetplanapi.NewCommands(internetplanapi.Runtime{DecodeRequest: decodeRequest}, func() (internetplanapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 							DecodeRequest: decodeRequest, TransformCreateRequest: transformPacketFilterCreateRequest, TransformUpdateRequest: transformPacketFilterUpdateRequest,
 						}, func() (packetfilterapi.API, error) { return nil, factoryError() })
+						commandLine.IaaSAPI.Product.PrivateHost = privatehostplanapi.NewCommands(privatehostplanapi.Runtime{DecodeRequest: decodeRequest}, func() (privatehostplanapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Server = serverapi.NewCommands(serverapi.Runtime{
 							DecodeRequest: decodeRequest, TransformCreateRequest: serverapi.TransformCreateRequest,
 						}, func() (serverapi.API, error) { return nil, factoryError() })

@@ -20,7 +20,10 @@ import (
 	"github.com/sacloud/skr/internal/iaas/diskapi"
 	"github.com/sacloud/skr/internal/iaas/diskplanapi"
 	"github.com/sacloud/skr/internal/iaas/internetapi"
+	"github.com/sacloud/skr/internal/iaas/internetplanapi"
+	"github.com/sacloud/skr/internal/iaas/licenseinfoapi"
 	"github.com/sacloud/skr/internal/iaas/packetfilterapi"
+	"github.com/sacloud/skr/internal/iaas/privatehostplanapi"
 	"github.com/sacloud/skr/internal/iaas/regionapi"
 	"github.com/sacloud/skr/internal/iaas/serverapi"
 	"github.com/sacloud/skr/internal/iaas/serverplanapi"
@@ -53,11 +56,29 @@ func setInternetAPIFactory(commandLine *cli, factory internetapi.APIFactory) {
 	}, factory)
 }
 
+func setInternetPlanAPIFactory(commandLine *cli, factory internetplanapi.APIFactory) {
+	commandLine.IaaSAPI.Product.Internet = internetplanapi.NewCommands(internetplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, factory)
+}
+
+func setLicenseInfoAPIFactory(commandLine *cli, factory licenseinfoapi.APIFactory) {
+	commandLine.IaaSAPI.Product.License = licenseinfoapi.NewCommands(licenseinfoapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, factory)
+}
+
 func setPacketFilterAPIFactory(commandLine *cli, factory packetfilterapi.APIFactory) {
 	commandLine.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 		TransformCreateRequest: transformPacketFilterCreateRequest,
 		TransformUpdateRequest: transformPacketFilterUpdateRequest,
+	}, factory)
+}
+
+func setPrivateHostPlanAPIFactory(commandLine *cli, factory privatehostplanapi.APIFactory) {
+	commandLine.IaaSAPI.Product.PrivateHost = privatehostplanapi.NewCommands(privatehostplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 	}, factory)
 }
 
