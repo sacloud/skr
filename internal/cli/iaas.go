@@ -31,7 +31,10 @@ import (
 	diskplanapi "github.com/sacloud/skr/internal/iaas/diskplanapi"
 	iconapi "github.com/sacloud/skr/internal/iaas/iconapi"
 	internetapi "github.com/sacloud/skr/internal/iaas/internetapi"
+	internetplanapi "github.com/sacloud/skr/internal/iaas/internetplanapi"
+	licenseinfoapi "github.com/sacloud/skr/internal/iaas/licenseinfoapi"
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
+	privatehostplanapi "github.com/sacloud/skr/internal/iaas/privatehostplanapi"
 	regionapi "github.com/sacloud/skr/internal/iaas/regionapi"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
 	serverplanapi "github.com/sacloud/skr/internal/iaas/serverplanapi"
@@ -55,8 +58,11 @@ type iaasAPICommand struct {
 }
 
 type iaasProductCommand struct {
-	Disk   diskplanapi.Commands   `cmd:"" help:"ディスクプランを検索・参照します。プランの利用可否とサイズを確認できます。"`
-	Server serverplanapi.Commands `cmd:"" help:"サーバプランを検索・参照します。CPU、メモリ、GPU、利用可否を確認できます。"`
+	Disk        diskplanapi.Commands        `cmd:"" help:"ディスクプランを検索・参照します。プランの利用可否とサイズを確認できます。"`
+	Internet    internetplanapi.Commands    `cmd:"" help:"インターネットプランを検索・参照します。帯域幅と利用可否を確認できます。"`
+	License     licenseinfoapi.Commands     `cmd:"" name:"license" help:"ライセンス情報を検索し、名称や利用条件を確認します。"`
+	PrivateHost privatehostplanapi.Commands `cmd:"" name:"privatehost" help:"専有ホストプランを検索・参照します。CPU、メモリ、利用可否を確認できます。"`
+	Server      serverplanapi.Commands      `cmd:"" help:"サーバプランを検索・参照します。CPU、メモリ、GPU、利用可否を確認できます。"`
 }
 
 func (c *cli) initIaaSAPI() {
@@ -103,6 +109,33 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return diskplanapi.NewSDKAPI(client), nil
+	})
+	c.IaaSAPI.Product.Internet = internetplanapi.NewCommands(internetplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (internetplanapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return internetplanapi.NewSDKAPI(client), nil
+	})
+	c.IaaSAPI.Product.License = licenseinfoapi.NewCommands(licenseinfoapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (licenseinfoapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return licenseinfoapi.NewSDKAPI(client), nil
+	})
+	c.IaaSAPI.Product.PrivateHost = privatehostplanapi.NewCommands(privatehostplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (privatehostplanapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return privatehostplanapi.NewSDKAPI(client), nil
 	})
 	c.IaaSAPI.Region = regionapi.NewCommands(regionapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,

@@ -27,6 +27,9 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | --- | --- |
 | `skr iaas-api disk` | ディスクの検索、参照、作成、更新、削除 |
 | `skr iaas-api product disk` | ディスクプランの検索、参照 |
+| `skr iaas-api product internet` | インターネットプランの検索、参照 |
+| `skr iaas-api product license` | ライセンス情報の検索 |
+| `skr iaas-api product privatehost` | 専有ホストプランの検索、参照 |
 | `skr iaas-api icon` | ユーザー作成アイコンの検索、参照、作成、更新、削除 |
 | `skr iaas-api region` | リージョン情報の検索、参照 |
 | `skr iaas-api server` | サーバの検索、参照、作成、更新、削除 |
@@ -72,6 +75,9 @@ $ skr iaas-api icon --help
 $ skr iaas-api region --help
 $ skr iaas-api product --help
 $ skr iaas-api product disk --help
+$ skr iaas-api product internet --help
+$ skr iaas-api product license --help
+$ skr iaas-api product privatehost --help
 $ skr iaas-api product server --help
 $ skr iaas-api service-class --help
 $ skr iaas-api switch --help
@@ -91,6 +97,8 @@ $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 
 ```
 
 サーバプランの検索と参照は読み取り専用です。CPU、メモリ、GPU、利用可否などを対象ゾーンごとに確認できます。詳細は[ServerPlan API チュートリアル](docs/manual/tutorials/iaas-api/server-plan.md)を参照してください。
+
+インターネットプランはゾーンごとに検索・参照でき、帯域幅と利用可否を確認できます。[InternetPlan API チュートリアル](docs/manual/tutorials/iaas-api/internet-plan.md)を参照してください。ライセンス情報は `skr iaas-api product license find` で検索します。専有ホストプランはゾーンごとに検索・参照でき、CPU、メモリ、利用可否を確認できます。これらの手順は読み取り専用で、専有ホストの契約やネットワーク設定の変更は行いません。詳細は[LicenseInfo API チュートリアル](docs/manual/tutorials/iaas-api/license-info.md)と[PrivateHostPlan API チュートリアル](docs/manual/tutorials/iaas-api/private-host-plan.md)を参照してください。
 
 Disk の作成では `--zone`、`--name`、`--disk-plan-id`、`--connection`、`--size-gb` を指定します。更新では `--zone` と `--id` に加えて、変更する値だけをフラグで指定できます。省略した値は変更されません。複雑な値は `--request` にインライン JSON または `@path.json` で渡せますが、個別フラグとは併用できません。詳しくは[Disk API チュートリアル](docs/manual/tutorials/iaas-api/disk.md)を参照してください。
 

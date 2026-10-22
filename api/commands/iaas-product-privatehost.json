@@ -1,0 +1,72 @@
+{
+  "package": "privatehostplanapi",
+  "resource": "IaaS PrivateHostPlan",
+  "command_type": "Commands",
+  "api_type": "API",
+  "factory_type": "APIFactory",
+  "runtime_type": "Runtime",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "command_type": "FindCommand",
+      "help": "指定したゾーンの専有ホストプランを検索します。API 応答の Total、From、Count、PrivateHostPlans を含む JSON を出力します。CPU、CPU モデル、メモリ、利用可否を確認できます。例: skr iaas-api product privatehost find --zone is1b",
+      "method": "FindWithContext",
+      "request_type": "FindRequest",
+      "response_type": "*FindResult",
+      "validate_zone": true,
+      "request_help": "必須: Zone (対象ゾーン名)。API の Filter、Sort、Include、Exclude は JSON で指定します。Filter の文字列値は部分一致、配列値は OR 条件です。Count と From は個別フラグです。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 検索対象のゾーン名です。例: --zone is1b",
+          "required": true
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数です。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置です。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "ReadCommand",
+      "help": "指定したゾーンと ID の専有ホストプランを参照します。例: skr iaas-api product privatehost read --zone ZONE --id PRIVATE-HOST-PLAN-ID",
+      "method": "ReadWithContext",
+      "request_type": "ReadRequest",
+      "response_type": "*iaas.PrivateHostPlan",
+      "validate_zone": true,
+      "request_help": "必須: Zone (単一ゾーン名)、ID (数値)。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名です。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 専有ホストプラン ID です。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    }
+  ]
+}

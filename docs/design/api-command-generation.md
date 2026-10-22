@@ -178,3 +178,15 @@ $ go run ./test/e2e/packetfilter --skr ./skr --confirm-is1b-live
 ```
 
 作成・検索・参照・ルール更新・削除と削除後の不在をライブ環境で確認済みです。runner はランダムな専用名を使い、同名リソースがある場合は変更せず停止します。成功時と途中失敗時のどちらでも、今回作成したフィルタの ID、名前、説明を削除直前に照合してから後片付けします。サーバや NIC は作成・変更しません。証跡は共通の private evidence 機構で `tmp/packetfilter-api/<YYYYMMDDHHmm>/` に保存し、Git へ追加しません。
+
+### 読み取り専用の商品プラン API
+
+InternetPlan、LicenseInfo、PrivateHostPlan の runner は、選択中プロファイルで商品情報を検索・参照するだけで、クラウドリソースを作成、変更、削除しません。InternetPlan と PrivateHostPlan は `is1b` で Find の先頭 ID を Read し、プランの主要項目が一致することを確認します。LicenseInfo は SDK が公開する Find のみを確認し、利用条件本文は証跡に含めません。
+
+```console
+$ make build
+$ ./skr config current
+$ go run ./test/e2e/iaas-product-plans --skr ./skr --confirm-read-only-live
+```
+
+runner は確認フラグを必須にします。入力・出力・エラーの記録先は `tmp/iaas-product-plans-api/<YYYYMMDDHHmm>/` です。証跡に対象プロファイル名を含むことがあるため、Git へ追加・共有しないでください。ライブ環境を使わないテストでは、検索条件、ID の一致、エラー伝播を確認します。
