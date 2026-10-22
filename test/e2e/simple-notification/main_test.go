@@ -34,6 +34,7 @@ type fakeCLI struct {
 	changeCleanupIdentity bool
 	omitCreateID          bool
 	invalidDestination    bool
+	profileOutput         []byte
 	historyStatuses       []int
 	historyCalls          int
 	historyReadMismatch   bool
@@ -54,6 +55,9 @@ func (f *fakeCLI) call(_ context.Context, step string, input any, args ...string
 	}
 	switch step {
 	case "profile-current":
+		if f.profileOutput != nil {
+			return f.profileOutput, nil
+		}
 		return []byte("test-profile\n"), nil
 	case "e2e-read-destination-status":
 		return json.Marshal(struct {
@@ -259,6 +263,26 @@ func TestScenarioRefusesExistingGroupName(t *testing.T) {
 	}
 }
 
+func TestScenarioRejectsMissingProfileBeforeCreatingGroup(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		fake *fakeCLI
+	}{
+		{name: "empty profile", fake: &fakeCLI{profileOutput: []byte{}}},
+		{name: "profile command failure", fake: &fakeCLI{failStep: "profile-current"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := testScenario(t, test.fake)
+			if err == nil || !strings.Contains(err.Error(), "profile") {
+				t.Fatalf("scenario error = %v, want profile error", err)
+			}
+			if contains(test.fake.calls, "e2e-create-group") {
+				t.Fatal("scenario created a group without a selected profile")
+			}
+		})
+	}
+}
+
 func TestScenarioRefusesCleanupWhenCreateOutputIsInvalid(t *testing.T) {
 	fake := &fakeCLI{badCreateOutput: true}
 	err := testScenario(t, fake)
@@ -308,6 +332,97 @@ func TestScenarioRequestFileIsPrivate(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("request file permissions = %04o, want 0600", info.Mode().Perm())
+	}
+}
+
+type failingEvidenceRecorder struct {
+	records int
+}
+
+func (r *failingEvidenceRecorder) Record(string, string, []string, any, string, string, error, bool) error {
+	r.records++
+	return errors.New("injected evidence failure")
+}
+
+func (*failingEvidenceRecorder) Dir() string {
+	return "private-evidence"
+}
+
+func TestScenarioPreservesCLIOutputWhenEvidenceRecordingFails(t *testing.T) {
+	const (
+		groupID       = "123456789012"
+		destinationID = "987654321098"
+	)
+	group := groupItem{ID: groupID, Name: "skr-e2e-notify-test", Description: "skr-e2e-simple-notification/test"}
+	group.Settings.Destinations = []string{destinationID}
+	groupData, err := json.Marshal(groupResponse{CommonServiceItem: group})
+	if err != nil {
+		t.Fatal(err)
+	}
+	groupList, err := json.Marshal([]groupItem{group})
+	if err != nil {
+		t.Fatal(err)
+	}
+	history := notificationHistory{
+		RequestID: "request-123",
+		Message:   "test notification",
+		Statuses: []notificationStatus{{
+			GroupID: groupID, DestinationID: destinationID, Status: 2,
+		}},
+	}
+	historyList, err := json.Marshal([]notificationHistory{history})
+	if err != nil {
+		t.Fatal(err)
+	}
+	historyRead, err := json.Marshal(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs := [][]byte{
+		[]byte("test-profile\n"),
+		[]byte(`{"NotificationStatus":{"IsValid":true}}`),
+		[]byte(`[]`),
+		groupData,
+		groupList,
+		groupData,
+		[]byte(`{"is_ok":true}`),
+		historyList,
+		historyRead,
+		groupData,
+		nil,
+		[]byte(`[]`),
+	}
+	var callCount int
+	recorder := &failingEvidenceRecorder{}
+	var recordErrors []error
+	runner := cliRunner{
+		binary:       "skr",
+		evidence:     recorder,
+		recordErrors: &recordErrors,
+		runCommand: func(context.Context, string, []string) ([]byte, []byte, error) {
+			if callCount >= len(outputs) {
+				t.Fatalf("unexpected CLI call %d", callCount+1)
+			}
+			output := outputs[callCount]
+			callCount++
+			return output, nil, nil
+		},
+	}
+	testScenarioWithClient := scenario{
+		client: runner, destinationID: destinationID,
+		requestPath:  filepath.Join(t.TempDir(), "create-request.json"),
+		message:      "test notification",
+		historyPoll:  time.Millisecond,
+		historyLimit: time.Second,
+	}
+	if err := testScenarioWithClient.run(context.Background(), group.Name, group.Description); err != nil {
+		t.Fatalf("scenario failed despite successful CLI responses: %v", err)
+	}
+	if callCount != len(outputs) || recorder.records != len(outputs) {
+		t.Fatalf("CLI/evidence calls = %d/%d, want %d", callCount, recorder.records, len(outputs))
+	}
+	if len(recordErrors) != len(outputs) || errors.Join(recordErrors...) == nil {
+		t.Fatalf("record errors = %d, want every evidence failure retained", len(recordErrors))
 	}
 }
 

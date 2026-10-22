@@ -36,6 +36,11 @@ type crudFake struct {
 	changeAfterFailure bool
 	missingID          bool
 	cleanupOther       bool
+	profileOutput      []byte
+	requestPath        string
+	failRequestWrite   bool
+	changeExistingAt   string
+	changeExisting     string
 }
 
 func newCRUDFake() *crudFake {
@@ -57,6 +62,12 @@ func (f *crudFake) call(_ context.Context, step string, input any, args ...strin
 	if step == f.failStep {
 		return nil, errors.New("injected CLI failure")
 	}
+	if step == "profile-current" {
+		if f.profileOutput != nil {
+			return f.profileOutput, nil
+		}
+		return []byte("test-profile\n"), nil
+	}
 	if len(args) < 3 || args[0] != "simple-notification-api" {
 		return nil, fmt.Errorf("unexpected command: %v", args)
 	}
@@ -66,10 +77,21 @@ func (f *crudFake) call(_ context.Context, step string, input any, args ...strin
 			return nil, errors.New("email address leaked into command arguments")
 		}
 	}
+	if step == "crud-destination-status" && f.failRequestWrite && f.requestPath != "" {
+		if err := os.Remove(f.requestPath); err != nil {
+			return nil, err
+		}
+		if err := os.Mkdir(f.requestPath, 0o700); err != nil {
+			return nil, err
+		}
+	}
 	switch operation {
 	case "list-source":
 		return []byte(`{"Sources":[{"id":"2","name":"test-source"}]}`), nil
 	case "list":
+		if step == f.changeExistingAt && resource == "routing" {
+			f.mutateExisting("routing")
+		}
 		return json.Marshal(f.items[resource])
 	case "read", "read-status":
 		if len(args) < 4 {
@@ -78,6 +100,14 @@ func (f *crudFake) call(_ context.Context, step string, input any, args ...strin
 		for _, item := range f.items[resource] {
 			if item.ID != args[3] {
 				continue
+			}
+			if step == f.changeExistingAt {
+				for i := range f.items[resource] {
+					if f.items[resource][i].ID == item.ID {
+						f.mutateItem(&f.items[resource][i], resource)
+						item = f.items[resource][i]
+					}
+				}
 			}
 			if operation == "read-status" {
 				return []byte(`{"NotificationStatus":{"IsValid":false}}`), nil
@@ -180,11 +210,33 @@ func (f *crudFake) call(_ context.Context, step string, input any, args ...strin
 	}
 }
 
+func (f *crudFake) mutateExisting(resource string) {
+	if len(f.items[resource]) > 0 {
+		f.mutateItem(&f.items[resource][0], resource)
+	}
+}
+
+func (f *crudFake) mutateItem(item *crudItem, resource string) {
+	switch f.changeExisting {
+	case "setting-added":
+		item.Settings["Unexpected"] = true
+	case "setting-removed":
+		key := "SourceID"
+		if resource == "destination" {
+			key = "Disabled"
+		}
+		delete(item.Settings, key)
+	case "icon-changed":
+		item.Icon = "changed"
+	}
+}
+
 func runCRUDTest(t *testing.T, fake *crudFake) error {
 	t.Helper()
+	fake.requestPath = filepath.Join(t.TempDir(), "request.json")
 	return (crudScenario{scenario{
 		client: fake, destinationID: "987654321098",
-		requestPath: filepath.Join(t.TempDir(), "request.json"),
+		requestPath: fake.requestPath,
 	}}).runCRUD(context.Background(), "test-unique")
 }
 
@@ -251,6 +303,97 @@ func TestCRUDScenarioRefusesUnverifiedCleanup(t *testing.T) {
 	}
 }
 
+func TestCRUDScenarioRejectsMissingProfileBeforeWrites(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		fake *crudFake
+	}{
+		{name: "empty profile", fake: &crudFake{profileOutput: []byte{}}},
+		{name: "profile command failure", fake: &crudFake{failStep: "profile-current"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			test.fake.items = newCRUDFake().items
+			err := runCRUDTest(t, test.fake)
+			if err == nil || !strings.Contains(err.Error(), "profile") {
+				t.Fatalf("error = %v, want profile error", err)
+			}
+			if len(test.fake.calls) != 1 {
+				t.Fatalf("CRUD performed calls beyond profile check: %v", test.fake.calls)
+			}
+		})
+	}
+}
+
+func TestCRUDScenarioRejectsExistingStateChanges(t *testing.T) {
+	for _, test := range []struct {
+		target   string
+		mutation string
+	}{
+		{target: "crud-routing-after", mutation: "setting-added"},
+		{target: "crud-routing-after", mutation: "setting-removed"},
+		{target: "crud-routing-after", mutation: "icon-changed"},
+		{target: "crud-source-destination-unchanged", mutation: "setting-added"},
+		{target: "crud-source-destination-unchanged", mutation: "setting-removed"},
+		{target: "crud-source-destination-unchanged", mutation: "icon-changed"},
+	} {
+		t.Run(test.target+"/"+test.mutation, func(t *testing.T) {
+			fake := newCRUDFake()
+			fake.changeExistingAt = test.target
+			fake.changeExisting = test.mutation
+			err := runCRUDTest(t, fake)
+			if err == nil || !strings.Contains(err.Error(), "changed during CRUD test") {
+				t.Fatalf("error = %v, want existing-state change detection", err)
+			}
+			if len(fake.items["destination"]) != 1 || len(fake.items["group"]) != 0 || len(fake.items["routing"]) != 1 {
+				t.Fatalf("temporary resources remain after detected change: %#v", fake.items)
+			}
+		})
+	}
+}
+
+func TestMatchesExactCRUDItemChecksFullStateAndIgnoresTagOrder(t *testing.T) {
+	expected := crudItem{
+		ID: "123", Name: "existing", Description: "baseline",
+		Tags: []string{"one", "two"}, Settings: map[string]any{"Disabled": false}, Icon: "icon",
+	}
+	reorderedTags := expected
+	reorderedTags.Tags = []string{"two", "one"}
+	if !matchesExactCRUDItem(reorderedTags, expected) {
+		t.Fatal("tag order should not affect exact resource comparison")
+	}
+	for _, mutate := range []func(*crudItem){
+		func(actual *crudItem) { actual.Settings["Added"] = true },
+		func(actual *crudItem) { delete(actual.Settings, "Disabled") },
+		func(actual *crudItem) { actual.Icon = "changed" },
+	} {
+		actual := expected
+		actual.Tags = slices.Clone(expected.Tags)
+		actual.Settings = map[string]any{"Disabled": false}
+		mutate(&actual)
+		if matchesExactCRUDItem(actual, expected) {
+			t.Fatalf("accepted resource state change: %+v", actual)
+		}
+	}
+}
+
+func TestCRUDScenarioCleansExistingResourcesWhenLaterRequestFileWriteFails(t *testing.T) {
+	fake := newCRUDFake()
+	fake.failRequestWrite = true
+	err := runCRUDTest(t, fake)
+	if err == nil || !strings.Contains(err.Error(), "write private request file") {
+		t.Fatalf("error = %v, want request file write failure", err)
+	}
+	if len(fake.items["destination"]) != 1 || len(fake.items["group"]) != 0 || len(fake.items["routing"]) != 1 {
+		t.Fatalf("temporary resources remain: %#v", fake.items)
+	}
+	if !slices.Contains(fake.calls, "crud-cleanup-delete-destination") {
+		t.Fatalf("created destination was not cleaned up: %v", fake.calls)
+	}
+	if slices.Contains(fake.calls, "crud-cleanup-delete-group") {
+		t.Fatalf("uncreated group cleanup was attempted: %v", fake.calls)
+	}
+}
+
 func TestCRUDScenarioReportsCleanupFailure(t *testing.T) {
 	fake := newCRUDFake()
 	fake.failStep = "crud-cleanup-delete-routing"
@@ -280,7 +423,7 @@ func TestCRUDScenarioRejectsOccupiedReorderRanks(t *testing.T) {
 	if err := runCRUDTest(t, fake); err == nil || !strings.Contains(err.Error(), "must be unused") {
 		t.Fatalf("error = %v", err)
 	}
-	if len(fake.calls) != 1 {
+	if len(fake.calls) != 2 {
 		t.Fatalf("scenario did not stop at preflight: %v", fake.calls)
 	}
 }

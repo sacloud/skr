@@ -64,33 +64,50 @@ type cli interface {
 	call(context.Context, string, any, ...string) ([]byte, error)
 }
 
+type evidenceRecorder interface {
+	Record(string, string, []string, any, string, string, error, bool) error
+	Dir() string
+}
+
 type cliRunner struct {
-	binary   string
-	evidence *evidence.Recorder
+	binary       string
+	evidence     evidenceRecorder
+	recordErrors *[]error
+	runCommand   func(context.Context, string, []string) ([]byte, []byte, error)
 }
 
 func (r cliRunner) call(ctx context.Context, step string, input any, args ...string) ([]byte, error) {
 	if err := evidence.ValidateStep(step); err != nil {
 		return nil, err
 	}
-	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // Structured arguments are passed without a shell to the selected skr binary.
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	runErr := command.Run()
-	if err := r.evidence.Record(step, r.binary, args, input, stdout.String(), stderr.String(), runErr, false); err != nil {
-		if runErr != nil {
-			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see private evidence)", step, runErr), err)
+	runCommand := r.runCommand
+	if runCommand == nil {
+		runCommand = executeCLI
+	}
+	stdout, stderr, runErr := runCommand(ctx, r.binary, args)
+	recordErr := r.evidence.Record(step, r.binary, args, input, string(stdout), string(stderr), runErr, false)
+	if recordErr != nil {
+		if r.recordErrors == nil {
+			return stdout, fmt.Errorf("%s: record E2E evidence: %w", step, recordErr)
 		}
-		return nil, err
+		*r.recordErrors = append(*r.recordErrors, recordErr)
 	}
 	if runErr != nil {
 		return nil, fmt.Errorf("%s: skr failed: %w (see private evidence)", step, runErr)
 	}
-	return stdout.Bytes(), nil
+	return stdout, nil
+}
+
+func executeCLI(ctx context.Context, binary string, args []string) ([]byte, []byte, error) {
+	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	command := exec.CommandContext(timeout, binary, args...) //nolint:gosec // Structured arguments are passed without a shell to the selected skr binary.
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	runErr := command.Run()
+	return stdout.Bytes(), stderr.Bytes(), runErr
 }
 
 type scenario struct {
@@ -189,16 +206,24 @@ func wrapIfError(message string, err error) error {
 	return fmt.Errorf("%s: %w", message, err)
 }
 
-func (s scenario) run(ctx context.Context, name, description string) (result error) {
+func (s scenario) selectedProfile(ctx context.Context) (string, error) {
 	profile, err := s.client.call(ctx, "profile-current", nil, "config", "current")
 	if err != nil {
-		return fmt.Errorf("a selected SDK profile is required: %w", err)
+		return "", fmt.Errorf("a selected SDK profile is required: %w", err)
 	}
 	if strings.TrimSpace(string(profile)) == "" {
-		return errors.New("selected SDK profile name is empty")
+		return "", errors.New("selected SDK profile name is empty")
+	}
+	return string(profile), nil
+}
+
+func (s scenario) run(ctx context.Context, name, description string) (result error) {
+	profile, err := s.selectedProfile(ctx)
+	if err != nil {
+		return err
 	}
 	fmt.Printf("Selected SDK profile: %s", profile)
-	if !strings.HasSuffix(string(profile), "\n") {
+	if !strings.HasSuffix(profile, "\n") {
 		fmt.Println()
 	}
 
@@ -495,24 +520,32 @@ func runMain() (exitCode int) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	runner := cliRunner{binary: path, evidence: recorder}
+	var recordErrors []error
+	runner := cliRunner{binary: path, evidence: recorder, recordErrors: &recordErrors}
+	var runErr error
 	if *crudOnly {
 		fmt.Println("CRUD-only: temporary resources will be created and deleted; no test notification will be sent.")
-		if err := (crudScenario{scenario{client: runner, destinationID: *destinationID, requestPath: requestPath}}).runCRUD(ctx, suffix); err != nil {
-			fmt.Fprintln(os.Stderr, "Simple Notification CRUD E2E failed:", err)
-			return 1
-		}
-		fmt.Println("Simple Notification CRUD E2E passed: temporary resources were verified and deleted.")
-		return 0
+		runErr = (crudScenario{scenario{client: runner, destinationID: *destinationID, requestPath: requestPath}}).runCRUD(ctx, suffix)
+	} else {
+		fmt.Println("Group to create:", name)
+		fmt.Println("A real notification will be sent to the supplied destination ID. Only the created group will be deleted.")
+		runErr = (scenario{
+			client: runner, destinationID: *destinationID, requestPath: requestPath, message: message,
+		}).run(ctx, name, description)
 	}
-	fmt.Println("Group to create:", name)
-	fmt.Println("A real notification will be sent to the supplied destination ID. Only the created group will be deleted.")
-	if err := (scenario{
-		client: runner, destinationID: *destinationID, requestPath: requestPath, message: message,
-	}).run(ctx, name, description); err != nil {
-		fmt.Fprintln(os.Stderr, "Simple Notification E2E failed:", err)
+	runErr = errors.Join(runErr, errors.Join(recordErrors...))
+	if runErr != nil {
+		if *crudOnly {
+			fmt.Fprintln(os.Stderr, "Simple Notification CRUD E2E failed:", runErr)
+		} else {
+			fmt.Fprintln(os.Stderr, "Simple Notification E2E failed:", runErr)
+		}
 		fmt.Fprintln(os.Stderr, "Evidence retained at:", recorder.Dir())
 		return 1
+	}
+	if *crudOnly {
+		fmt.Println("Simple Notification CRUD E2E passed: temporary resources were verified and deleted.")
+		return 0
 	}
 	fmt.Println("Simple Notification E2E passed: notification processing completed and the temporary group was deleted.")
 	fmt.Println("Delivery is not guaranteed; inspect the service notification history for delivery status.")

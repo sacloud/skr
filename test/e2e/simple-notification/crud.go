@@ -23,6 +23,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
@@ -83,16 +84,24 @@ func (s crudScenario) readItem(ctx context.Context, step, resource, id string) (
 }
 
 func (s crudScenario) writeItem(ctx context.Context, step, resource, operation string, item crudItem) (crudItem, error) {
+	return s.writeItemBeforeCall(ctx, step, resource, operation, item, nil)
+}
+
+func (s crudScenario) writeItemBeforeCall(ctx context.Context, step, resource, operation string, item crudItem, beforeCall func()) (crudItem, error) {
 	id := item.ID
 	item.ID = ""
 	data, err := json.Marshal(crudResponse{CommonServiceItem: item})
 	if err != nil {
 		return crudItem{}, err
 	}
-	return s.writeRequest(ctx, step, resource, operation, id, data)
+	return s.writeRequestBeforeCall(ctx, step, resource, operation, id, data, beforeCall)
 }
 
 func (s crudScenario) writeRequest(ctx context.Context, step, resource, operation, id string, data []byte) (crudItem, error) {
+	return s.writeRequestBeforeCall(ctx, step, resource, operation, id, data, nil)
+}
+
+func (s crudScenario) writeRequestBeforeCall(ctx context.Context, step, resource, operation, id string, data []byte, beforeCall func()) (crudItem, error) {
 	if err := os.WriteFile(s.requestPath, data, 0o600); err != nil {
 		return crudItem{}, fmt.Errorf("write private request file: %w", err)
 	}
@@ -101,6 +110,9 @@ func (s crudScenario) writeRequest(ctx context.Context, step, resource, operatio
 		args = append(args, id)
 	}
 	args = append(args, "--request", "@"+s.requestPath)
+	if beforeCall != nil {
+		beforeCall()
+	}
 	output, err := s.call(ctx, step, evidence.RequestFileInput{Path: s.requestPath, Content: string(data)}, args...)
 	if err != nil {
 		return crudItem{}, err
@@ -138,6 +150,12 @@ func matchesCRUDItem(actual, expected crudItem) bool {
 		}
 	}
 	return true
+}
+
+func matchesExactCRUDItem(actual, expected crudItem) bool {
+	return matchesCRUDItem(actual, expected) &&
+		reflect.DeepEqual(actual.Settings, expected.Settings) &&
+		reflect.DeepEqual(actual.Icon, expected.Icon)
 }
 
 func (s crudScenario) verifyItem(ctx context.Context, step, resource string, expected crudItem) error {
@@ -201,6 +219,14 @@ func (s crudScenario) verifyOwnedItem(ctx context.Context, owned *ownedItem) err
 }
 
 func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error) {
+	profile, err := s.scenario.selectedProfile(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Selected SDK profile: %s", profile)
+	if !strings.HasSuffix(profile, "\n") {
+		fmt.Println()
+	}
 	// Capture existing routing settings before any writes so their priorities can be checked afterwards.
 	before, err := s.listItems(ctx, "crud-routing-before", "routing")
 	if err != nil {
@@ -253,8 +279,9 @@ func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error)
 		}
 		item := crudItem{Name: name, Description: description, Tags: []string{"skr-e2e", suffix}, Settings: settings}
 		entry := &ownedItem{resource: resource, item: item}
-		owned = append(owned, entry)
-		created, err := s.writeItem(ctx, "crud-create-"+resource, resource, "create", item)
+		created, err := s.writeItemBeforeCall(ctx, "crud-create-"+resource, resource, "create", item, func() {
+			owned = append(owned, entry)
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -416,7 +443,7 @@ func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error)
 	for _, expected := range before {
 		found := false
 		for _, actual := range existing {
-			if matchesCRUDItem(actual, expected) {
+			if matchesExactCRUDItem(actual, expected) {
 				found = true
 			}
 		}
@@ -424,5 +451,12 @@ func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error)
 			return errors.New("existing routing identity or settings changed during CRUD test")
 		}
 	}
-	return s.verifyItem(ctx, "crud-source-destination-unchanged", "destination", source)
+	actualSource, err := s.readItem(ctx, "crud-source-destination-unchanged", "destination", source.ID)
+	if err != nil {
+		return err
+	}
+	if !matchesExactCRUDItem(actualSource, source) {
+		return errors.New("source destination identity or settings changed during CRUD test")
+	}
+	return nil
 }
