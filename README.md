@@ -37,6 +37,10 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr gslb-api` | GSLB の検索、参照、作成、更新、削除 |
 | `skr simplemq-api queue` | キューの管理、メッセージ数の確認、キュー内メッセージの削除 |
 | `skr simplemq-api message` | メッセージの送信、受信、タイムアウト延長、削除 |
+| `skr simple-notification-api destination` | 通知先の管理と送信可否ステータスの確認 |
+| `skr simple-notification-api group` | 通知先グループの管理と通知送信 |
+| `skr simple-notification-api routing` | 通知ルーティング設定の管理と順序変更 |
+| `skr simple-notification-api history` | 通知履歴の参照 |
 | `skr eventbus-api process-configuration` | 実行設定の管理、実行先サービス用シークレットの登録 |
 | `skr eventbus-api schedule` | スケジュールの管理 |
 | `skr eventbus-api trigger` | イベントトリガーの管理 |
@@ -73,6 +77,7 @@ $ skr iaas-api service-class --help
 $ skr iaas-api switch --help
 $ skr gslb-api --help
 $ skr simplemq-api --help
+$ skr simple-notification-api --help
 $ skr eventbus-api --help
 $ skr apprun-dedicated-api --help
 $ skr container-registry-api --help

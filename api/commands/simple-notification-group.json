@@ -1,0 +1,105 @@
+{
+  "package": "simplenotificationapi",
+  "resource": "Simple Notification group",
+  "command_type": "GroupCommands",
+  "api_type": "GroupAPI",
+  "factory_type": "GroupAPIFactory",
+  "runtime_type": "GroupRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "GroupListCommand",
+      "help": "通知先グループを一覧表示します。",
+      "method": "List",
+      "response_type": "*v1.ListCommonServiceItemsResponse"
+    },
+    {
+      "name": "Read",
+      "command_type": "GroupReadCommand",
+      "help": "通知先グループの詳細を読み取ります。",
+      "method": "Read",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "参照する通知先グループ ID。"
+        }
+      ],
+      "response_type": "*v1.GetCommonServiceItemOK"
+    },
+    {
+      "name": "Create",
+      "command_type": "GroupCreateCommand",
+      "help": "通知先グループを作成します。Settings.Destinations に通知先 ID を指定します。",
+      "method": "Create",
+      "request_type": "v1.PostCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.CreateCommonServiceItemCreated",
+      "request_help": "通知先グループの作成に使う JSON を直接または @path.json で指定します。Settings.Destinations に通知先 ID の配列を指定します。Provider.Class と ServiceClass は自動設定します。例: --request='{\"CommonServiceItem\":{\"Name\":\"mail-group\",\"Settings\":{\"Destinations\":[\"DESTINATION-ID\"]}}}'",
+      "request_validator": "SetGroupProvider"
+    },
+    {
+      "name": "Update",
+      "command_type": "GroupUpdateCommand",
+      "help": "通知先グループの名前、説明、タグ、Settings を更新します。",
+      "method": "Update",
+      "request_type": "v1.PutCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.UpdateCommonServiceItemOK",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新する通知先グループ ID。"
+        }
+      ],
+      "request_help": "通知先グループの更新に使う JSON を直接または @path.json で指定します。Name、Description、Tags、Icon は必須です。値を維持する項目は参照結果から再指定してください。Settings を指定する場合は Destinations 配列と任意の Disabled を含む設定全体を指定します。"
+    },
+    {
+      "name": "Delete",
+      "command_type": "GroupDeleteCommand",
+      "help": "通知先グループを削除します。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除する通知先グループ ID。"
+        }
+      ]
+    },
+    {
+      "name": "SendMessage",
+      "command_type": "GroupSendMessageCommand",
+      "help": "通知先グループにメッセージを送信します。応答は受付結果であり、通知先への到達を保証しません。",
+      "method": "SendMessage",
+      "request_type": "v1.SendNotificationMessageRequest",
+      "request_by_value": true,
+      "response_type": "*v1.SendNotificationMessageResponse",
+      "request_help": "Message を含む JSON を直接または @path.json で指定するか、--message を指定します。--request と個別フラグは併用できません。例: send-message GROUP-ID --message 'テスト通知'",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "送信先の通知先グループ ID。通知先 ID ではありません。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "message",
+          "field": "Message",
+          "type": "string",
+          "help": "必須: 通知するメッセージ。API の Message フィールドに対応します。",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

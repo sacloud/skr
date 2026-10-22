@@ -1,0 +1,95 @@
+{
+  "package": "simplenotificationapi",
+  "resource": "Simple Notification routing",
+  "command_type": "RoutingCommands",
+  "api_type": "RoutingAPI",
+  "factory_type": "RoutingAPIFactory",
+  "runtime_type": "RoutingRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "RoutingListCommand",
+      "help": "ルーティング設定を一覧表示します。",
+      "method": "List",
+      "response_type": "*v1.ListCommonServiceItemsResponse"
+    },
+    {
+      "name": "Read",
+      "command_type": "RoutingReadCommand",
+      "help": "ルーティング設定を読み取ります。",
+      "method": "Read",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "参照するルーティング設定 ID。"
+        }
+      ],
+      "response_type": "*v1.GetCommonServiceItemOK"
+    },
+    {
+      "name": "Create",
+      "command_type": "RoutingCreateCommand",
+      "help": "ルーティング設定を作成します。",
+      "method": "Create",
+      "request_type": "v1.PostCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.CreateCommonServiceItemCreated",
+      "request_help": "ルーティング設定の作成に使う JSON を直接または @path.json で指定します。Settings にルーティング API の設定を指定します。Provider.Class と ServiceClass は自動設定します。",
+      "request_validator": "SetRoutingProvider"
+    },
+    {
+      "name": "Update",
+      "command_type": "RoutingUpdateCommand",
+      "help": "ルーティング設定を更新します。",
+      "method": "Update",
+      "request_type": "v1.PutCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.UpdateCommonServiceItemOK",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新するルーティング設定 ID。"
+        }
+      ],
+      "request_help": "ルーティング設定の更新に使う JSON を直接または @path.json で指定します。Name、Description、Tags、Icon は必須です。値を維持する項目は参照結果から再指定してください。Settings を指定する場合はルーティング設定全体を指定します。"
+    },
+    {
+      "name": "Delete",
+      "command_type": "RoutingDeleteCommand",
+      "help": "ルーティング設定を削除します。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するルーティング設定 ID。"
+        }
+      ]
+    },
+    {
+      "name": "Reorder",
+      "command_type": "RoutingReorderCommand",
+      "help": "ルーティング設定の順序を変更します。",
+      "method": "Reorder",
+      "request_type": "v1.PutCommonServiceItemRoutingReorderRequest",
+      "request_by_value": true,
+      "response_type": "*v1.ReorderRoutingAccepted",
+      "request_help": "ルーティング順序の変更に使う JSON を直接または @path.json で指定します。"
+    },
+    {
+      "name": "ListSource",
+      "command_type": "RoutingListSourceCommand",
+      "help": "ルーティング設定に利用できる通知元を一覧表示します。",
+      "method": "ListSource",
+      "response_type": "*v1.ListSourcesResponse"
+    }
+  ]
+}

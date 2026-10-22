@@ -104,6 +104,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 - [x] `iam` — `iam-api` コマンド、ライブ E2E、[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。
 - [x] `eventbus` — `eventbus-api`。Provider 補完・リクエスト検証・シークレット入力とエラー伝播のドメイン単体テストを実装済みです。
 - [x] `simplemq` — `simplemq-api`。キュー／メッセージコマンドは `apigen-api` を使います。
+- [x] `simple-notification` — `simple-notification-api`。通知先、グループ、ルーティング、履歴の SDK 公開操作を実装済みです。送信は `--message` と JSON 入力に対応します。[ライブ E2E runner](test/e2e/simple-notification/) と[チュートリアル](docs/manual/tutorials/simple-notification-api.md)があります。ライブではメール通知の処理完了、利用者による実受信、履歴の個別取得を確認済みです。追加の `--crud-only` シナリオで、一時通知先・グループ・ルーティングの作成／参照／更新／削除、設定省略時の保持と設定変更、一時ルーティングだけの並べ替え、既存設定の保持、削除後の不在も確認済みです。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。
 - [ ] `apprun-dedicated` — `apprun-dedicated-api`。リクエスト入力・秘密情報のインライン拒否・エラー伝播のドメイン単体テストを実装済みです。
   - CLI 実装済み、ライブ E2E とチュートリアルは未対応。不足分は [#59](https://github.com/sacloud/skr/issues/59) で対応予定
 - [ ] `addon`
@@ -119,7 +120,6 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 - [ ] `secretmanager`
 - [ ] `security-control`
 - [ ] `service-endpoint-gateway`
-- [ ] `simple-notification`
 - [ ] `webaccel`
 - [ ] `workflows`
 

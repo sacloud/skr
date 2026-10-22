@@ -1,0 +1,93 @@
+{
+  "package": "simplenotificationapi",
+  "resource": "Simple Notification destination",
+  "command_type": "DestinationCommands",
+  "api_type": "DestinationAPI",
+  "factory_type": "DestinationAPIFactory",
+  "runtime_type": "DestinationRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "DestinationListCommand",
+      "help": "通知先を一覧表示します。",
+      "method": "List",
+      "response_type": "*v1.ListCommonServiceItemsResponse"
+    },
+    {
+      "name": "Read",
+      "command_type": "DestinationReadCommand",
+      "help": "通知先の詳細を読み取ります。",
+      "method": "Read",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "参照する通知先 ID。"
+        }
+      ],
+      "response_type": "*v1.GetCommonServiceItemOK"
+    },
+    {
+      "name": "Create",
+      "command_type": "DestinationCreateCommand",
+      "help": "通知先を作成します。メールアドレスは確認が完了するまで送信先として利用できません。",
+      "method": "Create",
+      "request_type": "v1.PostCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.CreateCommonServiceItemCreated",
+      "request_help": "通知先の作成に使う JSON ファイルを @path.json で指定します。Settings は Type (email または webhook)、Value、任意の Disabled を持ちます。メールアドレスやWebhook URLをコマンド引数に含めないでください。Provider.Class と ServiceClass は自動設定します。",
+      "request_validator": "SetDestinationProvider"
+    },
+    {
+      "name": "Update",
+      "command_type": "DestinationUpdateCommand",
+      "help": "通知先の名前、説明、タグ、Settings を更新します。通知先アドレスは変更できません。",
+      "method": "Update",
+      "request_type": "v1.PutCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.UpdateCommonServiceItemOK",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新する通知先 ID。"
+        }
+      ],
+      "request_help": "通知先の更新に使う JSON を直接または @path.json で指定します。Name、Description、Tags、Icon は必須です。値を維持する項目は参照結果から再指定してください。Settings を指定する場合は Type、Value、任意の Disabled を含む設定全体を指定し、Webhook URL 等を保護するため @path.json を使ってください。通知先アドレスは更新できません。"
+    },
+    {
+      "name": "Delete",
+      "command_type": "DestinationDeleteCommand",
+      "help": "通知先を削除します。グループから参照されている通知先は先にグループ設定から外してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除する通知先 ID。"
+        }
+      ]
+    },
+    {
+      "name": "ReadStatus",
+      "command_type": "DestinationReadStatusCommand",
+      "help": "通知先の送信可否ステータスを取得します。",
+      "method": "ReadStatus",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "ステータスを確認する通知先 ID。"
+        }
+      ],
+      "response_type": "*v1.GetCommonServiceItemStatusResponse"
+    }
+  ]
+}
