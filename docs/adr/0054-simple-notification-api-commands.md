@@ -1,4 +1,4 @@
-# ADR 0053: Simple Notification API コマンドを追加する
+# ADR 0054: Simple Notification API コマンドを追加する
 
 - Status: Accepted
 - Date: 2026-10-20
