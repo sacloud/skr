@@ -17,7 +17,6 @@ package cli
 import (
 	archiveSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 	diskSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	diskplanSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/diskplan"
 	iconSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
 	internetSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
 	packetfilterSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
@@ -35,6 +34,7 @@ import (
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	regionapi "github.com/sacloud/skr/internal/iaas/regionapi"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
+	serverplanapi "github.com/sacloud/skr/internal/iaas/serverplanapi"
 	serviceclassapi "github.com/sacloud/skr/internal/iaas/serviceclassapi"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	zoneapi "github.com/sacloud/skr/internal/iaas/zoneapi"
@@ -43,15 +43,20 @@ import (
 type iaasAPICommand struct {
 	Archive      archiveapi.Commands      `cmd:"" help:"さくらのクラウドのアーカイブを検索・参照します。検索では対象ゾーン、タグまたは OS 種別を指定できます。"`
 	Disk         diskapi.Commands         `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
-	DiskPlan     diskplanapi.Commands     `cmd:"" help:"指定したゾーンのディスクプランを検索・参照します。プランの利用可否とサイズを確認できます。"`
 	Icon         iconapi.Commands         `cmd:"" help:"ユーザー作成アイコンを検索、参照、作成、更新、削除します。"`
 	Internet     internetapi.Commands     `cmd:"" help:"さくらのクラウドのルータ＋スイッチと、関連する IP アドレスブロックおよび IPv6 設定を操作します。"`
 	PacketFilter packetfilterapi.Commands `cmd:"" name:"packetfilter" help:"さくらのクラウドのパケットフィルタを検索、参照、作成、更新、削除します。ルール配列は --expressions JSON または --request JSON で指定します。"`
+	Product      iaasProductCommand       `cmd:"" help:"商品 API のプラン情報を検索・参照します。"`
 	Region       regionapi.Commands       `cmd:"" help:"リージョン情報を検索・参照します。"`
 	Switch       switchapi.Commands       `cmd:"" help:"さくらのクラウドのスイッチを操作します。各操作で --zone などのフラグ、または --request JSON に Zone を指定します。両経路は併用できません。"`
 	Server       serverapi.Commands       `cmd:"" help:"さくらのクラウドのサーバを検索、参照、作成、更新、起動、削除します。作成時はcloud-init用ディスクやNICを個別フラグで指定できます。"`
 	ServiceClass serviceclassapi.Commands `cmd:"" help:"指定したゾーンのサービスクラスを検索します。"`
 	Zone         zoneapi.Commands         `cmd:"" help:"さくらのクラウドのゾーン一覧を取得します。"`
+}
+
+type iaasProductCommand struct {
+	Disk   diskplanapi.Commands   `cmd:"" help:"ディスクプランを検索・参照します。プランの利用可否とサイズを確認できます。"`
+	Server serverplanapi.Commands `cmd:"" help:"サーバプランを検索・参照します。CPU、メモリ、GPU、利用可否を確認できます。"`
 }
 
 func (c *cli) initIaaSAPI() {
@@ -90,14 +95,14 @@ func (c *cli) initIaaSAPI() {
 		}
 		return diskSDK.New(client), nil
 	})
-	c.IaaSAPI.DiskPlan = diskplanapi.NewCommands(diskplanapi.Runtime{
+	c.IaaSAPI.Product.Disk = diskplanapi.NewCommands(diskplanapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 	}, func() (diskplanapi.API, error) {
 		client, err := iaasclient.New(c.Trace)
 		if err != nil {
 			return nil, err
 		}
-		return diskplanSDK.New(client), nil
+		return diskplanapi.NewSDKAPI(client), nil
 	})
 	c.IaaSAPI.Region = regionapi.NewCommands(regionapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
@@ -172,5 +177,14 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return serverSDK.New(client), nil
+	})
+	c.IaaSAPI.Product.Server = serverplanapi.NewCommands(serverplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, func() (serverplanapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return serverplanapi.NewSDKAPI(client), nil
 	})
 }

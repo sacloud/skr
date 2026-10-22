@@ -59,7 +59,7 @@ func TestIaaSArchiveHelp(t *testing.T) {
 		want    []string
 		notWant []string
 	}{
-		{args: []string{"iaas-api", "--help"}, want: []string{"archive", "disk-plan"}},
+		{args: []string{"iaas-api", "--help"}, want: []string{"archive", "product"}},
 		{args: []string{"iaas-api", "archive", "--help"}, want: []string{"find", "read"}},
 		{args: []string{"iaas-api", "archive", "find", "--help"}, want: []string{"--zone", "--os-type", "--tags", "--count", "--from", "--request", "Names", "DiskPlanName", "SizeMB", "Tags", "上書き"}, notWant: []string{"--zone all", "併用できません"}},
 		{args: []string{"iaas-api", "archive", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},

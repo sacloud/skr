@@ -27,7 +27,6 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/ostype"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/diskplan"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
@@ -37,12 +36,26 @@ import (
 	"github.com/sacloud/skr/internal/iaas/diskplanapi"
 	"github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	"github.com/sacloud/skr/internal/iaas/serverapi"
+	"github.com/sacloud/skr/internal/iaas/serverplanapi"
 	"github.com/sacloud/skr/internal/iaas/switchapi"
 )
 
 func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
-	for _, resource := range []string{"archive", "disk", "diskplan", "packetfilter", "server", "switch"} {
-		data, err := os.ReadFile(repositoryPath("api/commands/iaas-" + resource + ".json"))
+	resources := []struct {
+		name    string
+		config  string
+		command string
+	}{
+		{name: "archive", config: "iaas-archive", command: "archive"},
+		{name: "disk", config: "iaas-disk", command: "disk"},
+		{name: "diskplan", config: "iaas-product-disk", command: "product disk"},
+		{name: "packetfilter", config: "iaas-packetfilter", command: "packetfilter"},
+		{name: "server", config: "iaas-server", command: "server"},
+		{name: "serverplan", config: "iaas-product-server", command: "product server"},
+		{name: "switch", config: "iaas-switch", command: "switch"},
+	}
+	for _, resource := range resources {
+		data, err := os.ReadFile(repositoryPath("api/commands/" + resource.config + ".json"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -51,17 +64,17 @@ func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, operation := range config.Operations {
-			if resource == "archive" && operation.Name == "Find" {
+			if resource.name == "archive" && operation.Name == "Find" {
 				if operation.RequestValidator != "ValidateFindRequest" {
 					t.Fatal("Archive Find must retain unknown OSType validation")
 				}
 			} else if operation.RequestValidator != "" {
-				t.Fatalf("%s %s still configures a body validator", resource, operation.Name)
+				t.Fatalf("%s %s still configures a body validator", resource.name, operation.Name)
 			}
 			if operation.Handwritten {
 				continue
 			}
-			t.Run(resource+"/"+operation.Name, func(t *testing.T) {
+			t.Run(resource.name+"/"+operation.Name, func(t *testing.T) {
 				commandLine := newCLI()
 				failure := errors.New("API factory reached")
 				setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return nil, failure })
@@ -69,13 +82,12 @@ func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
 				setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return nil, failure })
 				setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) { return nil, failure })
 				setServerAPIFactory(commandLine, func() (serverapi.API, error) { return nil, failure })
+				setServerPlanAPIFactory(commandLine, func() (serverplanapi.API, error) { return nil, failure })
 				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return nil, failure })
-				command := resource
-				if command == "diskplan" {
-					command = "disk-plan"
-				}
 				var stdout, stderr bytes.Buffer
-				code := runCLI([]string{"iaas-api", command, strings.ToLower(operation.Name), "--request", `{"Zone":"test-zone"}`}, &stdout, &stderr, commandLine)
+				args := append([]string{"iaas-api"}, strings.Fields(resource.command)...)
+				args = append(args, strings.ToLower(operation.Name), "--request", `{"Zone":"test-zone"}`)
+				code := runCLI(args, &stdout, &stderr, commandLine)
 				if code != 1 || stdout.Len() != 0 || stderr.String() != failure.Error()+"\n" {
 					t.Fatalf("request body was rejected before API setup: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 				}
@@ -85,18 +97,20 @@ func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
 }
 
 func TestIaaSSDKValidationErrorsAreReturned(t *testing.T) {
-	for _, resource := range []string{"archive", "disk", "disk-plan", "packetfilter", "server", "switch"} {
+	for _, resource := range []string{"archive", "disk", "product disk", "packetfilter", "server", "product server", "switch"} {
 		for _, input := range []string{"JSON", "flags"} {
 			t.Run(resource+"/"+input, func(t *testing.T) {
 				commandLine := newCLI()
 				caller := &serverAPICaller{}
 				setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return archive.New(caller), nil })
 				setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return disk.New(caller), nil })
-				setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return diskplan.New(caller), nil })
+				setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return diskplanapi.NewSDKAPI(caller), nil })
 				setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) { return packetfilter.New(caller), nil })
 				setServerAPIFactory(commandLine, func() (serverapi.API, error) { return server.New(caller), nil })
+				setServerPlanAPIFactory(commandLine, func() (serverplanapi.API, error) { return serverplanapi.NewSDKAPI(caller), nil })
 				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return swytch.New(caller), nil })
-				args := []string{"iaas-api", resource, "read"}
+				args := append([]string{"iaas-api"}, strings.Fields(resource)...)
+				args = append(args, "read")
 				if input == "JSON" {
 					args = append(args, "--request", `{"Zone":"test-zone"}`)
 				} else {

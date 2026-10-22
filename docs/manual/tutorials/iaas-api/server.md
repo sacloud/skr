@@ -18,8 +18,8 @@ Server と Disk の利用料金が発生します。共有セグメントへ接�
 ```console
 $ skr iaas-api archive find --help
 $ skr iaas-api archive read --help
-$ skr iaas-api disk-plan find --help
-$ skr iaas-api disk-plan read --help
+$ skr iaas-api product disk find --help
+$ skr iaas-api product disk read --help
 $ skr iaas-api server create --help
 $ skr iaas-api server boot --help
 $ skr iaas-api server read --help
@@ -45,10 +45,10 @@ $ skr iaas-api archive read --zone is1b --id "$CLOUDIMG_ARCHIVE_ID" \
 次に、同じゾーンのディスクプランを検索します。プランの `Availability` と `Size` 内の各サイズの `Availability` を確認し、利用可能なプランとサイズを選びます。[ディスクプランや作成先のゾーンによって選択可能なサイズは異なります](https://manual.sakura.ad.jp/cloud/storage/disk.html)。
 
 ```console
-$ skr iaas-api disk-plan find --zone is1b \
-    --query 'map({ID,Name,StorageClass,Availability,Size})'
+$ skr iaas-api product disk find --zone is1b \
+    --query '.DiskPlans | map({ID,Name,StorageClass,Availability,Size})'
 $ DISK_PLAN_ID=DISK_PLAN_ID
-$ skr iaas-api disk-plan read --zone is1b --id "$DISK_PLAN_ID" \
+$ skr iaas-api product disk read --zone is1b --id "$DISK_PLAN_ID" \
     --query '{ID,Name,StorageClass,Availability,Size}'
 $ DISK_SIZE_GB=DISK_SIZE_GB
 ```

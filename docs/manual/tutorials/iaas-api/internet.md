@@ -43,11 +43,11 @@ $ skr iaas-api archive read --zone is1b --id "$CLOUDIMG_ARCHIVE_ID"
 次に、同じゾーンで利用可能な DiskPlan とサイズを検索し、`DISK_PLAN_ID` と `DISK_SIZE_GB` を設定します。
 
 ```console
-$ skr iaas-api disk-plan find --zone is1b \
-    --query 'map({ID,Name,Availability,Size})'
+$ skr iaas-api product disk find --zone is1b \
+    --query '.DiskPlans | map({ID,Name,Availability,Size})'
 $ DISK_PLAN_ID=DISK_PLAN_ID
 $ DISK_SIZE_GB=DISK_SIZE_GB
-$ skr iaas-api disk-plan read --zone is1b --id "$DISK_PLAN_ID"
+$ skr iaas-api product disk read --zone is1b --id "$DISK_PLAN_ID"
 ```
 
 各代入の右辺は実際に選んだ正の整数に置き換えます。Archive と DiskPlan の選び方は [Archive API チュートリアル](archive.md)と[DiskPlan API チュートリアル](disk-plan.md)も参照してください。
