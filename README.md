@@ -26,9 +26,11 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | コマンド | 操作できる API |
 | --- | --- |
 | `skr iaas-api disk` | ディスクの検索、参照、作成、更新、削除 |
+| `skr iaas-api product disk` | ディスクプランの検索、参照 |
 | `skr iaas-api icon` | ユーザー作成アイコンの検索、参照、作成、更新、削除 |
 | `skr iaas-api region` | リージョン情報の検索、参照 |
 | `skr iaas-api server` | サーバの検索、参照、作成、更新、削除 |
+| `skr iaas-api product server` | サーバプランの検索、参照 |
 | `skr iaas-api service-class` | 指定したゾーンのサービスクラスの検索 |
 | `skr iaas-api switch` | スイッチの検索、参照、作成、更新、削除 |
 | `skr iaas-api zone` | ゾーン一覧の取得 |
@@ -68,6 +70,9 @@ $ skr --help
 $ skr iaas-api disk --help
 $ skr iaas-api icon --help
 $ skr iaas-api region --help
+$ skr iaas-api product --help
+$ skr iaas-api product disk --help
+$ skr iaas-api product server --help
 $ skr iaas-api service-class --help
 $ skr iaas-api switch --help
 $ skr gslb-api --help
@@ -84,6 +89,8 @@ $ skr http --help
 ```console
 $ skr iaas-api server create --zone ZONE --name SERVER-NAME --cpu 1 --memory-gb 1 --tags production,web
 ```
+
+サーバプランの検索と参照は読み取り専用です。CPU、メモリ、GPU、利用可否などを対象ゾーンごとに確認できます。詳細は[ServerPlan API チュートリアル](docs/manual/tutorials/iaas-api/server-plan.md)を参照してください。
 
 Disk の作成では `--zone`、`--name`、`--disk-plan-id`、`--connection`、`--size-gb` を指定します。更新では `--zone` と `--id` に加えて、変更する値だけをフラグで指定できます。省略した値は変更されません。複雑な値は `--request` にインライン JSON または `@path.json` で渡せますが、個別フラグとは併用できません。詳しくは[Disk API チュートリアル](docs/manual/tutorials/iaas-api/disk.md)を参照してください。
 

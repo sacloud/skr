@@ -32,7 +32,7 @@ $ skr gslb-api create --help
 $ skr gslb-api update --help
 $ skr gslb-api delete --help
 $ skr iaas-api archive find --help
-$ skr iaas-api disk-plan read --help
+$ skr iaas-api product disk read --help
 $ skr iaas-api server create --help
 $ skr iaas-api server boot --help
 $ skr iaas-api server delete --help
@@ -64,7 +64,7 @@ $ skr iaas-api archive read --zone is1b --id "$CLOUDIMG_ARCHIVE_ID" \
 次に SSD プラン ID 4 の利用可否とサイズを確認します。この手順では 20 GB を使います。プランと `Size` 内の 20 GB の `Availability` が `available` であることを確認してください。アーカイブの `SizeMB` が 20480 を超える場合は、より大きい利用可能なサイズを選びます（[ディスクのプランとサイズ](https://manual.sakura.ad.jp/cloud/storage/disk.html)）。
 
 ```console
-$ skr iaas-api disk-plan read --zone is1b --id 4 \
+$ skr iaas-api product disk read --zone is1b --id 4 \
     --query '{ID,Name,Availability,Size}'
 $ DISK_PLAN_ID=4
 $ DISK_SIZE_GB=20

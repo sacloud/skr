@@ -23,6 +23,7 @@ import (
 	"github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	"github.com/sacloud/skr/internal/iaas/regionapi"
 	"github.com/sacloud/skr/internal/iaas/serverapi"
+	"github.com/sacloud/skr/internal/iaas/serverplanapi"
 	"github.com/sacloud/skr/internal/iaas/serviceclassapi"
 	"github.com/sacloud/skr/internal/iaas/switchapi"
 	"github.com/sacloud/skr/internal/iaas/zoneapi"
@@ -41,7 +42,7 @@ func setDiskAPIFactory(commandLine *cli, factory diskapi.APIFactory) {
 }
 
 func setDiskPlanAPIFactory(commandLine *cli, factory diskplanapi.APIFactory) {
-	commandLine.IaaSAPI.DiskPlan = diskplanapi.NewCommands(diskplanapi.Runtime{
+	commandLine.IaaSAPI.Product.Disk = diskplanapi.NewCommands(diskplanapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 	}, factory)
 }
@@ -64,6 +65,12 @@ func setServerAPIFactory(commandLine *cli, factory serverapi.APIFactory) {
 	commandLine.IaaSAPI.Server = serverapi.NewCommands(serverapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 		TransformCreateRequest: serverapi.TransformCreateRequest,
+	}, factory)
+}
+
+func setServerPlanAPIFactory(commandLine *cli, factory serverplanapi.APIFactory) {
+	commandLine.IaaSAPI.Product.Server = serverplanapi.NewCommands(serverplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 	}, factory)
 }
 

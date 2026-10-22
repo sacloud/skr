@@ -2,7 +2,7 @@
 
 ## 対象と方針
 
-対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.3.1](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。`service/iaas` に含まれる API でも、CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
+対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.3.1](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。SDK の配置ではなく実際の API route とドメインに基づいて CLI の境界を決めます。`service/iaas` に含まれる API でも、System API や CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
 
 一覧は SDK の提供範囲を把握するためのもので、すべてのパッケージをそのまま CLI コマンドにすることを決めるものではありません。各パッケージで公開操作、入力、出力、固有の検証を確認し、対応範囲を明示して段階的に実装します。コマンドの階層は `<domain>-api <resource>` とし、SDK の型だけから公開操作や入力の意味を推測しません。詳細は [ADR 0016](docs/adr/0016-generate-low-level-api-commands.md) に従います。
 
@@ -69,17 +69,33 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 
 ## IaaS の補助・プラン系サービス候補
 
-これらも SDK にサービスパッケージがあります。リソース操作コマンドと同じ形にせず、公開する操作と適切な CLI の配置を個別に確認します。
+IaaS API のコマンド階層は SDK のサービスパッケージ名ではなく、実際の API route に合わせます。たとえば `/api/cloud/1.1/product/server` は `iaas-api product server`、`/api/cloud/1.1/public/price` は `iaas-api public price` です。低レベル API 操作が SDK にある場合は `sacloud-sdk-go/api/iaas` を直接使い、Find の応答 envelope を含む API 応答モデルを JSON 出力します。JSON は SDK の型から再エンコードするため HTTP body のバイト列そのものではありません。今回の範囲は DiskPlan と ServerPlan です。既存 IaaS コマンドの他の出力経路は別途段階的に見直します。
 
-- [ ] `bill`
+SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のように整理します。
+
+| API | route | CLI 階層 |
+| --- | --- | --- |
+| InternetPlan | `/api/cloud/1.1/product/internet` | `product internet` |
+| LicenseInfo | `/api/cloud/1.1/product/license` | `product license` |
+| PrivateHostPlan | `/api/cloud/1.1/product/privatehost` | `product privatehost` |
+| Region | `/api/cloud/1.1/region` | `region` |
+| ServerPlan | `/api/cloud/1.1/product/server` | `product server` |
+| ServiceClass | `/api/cloud/1.1/public/price` | `public price` |
+| Zone | `/api/cloud/1.1/zone` | `zone` |
+| DiskPlan | `/api/cloud/1.1/product/disk` | `product disk` |
+
 - [ ] `internetplan`
 - [ ] `licenseinfo`
 - [ ] `privatehostplan`
 - [x] `region` — `iaas-api region` の Find / Read を実装済みです。Find は件数・開始位置をフラグで指定でき、検索名・Sort は JSON で指定します。Read は ID で参照します。Region API はゾーン指定を受け付けません。SDK の公開操作はすべて CLI にあります。読み取り専用の[ライブ E2E runner](test/e2e/region/) と[チュートリアル](docs/manual/tutorials/iaas-api/region.md)を追加し、実環境で Find / Read の結果一致を確認済みです
-- [ ] `serverplan`
-- [x] `serviceclass` — `iaas-api service-class` の Find を実装済みです。指定ゾーンのサービスクラス一覧を取得できます。読み取り専用の [ライブ E2E runner](test/e2e/serviceclass/) と[チュートリアル](docs/manual/tutorials/iaas-api/serviceclass.md)があります。`is1b` でライブ E2E を実行し、517 件のサービスクラスを取得して、各項目の ID・名前・パスを検証済みです
+- [x] `serverplan` — `iaas-api product server` の Find / Read を実装済みです。`api/iaas.ServerPlanAPI` を使い、Find の API 応答 envelope を含む JSON を出力します。CPU、メモリ、GPU、CPU モデル、利用可否などを検索・参照できます。読み取り専用の [ライブ E2E runner](test/e2e/serverplan/) と[チュートリアル](docs/manual/tutorials/iaas-api/server-plan.md)があります。is1b のライブ E2E で Find の結果と Read の ID・プラン情報の一致を確認済みです
+- [x] `serviceclass` — 現在は `iaas-api service-class` の Find を実装済みです。指定ゾーンのサービスクラス一覧を取得できます。SDK route は `/public/price` のため、route に沿う `iaas-api public price` への移行は未対応です。読み取り専用の [ライブ E2E runner](test/e2e/serviceclass/) と[チュートリアル](docs/manual/tutorials/iaas-api/serviceclass.md)があります。`is1b` でライブ E2E を実行し、517 件のサービスクラスを取得して、各項目の ID・名前・パスを検証済みです
 - [x] `zone` — `iaas-api zone` の Find のみ実装済みです。SDK の Read は未対応です。ゾーン一覧を取得して jq で名前を抽出する読み取り専用の [ライブ E2E runner](test/e2e/zone/) と[チュートリアル](docs/manual/tutorials/iaas-api/zone.md)があります
-- [x] `diskplan` — `iaas-api disk-plan` の Find / Read を実装済みです。検索結果の API `Availability` と `Size` から、指定ゾーンの利用可否とサイズを確認できます。SDK の公開操作はすべて CLI にあります。Archive と合わせて検証する読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk-plan.md)があります。is1b で検索・参照を確認済みです
+- [x] `diskplan` — `iaas-api product disk` の Find / Read を実装済みです。`api/iaas.DiskPlanAPI` を使い、Find の API 応答 envelope を含む JSON を出力します。検索結果の API `Availability` と `Size` から、指定ゾーンの利用可否とサイズを確認できます。SDK の公開操作はすべて CLI にあります。Archive と合わせて検証する読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk-plan.md)があります。is1b で検索・参照を確認済みです
+
+## IaaS SDK に同居する System API 候補
+
+`service/iaas/bill` は SDK 上では IaaS 配下ですが、対象 route は `/api/system/1.0/bill` であり、IaaS resource route ではありません。そのため `iaas-api` には含めず、独立した `bill-api` コマンドとして扱う方向です。SDK の公開操作に合わせて `bill-api list` と `bill-api csv` を候補とし、応答と CSV の出力形式を含む実装範囲は着手時に確認します。CLI 実装、ライブ E2E、チュートリアルはいずれも未対応です。
 
 ## IaaS 以外の API ドメイン候補
 

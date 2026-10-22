@@ -31,8 +31,21 @@ import (
 )
 
 func TestIaaSCommonZoneValidation(t *testing.T) {
-	for _, resource := range []string{"archive", "disk", "diskplan", "packetfilter", "server", "switch"} {
-		data, err := os.ReadFile(repositoryPath("api/commands/iaas-" + resource + ".json"))
+	resources := []struct {
+		name    string
+		config  string
+		command string
+	}{
+		{name: "archive", config: "iaas-archive", command: "archive"},
+		{name: "disk", config: "iaas-disk", command: "disk"},
+		{name: "diskplan", config: "iaas-product-disk", command: "product disk"},
+		{name: "packetfilter", config: "iaas-packetfilter", command: "packetfilter"},
+		{name: "server", config: "iaas-server", command: "server"},
+		{name: "serverplan", config: "iaas-product-server", command: "product server"},
+		{name: "switch", config: "iaas-switch", command: "switch"},
+	}
+	for _, resource := range resources {
+		data, err := os.ReadFile(repositoryPath("api/commands/" + resource.config + ".json"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,23 +53,19 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		commandName := resource
-		if resource == "diskplan" {
-			commandName = "disk-plan"
-		}
 		for _, operation := range config.Operations {
 			if operation.Handwritten {
 				continue
 			}
 			if !operation.ValidateZone {
-				t.Fatalf("%s %s does not enable common zone validation", resource, operation.Name)
+				t.Fatalf("%s %s does not enable common zone validation", resource.name, operation.Name)
 			}
 			for _, zone := range []string{"", "all"} {
 				for _, input := range []string{"flags", "JSON", "missing Zone JSON"} {
 					if input == "missing Zone JSON" && zone != "" {
 						continue
 					}
-					t.Run(resource+"/"+operation.Name+"/"+input+"/"+zone, func(t *testing.T) {
+					t.Run(resource.name+"/"+operation.Name+"/"+input+"/"+zone, func(t *testing.T) {
 						commandLine := newCLI()
 						factoryCalled := false
 						factoryError := func() error {
@@ -65,7 +74,7 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 						}
 						commandLine.IaaSAPI.Archive = archiveapi.NewCommands(archiveapi.Runtime{DecodeRequest: decodeRequest}, func() (archiveapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Disk = diskapi.NewCommands(diskapi.Runtime{DecodeRequest: decodeRequest}, func() (diskapi.API, error) { return nil, factoryError() })
-						commandLine.IaaSAPI.DiskPlan = diskplanapi.NewCommands(diskplanapi.Runtime{DecodeRequest: decodeRequest}, func() (diskplanapi.API, error) { return nil, factoryError() })
+						commandLine.IaaSAPI.Product.Disk = diskplanapi.NewCommands(diskplanapi.Runtime{DecodeRequest: decodeRequest}, func() (diskplanapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 							DecodeRequest: decodeRequest, TransformCreateRequest: transformPacketFilterCreateRequest, TransformUpdateRequest: transformPacketFilterUpdateRequest,
 						}, func() (packetfilterapi.API, error) { return nil, factoryError() })
@@ -73,7 +82,8 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 							DecodeRequest: decodeRequest, TransformCreateRequest: serverapi.TransformCreateRequest,
 						}, func() (serverapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Switch = switchapi.NewCommands(switchapi.Runtime{DecodeRequest: decodeRequest}, func() (switchapi.API, error) { return nil, factoryError() })
-						args := []string{"iaas-api", commandName, strings.ToLower(operation.Name)}
+						args := append([]string{"iaas-api"}, strings.Fields(resource.command)...)
+						args = append(args, strings.ToLower(operation.Name))
 						switch input {
 						case "missing Zone JSON":
 							args = append(args, "--request", `{}`)

@@ -71,10 +71,10 @@ func TestScenarioFindsAndReadsArchiveAndDiskPlan(t *testing.T) {
 	if got, want := strings.Join(fake.args["archive-read"], " "), "iaas-api archive read --zone is1b --id 123"; got != want {
 		t.Errorf("Archive read args = %q, want %q", got, want)
 	}
-	if got, want := strings.Join(fake.args["disk-plan-find"], " "), "iaas-api disk-plan find --zone is1b --query "+diskPlanQuery; got != want {
+	if got, want := strings.Join(fake.args["disk-plan-find"], " "), "iaas-api product disk find --zone is1b --query "+diskPlanQuery; got != want {
 		t.Errorf("DiskPlan find args = %q, want %q", got, want)
 	}
-	if got, want := strings.Join(fake.args["disk-plan-read"], " "), "iaas-api disk-plan read --zone is1b --id 4"; got != want {
+	if got, want := strings.Join(fake.args["disk-plan-read"], " "), "iaas-api product disk read --zone is1b --id 4"; got != want {
 		t.Errorf("DiskPlan read args = %q, want %q", got, want)
 	}
 }

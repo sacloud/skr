@@ -1,7 +1,7 @@
 # CLI コマンド体系の設計
 
 - Status: Proposed
-- SDK: `github.com/sacloud/sacloud-sdk-go v0.3.0`
+- SDK: `github.com/sacloud/sacloud-sdk-go v0.3.1`
 
 ## 目的
 
@@ -74,7 +74,11 @@ IaaS の各操作で対象ゾーンを指定します。フラグまたは JSON 
 
 #### Zone API
 
-`skr iaas-api zone find` は sacloud-sdk-go v0.3.0 の `service/iaas/zone` が提供する `FindWithContext` を使ってゾーン一覧を取得します。リクエストは省略でき、指定する場合は `zone.FindRequest` JSON を使います。結果は他の API コマンドと同じ JSON と jq の出力経路を通します。この読み取り専用コマンドを jq の例とライブ E2E に使い、ゾーン名の抽出を検証します。詳細は [Zone チュートリアル](../manual/tutorials/iaas-api/zone.md) を参照してください。
+`skr iaas-api zone find` は sacloud-sdk-go v0.3.1 の `service/iaas/zone` が提供する `FindWithContext` を使ってゾーン一覧を取得します。リクエストは省略でき、指定する場合は `zone.FindRequest` JSON を使います。結果は他の API コマンドと同じ JSON と jq の出力経路を通します。この読み取り専用コマンドを jq の例とライブ E2E に使い、ゾーン名の抽出を検証します。詳細は [Zone チュートリアル](../manual/tutorials/iaas-api/zone.md) を参照してください。
+
+#### Product API (DiskPlan / ServerPlan)
+
+`skr iaas-api product server` は sacloud-sdk-go v0.3.1 の `api/iaas.ServerPlanAPI` を使い、API route `/product/server` に対応します。設定ファイル名もコマンド階層に合わせ、`api/commands/iaas-product-server.json` とします。`product disk` は同様に `api/iaas.DiskPlanAPI` と `/product/disk` に対応し、設定は `api/commands/iaas-product-disk.json` に置きます。Find / Read の出力は低レベル API の応答モデルを JSON 化し、Find の `Total`、`From`、`Count` と `ServerPlans` / `DiskPlans` の envelope を保持します。SDK 応答モデルがゼロ値を省略するため、Find 出力は専用 envelope でゼロ値のページング情報と空配列も維持します。Find は API の `Filter`、`Sort` と対象ゾーンを JSON で受け付けます。Filter の文字列値は部分一致、配列値は OR 条件です。件数と開始位置は個別フラグで指定できます。`--query` で配列を取り出す場合は `.ServerPlans | map(...)` または `.DiskPlans | map(...)` を使います。JSON は API 応答モデルを再エンコードするため、HTTP body のバイト列そのものを保存するものではありません。読み取り専用のライブ E2E は Find の結果を Read し、ID とプラン情報が一致することを確認します。クラウドリソースの作成・変更・削除は行いません。この route と出力の方針は [ADR 0053](../adr/0053-iaas-api-route-and-response-shape.md) に記録しています。詳細は [ServerPlan](../manual/tutorials/iaas-api/server-plan.md) と [DiskPlan](../manual/tutorials/iaas-api/disk-plan.md) のチュートリアルを参照してください。
 
 ### API コマンドの出力形式
 
@@ -98,7 +102,7 @@ Zone API の読み取り専用ライブ E2E は `test/e2e/zone` にあります�
 
 ### EventBus
 
-`skr eventbus-api` は `sacloud-sdk-go/api/eventbus` の操作を直接公開します。SDK `v0.3.0` では process-configuration、schedule、trigger の操作があり、process-configuration には `UpdateSecret` もあります。現在の EventBus チュートリアルにある作成順序などの利用手順は、高レベル `skr event` を設計する際の根拠にできます。
+`skr eventbus-api` は `sacloud-sdk-go/api/eventbus` の操作を直接公開します。SDK `v0.3.1` では process-configuration、schedule、trigger の操作があり、process-configuration には `UpdateSecret` もあります。現在の EventBus チュートリアルにある作成順序などの利用手順は、高レベル `skr event` を設計する際の根拠にできます。
 
 `test/e2e/eventbus-api` は `simplemq-api` と `iaas-api switch` を組み合わせ、`is1b` の通常スイッチ作成イベントから SimpleMQ への配送を実機で検証します。実行条件、秘密情報と証跡の扱い、リソースの後片付けは [EventBus API ライブ E2E 設計](eventbus-api.md) に記録します。
 
@@ -111,7 +115,7 @@ EventBus の secret は通常の定義表示や差分に含めず、専用の安
 
 ## sacloud-sdk-go の対象範囲
 
-本設計の確認対象は、リポジトリの `go.mod` が指定する sacloud-sdk-go `v0.3.0` です。SDK 内の API 定義形式やディレクトリ構成は領域ごとに異なります。これらは低レベルコマンドを SDK の公開メソッドに対応させるための調査対象であり、CLI の高レベル層を決めるものではありません。
+本設計の確認対象は、リポジトリの `go.mod` が指定する sacloud-sdk-go `v0.3.1` です。SDK 内の API 定義形式やディレクトリ構成は領域ごとに異なります。これらは低レベルコマンドを SDK の公開メソッドに対応させるための調査対象であり、CLI の高レベル層を決めるものではありません。
 
 SDK の `api/` 直下で確認した 21 の API グループは次のとおりです。
 
@@ -191,7 +195,7 @@ vpcrouter
 zone
 ```
 
-この一覧は SDK `v0.3.0` 時点の調査スナップショットであり、すべてを一括実装する約束ではありません。新しい SDK バージョンを採用するときは API グループ、service package、公開操作を再調査し、低レベル生成対象と高レベルで扱う範囲を更新します。
+この一覧は SDK `v0.3.1` 時点の調査スナップショットであり、すべてを一括実装する約束ではありません。新しい SDK バージョンを採用するときは API グループ、service package、公開操作を再調査し、低レベル生成対象と高レベルで扱う範囲を更新します。
 
 ## AppRun CLI を参考にする範囲
 
