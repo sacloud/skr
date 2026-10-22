@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.0.4](https://github.com/sacloud/skr/compare/v0.0.3...v0.0.4) - 2026-10-22
+
+### 🚀 Changes
+- GSLB API コマンドと ping 監視チュートリアルを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/123
+- API 開発とライブ E2E の安全確認を明確化する by @tokuhirom in https://github.com/sacloud/skr/pull/125
+- IaaS Region API コマンドを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/126
+- 当面対応しない API を PLAN.md で明示 by @tokuhirom in https://github.com/sacloud/skr/pull/127
+- IaaS ServiceClass API を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/128
+- Go 1.27.3 に更新 by @tokuhirom in https://github.com/sacloud/skr/pull/133
+- Potential fix for code scanning alert no. 1: Workflow does not contain permissions by @tokuhirom in https://github.com/sacloud/skr/pull/134
+- IaaS プラン API を route に沿って追加 by @tokuhirom in https://github.com/sacloud/skr/pull/135
+- Simple Notification API コマンドとライブ E2E を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/131
+
 ## [v0.0.3](https://github.com/sacloud/skr/compare/v0.0.2...v0.0.3) - 2026-10-19
 
 ### 🚀 Changes
