@@ -109,7 +109,7 @@ func TestAppRunAPIWithSakumock(t *testing.T) {
 	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
 	server := apprunmock.NewTestServer(apprunmock.Config{})
 	t.Cleanup(server.Close)
-	t.Setenv("SAKURA_ENDPOINTS_APPRUN", server.TestURL())
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_SHARED", server.TestURL())
 
 	runCommand := func(args ...string) []byte {
 		t.Helper()
