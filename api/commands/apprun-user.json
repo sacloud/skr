@@ -1,0 +1,27 @@
+{
+  "package": "apprunapi",
+  "resource": "AppRun user",
+  "command_type": "UserCommands",
+  "api_type": "UserAPI",
+  "factory_type": "UserAPIFactory",
+  "runtime_type": "UserRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "Read",
+      "command_type": "UserReadCommand",
+      "help": "ログイン中の AppRun ユーザー情報を取得します。",
+      "method": "Read",
+      "response_type": "*v1.HandlerReadUser"
+    },
+    {
+      "name": "Create",
+      "command_type": "UserCreateCommand",
+      "help": "AppRun にサインアップします。",
+      "method": "Create",
+      "response_type": "*v1.HandlerCreateUser"
+    }
+  ]
+}

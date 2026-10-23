@@ -1,0 +1,45 @@
+{
+  "package": "apprunapi",
+  "resource": "AppRun packet filter",
+  "command_type": "PacketFilterCommands",
+  "api_type": "PacketFilterAPI",
+  "factory_type": "PacketFilterAPIFactory",
+  "runtime_type": "PacketFilterRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "Read",
+      "command_type": "PacketFilterReadCommand",
+      "help": "アプリケーションのパケットフィルターを取得します。",
+      "method": "Read",
+      "response_type": "*v1.HandlerReadPacketFilter",
+      "arguments": [
+        {
+          "name": "application-id",
+          "field": "ApplicationID",
+          "type": "string",
+          "help": "対象アプリケーション ID。"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "command_type": "PacketFilterUpdateCommand",
+      "help": "パケットフィルターの有効状態と IPv4 アドレス設定を更新します。",
+      "method": "Update",
+      "request_type": "v1.PatchPacketFilterBody",
+      "response_type": "*v1.HandlerPatchPacketFilter",
+      "request_help": "PatchPacketFilterBody JSON。is_enabled と settings（from_ip、from_ip_prefix_length）の形式です。直接指定、@path.json、または -（標準入力）に対応します。",
+      "arguments": [
+        {
+          "name": "application-id",
+          "field": "ApplicationID",
+          "type": "string",
+          "help": "対象アプリケーション ID。"
+        }
+      ]
+    }
+  ]
+}
