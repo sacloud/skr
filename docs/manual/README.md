@@ -23,6 +23,7 @@
 - [SimpleMQ API: キューを作成してメッセージを送受信する](tutorials/simplemq-api.md)
 - [Simple Notification API: グループに通知を送り、履歴を確認する](tutorials/simple-notification-api.md)
 - [Container Registry API: レジストリと認証ユーザーを管理する](tutorials/container-registry-api.md)
+- [Object Storage API: サイトとバケットを管理する](tutorials/object-storage-api.md)
 - [EventBus API: スイッチ作成イベントを SimpleMQ で受信する](tutorials/eventbus-api.md)
 - [AppRun API: コンテナイメージからアプリケーションをデプロイする](tutorials/apprun-api.md)
 - [IAM API: 組織と IAM リソースを管理する](tutorials/iam-api.md)
