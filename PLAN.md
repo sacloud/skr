@@ -50,7 +50,7 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - Create では基本項目に加え、反復可能な `--disk` と `--nic` で複数ディスクと共有／未接続／スイッチ ID 接続の NIC を指定できます。Find は `--name` による単一名の部分一致検索に対応します。Boot は user-data のファイル／標準入力に対応します。
     - Create の定型的な入力処理・検証・API 呼び出しは生成し、ディスク／NIC の固有変換だけを型付き callback に接続します。生成への移行後も is1b のライブ E2E で作成・起動・SSH 接続・削除後の不在を確認済みです。生成器との境界は [ADR 0042](docs/adr/0042-generated-request-transform.md) に記載しています。Boot は手書きを維持します。
     - [ ] SDK の Apply / ChangePlan / EjectCDROM / InsertCDROM / MonitorCPU / Reset / SendNMI / Shutdown / WaitBoot / WaitShutdown は **未対応**です。
-    - is1b で新記法による cloud-init 起動・SSH 接続・削除・一時 SSH ファイルの後始末を確認済みです。[ライブ E2E runner](test/e2e/server/) と[チュートリアル](docs/manual/tutorials/iaas-api/server.md)があります。設計は [ADR 0040](docs/adr/0040-server-cloud-init-and-ssh-tutorial.md)、[ADR 0041](docs/adr/0041-server-repeatable-disk-and-nic-options.md) と[設計文書](docs/design/server-cloud-init-ssh.md)を参照してください。
+    - is1b で新記法による cloud-init 起動・SSH 接続・削除・一時 SSH ファイルの後始末を確認済みです。Update のライブ検証は未実施です。[ライブ E2E runner](test/e2e/server/) と[チュートリアル](docs/manual/tutorials/iaas-api/server.md)があります。設計は [ADR 0040](docs/adr/0040-server-cloud-init-and-ssh-tutorial.md)、[ADR 0041](docs/adr/0041-server-repeatable-disk-and-nic-options.md) と[設計文書](docs/design/server-cloud-init-ssh.md)を参照してください。
 - [x] `switch` — SDK の `swytch` に対応する `iaas-api switch` の Find / Read / Create / Update / Delete を実装済みです。SDK の公開操作はすべて CLI にあります。Sandbox と is1b で作成・検索・参照・更新・削除を検証する [ライブ E2E runner](test/e2e/switch/) と[チュートリアル](docs/manual/tutorials/iaas-api/switch.md)があります。
 
 ## CommonServiceItem 系 API 候補
@@ -103,9 +103,9 @@ SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のよう
 
 SDK の `api` 直下には、IaaS 以外に次の API ドメインがあります。CLI コマンドの実装、ライブ E2E、チュートリアルの対応状況は分けて記載します。コマンドの入口があることは、そのドメインの SDK 操作すべてへの対応を意味しません。
 
-- [x] `iam` — `iam-api` コマンド、ライブ E2E、[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。
-- [x] `eventbus` — `eventbus-api`。Provider 補完・リクエスト検証・シークレット入力とエラー伝播のドメイン単体テストを実装済みです。
-- [x] `simplemq` — `simplemq-api`。キュー／メッセージコマンドは `apigen-api` を使います。
+- [x] `iam` — `iam-api` コマンドと[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。[ライブ E2E runner](test/e2e/iam-api/)はユーザー、グループ、フォルダ、プロジェクト、サービスプリンシパルの一部操作を検証済みで、残りの末端コマンドは[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)で管理します。
+- [x] `eventbus` — `eventbus-api`。Provider 補完・リクエスト検証・シークレット入力とエラー伝播のドメイン単体テストを実装済みです。[ライブ E2E runner](test/e2e/eventbus-api/)は process-configuration と trigger の作成・参照・削除、update-secret、SimpleMQ 連携を検証済みです。schedule と Update 操作は未検証で、[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)で管理します。
+- [x] `simplemq` — `simplemq-api`。キュー／メッセージコマンドは `apigen-api` を使います。12の末端コマンドを1シナリオで実行する[ライブ E2E runner](test/e2e/simplemq/)と[チュートリアル](docs/manual/tutorials/simplemq-api.md)があります。
 - [x] `simple-notification` — `simple-notification-api`。通知先、グループ、ルーティング、履歴の SDK 公開操作を実装済みです。送信は `--message` と JSON 入力に対応します。[ライブ E2E runner](test/e2e/simple-notification/) と[チュートリアル](docs/manual/tutorials/simple-notification-api.md)があります。ライブではメール通知の処理完了、利用者による実受信、履歴の個別取得を確認済みです。追加の `--crud-only` シナリオで、一時通知先・グループ・ルーティングの作成／参照／更新／削除、設定省略時の保持と設定変更、一時ルーティングだけの並べ替え、既存設定の保持、削除後の不在も確認済みです。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。
 - [ ] `apprun-dedicated` — `apprun-dedicated-api`。リクエスト入力・秘密情報のインライン拒否・エラー伝播のドメイン単体テストを実装済みです。
   - CLI 実装済み、ライブ E2E とチュートリアルは未対応。不足分は [#59](https://github.com/sacloud/skr/issues/59) で対応予定
@@ -135,6 +135,14 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 - `enhanceddb`
 - `certificateauthority`
 - `authstatus`
+
+## ライブ E2E の対応状況
+
+[ADR 0058](docs/adr/0058-live-e2e-command-coverage.md) に従い、公開するすべての末端サブコマンドをライブ E2E で検証します。2026-10-23 時点で末端コマンド一覧と runner 実装を突合しました。
+
+多くの runner は対象コマンドを網羅しています。未検証は122コマンドで、version 1、server 1、internet 8、eventbus-api 7、apprun 11、iam-api 59、apprun-dedicated-api 35 です。
+
+網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。
 
 ## 進め方
 
