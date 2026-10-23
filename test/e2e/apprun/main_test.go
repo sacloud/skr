@@ -18,9 +18,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 type fakeCLI struct {
@@ -31,6 +39,9 @@ type fakeCLI struct {
 	changeCleanupData bool
 	deleted           bool
 	calls             []string
+	pages             map[string][][]appSummary
+	failPage          int
+	otherID           bool
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
@@ -39,7 +50,20 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		return nil, errors.New("injected CLI failure")
 	}
 	switch step {
-	case "preflight-list", "list-created", "cleanup-list-unknown-id", "cleanup-list-after-delete":
+	case "preflight-list", "list-created", "cleanup-list-after-delete":
+		page, err := strconv.Atoi(args[3])
+		if err != nil {
+			return nil, err
+		}
+		if f.failPage == page {
+			return nil, errors.New("injected page failure")
+		}
+		if pages, ok := f.pages[step]; ok {
+			if page > len(pages) {
+				return []byte("[]"), nil
+			}
+			return json.Marshal(pages[page-1])
+		}
 		if f.value == nil {
 			return []byte("[]"), nil
 		}
@@ -59,6 +83,9 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 			return nil, err
 		}
 		f.value = newFakeApp(request.Name)
+		if f.otherID {
+			f.value.ID = "another-run-id"
+		}
 		if f.badCreateOutput {
 			return []byte("{"), nil
 		}
@@ -132,14 +159,171 @@ func TestScenarioCreatesChecksAndCleansUpApp(t *testing.T) {
 	}
 }
 
-func TestScenarioCleansUpWhenCreateResponseCannotBeDecoded(t *testing.T) {
+func TestScenarioRefusesCleanupWhenCreateResponseCannotBeDecoded(t *testing.T) {
 	fake := &fakeCLI{badCreateOutput: true}
 	err := runScenario(t, fake, namePrefix+"decode-error")
 	if err == nil || !strings.Contains(err.Error(), "decode created AppRun application") {
 		t.Fatalf("run error = %v, want create response decode failure", err)
 	}
-	if fake.value != nil || !fake.deleted {
-		t.Fatal("created AppRun application was not identified and cleaned up")
+	if fake.value == nil || fake.deleted || !strings.Contains(err.Error(), "manually verify") {
+		t.Fatal("unknown creation ID must require manual verification without deletion")
+	}
+}
+
+func TestScenarioProtectsSameNameAndSettingsFromAnotherRun(t *testing.T) {
+	fake := &fakeCLI{badCreateOutput: true, otherID: true}
+	err := runScenario(t, fake, namePrefix+"other-run")
+	if err == nil || !strings.Contains(err.Error(), "refusing cleanup") {
+		t.Fatalf("run error = %v", err)
+	}
+	if fake.deleted || fake.value == nil || fake.value.ID != "another-run-id" {
+		t.Fatal("deleted another run's application")
+	}
+}
+
+func fullPage() []appSummary {
+	items := make([]appSummary, 100)
+	for i := range items {
+		items[i] = appSummary{ID: fmt.Sprintf("existing-%d", i), Name: fmt.Sprintf("existing-%d", i)}
+	}
+	return items
+}
+
+func TestScenarioRefusesNameCollisionOnSecondPage(t *testing.T) {
+	name := namePrefix + "page-two"
+	fake := &fakeCLI{pages: map[string][][]appSummary{
+		"preflight-list": {fullPage(), {{ID: "other-id", Name: name}}},
+	}}
+	err := runScenario(t, fake, name)
+	if err == nil || !strings.Contains(err.Error(), "already exists") || containsStep(fake.calls, "create") {
+		t.Fatalf("second-page collision was not protected: %v", err)
+	}
+}
+
+func TestScenarioFindsCreatedApplicationOnSecondPage(t *testing.T) {
+	name := namePrefix + "created-page-two"
+	fake := &fakeCLI{pages: map[string][][]appSummary{
+		"list-created": {fullPage(), {{ID: "app-id", Name: name}}},
+	}}
+	if err := runScenario(t, fake, name); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCleanupDetectsRemainingApplicationOnSecondPage(t *testing.T) {
+	name := namePrefix + "remaining"
+	fake := &fakeCLI{value: newFakeApp(name), pages: map[string][][]appSummary{
+		"cleanup-list-after-delete": {fullPage(), {{ID: "app-id", Name: name}}},
+	}}
+	err := (scenario{client: fake}).cleanup(name, "app-id")
+	if err == nil || !strings.Contains(err.Error(), "remains after deletion") {
+		t.Fatalf("cleanup error = %v", err)
+	}
+}
+
+func TestListDoesNotTreatPageFailureAsAbsence(t *testing.T) {
+	fake := &fakeCLI{pages: map[string][][]appSummary{"preflight-list": {fullPage()}}, failPage: 2}
+	items, err := (scenario{client: fake}).list(context.Background(), "preflight-list")
+	if err == nil || items != nil {
+		t.Fatalf("list = %v, %v; want failure without partial results", items, err)
+	}
+}
+
+func TestPublicURLRecordsEachAttempt(t *testing.T) {
+	attempt := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempt++
+		if attempt == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("temporarily unavailable"))
+			return
+		}
+		_, _ = w.Write([]byte("Hello from AppRun!"))
+	}))
+	defer server.Close()
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkPublicURLWithClient(context.Background(), recorder, server.URL, server.Client(), time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	for i, status := range []int{503, 200} {
+		data, err := os.ReadFile(filepath.Join(recorder.Dir(), fmt.Sprintf("%03d-public-url.json", i+1)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var record struct {
+			Stdout string `json:"stdout"`
+			Error  string `json:"error"`
+		}
+		if err := json.Unmarshal(data, &record); err != nil {
+			t.Fatal(err)
+		}
+		body := "Hello from AppRun!"
+		if i == 0 {
+			body = "temporarily unavailable"
+		}
+		if !strings.Contains(record.Stdout, fmt.Sprintf("HTTP status: %d", status)) ||
+			!strings.Contains(record.Stdout, body) || (i == 0) != (record.Error != "") {
+			t.Fatalf("unexpected attempt record: %+v", record)
+		}
+	}
+}
+
+func TestPublicURLFailsWhenEvidenceCannotBeWritten(t *testing.T) {
+	attempts := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		_, _ = w.Write([]byte("Hello from AppRun!"))
+	}))
+	defer server.Close()
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A directory at the record path makes writing fail even when tests run as root.
+	if err := os.Mkdir(filepath.Join(recorder.Dir(), "001-public-url.json"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	err = checkPublicURLWithClient(context.Background(), recorder, server.URL, server.Client(), time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "write evidence") || attempts != 1 {
+		t.Fatalf("evidence failure: attempts = %d, error = %v", attempts, err)
+	}
+}
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("injected connection failure")
+}
+
+func TestPublicURLRecordsConnectionFailure(t *testing.T) {
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = checkPublicURLWithClient(ctx, recorder, "https://example.invalid", &http.Client{
+		Transport: failingTransport{},
+	}, time.Millisecond)
+	if err == nil {
+		t.Fatal("connection failure succeeded")
+	}
+	data, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-public-url.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record struct {
+		Stdout string `json:"stdout"`
+		Error  string `json:"error"`
+	}
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(record.Stdout, "HTTP status: 0") || !strings.Contains(record.Error, "injected connection failure") {
+		t.Fatalf("connection failure record = %+v", record)
 	}
 }
 

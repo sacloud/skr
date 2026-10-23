@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -164,18 +165,24 @@ func (s scenario) writeCreateRequest(name string) (string, error) {
 }
 
 func (s scenario) list(ctx context.Context, step string) ([]appSummary, error) {
-	data, err := s.call(ctx, step, "application", "list", "--page-num", "1", "--page-size", "100", "--query", queryApps)
-	if err != nil {
-		return nil, err
+	items := make([]appSummary, 0)
+	for page := 1; ; page++ {
+		data, err := s.call(ctx, step, "application", "list", "--page-num", strconv.Itoa(page), "--page-size", "100", "--query", queryApps)
+		if err != nil {
+			return nil, err
+		}
+		var batch []appSummary
+		if err := json.Unmarshal(data, &batch); err != nil {
+			return nil, fmt.Errorf("%s: decode AppRun application list page %d: %w", step, page, err)
+		}
+		if batch == nil {
+			return nil, fmt.Errorf("%s: expected a JSON application array on page %d", step, page)
+		}
+		items = append(items, batch...)
+		if len(batch) < 100 {
+			return items, nil
+		}
 	}
-	var items []appSummary
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, fmt.Errorf("%s: decode AppRun application list: %w", step, err)
-	}
-	if items == nil {
-		return nil, fmt.Errorf("%s: expected a JSON application array", step)
-	}
-	return items, nil
 }
 
 func (s scenario) read(ctx context.Context, step, id string) (app, error) {
@@ -204,29 +211,7 @@ func (s scenario) cleanup(name, knownID string) error {
 
 	id := knownID
 	if id == "" {
-		matches, err := s.list(ctx, "cleanup-list-unknown-id")
-		if err != nil {
-			return fmt.Errorf("cannot locate a possibly created AppRun application: %w", err)
-		}
-		for _, item := range matches {
-			if item.Name != name {
-				continue
-			}
-			candidate, err := s.read(ctx, "cleanup-read-unknown-id", item.ID)
-			if err != nil {
-				return fmt.Errorf("cannot verify a possibly created AppRun application: %w", err)
-			}
-			if err := checkApp(candidate, item.ID, name); err != nil {
-				return err
-			}
-			if id != "" {
-				return errors.New("multiple matching AppRun applications; refusing cleanup")
-			}
-			id = item.ID
-		}
-		if id == "" {
-			return nil
-		}
+		return errors.New("created AppRun application ID is unknown; refusing cleanup; manually verify creation using private evidence")
 	}
 
 	current, err := s.read(ctx, "cleanup-read-before-delete", id)
@@ -383,27 +368,36 @@ func (s scenario) waitHealthy(ctx context.Context, id string) error {
 }
 
 func checkPublicURL(ctx context.Context, recorder *evidence.Recorder, publicURL string) error {
-	parsed, err := url.Parse(publicURL)
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-		return fmt.Errorf("AppRun returned an invalid HTTPS public URL")
-	}
-	client := &http.Client{
+	return checkPublicURLWithClient(ctx, recorder, publicURL, &http.Client{
 		Timeout: 20 * time.Second,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+	}, 10*time.Second)
+}
+
+func checkPublicURLWithClient(ctx context.Context, recorder *evidence.Recorder, publicURL string, client *http.Client, interval time.Duration) error {
+	parsed, err := url.Parse(publicURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		return fmt.Errorf("AppRun returned an invalid HTTPS public URL")
 	}
 	deadline := time.NewTimer(5 * time.Minute)
 	defer deadline.Stop()
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	var last string
 	for {
 		status, body, requestErr := getPublicURL(ctx, client, publicURL)
-		if requestErr == nil && status == http.StatusOK && strings.Contains(body, "Hello from AppRun!") {
-			if err := recorder.Record("public-url", "GET", []string{publicURL}, nil, body, "", nil, false); err != nil {
-				return err
-			}
+		success := requestErr == nil && status == http.StatusOK && strings.Contains(body, "Hello from AppRun!")
+		attemptErr := requestErr
+		if !success && attemptErr == nil {
+			attemptErr = fmt.Errorf("unexpected HTTP status or sample response: HTTP %d", status)
+		}
+		output := fmt.Sprintf("HTTP status: %d\n\n%s", status, body)
+		if err := recorder.Record("public-url", "GET", []string{publicURL}, nil, output, "", attemptErr, false); err != nil {
+			return errors.Join(attemptErr, err)
+		}
+		if success {
 			return nil
 		}
 		last = fmt.Sprintf("HTTP status %d, body %q, error %v", status, body, requestErr)

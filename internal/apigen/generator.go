@@ -437,6 +437,10 @@ func (c Config) Validate() error {
 		if operation.RequestFileOnly && operation.RequestType == "" {
 			return fmt.Errorf("operation %q request_file_only requires request_type", operation.Name)
 		}
+		if operation.RequestFileOnly && (operation.RequestOptional || operation.Handwritten ||
+			len(operation.Flags) > 0 || len(operation.RepeatedFlags) > 0) {
+			return fmt.Errorf("operation %q request_file_only cannot be combined with request_optional, handwritten, flags, or repeated_flags", operation.Name)
+		}
 		if operation.ValidateZone && (operation.RequestType == "" || operation.Handwritten) {
 			return fmt.Errorf("operation %q validate_zone requires a generated request operation", operation.Name)
 		}

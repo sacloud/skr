@@ -100,7 +100,7 @@ $ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=int
 
 リクエストを持つ操作では `--request` にインライン JSON または `@path.json` を指定できます。個別フラグを設定した場合は `--request` と併用できません。JSON 経路では個別フラグの必須指定を要求せず、フラグ経路では必須フラグと、少なくとも 1 つのフラグの指定を確認してから SDK を呼び出します。IaaS API のトップレベル `Tags` 配列は例外として `--tags` でも指定できますが、JSON 経路での `Tags` 配列も引き続き利用でき、両経路を混在させることはできません。その他の配列、map、union、nullable 値、秘密情報など生成器の単純な型で表現しない入力は `--request` に残します。
 
-秘密情報を含む可能性があり、インライン JSON を引数として受け付けない操作には `request_file_only: true` を指定します。この設定には `request_type` が必要です。生成コマンドは `--request` を必須とし、入力値として `@path.json` または `-`（標準入力）だけを受け付けます。JSON の読み込みと SDK 型への変換は既存の Runtime decoder が行います。
+秘密情報を含む可能性があり、インライン JSON を引数として受け付けない操作には `request_file_only: true` を指定します。この設定には `request_type` が必要です。`request_optional`、`handwritten`、`flags`、`repeated_flags` との併用は設定検証で拒否します。生成コマンドは `--request` を必須とし、入力値として `@path.json` または `-`（標準入力）だけを受け付けます。JSON の読み込みと SDK 型への変換は既存の Runtime decoder が行います。
 
 この規則は生成器の共通設定で扱う入力を対象とします。複雑な操作を JSON 専用と機械的に決めず、主要な作業に必要な値をサービス固有の個別フラグや厳密な反復可能オプションで表現できるか検討します。独自構文を設ける場合はユーザーと合意し、サービスパッケージの実装とテスト、ヘルプ、チュートリアル、ADR、設計文書に記録します。特定サービス向けの構文を他の配列や操作へ自動的に一般化しません。
 
