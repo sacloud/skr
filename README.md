@@ -50,6 +50,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr apprun-dedicated-api` | AppRun 専有型のクラスタ、アプリケーション、ワーカノードなどの管理 |
 | `skr apprun-api` | AppRun 共用型のアプリケーション、バージョン、トラフィック分散、パケットフィルター、ユーザー情報の管理 |
 | `skr container-registry-api registry` | コンテナレジストリと認証ユーザーの管理 |
+| `skr object-storage-api` | サイト、サイトアカウント、バケット、パーミッションの管理 |
 | `skr iam-api user` | IAM ユーザーの作成、参照、更新、削除、メールアドレスの登録と解除 |
 | `skr iam-api group` | IAM グループの管理とメンバーシップの更新 |
 | `skr iam-api policy` | 組織・プロジェクト・フォルダの IAM ポリシーバインディングの参照と更新 |
@@ -89,8 +90,11 @@ $ skr eventbus-api --help
 $ skr apprun-dedicated-api --help
 $ skr apprun-api --help
 $ skr container-registry-api --help
+$ skr object-storage-api --help
 $ skr http --help
 ```
+
+オブジェクトストレージの管理 API では、サイトやバケット、アクセス権限を管理します。バケットの作成後は基本料金が発生します。S3 互換 API によるオブジェクト本体のアップロード／ダウンロードは別の操作です。利用手順は[オブジェクトストレージ API チュートリアル](docs/manual/tutorials/object-storage-api.md)を参照してください。
 
 サーバの作成では、対象ゾーンで利用できる CPU とメモリの組み合わせを指定します。タグはカンマ区切りの `--tags` フラグで指定できます。その他の配列を含む設定には JSON の `--request` を使います。`--request` と個別フラグは併用できません。作成前に対象環境と料金を確認してください（[サーバの作成と削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)）。
 
