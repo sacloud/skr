@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.0.5](https://github.com/sacloud/skr/compare/v0.0.4...v0.0.5) - 2026-10-23
+
+### 🚀 Changes
+- AppRun 共用型 API コマンドとライブ E2E を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/140
+- Object Storage 管理 API・チュートリアル・全サブコマンドの E2E を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/143
+### 📦 Dependency Updates
+- ci: bump Songmu/tagpr from 1.21.2 to 1.21.3 by @dependabot[bot] in https://github.com/sacloud/skr/pull/138
+
 ## [v0.0.4](https://github.com/sacloud/skr/compare/v0.0.3...v0.0.4) - 2026-10-22
 
 ### 🚀 Changes
