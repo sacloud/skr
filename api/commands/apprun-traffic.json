@@ -1,0 +1,45 @@
+{
+  "package": "apprunapi",
+  "resource": "AppRun traffic",
+  "command_type": "TrafficCommands",
+  "api_type": "TrafficAPI",
+  "factory_type": "TrafficAPIFactory",
+  "runtime_type": "TrafficRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "TrafficListCommand",
+      "help": "アプリケーションのトラフィック分散設定を取得します。",
+      "method": "List",
+      "response_type": "*v1.HandlerListTraffic",
+      "arguments": [
+        {
+          "name": "application-id",
+          "field": "ApplicationID",
+          "type": "string",
+          "help": "対象アプリケーション ID。"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "command_type": "TrafficUpdateCommand",
+      "help": "最大4バージョンへのトラフィック分散割合を更新します。最新バージョンを対象にする場合は is_latest_version を指定します。",
+      "method": "Update",
+      "request_type": "v1.UpdateTrafficBody",
+      "response_type": "*v1.HandlerUpdateTraffic",
+      "request_help": "UpdateTrafficBody JSON 配列。各要素は is_latest_version と percent、または version_name と percent の組です。percent はトラフィック分散割合です。最新バージョンに分散する場合は is_latest_version を指定します。直接指定、@path.json、または -（標準入力）に対応します。",
+      "arguments": [
+        {
+          "name": "application-id",
+          "field": "ApplicationID",
+          "type": "string",
+          "help": "対象アプリケーション ID。"
+        }
+      ]
+    }
+  ]
+}

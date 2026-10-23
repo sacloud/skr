@@ -109,9 +109,9 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 - [x] `simple-notification` — `simple-notification-api`。通知先、グループ、ルーティング、履歴の SDK 公開操作を実装済みです。送信は `--message` と JSON 入力に対応します。[ライブ E2E runner](test/e2e/simple-notification/) と[チュートリアル](docs/manual/tutorials/simple-notification-api.md)があります。ライブではメール通知の処理完了、利用者による実受信、履歴の個別取得を確認済みです。追加の `--crud-only` シナリオで、一時通知先・グループ・ルーティングの作成／参照／更新／削除、設定省略時の保持と設定変更、一時ルーティングだけの並べ替え、既存設定の保持、削除後の不在も確認済みです。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。
 - [ ] `apprun-dedicated` — `apprun-dedicated-api`。リクエスト入力・秘密情報のインライン拒否・エラー伝播のドメイン単体テストを実装済みです。
   - CLI 実装済み、ライブ E2E とチュートリアルは未対応。不足分は [#59](https://github.com/sacloud/skr/issues/59) で対応予定
+- [x] `apprun` — `apprun-api` でアプリケーション CRUD・ステータス、バージョンの一覧／参照／削除／ステータス、トラフィック、パケットフィルター、ユーザー操作を実装済みです。Ogen 系 API 共通生成器の設定と生成コードを使います。認証情報を含み得るアプリケーションの作成・更新リクエストは保護したファイルまたは標準入力に限定します。sakumock による CLI 操作テスト、[ライブ E2E runner](test/e2e/apprun/)、[チュートリアル](docs/manual/tutorials/apprun-api.md)があります。ライブでは Application の作成・一覧・参照、`Healthy` への遷移、公開 URL の HTTP 200 とサンプル本文、削除と削除後の不在を確認済みです。チュートリアルに応答例と安全な後片付けを反映しました。Application の Update、Version、Traffic、PacketFilter、User のライブ検証は未実施です
 - [ ] `addon`
 - [ ] `apigw`
-- [ ] `apprun`
 - [ ] `cloudhsm`
 - [ ] `dedicated-storage`
 - [ ] `kms`

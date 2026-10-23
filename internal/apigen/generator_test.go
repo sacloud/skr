@@ -196,6 +196,52 @@ func TestGenerateHandwrittenRequestValidator(t *testing.T) {
 	}
 }
 
+func TestGenerateFileOnlyRequestInput(t *testing.T) {
+	config := Config{
+		Package: "exampleapi", Resource: "Example",
+		CommandType: "Commands", APIType: "API", FactoryType: "APIFactory", RuntimeType: "Runtime",
+		Operations: []Operation{{
+			Name: "Create", CommandType: "CreateCommand", Help: "作成します。",
+			Method: "Create", RequestType: "CreateRequest", RequestFileOnly: true,
+		}},
+	}
+	source, err := Generate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`if *c.Request != "-" && (len(*c.Request) == 0 || (*c.Request)[0] != '@')`,
+		"--request には @path.json または -（標準入力）を指定してください",
+	} {
+		if !strings.Contains(string(source), want) {
+			t.Errorf("generated source does not contain %q", want)
+		}
+	}
+	config.Operations[0].RequestType = ""
+	if err := config.Validate(); err == nil || !strings.Contains(err.Error(), "request_file_only requires request_type") {
+		t.Fatalf("Validate() error = %v, want request_file_only request_type error", err)
+	}
+	config.Operations[0].RequestType = "CreateRequest"
+	for _, test := range []struct {
+		name   string
+		change func(*Operation)
+	}{
+		{"optional", func(op *Operation) { op.RequestOptional = true }},
+		{"handwritten", func(op *Operation) { op.Handwritten = true }},
+		{"flags", func(op *Operation) { op.Flags = []Flag{{Name: "name", Field: "Name", Type: "string"}} }},
+		{"repeated flags", func(op *Operation) { op.RepeatedFlags = []RepeatedFlag{{Name: "item", Field: "Item"}} }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			copyConfig := config
+			copyConfig.Operations = append([]Operation(nil), config.Operations...)
+			test.change(&copyConfig.Operations[0])
+			if err := copyConfig.Validate(); err == nil || !strings.Contains(err.Error(), "request_file_only cannot be combined") {
+				t.Fatalf("Validate() = %v, want incompatible file-only configuration", err)
+			}
+		})
+	}
+}
+
 func TestGenerateZoneValidation(t *testing.T) {
 	config := Config{
 		Package: "exampleapi", Resource: "Example",

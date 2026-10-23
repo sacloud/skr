@@ -51,6 +51,7 @@ type Operation struct {
 	RequestType      string         `json:"request_type,omitempty"`
 	RequestByValue   bool           `json:"request_by_value,omitempty"`
 	RequestOptional  bool           `json:"request_optional,omitempty"`
+	RequestFileOnly  bool           `json:"request_file_only,omitempty"`
 	ResponseType     string         `json:"response_type,omitempty"`
 	RequestHelp      string         `json:"request_help,omitempty"`
 	RequestValidator string         `json:"request_validator,omitempty"`
@@ -192,6 +193,11 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 	}
 	request := &{{.RequestType}}{}
 	if c.Request != nil {
+{{- if .RequestFileOnly }}
+		if *c.Request != "-" && (len(*c.Request) == 0 || (*c.Request)[0] != '@') {
+			return fmt.Errorf("--request には @path.json または -（標準入力）を指定してください")
+		}
+{{- end }}
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
 		}
@@ -427,6 +433,13 @@ func (c Config) Validate() error {
 		}
 		if operation.RequestOptional && operation.RequestType == "" {
 			return fmt.Errorf("operation %q request_optional requires request_type", operation.Name)
+		}
+		if operation.RequestFileOnly && operation.RequestType == "" {
+			return fmt.Errorf("operation %q request_file_only requires request_type", operation.Name)
+		}
+		if operation.RequestFileOnly && (operation.RequestOptional || operation.Handwritten ||
+			len(operation.Flags) > 0 || len(operation.RepeatedFlags) > 0) {
+			return fmt.Errorf("operation %q request_file_only cannot be combined with request_optional, handwritten, flags, or repeated_flags", operation.Name)
 		}
 		if operation.ValidateZone && (operation.RequestType == "" || operation.Handwritten) {
 			return fmt.Errorf("operation %q validate_zone requires a generated request operation", operation.Name)

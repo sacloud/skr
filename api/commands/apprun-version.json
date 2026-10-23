@@ -1,0 +1,138 @@
+{
+  "package": "apprunapi",
+  "resource": "AppRun application version",
+  "command_type": "VersionCommands",
+  "api_type": "VersionAPI",
+  "factory_type": "VersionAPIFactory",
+  "runtime_type": "VersionRuntime",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "command_type": "VersionListCommand",
+      "help": "アプリケーションのバージョン一覧を取得します。",
+      "method": "List",
+      "request_type": "v1.ListApplicationVersionsParams",
+      "request_optional": true,
+      "request_validator": "ValidateVersionListRequest",
+      "response_type": "*v1.HandlerListVersions",
+      "request_help": "ListApplicationVersionsParams JSON。フラグと併用できません。直接指定、@path.json、または -（標準入力）に対応します。",
+      "arguments": [
+        {
+          "name": "application-id",
+          "field": "ApplicationID",
+          "type": "string",
+          "help": "対象アプリケーション ID。",
+          "flag": true,
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "page-num",
+          "field": "PageNum",
+          "type": "int",
+          "help": "取得するページ番号。",
+          "conversion": "v1.NewOptInt"
+        },
+        {
+          "name": "page-size",
+          "field": "PageSize",
+          "type": "int",
+          "help": "1ページあたりの項目数。",
+          "conversion": "v1.NewOptInt"
+        },
+        {
+          "name": "sort-field",
+          "field": "SortField",
+          "type": "string",
+          "help": "並び替えに使うフィールド名。",
+          "conversion": "v1.NewOptString"
+        },
+        {
+          "name": "sort-order",
+          "field": "SortOrder",
+          "type": "string",
+          "help": "並び順。asc または desc。",
+          "conversion": "NewOptVersionSortOrder"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "command_type": "VersionReadCommand",
+      "help": "アプリケーションのバージョン詳細を取得します。",
+      "method": "Read",
+      "response_type": "*v1.HandlerReadVersion",
+      "arguments": [
+        {
+          "name": "application-id",
+          "field": "ApplicationID",
+          "type": "string",
+          "help": "対象アプリケーション ID。",
+          "flag": true,
+          "required": true
+        },
+        {
+          "name": "version-id",
+          "field": "VersionID",
+          "type": "string",
+          "help": "取得するバージョン ID。",
+          "flag": true,
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "command_type": "VersionDeleteCommand",
+      "help": "アプリケーションのバージョンを削除します。最新バージョン、トラフィックの宛先に指定したバージョン、最後の1件は削除できません。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "application-id",
+          "field": "ApplicationID",
+          "type": "string",
+          "help": "対象アプリケーション ID。",
+          "flag": true,
+          "required": true
+        },
+        {
+          "name": "version-id",
+          "field": "VersionID",
+          "type": "string",
+          "help": "削除するバージョン ID。",
+          "flag": true,
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Status",
+      "command_type": "VersionStatusCommand",
+      "help": "アプリケーションのバージョンステータスを取得します。",
+      "method": "ReadStatus",
+      "response_type": "*v1.HandlerReadApplicationVersionOnlyStatus",
+      "arguments": [
+        {
+          "name": "application-id",
+          "field": "ApplicationID",
+          "type": "string",
+          "help": "対象アプリケーション ID。",
+          "flag": true,
+          "required": true
+        },
+        {
+          "name": "version-id",
+          "field": "VersionID",
+          "type": "string",
+          "help": "対象バージョン ID。",
+          "flag": true,
+          "required": true
+        }
+      ]
+    }
+  ]
+}

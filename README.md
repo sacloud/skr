@@ -48,6 +48,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr eventbus-api schedule` | スケジュールの管理 |
 | `skr eventbus-api trigger` | イベントトリガーの管理 |
 | `skr apprun-dedicated-api` | AppRun 専有型のクラスタ、アプリケーション、ワーカノードなどの管理 |
+| `skr apprun-api` | AppRun 共用型のアプリケーション、バージョン、トラフィック分散、パケットフィルター、ユーザー情報の管理 |
 | `skr container-registry-api registry` | コンテナレジストリと認証ユーザーの管理 |
 | `skr iam-api user` | IAM ユーザーの作成、参照、更新、削除、メールアドレスの登録と解除 |
 | `skr iam-api group` | IAM グループの管理とメンバーシップの更新 |
@@ -86,6 +87,7 @@ $ skr simplemq-api --help
 $ skr simple-notification-api --help
 $ skr eventbus-api --help
 $ skr apprun-dedicated-api --help
+$ skr apprun-api --help
 $ skr container-registry-api --help
 $ skr http --help
 ```
