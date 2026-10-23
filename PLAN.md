@@ -42,7 +42,7 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - SDK の Create / Update / Delete / Upload / Download / OpenFTP / CloseFTP / WaitReady は未対応です。
     - 読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/archive.md)があります。is1b で検索・参照を確認済みです。
 - [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。Create は必須・任意の単純値とタグ、Update はゾーン・ID・変更する単純値とタグを個別フラグで指定でき、複雑な入力には JSON を使います。Find は `--name` による単一名の部分一致検索に対応します。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
-- [x] `internet` — `iaas-api internet` の Find / Read / Create / Update / Delete、サブネット操作、IPv6 操作、MonitorRouter を実装済みです。Find は `--name` による単一名の部分一致検索、Delete は `--force` と `--fail-if-not-found` に対応します。ルータ＋スイッチ、Server、起動 Disk を作成し、サブネットから選んだ IPv4 アドレスを NIC の OS 設定へ適用して SSH 接続する [ライブ E2E runner](test/e2e/internet/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet.md)があります。個別オプションだけの操作で is1b の作成・NIC 接続・名前検索・サブネット参照・SSH ログイン・削除後の不在に加え、Update(更新と復元)と MonitorRouter のライブ検証を確認済みです。追加サブネットと IPv6 のライブ検証は未実施です。
+- [x] `internet` — `iaas-api internet` の Find / Read / Create / Update / Delete、サブネット操作、IPv6 操作、MonitorRouter を実装済みです。Find は `--name` による単一名の部分一致検索、Delete は `--force` と `--fail-if-not-found` に対応します。ルータ＋スイッチ、Server、起動 Disk を作成し、サブネットから選んだ IPv4 アドレスを NIC の OS 設定へ適用して SSH 接続する [ライブ E2E runner](test/e2e/internet/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet.md)があります。個別オプションだけの操作で is1b の作成・NIC 接続・名前検索・サブネット参照・SSH ログイン・削除後の不在に加え、Update(更新と復元)、MonitorRouter、追加サブネットの追加・NextHop 更新・削除、IPv6 の有効化・参照・無効化のライブ検証を確認済みです。
 - [x] `icon` — `iaas-api icon` の Find / Read / Create / Update / Delete を実装済みです。Create は `--image-file` で画像ファイルを読み込み、API 用の Base64 文字列へ変換します。更新できる項目は Name と Tags です。CRUD の[ライブ E2E runner](test/e2e/icon/) と[チュートリアル](docs/manual/tutorials/iaas-api/icon.md)を追加済みです。ライブ E2E で作成・検索・参照・更新・削除と削除後の不在を確認済みです。
 - [x] `packetfilter` — `iaas-api packetfilter` の Find / Read / Create / Update / Delete を実装済みです。ルールの Expression 配列は `--expressions` の JSON 値または `--request` で指定し、ゾーン、名前、ID などの単純値はフラグで指定できます。is1b で作成・検索・参照・ルール更新・削除を確認する [ライブ E2E runner](test/e2e/packetfilter/) と[チュートリアル](docs/manual/tutorials/iaas-api/packetfilter.md)があります。ライブ E2E で各操作と削除後の不在を確認済みです。NIC への適用とパケット通信の検証は対象外です。
 - [x] `server`
@@ -104,12 +104,12 @@ SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のよう
 SDK の `api` 直下には、IaaS 以外に次の API ドメインがあります。CLI コマンドの実装、ライブ E2E、チュートリアルの対応状況は分けて記載します。コマンドの入口があることは、そのドメインの SDK 操作すべてへの対応を意味しません。
 
 - [x] `iam` — `iam-api` コマンドと[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。[ライブ E2E runner](test/e2e/iam-api/)はユーザー、グループ、フォルダ、プロジェクト、サービスプリンシパルの一部操作を検証済みで、残りの末端コマンドは[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)で管理します。
-- [x] `eventbus` — `eventbus-api`。Provider 補完・リクエスト検証・シークレット入力とエラー伝播のドメイン単体テストを実装済みです。[ライブ E2E runner](test/e2e/eventbus-api/)は process-configuration と trigger の作成・参照・削除、update-secret、SimpleMQ 連携を検証済みです。schedule と Update 操作は未検証で、[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)で管理します。
+- [x] `eventbus` — `eventbus-api`。Provider 補完・リクエスト検証・シークレット入力とエラー伝播のドメイン単体テストを実装済みです。[ライブ E2E runner](test/e2e/eventbus-api/)は process-configuration と trigger の作成・参照・削除、update-secret、SimpleMQ 連携を検証済みです。schedule と Update 操作も[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)のとおり 2026-10-23 にライブ検証を確認済みです。
 - [x] `simplemq` — `simplemq-api`。キュー／メッセージコマンドは `apigen-api` を使います。12の末端コマンドを1シナリオで実行する[ライブ E2E runner](test/e2e/simplemq/)と[チュートリアル](docs/manual/tutorials/simplemq-api.md)があります。
 - [x] `simple-notification` — `simple-notification-api`。通知先、グループ、ルーティング、履歴の SDK 公開操作を実装済みです。送信は `--message` と JSON 入力に対応します。[ライブ E2E runner](test/e2e/simple-notification/) と[チュートリアル](docs/manual/tutorials/simple-notification-api.md)があります。ライブではメール通知の処理完了、利用者による実受信、履歴の個別取得を確認済みです。追加の `--crud-only` シナリオで、一時通知先・グループ・ルーティングの作成／参照／更新／削除、設定省略時の保持と設定変更、一時ルーティングだけの並べ替え、既存設定の保持、削除後の不在も確認済みです。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。
 - [ ] `apprun-dedicated` — `apprun-dedicated-api`。リクエスト入力・秘密情報のインライン拒否・エラー伝播のドメイン単体テストを実装済みです。
   - CLI 実装済み、ライブ E2E とチュートリアルは未対応。不足分は [#59](https://github.com/sacloud/skr/issues/59) で対応予定
-- [x] `apprun` — `apprun-api` でアプリケーション CRUD・ステータス、バージョンの一覧／参照／削除／ステータス、トラフィック、パケットフィルター、ユーザー操作を実装済みです。Ogen 系 API 共通生成器の設定と生成コードを使います。認証情報を含み得るアプリケーションの作成・更新リクエストは保護したファイルまたは標準入力に限定します。sakumock による CLI 操作テスト、[ライブ E2E runner](test/e2e/apprun/)、[チュートリアル](docs/manual/tutorials/apprun-api.md)があります。ライブでは Application の作成・一覧・参照、`Healthy` への遷移、公開 URL の HTTP 200 とサンプル本文、削除と削除後の不在を確認済みです。チュートリアルに応答例と安全な後片付けを反映しました。Application の Update、Version、Traffic、PacketFilter、User のライブ検証は未実施です
+- [x] `apprun` — `apprun-api` でアプリケーション CRUD・ステータス、バージョンの一覧／参照／削除／ステータス、トラフィック、パケットフィルター、ユーザー操作を実装済みです。Ogen 系 API 共通生成器の設定と生成コードを使います。認証情報を含み得るアプリケーションの作成・更新リクエストは保護したファイルまたは標準入力に限定します。sakumock による CLI 操作テスト、[ライブ E2E runner](test/e2e/apprun/)、[チュートリアル](docs/manual/tutorials/apprun-api.md)があります。ライブでは Application の作成・一覧・参照、`Healthy` への遷移、公開 URL の HTTP 200 とサンプル本文、削除と削除後の不在を確認済みです。Application の Update(1 vCPU / 2Gi の新バージョン作成)、Version の一覧・参照・ステータス・削除、Traffic の一覧・更新、PacketFilter の参照・更新、User の参照も 2026-10-23 に確認済みです。チュートリアルに応答例と安全な後片付けを反映しました
 - [ ] `addon`
 - [ ] `apigw`
 - [ ] `cloudhsm`
@@ -140,9 +140,13 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 [ADR 0058](docs/adr/0058-live-e2e-command-coverage.md) に従い、公開するすべての末端サブコマンドをライブ E2E で検証します。2026-10-23 時点で末端コマンド一覧と runner 実装を突合しました。
 
-多くの runner は対象コマンドを網羅しています。未検証は118コマンドで、internet 6、eventbus-api 7、apprun 11、iam-api 59、apprun-dedicated-api 35 です。
+多くの runner は対象コマンドを網羅しています。タスク2完了後の未検証は59コマンドで、iam-api 59、apprun-dedicated-api 35 です。
 
 2026-10-23 にタスク1として `server update`、`internet update`、`internet monitor-router`、`version` の4コマンドをライブ検証しました。既存 runner へのシナリオ追加と専用 runner の新規作成、そのライブ実行を完了しています。
+
+2026-10-23 にタスク2として 25 コマンドをライブ検証しました。internet のサブネット3操作と IPv6 3操作です。eventbus-api の schedule 5操作、process-configuration update、trigger update です。apprun の Update、Version 4操作、Traffic 2操作、PacketFilter 2操作、User 2操作です。
+
+既存 runner へのシナリオ追加とそのライブ実行を完了しています。
 
 網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。
 

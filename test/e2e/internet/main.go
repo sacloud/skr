@@ -196,6 +196,55 @@ func internetArgs(step string, request map[string]any, userDataPath string) ([]s
 		}, nil
 	case "test-monitor-router":
 		return monitorRouterArgs(request)
+	case "test-add-subnet":
+		id, err := requestID(request)
+		if err != nil {
+			return nil, err
+		}
+		maskLen, err := requestInt64(request, "NetworkMaskLen")
+		if err != nil {
+			return nil, err
+		}
+		nextHop, err := requestNextHop(request)
+		if err != nil {
+			return nil, err
+		}
+		return []string{
+			"iaas-api", "internet", "add-subnet", "--zone", zone, "--id", id,
+			"--network-mask-len", strconv.FormatInt(maskLen, 10), "--next-hop", nextHop,
+		}, nil
+	case "test-update-subnet", "test-delete-subnet":
+		id, err := requestID(request)
+		if err != nil {
+			return nil, err
+		}
+		subnetID, err := requestInt64(request, "SubnetID")
+		if err != nil {
+			return nil, err
+		}
+		operation := "update-subnet"
+		if step == "test-delete-subnet" {
+			operation = "delete-subnet"
+		}
+		args := []string{
+			"iaas-api", "internet", operation, "--zone", zone, "--id", id,
+			"--subnet-id", strconv.FormatInt(subnetID, 10),
+		}
+		if step == "test-update-subnet" {
+			nextHop, err := requestNextHop(request)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, "--next-hop", nextHop)
+		}
+		return args, nil
+	case "test-enable-ipv6", "test-read-ipv6", "test-disable-ipv6":
+		id, err := requestID(request)
+		if err != nil {
+			return nil, err
+		}
+		operation := strings.TrimPrefix(step, "test-")
+		return []string{"iaas-api", "internet", operation, "--zone", zone, "--id", id}, nil
 	case "test-list-subnet":
 		id, err := requestID(request)
 		if err != nil {
@@ -327,6 +376,18 @@ func requestID(request map[string]any) (string, error) {
 		return "", errors.New("invalid ID")
 	}
 	return id, nil
+}
+
+func requestNextHop(request map[string]any) (string, error) {
+	value, err := requestString(request, "NextHop")
+	if err != nil {
+		return "", err
+	}
+	address := net.ParseIP(value)
+	if address == nil || address.To4() == nil || address.To4().String() != value {
+		return "", errors.New("NextHop must be an IPv4 address")
+	}
+	return value, nil
 }
 
 type sshRunner struct {
@@ -862,7 +923,13 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	}); err != nil {
 		return err
 	}
-	return s.waitForSSH(ctx, serverID, name, switchID, iface.IPAddress)
+	if err := s.waitForSSH(ctx, serverID, name, switchID, iface.IPAddress); err != nil {
+		return err
+	}
+	if err := s.subnetScenario(ctx, internetID, iface.IPAddress); err != nil {
+		return err
+	}
+	return s.ipv6Scenario(ctx, internetID)
 }
 
 func createSSHMaterial(dir string) (userDataPath, privateKey, knownHosts, publicKey string, err error) {

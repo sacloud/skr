@@ -108,12 +108,14 @@ func TestWriteUserDataRejectsInvalidNetworkValues(t *testing.T) {
 }
 
 type fakeCLI struct {
-	internet   *internetItem
-	server     *serverItem
-	disk       bool
-	failStep   string
-	calls      []string
-	subnetJSON string
+	internet    *internetItem
+	server      *serverItem
+	disk        bool
+	failStep    string
+	calls       []string
+	subnetJSON  string
+	addedSubnet *subnetResponse
+	ipv6Net     *ipv6NetItem
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) ([]byte, error) {
@@ -146,7 +148,71 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 		if f.subnetJSON != "" {
 			return []byte(f.subnetJSON), nil
 		}
-		return []byte(`[{"ID":14,"InternetID":12,"DefaultRoute":"192.0.2.1","NetworkAddress":"192.0.2.0","NetworkMaskLen":28,"IPAddresses":[{"IPAddress":"192.0.2.0"},{"IPAddress":"192.0.2.1"},{"IPAddress":"192.0.2.15"},{"IPAddress":"192.0.2.2"}]}]`), nil
+		return f.subnetListJSON()
+	case "test-add-subnet":
+		if f.internet == nil || request["ID"] != f.internet.ID {
+			return nil, errors.New("missing Internet")
+		}
+		maskLen, err := requestInt64(request, "NetworkMaskLen")
+		if err != nil || maskLen != addedSubnetMaskLen {
+			return nil, errors.New("add-subnet requires NetworkMaskLen 28")
+		}
+		nextHop, err := requestNextHop(request)
+		if err != nil {
+			return nil, err
+		}
+		if f.addedSubnet != nil {
+			return nil, errors.New("an added Subnet already exists")
+		}
+		f.addedSubnet = &subnetResponse{ID: 15, NextHop: nextHop, NetworkAddress: "198.51.100.0", NetworkMaskLen: addedSubnetMaskLen}
+		return json.Marshal(f.addedSubnet)
+	case "test-update-subnet":
+		if f.internet == nil || request["ID"] != f.internet.ID {
+			return nil, errors.New("missing Internet")
+		}
+		subnetID, err := requestInt64(request, "SubnetID")
+		if err != nil || f.addedSubnet == nil || subnetID != int64(f.addedSubnet.ID) {
+			return nil, errors.New("missing added Subnet")
+		}
+		nextHop, err := requestNextHop(request)
+		if err != nil {
+			return nil, err
+		}
+		f.addedSubnet.NextHop = nextHop
+		return json.Marshal(f.addedSubnet)
+	case "test-delete-subnet":
+		if f.internet == nil || request["ID"] != f.internet.ID {
+			return nil, errors.New("missing Internet")
+		}
+		subnetID, err := requestInt64(request, "SubnetID")
+		if err != nil || f.addedSubnet == nil || subnetID != int64(f.addedSubnet.ID) {
+			return nil, errors.New("missing added Subnet")
+		}
+		f.addedSubnet = nil
+		return nil, nil
+	case "test-enable-ipv6", "test-read-ipv6", "test-disable-ipv6":
+		if f.internet == nil || request["ID"] != f.internet.ID {
+			return nil, errors.New("missing Internet")
+		}
+		switch step {
+		case "test-enable-ipv6":
+			if f.ipv6Net != nil {
+				return nil, errors.New("IPv6Net is already enabled")
+			}
+			f.ipv6Net = &ipv6NetItem{ID: 16, IPv6Prefix: "2001:db8::", IPv6PrefixLen: 64}
+			return json.Marshal(f.ipv6Net)
+		case "test-read-ipv6":
+			if f.ipv6Net == nil {
+				return nil, errors.New("IPv6Net is not enabled")
+			}
+			return json.Marshal(f.ipv6Net)
+		default:
+			if f.ipv6Net == nil {
+				return nil, errors.New("IPv6Net is not enabled")
+			}
+			f.ipv6Net = nil
+			return nil, nil
+		}
 	case "preflight-find-server", "preflight-find-disk", "cleanup-find-server", "cleanup-find-server-after", "cleanup-find-disk-after":
 		if (step == "preflight-find-server" || step == "cleanup-find-server" || step == "cleanup-find-server-after") &&
 			f.server != nil && f.server.Name == request["Name"] {
@@ -222,6 +288,23 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 	default:
 		return nil, errors.New("unexpected E2E step " + step)
 	}
+}
+
+func (f *fakeCLI) subnetListJSON() ([]byte, error) {
+	subnets := []subnetItem{{
+		ID: 14, InternetID: 12, DefaultRoute: "192.0.2.1", NetworkAddress: "192.0.2.0",
+		NetworkMaskLen: 28,
+		IPAddresses: []struct {
+			IPAddress string `json:"IPAddress"`
+		}{{IPAddress: "192.0.2.2"}, {IPAddress: "192.0.2.1"}},
+	}}
+	if f.addedSubnet != nil {
+		subnets = append(subnets, subnetItem{
+			ID: f.addedSubnet.ID, InternetID: 12, NextHop: f.addedSubnet.NextHop,
+			NetworkAddress: f.addedSubnet.NetworkAddress, NetworkMaskLen: f.addedSubnet.NetworkMaskLen,
+		})
+	}
+	return json.Marshal(subnets)
 }
 
 func testScenario(fake *fakeCLI, dir string) scenario {
@@ -443,7 +526,9 @@ func TestScenarioCreatesRouterServerAndCleansEverything(t *testing.T) {
 		"preflight-find-internet", "preflight-find-server", "preflight-find-disk",
 		"test-create-internet", "test-update-internet", "test-update-internet-restore",
 		"test-monitor-router", "test-create-server", "test-list-subnet", "test-boot-server",
-		"test-read-server", "cleanup-read-server", "cleanup-delete-server",
+		"test-read-server", "test-add-subnet", "test-update-subnet", "test-delete-subnet",
+		"test-enable-ipv6", "test-read-ipv6", "test-disable-ipv6",
+		"cleanup-read-server", "cleanup-delete-server",
 		"cleanup-find-server-after", "cleanup-find-disk-after", "cleanup-read-internet",
 		"cleanup-delete-internet", "cleanup-find-internet-after",
 	} {

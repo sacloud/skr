@@ -58,6 +58,8 @@ type app struct {
 	Port       int    `json:"port"`
 	PublicURL  string `json:"public_url"`
 	Components []struct {
+		MaxCPU       string `json:"max_cpu"`
+		MaxMemory    string `json:"max_memory"`
 		DeploySource struct {
 			ContainerRegistry struct {
 				Image string `json:"image"`
@@ -320,7 +322,13 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := s.checkURL(ctx, current.PublicURL); err != nil {
 		return err
 	}
-	return nil
+	if err := s.packetFilterScenario(ctx, id); err != nil {
+		return err
+	}
+	if err := s.userScenario(ctx); err != nil {
+		return err
+	}
+	return s.versionScenario(ctx, id, name)
 }
 
 func (s scenario) waitHealthy(ctx context.Context, id string) error {
@@ -485,8 +493,10 @@ func runMain() (exitCode int) {
 	}
 	defer func() {
 		var cleanupErr error
-		if err := os.Remove(filepath.Join(tempDir, "create.json")); err != nil && !errors.Is(err, os.ErrNotExist) {
-			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove private AppRun request file: %w", err))
+		for _, file := range []string{"create.json", "update.json"} {
+			if err := os.Remove(filepath.Join(tempDir, file)); err != nil && !errors.Is(err, os.ErrNotExist) {
+				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove private AppRun request file %s: %w", file, err))
+			}
 		}
 		if err := os.Remove(tempDir); err != nil && !errors.Is(err, os.ErrNotExist) {
 			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove private AppRun temporary directory: %w", err))

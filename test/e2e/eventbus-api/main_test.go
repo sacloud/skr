@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -34,6 +35,26 @@ type fakeCLI struct {
 	failAt         string
 	failCreate     bool
 	messageContent string
+	configSettings struct {
+		Destination string `json:"Destination"`
+		Parameters  string `json:"Parameters"`
+	}
+	triggerSettings struct {
+		Source     string   `json:"Source"`
+		Types      []string `json:"Types"`
+		Conditions []struct {
+			Key    string   `json:"Key"`
+			Op     string   `json:"Op"`
+			Values []string `json:"Values"`
+		} `json:"Conditions"`
+		ProcessConfigurationID string `json:"ProcessConfigurationID"`
+	}
+	scheduleSettings struct {
+		ProcessConfigurationID string `json:"ProcessConfigurationID"`
+		StartsAt               int64  `json:"StartsAt"`
+		RecurringStep          int    `json:"RecurringStep"`
+		RecurringUnit          string `json:"RecurringUnit"`
+	}
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
@@ -66,7 +87,15 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 				Name        string `json:"Name"`
 				Description string `json:"Description"`
 				Settings    struct {
-					Parameters string `json:"Parameters"`
+					Source     string   `json:"Source"`
+					Types      []string `json:"Types"`
+					Conditions []struct {
+						Key    string   `json:"Key"`
+						Op     string   `json:"Op"`
+						Values []string `json:"Values"`
+					} `json:"Conditions"`
+					ProcessConfigurationID string `json:"ProcessConfigurationID"`
+					Parameters             string `json:"Parameters"`
 				} `json:"Settings"`
 			} `json:"CommonServiceItem"`
 		}
@@ -75,7 +104,14 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		}
 		kind, id := "process-configuration", `"config-id"`
 		if step == "create-trigger" {
+			if request.CommonServiceItem.Settings.ProcessConfigurationID != "config-id" {
+				return nil, fmt.Errorf("trigger references unknown process-configuration %q", request.CommonServiceItem.Settings.ProcessConfigurationID)
+			}
 			kind, id = "trigger", `"trigger-id"`
+			f.triggerSettings.Source = request.CommonServiceItem.Settings.Source
+			f.triggerSettings.Types = request.CommonServiceItem.Settings.Types
+			f.triggerSettings.Conditions = request.CommonServiceItem.Settings.Conditions
+			f.triggerSettings.ProcessConfigurationID = request.CommonServiceItem.Settings.ProcessConfigurationID
 		} else {
 			var parameters struct {
 				Content string `json:"content"`
@@ -88,6 +124,31 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		created := newFakeItem(id, request.CommonServiceItem.Name, request.CommonServiceItem.Description)
 		f.items[kind] = created
 		return f.maybeFail(step, created)
+	case step == "update-process-configuration":
+		var request struct {
+			CommonServiceItem struct {
+				Settings struct {
+					Destination string `json:"Destination"`
+					Parameters  string `json:"Parameters"`
+				} `json:"Settings"`
+			} `json:"CommonServiceItem"`
+		}
+		if err := json.Unmarshal([]byte(argument(args, "--request")), &request); err != nil {
+			return nil, err
+		}
+		var parameters struct {
+			QueueName string `json:"queue_name"`
+			Content   string `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(request.CommonServiceItem.Settings.Parameters), &parameters); err != nil {
+			return nil, err
+		}
+		f.configSettings.Destination = request.CommonServiceItem.Settings.Destination
+		f.configSettings.Parameters = request.CommonServiceItem.Settings.Parameters
+		f.messageContent = parameters.Content
+		return json.Marshal(f.items["config"])
+	case step == "read-updated-process-configuration":
+		return f.readConfigurationItem()
 	case step == "set-process-configuration-secret":
 		data, err := os.ReadFile(argument(args, "--secret-file"))
 		if err != nil {
@@ -106,6 +167,64 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		return data, err
 	case step == "verify-trigger":
 		return json.Marshal(f.items["trigger"])
+	case step == "update-trigger", step == "restore-trigger":
+		var request struct {
+			CommonServiceItem struct {
+				Description string `json:"Description"`
+			} `json:"CommonServiceItem"`
+		}
+		if err := json.Unmarshal([]byte(argument(args, "--request")), &request); err != nil {
+			return nil, err
+		}
+		updated := f.items["trigger"]
+		updated.Description = request.CommonServiceItem.Description
+		f.items["trigger"] = updated
+		return json.Marshal(updated)
+	case step == "read-updated-trigger", step == "read-restored-trigger":
+		return f.readTriggerItem()
+	case step == "create-schedule":
+		var request struct {
+			CommonServiceItem struct {
+				Name        string `json:"Name"`
+				Description string `json:"Description"`
+				Settings    struct {
+					ProcessConfigurationID string `json:"ProcessConfigurationID"`
+					StartsAt               int64  `json:"StartsAt"`
+					RecurringStep          int    `json:"RecurringStep"`
+					RecurringUnit          string `json:"RecurringUnit"`
+				} `json:"Settings"`
+			} `json:"CommonServiceItem"`
+		}
+		if err := json.Unmarshal([]byte(argument(args, "--request")), &request); err != nil {
+			return nil, err
+		}
+		if request.CommonServiceItem.Settings.ProcessConfigurationID != "config-id" {
+			return nil, fmt.Errorf("schedule references unknown process-configuration %q", request.CommonServiceItem.Settings.ProcessConfigurationID)
+		}
+		f.scheduleSettings = request.CommonServiceItem.Settings
+		created := newFakeItem(`"schedule-id"`, request.CommonServiceItem.Name, request.CommonServiceItem.Description)
+		f.items["schedule"] = created
+		return f.maybeFail(step, created)
+	case step == "list-schedule", step == "verify-schedule-deleted":
+		return f.list("schedule")
+	case step == "read-schedule", step == "read-updated-schedule", step == "read-restored-schedule":
+		return f.readScheduleItem()
+	case step == "update-schedule", step == "restore-schedule":
+		var request struct {
+			CommonServiceItem struct {
+				Description string `json:"Description"`
+			} `json:"CommonServiceItem"`
+		}
+		if err := json.Unmarshal([]byte(argument(args, "--request")), &request); err != nil {
+			return nil, err
+		}
+		updated := f.items["schedule"]
+		updated.Description = request.CommonServiceItem.Description
+		f.items["schedule"] = updated
+		return json.Marshal(updated)
+	case step == "delete-schedule":
+		delete(f.items, "schedule")
+		return nil, nil
 	case strings.HasPrefix(step, "cleanup-read-"):
 		kind := strings.TrimPrefix(step, "cleanup-read-")
 		return json.Marshal(f.items[kind])
@@ -136,6 +255,55 @@ func (f *fakeCLI) list(kind string) ([]byte, error) {
 	return json.Marshal([]item{value})
 }
 
+func (f *fakeCLI) readConfigurationItem() ([]byte, error) {
+	base := f.items["process-configuration"]
+	result := configurationItem{
+		ID:          base.ID,
+		Name:        base.Name,
+		Description: base.Description,
+	}
+	result.Settings.Destination = f.configSettings.Destination
+	result.Settings.Parameters = f.configSettings.Parameters
+	return json.Marshal(result)
+}
+
+func (f *fakeCLI) readTriggerItem() ([]byte, error) {
+	return f.triggerResponse(f.items["trigger"].Description)
+}
+
+func (f *fakeCLI) triggerResponse(description string) ([]byte, error) {
+	base := f.items["trigger"]
+	result := triggerItem{
+		ID:          base.ID,
+		Name:        base.Name,
+		Description: description,
+	}
+	result.Settings.Source = f.triggerSettings.Source
+	result.Settings.Types = f.triggerSettings.Types
+	result.Settings.Conditions = f.triggerSettings.Conditions
+	result.Settings.ProcessConfigurationID = json.RawMessage(`"` + f.triggerSettings.ProcessConfigurationID + `"`)
+	return json.Marshal(result)
+}
+
+func (f *fakeCLI) readScheduleItem() ([]byte, error) {
+	return f.scheduleResponse(f.items["schedule"].Description)
+}
+
+func (f *fakeCLI) scheduleResponse(description string) ([]byte, error) {
+	base := f.items["schedule"]
+	result := scheduleItem{
+		ID:          base.ID,
+		Name:        base.Name,
+		Description: description,
+	}
+	result.Settings.ProcessConfigurationID = json.RawMessage(`"` + f.scheduleSettings.ProcessConfigurationID + `"`)
+	// The API returns StartsAt as a decimal string in responses.
+	result.Settings.StartsAt = strconv.FormatInt(f.scheduleSettings.StartsAt, 10)
+	result.Settings.RecurringStep = f.scheduleSettings.RecurringStep
+	result.Settings.RecurringUnit = f.scheduleSettings.RecurringUnit
+	return json.Marshal(result)
+}
+
 func newFakeItem(id, name, description string) item {
 	return item{ID: json.RawMessage(id), Name: name, Description: description}
 }
@@ -160,6 +328,7 @@ func testScenario(t *testing.T, fake *fakeCLI) *scenario {
 		queue:      resource{kind: "queue", name: "skr-e2e-eventbus-test", description: resourceDescription + "test"},
 		config:     resource{kind: "process-configuration", name: "skr-e2e-eventbus-test", description: resourceDescription + "test"},
 		trigger:    resource{kind: "trigger", name: "skr-e2e-eventbus-test", description: resourceDescription + "test"},
+		schedule:   resource{kind: "schedule", name: "skr-e2e-eventbus-test", description: resourceDescription + "test"},
 		sw:         resource{kind: "switch", name: "skr-e2e-eventbus-test", description: resourceDescription + "test"},
 		expected:   "SKRE2ESWITCHCREATEDTEST",
 	}
@@ -178,10 +347,25 @@ func TestScenarioCreatesSwitchAndCleansUpResources(t *testing.T) {
 		"create-queue",
 		"rotate-api-key",
 		"create-process-configuration",
+		"update-process-configuration",
+		"read-updated-process-configuration",
 		"set-process-configuration-secret",
 		"create-trigger",
 		"create-switch",
 		"verify-trigger",
+		"update-trigger",
+		"read-updated-trigger",
+		"restore-trigger",
+		"read-restored-trigger",
+		"create-schedule",
+		"list-schedule",
+		"read-schedule",
+		"update-schedule",
+		"read-updated-schedule",
+		"restore-schedule",
+		"read-restored-schedule",
+		"delete-schedule",
+		"verify-schedule-deleted",
 		"receive-event-message-000",
 		"cleanup-delete-trigger",
 		"cleanup-delete-process-configuration",
