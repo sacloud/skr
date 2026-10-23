@@ -78,6 +78,9 @@ type SiteListCommand struct {
 }
 
 func (c *SiteListCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open("")
 	if err != nil {
 		return err
@@ -96,6 +99,9 @@ type SiteReadCommand struct {
 }
 
 func (c *SiteReadCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -114,6 +120,9 @@ type SitePlansCommand struct {
 }
 
 func (c *SitePlansCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -140,6 +149,9 @@ type SiteStatusReadCommand struct {
 }
 
 func (c *SiteStatusReadCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -158,6 +170,9 @@ type SiteStatusQuotaCommand struct {
 }
 
 func (c *SiteStatusQuotaCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -179,6 +194,9 @@ type SiteStatusBucketMeteringCommand struct {
 }
 
 func (c *SiteStatusBucketMeteringCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	from, err := time.Parse(time.RFC3339, c.From)
 	if err != nil {
 		return fmt.Errorf("--from は RFC3339 形式で指定してください: %w", err)
@@ -214,6 +232,9 @@ type AccountCreateCommand struct {
 }
 
 func (c *AccountCreateCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -232,6 +253,9 @@ type AccountReadCommand struct {
 }
 
 func (c *AccountReadCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -250,6 +274,9 @@ type AccountDeleteCommand struct {
 }
 
 func (c *AccountDeleteCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -273,6 +300,9 @@ type AccountAccessKeyListCommand struct {
 }
 
 func (c *AccountAccessKeyListCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -291,6 +321,9 @@ type AccountAccessKeyCreateCommand struct {
 }
 
 func (c *AccountAccessKeyCreateCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -310,6 +343,9 @@ type AccountAccessKeyReadCommand struct {
 }
 
 func (c *AccountAccessKeyReadCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -329,6 +365,9 @@ type AccountAccessKeyDeleteCommand struct {
 }
 
 func (c *AccountAccessKeyDeleteCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -339,9 +378,9 @@ func (c *AccountAccessKeyDeleteCommand) Run(ctx *kong.Context) error {
 type BucketCommands struct {
 	List        BucketListCommand         `cmd:"" help:"サイト内のバケットを一覧表示します。"`
 	Create      BucketCreateCommand       `cmd:"" help:"バケットを作成します。現在利用できるサイトは isk01、tky01、arc02 です。arc02 では --plan を指定します。作成完了後からバケットの基本料金が発生します。"`
-	Delete      BucketDeleteCommand       `cmd:"" help:"バケットを削除します。バケット内のオブジェクトを事前に削除してください。"`
+	Delete      BucketDeleteCommand       `cmd:"" help:"指定サイトに所属するバケットを削除します。所属を確認できない場合は拒否します。バケット内のオブジェクトを事前に削除してください。"`
 	Encryption  BucketEncryptionCommands  `cmd:"" help:"バケット暗号化を管理します。"`
-	Replication BucketReplicationCommands `cmd:"" help:"バケットのリージョン間レプリケーションを管理します。"`
+	Replication BucketReplicationCommands `cmd:"" help:"バケットのリージョン間レプリケーションを管理します。送信元バケットの指定サイトへの所属を確認できない場合は拒否します。"`
 	Penalty     BucketPenaltyCommand      `cmd:"" help:"バケットのペナルティ情報を取得します。"`
 	Usage       BucketUsageCommand        `cmd:"" help:"バケットの利用量を取得します。"`
 	Quota       BucketQuotaCommand        `cmd:"" help:"バケットのクォータを取得します。"`
@@ -356,6 +395,9 @@ type BucketListCommand struct {
 }
 
 func (c *BucketListCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -376,6 +418,9 @@ type BucketCreateCommand struct {
 }
 
 func (c *BucketCreateCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	switch c.SiteID {
 	case "isk01", "tky01":
 		if c.Plan != nil {
@@ -415,8 +460,14 @@ type BucketDeleteCommand struct {
 }
 
 func (c *BucketDeleteCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
+		return err
+	}
+	if err := requireBucketInSite(context.Background(), api, c.SiteID, c.Bucket); err != nil {
 		return err
 	}
 	return api.Bucket.Delete(context.Background(), c.Bucket)
@@ -438,6 +489,9 @@ type BucketEncryptionReadCommand struct {
 }
 
 func (c *BucketEncryptionReadCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -458,6 +512,9 @@ type BucketEncryptionEnableCommand struct {
 }
 
 func (c *BucketEncryptionEnableCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -473,6 +530,9 @@ type BucketEncryptionDisableCommand struct {
 }
 
 func (c *BucketEncryptionDisableCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -496,8 +556,14 @@ type BucketReplicationReadCommand struct {
 }
 
 func (c *BucketReplicationReadCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
+		return err
+	}
+	if err := requireBucketInSite(context.Background(), api, c.SiteID, c.Bucket); err != nil {
 		return err
 	}
 	result, err := api.BucketExtra(c.Bucket).ReadReplication(context.Background())
@@ -516,8 +582,14 @@ type BucketReplicationEnableCommand struct {
 }
 
 func (c *BucketReplicationEnableCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
+		return err
+	}
+	if err := requireBucketInSite(context.Background(), api, c.SiteID, c.Bucket); err != nil {
 		return err
 	}
 	result, err := api.BucketExtra(c.Bucket).EnableReplication(context.Background(), c.TargetBucket)
@@ -535,8 +607,14 @@ type BucketReplicationDisableCommand struct {
 }
 
 func (c *BucketReplicationDisableCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
+		return err
+	}
+	if err := requireBucketInSite(context.Background(), api, c.SiteID, c.Bucket); err != nil {
 		return err
 	}
 	return api.BucketExtra(c.Bucket).DisableReplication(context.Background())
@@ -550,6 +628,9 @@ type BucketPenaltyCommand struct {
 }
 
 func (c *BucketPenaltyCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -569,6 +650,9 @@ type BucketUsageCommand struct {
 }
 
 func (c *BucketUsageCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -588,6 +672,9 @@ type BucketQuotaCommand struct {
 }
 
 func (c *BucketQuotaCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -617,6 +704,9 @@ type PermissionListCommand struct {
 }
 
 func (c *PermissionListCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -636,6 +726,9 @@ type PermissionCreateCommand struct {
 }
 
 func (c *PermissionCreateCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	var request v2.PermissionBucketControlsBody
 	if err := c.runtime.decodeRequest(c.Request, &request); err != nil {
 		return err
@@ -659,6 +752,9 @@ type PermissionReadCommand struct {
 }
 
 func (c *PermissionReadCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -679,6 +775,9 @@ type PermissionUpdateCommand struct {
 }
 
 func (c *PermissionUpdateCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	var request v2.PermissionBucketControlsBody
 	if err := c.runtime.decodeRequest(c.Request, &request); err != nil {
 		return err
@@ -702,6 +801,9 @@ type PermissionDeleteCommand struct {
 }
 
 func (c *PermissionDeleteCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -726,6 +828,9 @@ type PermissionAccessKeyListCommand struct {
 }
 
 func (c *PermissionAccessKeyListCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -745,6 +850,9 @@ type PermissionAccessKeyCreateCommand struct {
 }
 
 func (c *PermissionAccessKeyCreateCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -765,6 +873,9 @@ type PermissionAccessKeyReadCommand struct {
 }
 
 func (c *PermissionAccessKeyReadCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -785,6 +896,9 @@ type PermissionAccessKeyDeleteCommand struct {
 }
 
 func (c *PermissionAccessKeyDeleteCommand) Run(ctx *kong.Context) error {
+	if err := c.runtime.validateOutput(ctx); err != nil {
+		return err
+	}
 	api, err := c.open(c.SiteID)
 	if err != nil {
 		return err
@@ -935,6 +1049,23 @@ func openAPI(factory APIFactory, siteID string) (API, error) {
 	return factory(siteID)
 }
 
+func requireBucketInSite(ctx context.Context, api API, siteID, name string) error {
+	buckets, err := api.Bucket.List(ctx)
+	if err != nil {
+		return fmt.Errorf("サイト %q のバケット所属確認に失敗しました: %w", siteID, err)
+	}
+	matches := 0
+	for _, bucket := range buckets {
+		if string(bucket.Name) == name {
+			matches++
+		}
+	}
+	if matches != 1 {
+		return fmt.Errorf("サイト %q でバケット %q を一意に確認できないため、操作を拒否しました", siteID, name)
+	}
+	return nil
+}
+
 func (r Runtime) decodeRequest(input string, destination any) error {
 	if r.DecodeRequest == nil {
 		return fmt.Errorf("API リクエスト入力が設定されていません")
@@ -942,13 +1073,14 @@ func (r Runtime) decodeRequest(input string, destination any) error {
 	return r.DecodeRequest(input, destination)
 }
 
-func (r Runtime) writeOutput(ctx *kong.Context, value any) error {
+func (r Runtime) validateOutput(ctx *kong.Context) error {
 	if r.ValidateOutput == nil || r.WriteOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	if err := r.ValidateOutput(ctx); err != nil {
-		return err
-	}
+	return r.ValidateOutput(ctx)
+}
+
+func (r Runtime) writeOutput(ctx *kong.Context, value any) error {
 	return r.WriteOutput(ctx, value)
 }
 

@@ -348,7 +348,138 @@ func TestObjectStorageSakumockErrorPropagation(t *testing.T) {
 	if code := run([]string{"object-storage-api", "site", "list"}, &stdout, &stderr); code == 0 {
 		t.Fatal("API error returned success")
 	}
+
 	if stdout.Len() != 0 || !strings.Contains(stderr.String(), "403") {
 		t.Fatal("API error was hidden or produced success-shaped output")
+	}
+}
+
+func TestObjectStorageInvalidQueryBeforeAPIFactory(t *testing.T) {
+	var commands [][]string
+	for _, operation := range []string{"list", "read", "plans"} {
+		args := []string{"site", operation}
+		if operation != "list" {
+			args = append(args, "tky01")
+		}
+		commands = append(commands, args)
+	}
+	for _, operation := range []string{"read", "quota", "bucket-metering"} {
+		args := []string{"site", "status", operation, "tky01"}
+		if operation == "bucket-metering" {
+			args = append(args, "test-bucket", "--from", "2026-09-01T00:00:00Z", "--to", "2026-10-01T00:00:00Z")
+		}
+		commands = append(commands, args)
+	}
+	for _, operation := range []string{"create", "read", "delete"} {
+		commands = append(commands, []string{"account", operation, "tky01"})
+	}
+	for _, operation := range []string{"list", "create", "delete", "penalty", "usage", "quota"} {
+		args := []string{"bucket", operation, "tky01"}
+		if operation != "list" {
+			args = append(args, "test-bucket")
+		}
+		commands = append(commands, args)
+	}
+	for _, resource := range []string{"encryption", "replication"} {
+		for _, operation := range []string{"read", "enable", "disable"} {
+			args := []string{"bucket", resource, operation, "tky01", "test-bucket"}
+			if operation == "enable" {
+				flag := "--kms-key-id"
+				if resource == "replication" {
+					flag = "--target-bucket"
+				}
+				args = append(args, flag, "test-target")
+			}
+			commands = append(commands, args)
+		}
+	}
+	for _, operation := range []string{"list", "create", "read", "update", "delete"} {
+		args := []string{"permission", operation, "tky01"}
+		if operation == "read" || operation == "update" || operation == "delete" {
+			args = append(args, "1001")
+		}
+		if operation == "create" || operation == "update" {
+			args = append(args, "--request", `{"display_name":"test","bucket_controls":[]}`)
+		}
+		commands = append(commands, args)
+	}
+	for _, resource := range []string{"account", "permission"} {
+		for _, operation := range []string{"list", "create", "read", "delete"} {
+			args := []string{resource, "access-key", operation, "tky01"}
+			if resource == "permission" {
+				args = append(args, "1001")
+			}
+			if operation == "read" || operation == "delete" {
+				args = append(args, "test-key")
+			}
+			commands = append(commands, args)
+		}
+	}
+	if len(commands) != 34 {
+		t.Fatalf("query regression coverage = %d, want 34", len(commands))
+	}
+	for _, args := range commands {
+		for _, expression := range []string{"(", "unknown_function"} {
+			t.Run(strings.Join(args, " ")+"/"+expression, func(t *testing.T) {
+				commandLine := newCLI()
+				commandLine.ObjectStorageAPI = objectstorageapi.NewCommands(objectstorageapi.Runtime{
+					DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+				}, func(string) (objectstorageapi.API, error) {
+					t.Fatal("API factory called with invalid query")
+					return objectstorageapi.API{}, nil
+				})
+				var stdout, stderr bytes.Buffer
+				input := append([]string{"object-storage-api"}, args...)
+				input = append(input, "--query", expression)
+				if code := runCLI(input, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "--query expression") {
+					t.Fatalf("invalid query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+				}
+			})
+		}
+	}
+}
+
+func TestObjectStorageSakumockRejectsWrongSite(t *testing.T) {
+	newObjectStorageMock(t, objectstoragemock.Config{})
+	call := func(wantSuccess bool, args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		code := run(append([]string{"object-storage-api"}, args...), &stdout, &stderr)
+		if wantSuccess {
+			if code != 0 {
+				t.Fatalf("%v: %s", args, stderr.String())
+			}
+		} else if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "操作を拒否") {
+			t.Fatalf("wrong-site operation %v: exit %d, stderr %s", args, code, stderr.String())
+		}
+		return stdout.Bytes()
+	}
+	for _, site := range []string{"isk01", "tky01"} {
+		call(true, "account", "create", site)
+	}
+	call(true, "bucket", "create", "isk01", "skr-site-source")
+	call(true, "bucket", "create", "tky01", "skr-site-target")
+	call(true, "bucket", "replication", "enable", "isk01", "skr-site-source", "--target-bucket", "skr-site-target")
+	for _, operation := range []string{"read", "enable", "disable"} {
+		args := []string{"bucket", "replication", operation, "tky01", "skr-site-source"}
+		if operation == "enable" {
+			args = append(args, "--target-bucket", "skr-site-target")
+		}
+		call(false, args...)
+	}
+	call(false, "bucket", "delete", "tky01", "skr-site-source")
+	setting := decodeObjectStorageResult[struct {
+		Target struct {
+			Name string `json:"name"`
+		} `json:"dest_bucket"`
+	}](t, call(true, "bucket", "replication", "read", "isk01", "skr-site-source"))
+	if setting.Target.Name != "skr-site-target" {
+		t.Fatal("wrong-site operation changed replication")
+	}
+	buckets := decodeObjectStorageResult[[]struct {
+		Name string `json:"name"`
+	}](t, call(true, "bucket", "list", "isk01"))
+	if len(buckets) != 1 || buckets[0].Name != "skr-site-source" {
+		t.Fatal("wrong-site operation deleted the source bucket")
 	}
 }

@@ -148,6 +148,11 @@ func TestPermissionCreateReturnsSDKError(t *testing.T) {
 type fakeBucketAPI struct {
 	objectstorage.BucketAPI
 	create func(context.Context, *objectstorage.BucketCreateParams) (*v2.ModelBucket, error)
+	list   func(context.Context) ([]v2.BucketListDataItem, error)
+}
+
+func (f *fakeBucketAPI) List(ctx context.Context) ([]v2.BucketListDataItem, error) {
+	return f.list(ctx)
 }
 
 func (f *fakeBucketAPI) Create(ctx context.Context, params *objectstorage.BucketCreateParams) (*v2.ModelBucket, error) {
@@ -201,4 +206,47 @@ func runCommandError(t *testing.T, commands Commands, args []string) error {
 		t.Fatalf("parse command: %v; stderr: %s", err, stderr.String())
 	}
 	return ctx.Run()
+}
+
+func TestFederationOperationsRefuseUnconfirmedBucketSite(t *testing.T) {
+	for _, args := range [][]string{
+		{"bucket", "delete", "tky01", "source"},
+		{"bucket", "replication", "read", "tky01", "source"},
+		{"bucket", "replication", "enable", "tky01", "source", "--target-bucket", "target"},
+		{"bucket", "replication", "disable", "tky01", "source"},
+	} {
+		for _, response := range []string{"[]", "null", `[{"name":"other"}]`, `[{"name":"source"},{"name":"source"}]`, "error"} {
+			t.Run(strings.Join(args, " ")+"/"+response, func(t *testing.T) {
+				lookupError := errors.New("bucket list failed")
+				commands := NewCommands(testRuntime(), func(siteID string) (API, error) {
+					if siteID != "tky01" {
+						t.Fatalf("site = %q", siteID)
+					}
+					return API{
+						Bucket: &fakeBucketAPI{list: func(context.Context) ([]v2.BucketListDataItem, error) {
+							if response == "error" {
+								return nil, lookupError
+							}
+							var buckets []v2.BucketListDataItem
+							if err := json.Unmarshal([]byte(response), &buckets); err != nil {
+								t.Fatal(err)
+							}
+							return buckets, nil
+						}},
+						BucketExtra: func(string) objectstorage.BucketExtraAPI {
+							t.Fatal("replication operation opened before site membership was confirmed")
+							return nil
+						},
+					}, nil
+				})
+				err := runCommandError(t, commands, args)
+				if err == nil {
+					t.Fatal("unconfirmed bucket site was accepted")
+				}
+				if response == "error" && !errors.Is(err, lookupError) {
+					t.Fatalf("lookup error was lost: %v", err)
+				}
+			})
+		}
+	}
 }

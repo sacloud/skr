@@ -36,6 +36,8 @@ import (
 
 const bucketListQuery = "map({name,resource_id,plan})"
 
+var errUnverifiedBucketSetting = errors.New("bucket setting ownership is unverified; refusing bucket deletion; manual inspection required")
+
 type cli interface {
 	call(context.Context, string, ...string) ([]byte, error)
 }
@@ -181,7 +183,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 
 	deleted := false
 	defer func() {
-		if deleted {
+		if deleted || errors.Is(result, errUnverifiedBucketSetting) {
 			return
 		}
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Minute)

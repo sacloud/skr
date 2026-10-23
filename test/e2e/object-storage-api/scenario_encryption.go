@@ -7,10 +7,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 )
 
 func (s scenario) runEncryption(ctx context.Context, name, kmsKeyID string) (result error) {
+	cleanupConfirmed := false
+	defer func() {
+		if !cleanupConfirmed {
+			result = errors.Join(result, errUnverifiedBucketSetting)
+		}
+	}()
 	args := []string{"object-storage-api", "bucket", "encryption"}
 	read := func(ctx context.Context) ([]byte, error) {
 		return s.client.call(ctx, "encryption-read", append(append([]string{}, args...), "read", s.siteID, name)...)
@@ -20,18 +27,27 @@ func (s scenario) runEncryption(ctx context.Context, name, kmsKeyID string) (res
 		return err
 	}
 	if err == nil {
-		var initial struct {
-			KeyID string `json:"kms_key_id"`
-		}
-		if err := json.Unmarshal(output, &initial); err != nil {
+		if _, err := encryptionKeyID(output); err != nil {
 			return err
 		}
-		if initial.KeyID != "" {
-			return errors.New("new bucket unexpectedly has encryption configured")
-		}
+		return errors.New("new bucket unexpectedly has encryption configured")
 	}
 	disabled := false
 	disable := func(ctx context.Context) error {
+		output, err := read(ctx)
+		if apiNotFound(err, "BucketExtra.ReadEncryption") {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		keyID, err := encryptionKeyID(output)
+		if err != nil {
+			return err
+		}
+		if keyID != kmsKeyID {
+			return errors.New("encryption key ID does not match this scenario; refusing to disable it")
+		}
 		if _, err := s.client.call(ctx, "encryption-disable", append(append([]string{}, args...), "disable", s.siteID, name)...); err != nil {
 			return err
 		}
@@ -43,20 +59,25 @@ func (s scenario) runEncryption(ctx context.Context, name, kmsKeyID string) (res
 			if err != nil {
 				return false, err
 			}
-			var state struct {
-				KeyID string `json:"kms_key_id"`
-			}
-			if err := json.Unmarshal(output, &state); err != nil {
+			keyID, err := encryptionKeyID(output)
+			if err != nil {
 				return false, err
 			}
-			return state.KeyID == "", nil
+			if keyID != kmsKeyID {
+				return false, errors.New("encryption key ID changed while waiting for disable")
+			}
+			return false, nil
 		})
 	}
 	defer func() {
 		if !disabled {
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Minute)
 			defer cancel()
-			result = errors.Join(result, disable(cleanupCtx))
+			err := disable(cleanupCtx)
+			if err == nil {
+				cleanupConfirmed = true
+			}
+			result = errors.Join(result, err)
 		}
 	}()
 	if _, err := s.client.call(ctx, "encryption-enable", append(append([]string{}, args...), "enable", s.siteID, name, "--kms-key-id", kmsKeyID)...); err != nil {
@@ -67,19 +88,35 @@ func (s scenario) runEncryption(ctx context.Context, name, kmsKeyID string) (res
 		if err != nil {
 			return false, err
 		}
-		var state struct {
-			KeyID string `json:"kms_key_id"`
-		}
-		if err := json.Unmarshal(output, &state); err != nil {
+		keyID, err := encryptionKeyID(output)
+		if err != nil {
 			return false, err
 		}
-		return state.KeyID == kmsKeyID, nil
+		if keyID != kmsKeyID {
+			return false, errors.New("enabled encryption key ID does not match this scenario")
+		}
+		return true, nil
 	}); err != nil {
 		return err
 	}
+
 	if err := disable(ctx); err != nil {
 		return err
 	}
 	disabled = true
+	cleanupConfirmed = true
 	return nil
+}
+
+func encryptionKeyID(output []byte) (string, error) {
+	var state struct {
+		KeyID string `json:"kms_key_id"`
+	}
+	if err := json.Unmarshal(output, &state); err != nil {
+		return "", fmt.Errorf("decode encryption setting: %w", err)
+	}
+	if state.KeyID == "" {
+		return "", errors.New("encryption setting has no key ID; refusing to modify it")
+	}
+	return state.KeyID, nil
 }
