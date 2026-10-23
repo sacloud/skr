@@ -193,6 +193,26 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 		f.server = nil
 		f.disk = false
 		return nil, nil
+	case "test-update-internet", "test-update-internet-restore":
+		if f.internet == nil || request["ID"] != f.internet.ID {
+			return nil, errors.New("missing Internet")
+		}
+		name, ok := request["Name"].(string)
+		if !ok || name == "" {
+			return nil, errors.New("missing Name")
+		}
+		desc, ok := request["Description"].(string)
+		if !ok || desc == "" {
+			return nil, errors.New("missing Description")
+		}
+		f.internet.Name = name
+		f.internet.Description = desc
+		return nil, nil
+	case "test-monitor-router":
+		if f.internet == nil || request["ID"] != f.internet.ID {
+			return nil, errors.New("missing Internet")
+		}
+		return []byte(`[{"Time":"2026-01-01T00:00:00Z","In":0,"Out":0}]`), nil
 	case "cleanup-delete-internet":
 		if f.internet == nil || request["ID"] != f.internet.ID {
 			return nil, errors.New("missing Internet")
@@ -421,7 +441,8 @@ func TestScenarioCreatesRouterServerAndCleansEverything(t *testing.T) {
 	}
 	for _, step := range []string{
 		"preflight-find-internet", "preflight-find-server", "preflight-find-disk",
-		"test-create-internet", "test-create-server", "test-list-subnet", "test-boot-server",
+		"test-create-internet", "test-update-internet", "test-update-internet-restore",
+		"test-monitor-router", "test-create-server", "test-list-subnet", "test-boot-server",
 		"test-read-server", "cleanup-read-server", "cleanup-delete-server",
 		"cleanup-find-server-after", "cleanup-find-disk-after", "cleanup-read-internet",
 		"cleanup-delete-internet", "cleanup-find-internet-after",

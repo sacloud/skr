@@ -177,6 +177,25 @@ func internetArgs(step string, request map[string]any, userDataPath string) ([]s
 			"iaas-api", "internet", "read", "--zone", zone, "--id", id,
 			"--query", "{ID,Name,Description,NetworkMaskLen,BandWidthMbps,Switch}",
 		}, nil
+	case "test-update-internet", "test-update-internet-restore":
+		id, err := requestID(request)
+		if err != nil {
+			return nil, err
+		}
+		name, err := requestString(request, "Name")
+		if err != nil {
+			return nil, err
+		}
+		desc, err := requestString(request, "Description")
+		if err != nil {
+			return nil, err
+		}
+		return []string{
+			"iaas-api", "internet", "update",
+			"--zone", zone, "--id", id, "--name", name, "--description", desc,
+		}, nil
+	case "test-monitor-router":
+		return monitorRouterArgs(request)
 	case "test-list-subnet":
 		id, err := requestID(request)
 		if err != nil {
@@ -802,6 +821,13 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		return err
 	}
 	internetCreateUncertain = false
+
+	if err := s.updateInternetAndVerify(ctx, internetID, name, switchID); err != nil {
+		return err
+	}
+	if err := s.monitorRouter(ctx, internetID); err != nil {
+		return err
+	}
 
 	serverOutput, err := s.call(ctx, "test-create-server", map[string]any{
 		"Zone": zone, "Name": name, "CloudimgArchiveID": s.archiveID,

@@ -169,6 +169,23 @@ func serverArgs(step string, request map[string]any, userDataPath string) ([]str
 			"iaas-api", "server", "read", "--zone", zone, "--id", id,
 			"--query", "{ID,Name,Description,InstanceStatus,Interfaces,Disks}",
 		}, nil
+	case "test-update", "test-update-restore":
+		id, err := requestID(request)
+		if err != nil {
+			return nil, err
+		}
+		name, err := requestString(request, "Name")
+		if err != nil {
+			return nil, err
+		}
+		desc, err := requestString(request, "Description")
+		if err != nil {
+			return nil, err
+		}
+		return []string{
+			"iaas-api", "server", "update",
+			"--zone", zone, "--id", id, "--name", name, "--description", desc,
+		}, nil
 	case "cleanup-read-disk", "cleanup-delete-disk":
 		id, err := requestID(request)
 		if err != nil {
@@ -505,7 +522,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := s.waitForSSH(ctx, id, name); err != nil {
 		return err
 	}
-	return nil
+	return s.updateAndVerify(ctx, id, name)
 }
 
 func createSSHMaterial(dir string) (userDataPath, privateKey, knownHosts string, err error) {

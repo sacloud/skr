@@ -42,7 +42,7 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - SDK の Create / Update / Delete / Upload / Download / OpenFTP / CloseFTP / WaitReady は未対応です。
     - 読み取り専用の [ライブ E2E runner](test/e2e/iaas-lookup/) と[チュートリアル](docs/manual/tutorials/iaas-api/archive.md)があります。is1b で検索・参照を確認済みです。
 - [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。Create は必須・任意の単純値とタグ、Update はゾーン・ID・変更する単純値とタグを個別フラグで指定でき、複雑な入力には JSON を使います。Find は `--name` による単一名の部分一致検索に対応します。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
-- [x] `internet` — `iaas-api internet` の Find / Read / Create / Update / Delete、サブネット操作、IPv6 操作、MonitorRouter を実装済みです。Find は `--name` による単一名の部分一致検索、Delete は `--force` と `--fail-if-not-found` に対応します。ルータ＋スイッチ、Server、起動 Disk を作成し、サブネットから選んだ IPv4 アドレスを NIC の OS 設定へ適用して SSH 接続する [ライブ E2E runner](test/e2e/internet/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet.md)があります。個別オプションだけの操作で is1b の作成・NIC 接続・名前検索・サブネット参照・SSH ログイン・削除後の不在を確認済みです。Update、追加サブネット、IPv6、MonitorRouter のライブ検証は未実施です。
+- [x] `internet` — `iaas-api internet` の Find / Read / Create / Update / Delete、サブネット操作、IPv6 操作、MonitorRouter を実装済みです。Find は `--name` による単一名の部分一致検索、Delete は `--force` と `--fail-if-not-found` に対応します。ルータ＋スイッチ、Server、起動 Disk を作成し、サブネットから選んだ IPv4 アドレスを NIC の OS 設定へ適用して SSH 接続する [ライブ E2E runner](test/e2e/internet/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet.md)があります。個別オプションだけの操作で is1b の作成・NIC 接続・名前検索・サブネット参照・SSH ログイン・削除後の不在に加え、Update(更新と復元)と MonitorRouter のライブ検証を確認済みです。追加サブネットと IPv6 のライブ検証は未実施です。
 - [x] `icon` — `iaas-api icon` の Find / Read / Create / Update / Delete を実装済みです。Create は `--image-file` で画像ファイルを読み込み、API 用の Base64 文字列へ変換します。更新できる項目は Name と Tags です。CRUD の[ライブ E2E runner](test/e2e/icon/) と[チュートリアル](docs/manual/tutorials/iaas-api/icon.md)を追加済みです。ライブ E2E で作成・検索・参照・更新・削除と削除後の不在を確認済みです。
 - [x] `packetfilter` — `iaas-api packetfilter` の Find / Read / Create / Update / Delete を実装済みです。ルールの Expression 配列は `--expressions` の JSON 値または `--request` で指定し、ゾーン、名前、ID などの単純値はフラグで指定できます。is1b で作成・検索・参照・ルール更新・削除を確認する [ライブ E2E runner](test/e2e/packetfilter/) と[チュートリアル](docs/manual/tutorials/iaas-api/packetfilter.md)があります。ライブ E2E で各操作と削除後の不在を確認済みです。NIC への適用とパケット通信の検証は対象外です。
 - [x] `server`
@@ -50,7 +50,7 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - Create では基本項目に加え、反復可能な `--disk` と `--nic` で複数ディスクと共有／未接続／スイッチ ID 接続の NIC を指定できます。Find は `--name` による単一名の部分一致検索に対応します。Boot は user-data のファイル／標準入力に対応します。
     - Create の定型的な入力処理・検証・API 呼び出しは生成し、ディスク／NIC の固有変換だけを型付き callback に接続します。生成への移行後も is1b のライブ E2E で作成・起動・SSH 接続・削除後の不在を確認済みです。生成器との境界は [ADR 0042](docs/adr/0042-generated-request-transform.md) に記載しています。Boot は手書きを維持します。
     - [ ] SDK の Apply / ChangePlan / EjectCDROM / InsertCDROM / MonitorCPU / Reset / SendNMI / Shutdown / WaitBoot / WaitShutdown は **未対応**です。
-    - is1b で新記法による cloud-init 起動・SSH 接続・削除・一時 SSH ファイルの後始末を確認済みです。Update のライブ検証は未実施です。[ライブ E2E runner](test/e2e/server/) と[チュートリアル](docs/manual/tutorials/iaas-api/server.md)があります。設計は [ADR 0040](docs/adr/0040-server-cloud-init-and-ssh-tutorial.md)、[ADR 0041](docs/adr/0041-server-repeatable-disk-and-nic-options.md) と[設計文書](docs/design/server-cloud-init-ssh.md)を参照してください。
+    - is1b で新記法による cloud-init 起動・SSH 接続・削除・一時 SSH ファイルの後始末、Update(更新・復元)のライブ検証を確認済みです。[ライブ E2E runner](test/e2e/server/) と[チュートリアル](docs/manual/tutorials/iaas-api/server.md)があります。設計は [ADR 0040](docs/adr/0040-server-cloud-init-and-ssh-tutorial.md)、[ADR 0041](docs/adr/0041-server-repeatable-disk-and-nic-options.md) と[設計文書](docs/design/server-cloud-init-ssh.md)を参照してください。
 - [x] `switch` — SDK の `swytch` に対応する `iaas-api switch` の Find / Read / Create / Update / Delete を実装済みです。SDK の公開操作はすべて CLI にあります。Sandbox と is1b で作成・検索・参照・更新・削除を検証する [ライブ E2E runner](test/e2e/switch/) と[チュートリアル](docs/manual/tutorials/iaas-api/switch.md)があります。
 
 ## CommonServiceItem 系 API 候補
@@ -140,7 +140,9 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 [ADR 0058](docs/adr/0058-live-e2e-command-coverage.md) に従い、公開するすべての末端サブコマンドをライブ E2E で検証します。2026-10-23 時点で末端コマンド一覧と runner 実装を突合しました。
 
-多くの runner は対象コマンドを網羅しています。未検証は122コマンドで、version 1、server 1、internet 8、eventbus-api 7、apprun 11、iam-api 59、apprun-dedicated-api 35 です。
+多くの runner は対象コマンドを網羅しています。未検証は118コマンドで、internet 6、eventbus-api 7、apprun 11、iam-api 59、apprun-dedicated-api 35 です。
+
+2026-10-23 にタスク1として `server update`、`internet update`、`internet monitor-router`、`version` の4コマンドをライブ検証しました。既存 runner へのシナリオ追加と専用 runner の新規作成、そのライブ実行を完了しています。
 
 網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。
 
