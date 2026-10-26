@@ -104,7 +104,7 @@ func TestRunIAMAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"iam-api", "service-principal", "update", "--help"},
-			want: []string{"--request", "--name", "description", "name は必須"},
+			want: []string{"--request", "--name", "--description", "name と description は必須"},
 		},
 		{
 			args: []string{"iam-api", "service-principal", "list-keys", "--help"},
@@ -378,6 +378,7 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 	if err := json.Unmarshal(runCommand(
 		"iam-api", "service-principal", "update", strconv.Itoa(servicePrincipal.ID),
 		"--name", "mock-service-principal-flag-updated",
+		"--description", "updated principal",
 	), &servicePrincipal); err != nil {
 		t.Fatal(err)
 	}

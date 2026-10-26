@@ -302,13 +302,13 @@ $ skr iam-api project move --ids PROJECT-ID --parent-folder-id FOLDER-ID
 
 サービスプリンシパルに公開鍵を登録する場合は、公開鍵を `--public-key-file` から渡します。トークン発行で使うアサーションも `--assertion-file` または標準入力から渡し、秘密情報をコマンドライン引数に含めないでください。API キーを作成する場合は、必須の IAM ロール配列を含む JSON リクエストを `--request @path.json` で指定してください。作成結果にはアクセストークンとシークレットが含まれるため、出力をアクセス制限したファイルへ保存してください（[APIキー](https://manual.sakura.ad.jp/cloud/api/apikey.html)）。
 
-サービスプリンシパルを更新するときは、更新後の名前が必須です。`--name` を使うか、`--request` の JSON に `name` を含めてください。`description` を指定する場合は JSON リクエストに含めます。
+サービスプリンシパルを更新するときは、更新後の名前と説明が必須です。API は `description` を必須として扱い、省いたリクエストには 400 を返します。`--name` と `--description` を使うか、`--request` の JSON に `name` と `description` を含めてください。
 
 ```console
-$ skr iam-api service-principal update "$PRINCIPAL_ID" --name iam-tutorial-principal-renamed
+$ skr iam-api service-principal update "$PRINCIPAL_ID" --name iam-tutorial-principal-renamed --description "IAM tutorial service principal"
 ```
 
-JSON リクエストの例です。`name` を更新後の名前に置き換えてファイルに保存します。
+JSON リクエストの例です。`name` と `description` を更新後の値に置き換えてファイルに保存します。
 
 ```json
 {

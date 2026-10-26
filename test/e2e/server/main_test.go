@@ -259,6 +259,21 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 			return nil, errors.New("injected partial delete failure")
 		}
 		return nil, nil
+	case "test-update", "test-update-restore":
+		if f.server == nil || request["ID"] != f.server.ID {
+			return nil, errors.New("missing Server")
+		}
+		name, ok := request["Name"].(string)
+		if !ok || name == "" {
+			return nil, errors.New("missing Name")
+		}
+		desc, ok := request["Description"].(string)
+		if !ok || desc == "" {
+			return nil, errors.New("missing Description")
+		}
+		f.server.Name = name
+		f.server.Description = desc
+		return nil, nil
 	case "cleanup-read-disk":
 		disk := diskItem{ID: 45, Name: namePrefix + "test", DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 20 * 1024}
 		if f.orphanDisk != nil {
@@ -299,7 +314,8 @@ func TestScenarioCreatesBootsSSHAndCleansServerAndDisk(t *testing.T) {
 	}
 	for _, step := range []string{
 		"preflight-find-server", "preflight-find-disk", "test-create", "test-boot",
-		"test-read", "cleanup-read", "cleanup-delete", "cleanup-find-server-after", "cleanup-find-disk-after",
+		"test-read", "test-update", "test-update-restore",
+		"cleanup-read", "cleanup-delete", "cleanup-find-server-after", "cleanup-find-disk-after",
 	} {
 		if !containsStep(fake.calls, step) {
 			t.Errorf("scenario did not call %s", step)

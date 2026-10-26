@@ -57,29 +57,7 @@ type item struct {
 }
 
 func (i item) id() (string, error) {
-	if len(i.ID) == 0 {
-		return "", errors.New("resource ID is missing")
-	}
-	decoder := json.NewDecoder(bytes.NewReader(i.ID))
-	decoder.UseNumber()
-	var value any
-	if err := decoder.Decode(&value); err != nil {
-		return "", fmt.Errorf("decode resource ID: %w", err)
-	}
-	switch value := value.(type) {
-	case string:
-		if value == "" {
-			return "", errors.New("resource ID is empty")
-		}
-		return value, nil
-	case json.Number:
-		if value == "0" {
-			return "", errors.New("resource ID is empty")
-		}
-		return value.String(), nil
-	default:
-		return "", fmt.Errorf("resource ID has unsupported JSON type %T", value)
-	}
+	return decodeResourceID(i.ID)
 }
 
 type message struct {
@@ -127,6 +105,7 @@ type resource struct {
 	description string
 	id          string
 	attempted   bool
+	deleted     bool
 }
 
 type scenario struct {
@@ -136,6 +115,7 @@ type scenario struct {
 	queue       resource
 	config      resource
 	trigger     resource
+	schedule    resource
 	sw          resource
 	expected    string
 	settleDelay time.Duration
@@ -161,7 +141,7 @@ func (s *scenario) list(ctx context.Context, step, kind string) ([]item, error) 
 	switch kind {
 	case "queue":
 		args = []string{"simplemq-api", "queue", "list"}
-	case "process-configuration", "trigger":
+	case "process-configuration", "trigger", "schedule":
 		args = []string{"eventbus-api", kind, "list"}
 	case "switch":
 		request, err := json.Marshal(map[string]any{"Zone": zone})
@@ -228,7 +208,7 @@ func (s *scenario) preflight(ctx context.Context) error {
 	if strings.TrimSpace(string(profile)) == "" {
 		return errors.New("selected SDK profile name is empty")
 	}
-	for _, resource := range []resource{s.queue, s.config, s.trigger, s.sw} {
+	for _, resource := range []resource{s.queue, s.config, s.trigger, s.schedule, s.sw} {
 		items, err := s.list(ctx, "preflight-"+resource.kind+"s", resource.kind)
 		if err != nil {
 			return err
@@ -433,7 +413,7 @@ func (s *scenario) read(ctx context.Context, step string, resource resource) (it
 	switch resource.kind {
 	case "queue":
 		args = []string{"simplemq-api", "queue", "read", resource.id}
-	case "process-configuration", "trigger":
+	case "process-configuration", "trigger", "schedule":
 		args = []string{"eventbus-api", resource.kind, "read", resource.id}
 	case "switch":
 		args = []string{"iaas-api", "switch", "read", "--zone", zone, "--id", resource.id}
@@ -452,7 +432,7 @@ func (s *scenario) delete(ctx context.Context, step string, resource resource) e
 	switch resource.kind {
 	case "queue":
 		args = []string{"simplemq-api", "queue", "delete", resource.id}
-	case "process-configuration", "trigger":
+	case "process-configuration", "trigger", "schedule":
 		args = []string{"eventbus-api", resource.kind, "delete", resource.id}
 	case "switch":
 		args = []string{"iaas-api", "switch", "delete", "--zone", zone, "--id", resource.id, "--fail-if-not-found=true"}
@@ -464,7 +444,7 @@ func (s *scenario) delete(ctx context.Context, step string, resource resource) e
 }
 
 func (s *scenario) cleanupResource(ctx context.Context, resource *resource) error {
-	if !resource.attempted {
+	if !resource.attempted || resource.deleted {
 		return nil
 	}
 	id := resource.id
@@ -519,7 +499,7 @@ func (s *scenario) cleanup() error {
 	ctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer cancel()
 	var result error
-	for _, resource := range []*resource{&s.trigger, &s.config, &s.sw, &s.queue} {
+	for _, resource := range []*resource{&s.schedule, &s.trigger, &s.config, &s.sw, &s.queue} {
 		if err := s.cleanupResource(ctx, resource); err != nil {
 			result = errors.Join(result, err)
 		}
@@ -560,6 +540,9 @@ func (s *scenario) run(ctx context.Context) (result error) {
 	if err := s.createConfiguration(ctx); err != nil {
 		return err
 	}
+	if err := s.updateConfigurationAndVerify(ctx); err != nil {
+		return err
+	}
 	if err := s.setConfigurationSecret(ctx); err != nil {
 		return err
 	}
@@ -572,6 +555,12 @@ func (s *scenario) run(ctx context.Context) (result error) {
 	}
 	if err := checkIdentity(trigger, s.trigger, s.trigger.id); err != nil {
 		return fmt.Errorf("verify EventBus trigger before creating the Switch: %w", err)
+	}
+	if err := s.updateTriggerAndVerify(ctx); err != nil {
+		return err
+	}
+	if err := s.scheduleScenario(ctx); err != nil {
+		return err
 	}
 	if s.settleDelay > 0 {
 		fmt.Printf("Waiting %s for the trigger to settle before creating the Switch.\n", s.settleDelay)
@@ -679,6 +668,7 @@ func runMain() (exitCode int) {
 		queue:       resource{kind: "queue", name: name, description: desc},
 		config:      resource{kind: "process-configuration", name: name, description: desc},
 		trigger:     resource{kind: "trigger", name: name, description: desc},
+		schedule:    resource{kind: "schedule", name: name, description: desc},
 		sw:          resource{kind: "switch", name: name, description: desc},
 		expected:    testMessage,
 		settleDelay: triggerSettleDelay,

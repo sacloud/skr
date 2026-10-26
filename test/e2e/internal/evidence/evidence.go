@@ -34,15 +34,16 @@ type Recorder struct {
 }
 
 type record struct {
-	Sequence   int      `json:"sequence"`
-	Step       string   `json:"step"`
-	Command    string   `json:"command"`
-	Args       []string `json:"args,omitempty"`
-	Request    any      `json:"request,omitempty"`
-	Stdout     string   `json:"stdout"`
-	Stderr     string   `json:"stderr"`
-	ExitStatus *int     `json:"exit_status"`
-	Error      string   `json:"error,omitempty"`
+	Sequence      int      `json:"sequence"`
+	Step          string   `json:"step"`
+	Command       string   `json:"command"`
+	Args          []string `json:"args,omitempty"`
+	Request       any      `json:"request,omitempty"`
+	Stdout        string   `json:"stdout"`
+	Stderr        string   `json:"stderr"`
+	ExitStatus    *int     `json:"exit_status"`
+	Error         string   `json:"error,omitempty"`
+	ExpectedError bool     `json:"expected_error,omitempty"`
 }
 
 type RequestFileInput struct {
@@ -103,6 +104,18 @@ func ValidateStep(step string) error {
 }
 
 func (r *Recorder) Record(step, binary string, args []string, request any, stdout, stderr string, runErr error, redactStdout bool) error {
+	return r.record(step, binary, args, request, stdout, stderr, runErr, redactStdout, false)
+}
+
+// RecordExpectedError records a step whose CLI failure is the expected
+// outcome, such as the not-found check for a missing resource ID. The order
+// and the report mark the step as expected, so the failing command does not
+// read as an unexpected failure.
+func (r *Recorder) RecordExpectedError(step, binary string, args []string, request any, stdout, stderr string, runErr error, redactStdout bool) error {
+	return r.record(step, binary, args, request, stdout, stderr, runErr, redactStdout, true)
+}
+
+func (r *Recorder) record(step, binary string, args []string, request any, stdout, stderr string, runErr error, redactStdout bool, expectedError bool) error {
 	if err := ValidateStep(step); err != nil {
 		return err
 	}
@@ -110,13 +123,14 @@ func (r *Recorder) Record(step, binary string, args []string, request any, stdou
 	sequence := r.sequence
 	filename := fmt.Sprintf("%03d-%s.json", sequence, step)
 	entry := record{
-		Sequence: sequence,
-		Step:     step,
-		Command:  commandLine(binary, args),
-		Args:     args,
-		Request:  request,
-		Stdout:   stdout,
-		Stderr:   stderr,
+		Sequence:      sequence,
+		Step:          step,
+		Command:       commandLine(binary, args),
+		Args:          args,
+		Request:       request,
+		Stdout:        stdout,
+		Stderr:        stderr,
+		ExpectedError: expectedError,
 	}
 	if redactStdout {
 		entry.Stdout = "[REDACTED: APIKey]"
@@ -141,6 +155,9 @@ func (r *Recorder) Record(step, binary string, args []string, request any, stdou
 	result := "ok"
 	if runErr != nil {
 		result = "failed"
+		if expectedError {
+			result = "expected-error"
+		}
 	}
 	if err := r.appendOrder(sequence, step, result, filename); err != nil {
 		return err
@@ -179,6 +196,9 @@ func (r *Recorder) renderReport(result string, completed time.Time) string {
 		stepResult, status := "成功", "取得できません"
 		if entry.Error != "" {
 			stepResult = "失敗"
+			if entry.ExpectedError {
+				stepResult = "期待どおりの失敗"
+			}
 		}
 		if entry.ExitStatus != nil {
 			status = strconv.Itoa(*entry.ExitStatus)
@@ -190,6 +210,9 @@ func (r *Recorder) renderReport(result string, completed time.Time) string {
 		stepResult, status := "成功", "取得できません"
 		if entry.Error != "" {
 			stepResult = "失敗"
+			if entry.ExpectedError {
+				stepResult = "期待どおりの失敗"
+			}
 		}
 		if entry.ExitStatus != nil {
 			status = strconv.Itoa(*entry.ExitStatus)

@@ -32,16 +32,23 @@ import (
 )
 
 type fakeCLI struct {
-	value             *app
-	failStep          string
-	status            string
-	badCreateOutput   bool
-	changeCleanupData bool
-	deleted           bool
-	calls             []string
-	pages             map[string][][]appSummary
-	failPage          int
-	otherID           bool
+	value               *app
+	failStep            string
+	status              string
+	badCreateOutput     bool
+	changeCleanupData   bool
+	deleted             bool
+	calls               []string
+	pages               map[string][][]appSummary
+	failPage            int
+	otherID             bool
+	versions            []versionSummary
+	traffic             []trafficEntry
+	filter              packetFilter
+	userLimit           int
+	dropVersions        int
+	ignoreVersionDelete bool
+	ignoreTrafficUpdate bool
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
@@ -105,6 +112,117 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 			status = "Healthy"
 		}
 		return json.Marshal(map[string]string{"status": status})
+	case "update-application":
+		if !strings.HasPrefix(args[len(args)-1], "@") {
+			return nil, errors.New("request file required")
+		}
+		data, err := os.ReadFile(strings.TrimPrefix(args[len(args)-1], "@")) // #nosec G304 -- Request file is created under t.TempDir by the scenario.
+		if err != nil {
+			return nil, err
+		}
+		var request struct {
+			Components []struct {
+				Name      string `json:"name"`
+				MaxCPU    string `json:"max_cpu"`
+				MaxMemory string `json:"max_memory"`
+			} `json:"components"`
+			AllTrafficAvailable bool `json:"all_traffic_available"`
+		}
+		if err := json.Unmarshal(data, &request); err != nil {
+			return nil, err
+		}
+		if len(request.Components) != 1 || request.Components[0].MaxMemory == "" || request.Components[0].MaxCPU == "" {
+			return nil, errors.New("update request must contain one component with max_cpu and max_memory")
+		}
+		if f.value == nil {
+			return nil, errors.New("application not found")
+		}
+		f.value.Components[0].MaxCPU = request.Components[0].MaxCPU
+		f.value.Components[0].MaxMemory = request.Components[0].MaxMemory
+		now := time.Now().UTC()
+		f.versions = []versionSummary{
+			{ID: "version-old", Name: "initial", Status: "Healthy", CreatedAt: now.Add(-time.Minute).Format(time.RFC3339)},
+			{ID: "version-new", Name: "updated", Status: "Healthy", CreatedAt: now.Format(time.RFC3339)},
+		}
+		return json.Marshal(f.value)
+	case "read-updated-application":
+		if f.value == nil {
+			return nil, errors.New("application not found")
+		}
+		return json.Marshal(f.value)
+	case "list-versions":
+		versions := f.versions
+		if f.dropVersions > 0 && len(versions) > f.dropVersions {
+			versions = versions[:len(versions)-f.dropVersions]
+		}
+		return json.Marshal(versions)
+	case "list-versions-after-delete":
+		remaining := make([]versionSummary, 0, len(f.versions))
+		for _, version := range f.versions {
+			if f.ignoreVersionDelete || version.ID != "version-old" {
+				remaining = append(remaining, version)
+			}
+		}
+		return json.Marshal(remaining)
+	case "read-version-status":
+		status := f.status
+		if status == "" {
+			status = "Healthy"
+		}
+		return json.Marshal(map[string]string{"status": status})
+	case "read-version":
+		return json.Marshal(map[string]any{
+			"id": "version-new", "name": "updated", "status": "Healthy",
+			"port": port, "min_scale": 0, "max_scale": 1,
+			"components": []map[string]any{{
+				"name": "web", "max_cpu": updatedMaxCPU, "max_memory": updatedMaxMemory,
+				"deploy_source": map[string]any{"container_registry": map[string]any{"image": image}},
+			}},
+		})
+	case "list-traffic", "list-traffic-after-update":
+		return json.Marshal(f.traffic)
+	case "update-traffic":
+		if !f.ignoreTrafficUpdate {
+			f.traffic = []trafficEntry{{VersionName: "updated", IsLatestVersion: true, Percent: allTrafficPercent}}
+		}
+		return nil, nil
+	case "delete-version":
+		return nil, nil
+	case "read-packet-filter", "read-updated-packet-filter", "read-restored-packet-filter":
+		return json.Marshal(f.filter)
+	case "update-packet-filter", "restore-packet-filter":
+		var request struct {
+			IsEnabled bool `json:"is_enabled"`
+			Settings  []struct {
+				FromIP             string `json:"from_ip"`
+				FromIPPrefixLength int    `json:"from_ip_prefix_length"`
+			} `json:"settings"`
+		}
+		if !strings.HasPrefix(args[len(args)-1], "@") && args[len(args)-1] != "-" {
+			// inline JSON request
+			var inline string
+			for i := 0; i+1 < len(args); i++ {
+				if args[i] == "--request" {
+					inline = args[i+1]
+				}
+			}
+			if err := json.Unmarshal([]byte(inline), &request); err != nil {
+				return nil, err
+			}
+		}
+		f.filter.IsEnabled = request.IsEnabled
+		f.filter.Settings = request.Settings
+		return nil, nil
+	case "create-user":
+		if f.userLimit == 0 {
+			f.userLimit = 10
+		}
+		return json.Marshal(map[string]any{"limit": map[string]int{"application_count": f.userLimit}})
+	case "read-user":
+		if f.userLimit == 0 {
+			return nil, errors.New("AppRun user is not signed up")
+		}
+		return json.Marshal(map[string]any{"limit": map[string]int{"application_count": f.userLimit}})
 	case "cleanup-delete":
 		f.value = nil
 		f.deleted = true
@@ -125,6 +243,8 @@ func (f *fakeCLI) callRoot(ctx context.Context, step string, args ...string) ([]
 func newFakeApp(name string) *app {
 	value := &app{ID: "app-id", Name: name, Port: port, PublicURL: "https://example.invalid"}
 	value.Components = make([]struct {
+		MaxCPU       string `json:"max_cpu"`
+		MaxMemory    string `json:"max_memory"`
 		DeploySource struct {
 			ContainerRegistry struct {
 				Image string `json:"image"`
@@ -132,6 +252,8 @@ func newFakeApp(name string) *app {
 		} `json:"deploy_source"`
 	}, 1)
 	value.Components[0].DeploySource.ContainerRegistry.Image = image
+	value.Components[0].MaxCPU = "0.5"
+	value.Components[0].MaxMemory = "1Gi"
 	return value
 }
 
@@ -152,7 +274,12 @@ func TestScenarioCreatesChecksAndCleansUpApp(t *testing.T) {
 	if fake.value != nil || !fake.deleted {
 		t.Fatalf("AppRun application remains after scenario: value=%+v deleted=%t", fake.value, fake.deleted)
 	}
-	for _, step := range []string{"preflight-list", "create", "list-created", "read-created", "read-status", "cleanup-delete", "cleanup-list-after-delete"} {
+	for _, step := range []string{"preflight-list", "create", "list-created", "read-created", "read-status",
+		"read-packet-filter", "update-packet-filter", "read-updated-packet-filter", "restore-packet-filter", "read-restored-packet-filter",
+		"create-user", "read-user",
+		"update-application", "read-updated-application", "list-versions", "read-version-status", "read-version",
+		"list-traffic", "update-traffic", "list-traffic-after-update", "delete-version", "list-versions-after-delete",
+		"cleanup-delete", "cleanup-list-after-delete"} {
 		if !containsStep(fake.calls, step) {
 			t.Errorf("scenario did not call %s: %v", step, fake.calls)
 		}
