@@ -68,10 +68,10 @@
 ### E2E の配置と命名
 
 - E2E シナリオは testing.T ベースのテストとして、サービスまたはリソースごとに `test/e2e/<service-or-resource>/scenario_<snake_case>_test.go` へ配置します。新しいディレクトリ名とシナリオの識別名は、小文字の kebab-case にします。サービスのコマンド名、または IaaS の対象リソース名に対応させ、`object-storage-api` のように何を検証するか分かる名前にします。
-- シナリオは共有の helper (`test/e2e/internal/helper`) でビルド済みの skr を実行し、CLI 呼び出しのたびに説明を付けて記録します。テスト関数とその呼び出しだけを読めば、実行するステップと確認内容が分かるようにします。
+- シナリオは共有の helper (`test/e2e/internal/helper`) でビルド済みの skr を実行し、CLI 呼び出しのたびに説明を付けて記録します。テスト関数とその呼び出しだけを読めば、実行するステップと確認内容が分かるようにします。ステップの通し番号は付けず、説明だけで書きます。
 - helper は `SKR_E2E` 環境変数が未設定のときにテストをスキップするため、通常の `go test` では実環境を変更しません。ライブ実行は明示的に `SKR_E2E` を設定して行います。
 - helper は `SAKURA_PROFILE` に `skr-e2e` を設定し、ライブ実行の認証はプロファイルディレクトリの `skr-e2e` プロファイルを使い、認証情報を表示しません。`skr-e2e` プロファイルが存在しない場合もテストをスキップします。テスト自身がプロファイルを作成・管理するシナリオ（config コマンドの検証など）は `NewWithTemporaryProfileDir` を使い、一時プロファイルディレクトリで実行します。
-- 途中で失敗した場合の後片付けはテスト関数内の `defer` で行います。`t.Cleanup` はテスト終了後に `t.Context()` がキャンセルされた状態で呼ばれるため、CLI 呼び出しを伴う後片付けは `defer` で実行します。
+- 途中で失敗した場合の後片付けはテスト関数内の `defer` で行います。リソースを作成して内容を確認した直後に、削除と不在確認を含む `defer` をその場で登録し、フラグによる状態追跡や後片付け専用の関数への切り出しはしません。`t.Cleanup` はテスト終了後に `t.Context()` がキャンセルされた状態で呼ばれるため、CLI 呼び出しを伴う後片付けは `defer` で実行します。
 - 入力処理や後片付けなどの共有処理は、`privatekey.go` や `cleanup.go` のように役割を表す snake_case にし、テストも同名の `_test.go` に置きます。複数シナリオを横断するテストは `scenarios_test.go` に置けます。曖昧な `advanced.go` や、意味のない連番だけの名前は使いません。
 - 実行記録は helper が Git 対象外の `e2e-output/` 配下に `<識別名>-<実行日時>.md` の Markdown で保存します。識別名は `helper.New` の引数で指定し、`config` を含む名前は `c0nfig` に置き換えます。名前に秘密情報を含めません。
 - この規則は新規作成・分割する E2E に適用します。旧 runner 方式 (`main.go` と evidence 機構) の既存 runner は一括移行せず、各サービスの作業時に段階的に移行します。背景と判断は [ADR 0058](docs/adr/0058-live-e2e-command-coverage.md) と [ADR 0061](docs/adr/0061-e2e-testing-t-based-scenario.md) を参照してください。

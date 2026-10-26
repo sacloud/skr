@@ -78,6 +78,22 @@ func TestNewWithTemporaryProfileDir(t *testing.T) {
 	require.True(t, completed, "NewWithTemporaryProfileDir should not skip without SKR_E2E")
 }
 
+// TestWriteRequestJSONFile は --request 用リクエストファイルの作成を確認する。
+func TestWriteRequestJSONFile(t *testing.T) {
+	h := &Helper{}
+
+	path := h.WriteRequestJSONFile(t, "find", map[string]any{"Names": []string{"test"}})
+
+	// テスト専用ディレクトリの find.json に、マーシャルした JSON が 0600 で書かれる
+	require.Equal(t, "find.json", filepath.Base(path))
+	data, err := os.ReadFile(path) //nolint:gosec // helper が返したテスト専用ディレクトリ内のパスを読み込む。
+	require.NoError(t, err, "read request file")
+	require.JSONEq(t, `{"Names":["test"]}`, string(data))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0600), info.Mode().Perm())
+}
+
 // createProfile は指定されたプロファイルディレクトリに空のプロファイルを作成する。
 func createProfile(t *testing.T, dir, name string) {
 	t.Helper()
