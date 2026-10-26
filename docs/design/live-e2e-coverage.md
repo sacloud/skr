@@ -27,40 +27,17 @@
 | `test/e2e/iaas-lookup` | archive find / read、product disk find / read(4) | 全コマンド実装済み |
 | `test/e2e/iaas-product-plans` | product internet find / read、product license find、product privatehost find / read(5) | 全コマンド実装済み |
 | `test/e2e/object-storage-api` | 6シナリオで34コマンド | runner 実装済み。ライブは29コマンドの正常応答を確認済みで、`bucket penalty` と `site status bucket-metering` は API エラー、暗号化3操作は KMS キー作成未実装のため延期。状況は `PLAN.md` を参照 |
+| `test/e2e/iam-api` | 8シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | runner 実装済み。ライブは57コマンドの正常実行を確認済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
 
 `config` は CLI のメタコマンドとして上表に含めます。`version` は `test/e2e/version` の専用 runner で検証します。
 
 ## 未検証コマンド
 
-タスク2の完了後、未検証は59コマンドです。
+タスク3の完了後、未検証は35コマンドです。
 
 | サービス | 未検証コマンド | 件数 |
 | --- | --- | --- |
-| iam-api | 次節の59コマンド | 59 |
 | apprun-dedicated-api | 次節の35コマンド | 35 |
-
-### iam-api の未検証59コマンド
-
-分類は実装前の暫定であり、実装時に公式マニュアルと SDK で確認します。
-
-- 読み取り系(15)
-    - iam-role の list / read、id-role の list / read、id-policy read-organization。
-    - auth の read-auth-context / read-auth-conditions / read-password-policy。
-    - policy の read-folder / read-organization / read-project。
-    - organization の read / read-service-policy。
-    - service-policy の is-enabled / list-rule-templates。
-- リソーススコープの書き込み(29)
-    - policy の update-folder / update-project、folder move、project move。
-    - scim の create / delete / list / read / regenerate-token / update。
-    - sso の create / delete / link / list / read / unlink / update。
-    - project-api-key の create / delete / list / read / update。
-    - service-principal の update / list-keys / upload-key / delete-key / disable-key / enable-key / issue-token。
-- アカウント全体やログインユーザーへ影響する書き込み(15)
-    - auth の update-auth-conditions / update-password-policy。
-    - service-policy の enable / disable、organization の update / update-service-policy。
-    - policy update-organization、id-policy update-organization。
-    - user-2fa の clear-trusted-devices / deactivate-otp / delete-security-key / delete-trusted-device。
-    - user-2fa の list-security-keys / list-trusted-devices / read-security-key。
 
 ### apprun-dedicated-api の未検証35コマンド
 
@@ -87,13 +64,16 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 - `apprun user create`(1コマンド): 完了。サインアップはアカウント単位で取り消せないため、create の失敗を「サインアップ済み」として許容し、Read で `limit.application_count` を確認します。2026-10-23 にライブで正常実行を確認しました。
 - vCPU とメモリの組み合わせは API 側で検証されます(0.5/1Gi、1/2Gi、2/4Gi)。update では 1 vCPU / 2Gi を使用します。
 
-### タスク3: iam-api の段階的整備
+### タスク3: iam-api の段階的整備(完了)
 
-未検証59コマンドを前節の暫定分類に従って整備します。
-
-- 読み取り系(15): 費用と副作用がないため、最初に整備します。
-- リソーススコープの書き込み(29): runner が作成する一時リソースに対する操作です。作成・変更・削除と後片付けを1シナリオで確認します。
-- アカウント全体やログインユーザーへ影響する書き込み(15): 実行前の合意が必要です。延期する場合は追跡 Issue を作成します。
+- 読み取り系(15): 完了。`scenario_read_only.go` で一括参照し、2026-10-26 にライブで正常応答を確認しました。
+- リソーススコープの書き込み(29): 完了。6つのシナリオで、runner が作成する一時リソースの作成・変更・削除と後片付けを1シナリオで確認し、2026-10-26 にライブで正常実行を確認しました。sso link/unlink は全組織ユーザーのログイン方法に影響するため、[#144](https://github.com/sacloud/skr/issues/144) で対応します。
+- アカウント全体やログインユーザーへ影響する書き込み(15): 完了。`scenario_account.go` と `scenario_user2fa.go` で確認し、2026-10-26 にライブで正常実行を確認しました。
+    - パスワードポリシー・認証条件・ID ポリシー・組織ポリシーの各更新は、読み取った値をそのまま送り返す同一値の往復で、組織設定を変更しません。
+    - service-policy は無効状態での update が 409 で拒否されるため、有効化してから同一ルールで更新し、無効化に戻します。
+    - user-2fa は使い捨ての一時ユーザーに対して、空ページの参照と `deactivate-otp`・`clear-trusted-devices` の正常終了、存在しない ID の操作が 404 で分類されることを確認します。
+- 期待どおりの失敗を確認するステップは、`test/e2e/internal/evidence` の `RecordExpectedError` で記録します。ORDER.txt では `expected-error`、レポートでは「期待どおりの失敗」と表示され、CLI の終了コード 1 が期待値であるステップを予期しない失敗と区別します。
+- ライブ実行では一時的なネットワークエラーが頻発したため、`SAKURACLOUD_RETRY_MAX=3` と `SAKURACLOUD_RETRY_WAIT_MIN=1`、`SAKURACLOUD_RETRY_WAIT_MAX=30` を実行時に指定しました。プロファイルの `RetryMax = 0` は変更していません。
 
 ### タスク4: apprun-dedicated-api
 
@@ -112,6 +92,9 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 - タスク2の internet runner の証跡ステップは `test-add-subnet`、`test-update-subnet`、`test-delete-subnet`、`test-enable-ipv6`、`test-read-ipv6` などの kebab-case です。
 - タスク2の eventbus runner の証跡ステップは `update-configuration`、`update-trigger`、`schedule-create`、`schedule-read`、`schedule-update` などの kebab-case です。
 - タスク2の apprun runner の証跡ステップは `update-application`、`list-versions`、`read-version`、`list-traffic`、`update-traffic`、`read-packet-filter` などの kebab-case です。
+- タスク3の iam-api runner は `test/e2e/iam-api/` 配下に次のシナリオと、対応する `_test.go` を追加しました。証跡ステップは `account-read-password-policy`、`account-update-service-policy`、`u2fa-read-missing-security-key` などの kebab-case です。
+    - `scenario_read_only.go`、`scenario_policy.go`、`scenario_hierarchy.go`、`scenario_serviceprincipal.go`、`scenario_projectapikey.go`。
+    - `scenario_scim.go`、`scenario_sso.go`、`scenario_account.go`、`scenario_user2fa.go`。
 - 任意の改善候補として、`test/e2e/simple-notification/crud.go` を `scenario_crud_only.go` に改名できます。対応する `crud_test.go` も合わせます。`test/e2e/gslb/server.go` は役割を表す名前のため変更不要です。
 
 ## 参照

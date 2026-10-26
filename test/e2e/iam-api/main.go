@@ -72,6 +72,7 @@ func (i item) markedForThisRun(suffix string) bool {
 
 type cli interface {
 	call(ctx context.Context, step string, args ...string) ([]byte, error)
+	callExpectError(ctx context.Context, step string, args ...string) error
 }
 
 type cliRunner struct {
@@ -80,6 +81,19 @@ type cliRunner struct {
 }
 
 func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]byte, error) {
+	return r.run(ctx, step, args, false)
+}
+
+// callExpectError runs the command expecting a failure, such as the
+// not-found check for a missing resource ID. The evidence marks the step as
+// an expected error, and the returned error lets the caller verify the
+// error classification.
+func (r *cliRunner) callExpectError(ctx context.Context, step string, args ...string) error {
+	_, err := r.run(ctx, step, args, true)
+	return err
+}
+
+func (r *cliRunner) run(ctx context.Context, step string, args []string, expectError bool) ([]byte, error) {
 	if err := evidence.ValidateStep(step); err != nil {
 		return nil, err
 	}
@@ -92,14 +106,28 @@ func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]by
 	command.Stderr = &stderr
 	runErr := command.Run()
 
-	if err := r.evidence.Record(step, r.binary, args, nil, stdout.String(), stderr.String(), runErr, false); err != nil {
+	var recordErr error
+	if expectError {
+		recordErr = r.evidence.RecordExpectedError(step, r.binary, args, nil, stdout.String(), stderr.String(), runErr, false)
+	} else {
+		recordErr = r.evidence.Record(step, r.binary, args, nil, stdout.String(), stderr.String(), runErr, false)
+	}
+	if recordErr != nil {
 		if runErr != nil {
-			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr), err)
+			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w: %s", step, runErr, stderr.String()), recordErr)
 		}
-		return nil, err
+		return nil, recordErr
 	}
 	if runErr != nil {
-		return nil, fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr)
+		if expectError {
+			// The caller verifies the error classification, so the failure is
+			// the expected outcome and not a CLI failure.
+			return nil, fmt.Errorf("%s: %w: %s", step, runErr, stderr.String())
+		}
+		return nil, fmt.Errorf("%s: skr failed: %w: %s", step, runErr, stderr.String())
+	}
+	if expectError {
+		return nil, nil // The caller reports the unexpected success.
 	}
 	return stdout.Bytes(), nil
 }
@@ -726,7 +754,13 @@ func (s *scenario) run(ctx context.Context) (result error) {
 	if err := s.updateMemberships(ctx); err != nil {
 		return err
 	}
-	return s.readMemberships(ctx)
+	if err := s.readMemberships(ctx); err != nil {
+		return err
+	}
+	if err := s.user2faScenario(ctx); err != nil {
+		return err
+	}
+	return s.accountScenario(ctx)
 }
 
 func randomSuffix() (string, error) {

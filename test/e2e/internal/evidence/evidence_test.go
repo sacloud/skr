@@ -104,6 +104,40 @@ func TestRecorderOrdersAndRedactsEvidence(t *testing.T) {
 	}
 }
 
+func TestRecordExpectedErrorMarksTheStepAsExpected(t *testing.T) {
+	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "iam-api"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.RecordExpectedError("u2fa-read-missing-security-key", "./skr", []string{"iam-api", "user-2fa", "read-security-key", "999999999999"}, nil, "", "iam: API Error 404", &exec.ExitError{}, false); err != nil {
+		t.Fatal(err)
+	}
+	order, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-u2fa-read-missing-security-key.json")) //nolint:gosec // The path is created under t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(order), `"expected_error": true`) {
+		t.Fatalf("expected error record is missing the expected_error flag: %s", order)
+	}
+	orderText, err := os.ReadFile(filepath.Join(recorder.Dir(), "ORDER.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(orderText), "001\tu2fa-read-missing-security-key\texpected-error\t001-u2fa-read-missing-security-key.json") {
+		t.Fatalf("evidence order does not mark the expected error: %s", orderText)
+	}
+	if err := recorder.SetResult("passed", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	report, err := os.ReadFile(filepath.Join(recorder.Dir(), "REPORT.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(report), "期待どおりの失敗") {
+		t.Fatalf("report does not mark the expected error: %s", report)
+	}
+}
+
 func TestSetResultWritesPrivateResult(t *testing.T) {
 	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "switch-api"), time.Now())
 	if err != nil {

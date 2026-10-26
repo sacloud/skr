@@ -79,6 +79,13 @@ type fakeCLI struct {
 
 	// knob for the hierarchy scenario parent verification
 	childFolderParentID int64
+
+	// state for the account scenario
+	orgName                    string
+	servicePolicyEnabled       bool
+	servicePolicyRules         json.RawMessage
+	idPolicyBindings           []policyBinding
+	organizationPolicyBindings []policyBinding
 }
 
 const (
@@ -98,7 +105,16 @@ func newFakeCLI() *fakeCLI {
 		folderPolicyBindings:  []policyBinding{},
 		projectPolicyBindings: []policyBinding{fakeServicePrincipalBinding("owner", 113702071936)},
 		childFolderParentID:   fakeMainFolderID,
+
+		servicePolicyRules:         json.RawMessage("[]"),
+		idPolicyBindings:           []policyBinding{fakeBinding("identity-admin", 1001)},
+		organizationPolicyBindings: []policyBinding{fakeBinding("identity-admin", 1001)},
 	}
+}
+
+func (f *fakeCLI) callExpectError(ctx context.Context, step string, args ...string) error {
+	_, err := f.call(ctx, step, args...)
+	return err
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
@@ -117,6 +133,9 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		return response, responseErr
 	}
 	if response, responseErr, ok := f.managedResponse(step, args); ok {
+		return response, responseErr
+	}
+	if response, responseErr, ok := f.accountResponse(step, args); ok {
 		return response, responseErr
 	}
 	if len(args) >= 3 && args[0] == "iam-api" && args[2] == "list" {
@@ -632,6 +651,122 @@ func parsePolicyBindings(args []string) []policyBinding {
 	return bindings
 }
 
+// accountResponse serves the organization-scoped write steps of the account
+// and user 2FA scenarios. The scenario updates each setting with the values it
+// read before, so the fake stores the request and serves it back on the
+// verify read.
+func (f *fakeCLI) accountResponse(step string, args []string) ([]byte, error, bool) {
+	switch step {
+	case "account-read-password-policy":
+		minLength := 8
+		if f.passwordMinLength != 0 {
+			minLength = f.passwordMinLength
+		}
+		return mustRoleJSON(passwordPolicy{MinLength: minLength}), nil, true
+	case "account-update-password-policy":
+		request := argument(args, "--request")
+		var policy passwordPolicy
+		if err := json.Unmarshal([]byte(request), &policy); err != nil {
+			return nil, errInvalid("account-update-password-policy: invalid request JSON"), true
+		}
+		if policy.MinLength <= 0 {
+			return nil, errInvalid("account-update-password-policy: min_length must be positive"), true
+		}
+		return []byte(request), nil, true
+	case "account-read-auth-conditions":
+		return mustRoleJSON(map[string]any{
+			"ip_restriction":          map[string]any{"mode": "allow_all"},
+			"require_two_factor_auth": map[string]any{"enabled": false},
+			"datetime_restriction":    map[string]any{"after": nil, "before": nil},
+		}), nil, true
+	case "account-update-auth-conditions":
+		request := argument(args, "--request")
+		var conditions authConditions
+		if err := json.Unmarshal([]byte(request), &conditions); err != nil {
+			return nil, errInvalid("account-update-auth-conditions: invalid request JSON"), true
+		}
+		if conditions.IPRestriction.Mode == "" {
+			return nil, errInvalid("account-update-auth-conditions: ip_restriction.mode is required"), true
+		}
+		return []byte(request), nil, true
+	case "account-read-id-policy", "account-verify-id-policy":
+		return mustRoleJSON(f.idPolicyBindings), nil, true
+	case "account-update-id-policy":
+		f.idPolicyBindings = parsePolicyBindings(args)
+		if f.idPolicyBindings == nil {
+			f.idPolicyBindings = []policyBinding{}
+		}
+		return mustRoleJSON(f.idPolicyBindings), nil, true
+	case "account-read-organization-policy", "account-verify-organization-policy":
+		return mustRoleJSON(f.organizationPolicyBindings), nil, true
+	case "account-update-organization-policy":
+		f.organizationPolicyBindings = parsePolicyBindings(args)
+		if f.organizationPolicyBindings == nil {
+			f.organizationPolicyBindings = []policyBinding{}
+		}
+		return mustRoleJSON(f.organizationPolicyBindings), nil, true
+	case "account-read-organization":
+		organizationID := int64(113701027680)
+		if f.organizationID != 0 {
+			organizationID = f.organizationID
+		}
+		return mustRoleJSON(organizationInfo{ID: organizationID, Name: f.orgName}), nil, true
+	case "account-update-organization":
+		organizationID := int64(113701027680)
+		if f.organizationID != 0 {
+			organizationID = f.organizationID
+		}
+		f.orgName = argument(args, "--name")
+		return mustRoleJSON(organizationInfo{ID: organizationID, Name: f.orgName}), nil, true
+	case "account-read-service-policy":
+		return mustRoleJSON(f.servicePolicyRules), nil, true
+	case "account-enable-service-policy":
+		f.servicePolicyEnabled = true
+		return nil, nil, true
+	case "account-disable-service-policy", "account-restore-service-policy-disabled":
+		f.servicePolicyEnabled = false
+		return nil, nil, true
+	case "account-verify-service-policy-enabled":
+		if !f.servicePolicyEnabled {
+			return nil, errInvalid("account-verify-service-policy-enabled: the service policy is not enabled"), true
+		}
+		return []byte("true\n"), nil, true
+	case "account-verify-service-policy-disabled":
+		if f.servicePolicyEnabled {
+			return nil, errInvalid("account-verify-service-policy-disabled: the service policy is enabled"), true
+		}
+		return []byte("false\n"), nil, true
+	case "account-update-service-policy":
+		// The rules can only be updated while the policy is enabled.
+		if !f.servicePolicyEnabled {
+			return nil, errInvalid("account-update-service-policy: API Error 409 - サービスポリシーが有効化されていません"), true
+		}
+		request := argument(args, "--request")
+		var rules []json.RawMessage
+		if err := json.Unmarshal([]byte(request), &rules); err != nil {
+			return nil, errInvalid("account-update-service-policy: invalid request JSON"), true
+		}
+		f.servicePolicyRules = json.RawMessage(request)
+		return []byte(request), nil, true
+	case "u2fa-list-trusted-devices", "u2fa-list-security-keys":
+		return mustRoleJSON(map[string]any{
+			"items": []json.RawMessage{}, "count": 0, "next": nil, "previous": nil,
+		}), nil, true
+	case "u2fa-deactivate-otp", "u2fa-clear-trusted-devices":
+		if argument(args, "--user-id") == "" {
+			return nil, errInvalid(step + " requires --user-id"), true
+		}
+		return nil, nil, true
+	case "u2fa-read-missing-security-key", "u2fa-delete-missing-trusted-device", "u2fa-delete-missing-security-key":
+		id := lastArg(args)
+		if id != missingTwoFactorResourceID {
+			return nil, errInvalid(step + ": unexpected resource ID " + id), true
+		}
+		return nil, errInvalid(step + ": API Error 404 - 見つかりませんでした。"), true
+	}
+	return nil, nil, false
+}
+
 func readRequestBody(args []string) map[string]any {
 	request := argument(args, "--request")
 	if strings.HasPrefix(request, "@") {
@@ -885,6 +1020,31 @@ func TestScenarioCreatesAndCleansUpResources(t *testing.T) {
 		"create-group",
 		"update-memberships",
 		"read-memberships",
+		"u2fa-list-trusted-devices",
+		"u2fa-list-security-keys",
+		"u2fa-deactivate-otp",
+		"u2fa-clear-trusted-devices",
+		"u2fa-read-missing-security-key",
+		"u2fa-delete-missing-trusted-device",
+		"u2fa-delete-missing-security-key",
+		"account-read-password-policy",
+		"account-update-password-policy",
+		"account-read-auth-conditions",
+		"account-update-auth-conditions",
+		"account-read-id-policy",
+		"account-update-id-policy",
+		"account-verify-id-policy",
+		"account-read-organization-policy",
+		"account-update-organization-policy",
+		"account-verify-organization-policy",
+		"account-read-organization",
+		"account-update-organization",
+		"account-read-service-policy",
+		"account-enable-service-policy",
+		"account-verify-service-policy-enabled",
+		"account-update-service-policy",
+		"account-disable-service-policy",
+		"account-verify-service-policy-disabled",
 		"cleanup-delete-service-principal",
 		"cleanup-verify-service-principal-page-1",
 		"cleanup-delete-group",

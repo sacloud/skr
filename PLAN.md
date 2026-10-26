@@ -103,7 +103,7 @@ SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のよう
 
 SDK の `api` 直下には、IaaS 以外に次の API ドメインがあります。CLI コマンドの実装、ライブ E2E、チュートリアルの対応状況は分けて記載します。コマンドの入口があることは、そのドメインの SDK 操作すべてへの対応を意味しません。
 
-- [x] `iam` — `iam-api` コマンドと[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。[ライブ E2E runner](test/e2e/iam-api/)はユーザー、グループ、フォルダ、プロジェクト、サービスプリンシパルの一部操作を検証済みで、残りの末端コマンドは[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)で管理します。
+- [x] `iam` — `iam-api` コマンドと[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。[ライブ E2E runner](test/e2e/iam-api/)は59の末端コマンドのうち57コマンドを2026-10-26 にライブ検証済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で対応します。残りの状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)で管理します。
 - [x] `eventbus` — `eventbus-api`。Provider 補完・リクエスト検証・シークレット入力とエラー伝播のドメイン単体テストを実装済みです。[ライブ E2E runner](test/e2e/eventbus-api/)は process-configuration と trigger の作成・参照・削除、update-secret、SimpleMQ 連携を検証済みです。schedule と Update 操作も[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)のとおり 2026-10-23 にライブ検証を確認済みです。
 - [x] `simplemq` — `simplemq-api`。キュー／メッセージコマンドは `apigen-api` を使います。12の末端コマンドを1シナリオで実行する[ライブ E2E runner](test/e2e/simplemq/)と[チュートリアル](docs/manual/tutorials/simplemq-api.md)があります。
 - [x] `simple-notification` — `simple-notification-api`。通知先、グループ、ルーティング、履歴の SDK 公開操作を実装済みです。送信は `--message` と JSON 入力に対応します。[ライブ E2E runner](test/e2e/simple-notification/) と[チュートリアル](docs/manual/tutorials/simple-notification-api.md)があります。ライブではメール通知の処理完了、利用者による実受信、履歴の個別取得を確認済みです。追加の `--crud-only` シナリオで、一時通知先・グループ・ルーティングの作成／参照／更新／削除、設定省略時の保持と設定変更、一時ルーティングだけの並べ替え、既存設定の保持、削除後の不在も確認済みです。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。
@@ -140,13 +140,15 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 [ADR 0058](docs/adr/0058-live-e2e-command-coverage.md) に従い、公開するすべての末端サブコマンドをライブ E2E で検証します。2026-10-23 時点で末端コマンド一覧と runner 実装を突合しました。
 
-多くの runner は対象コマンドを網羅しています。タスク2完了後の未検証は59コマンドで、iam-api 59、apprun-dedicated-api 35 です。
+多くの runner は対象コマンドを網羅しています。タスク3完了後の未検証は35コマンドで、apprun-dedicated-api 35 です。
 
 2026-10-23 にタスク1として `server update`、`internet update`、`internet monitor-router`、`version` の4コマンドをライブ検証しました。既存 runner へのシナリオ追加と専用 runner の新規作成、そのライブ実行を完了しています。
 
 2026-10-23 にタスク2として 25 コマンドをライブ検証しました。internet のサブネット3操作と IPv6 3操作です。eventbus-api の schedule 5操作、process-configuration update、trigger update です。apprun の Update、Version 4操作、Traffic 2操作、PacketFilter 2操作、User 2操作です。
 
 既存 runner へのシナリオ追加とそのライブ実行を完了しています。
+
+2026-10-26 にタスク3として iam-api の59コマンドのうち57コマンドをライブ検証しました。読み取り15操作、リソーススコープの書き込み27操作、アカウント全体やログインユーザーへ影響する書き込み15操作です。sso link/unlink は全組織ユーザーのログイン方法に影響するため、[#144](https://github.com/sacloud/skr/issues/144) で影響範囲の確認と設計を進めます。期待どおりの失敗を確認するステップは、証跡に `expected-error` として記録されます。
 
 網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。
 
