@@ -1,6 +1,6 @@
 # ADR 0060: E2E runner の共通ライブラリ化とシナリオ分離
 
-- Status: Accepted
+- Status: Superseded by [ADR 0061](0061-e2e-testing-t-based-scenario.md)
 - Date: 2026-10-26
 
 ## Context

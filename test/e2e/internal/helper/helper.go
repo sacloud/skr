@@ -56,7 +56,7 @@ func New(t *testing.T, name, description string) *Helper {
 		// $PROJECTROOT/e2e-output/${h.name}-YYYYMMDDHHMMSS.md を出力する。
 		// 実行されたコマンドの出力結果を記録する。
 		dir := "e2e-output"
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			t.Errorf("failed to create e2e-output directory: %v", err)
 			return
 		}
@@ -71,7 +71,7 @@ func New(t *testing.T, name, description string) *Helper {
 			buf.WriteString(res.Render())
 		}
 
-		if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
+		if err := os.WriteFile(path, buf.Bytes(), 0600); err != nil {
 			t.Errorf("failed to write report file: %v", err)
 		}
 		t.Logf("report file: %s", path)

@@ -30,12 +30,15 @@
 
 ## 検証
 
-`internal/containerregistryapi` の SDK caller test は公開 `iaas.APICaller` を通じて SDK の Container Registry API 操作とレスポンス変換を検証します。`internal/cli` のテストは実際の Kong コマンドパス、JSON の厳密なデコード、パスワードファイル、出力および入力エラーを確認します。`test/e2e/container-registry-api` は確認フラグ必須のライブシナリオで、ユニークなレジストリ・ユーザーを作成して照合し、今回作成した対象だけを削除します。
+`internal/containerregistryapi` の SDK caller test は公開 `iaas.APICaller` を通じて SDK の Container Registry API 操作とレスポンス変換を検証します。`internal/cli` のテストは実際の Kong コマンドパス、JSON の厳密なデコード、パスワードファイル、出力および入力エラーを確認します。`test/e2e/container-registry-api` は testing.T ベースのライブシナリオ ([ADR 0061](../adr/0061-e2e-testing-t-based-scenario.md)) で、ユニークなレジストリ・ユーザーを作成して照合し、今回作成した対象だけを削除します。
 
-ビルド済み CLI と対象プロファイルを確認し、ライブ API に接続する操作を承認した場合のみ、次のコマンドを実行します。
+ビルド済み CLI と認証情報を確認し、ライブ API に接続する操作を承認した場合のみ、次のコマンドを実行します。
 
 ```console
-$ go run ./test/e2e/container-registry-api --skr ./skr --confirm-container-registry-live
+$ go build -o skr .
+$ SKR_E2E=1 SAKURA_ACCESS_TOKEN=<token> SAKURA_ACCESS_TOKEN_SECRET=<secret> go test ./test/e2e/container-registry-api/
 ```
 
-runner はランダム名のレジストリとユーザーを作成し、レジストリの説明とユーザー権限を更新してから両方を削除します。既存名との衝突を検出した場合や識別情報が一致しない場合は変更せず停止します。コマンドの入出力証跡と `--request @path.json` で渡した JSON の内容は Git 管理外の `tmp/container-registry-api/` にアクセス制限付きで保存し、`REPORT.md` に表示します。パスワードは request JSON に含めず、証跡には記録しません。
+テストは helper が `SAKURA_PROFILE_DIR` を一時ディレクトリに分離するため、プロファイル認証は使えません。`skr` が対応する `SAKURA_ACCESS_TOKEN` / `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で認証します。`SKR_E2E` を設定しない場合はテストがスキップされ、通常の `go test` では実環境を変更しません。
+
+シナリオはランダム名のレジストリとユーザーを作成し、レジストリの説明とユーザー権限を更新してから両方を削除します。既存名との衝突を検出した場合や識別情報が一致しない場合は変更せず停止します。途中で失敗した場合は、作成が試行されたレジストリとユーザーだけを `defer` による後片付けで削除します。コマンドの入出力証跡は Git 管理外の `e2e-output/` 配下に Markdown で保存します。パスワードは保護されたファイルから読み込み、引数や証跡に含めません。
