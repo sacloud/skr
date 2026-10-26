@@ -17,7 +17,7 @@ type ServicePrincipalCommands struct {
 	List       ServicePrincipalListCommand       "cmd:\"\" help:\"サービスプリンシパルを一覧表示します。\""
 	Create     ServicePrincipalCreateCommand     "cmd:\"\" help:\"サービスプリンシパルを作成します。\""
 	Read       ServicePrincipalReadCommand       "cmd:\"\" help:\"ID を指定してサービスプリンシパルを読み取ります。\""
-	Update     ServicePrincipalUpdateCommand     "cmd:\"\" help:\"サービスプリンシパルを更新します。更新後の名前は --name または --request JSON の name に指定してください。\""
+	Update     ServicePrincipalUpdateCommand     "cmd:\"\" help:\"サービスプリンシパルの名前と説明を更新します。名前と説明は必須です。\""
 	Delete     ServicePrincipalDeleteCommand     "cmd:\"\" help:\"ID を指定してサービスプリンシパルを削除します。\""
 	ListKeys   ServicePrincipalListKeysCommand   "cmd:\"\" help:\"サービスプリンシパルに登録されたキーを一覧表示します。\""
 	UploadKey  ServicePrincipalUploadKeyCommand  "cmd:\"\" help:\"サービスプリンシパルに PEM 形式の RSA 公開鍵（2048～4096 ビット）を登録します。公開鍵は --public-key-file で読み込みます。\""
@@ -245,16 +245,18 @@ func (c *ServicePrincipalReadCommand) Run(ctx *kong.Context) error {
 }
 
 type ServicePrincipalUpdateCommand struct {
-	ID      int     "arg:\"\" name:\"id\" help:\"更新するサービスプリンシパル ID。\""
-	Request *string "help:\"更新後の名前を含む JSON。name は必須です。任意の description は JSON で指定できます。直接指定するか @path.json で読み込みます。--request と --name は併用できません。\""
-	Name    *string "name:\"name\" help:\"必須: 更新後のサービスプリンシパル名。\""
-	factory ServicePrincipalAPIFactory
-	runtime ServicePrincipalRuntime
+	ID          int     "arg:\"\" name:\"id\" help:\"更新するサービスプリンシパル ID。\""
+	Request     *string "help:\"更新後のサービスプリンシパル設定を含む JSON。name と description は必須です。直接指定するか @path.json で読み込みます。--request と --name は併用できません。\""
+	Name        *string "name:\"name\" help:\"必須: 更新後のサービスプリンシパル名。\""
+	Description *string "name:\"description\" help:\"必須: 更新後のサービスプリンシパルの説明。\""
+	factory     ServicePrincipalAPIFactory
+	runtime     ServicePrincipalRuntime
 }
 
 func (c *ServicePrincipalUpdateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Name != nil
+	flagsSet = flagsSet || c.Description != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -275,6 +277,13 @@ func (c *ServicePrincipalUpdateCommand) Run(ctx *kong.Context) error {
 		}
 		if c.Name != nil {
 			request.Name = *c.Name
+		}
+		if c.Description == nil {
+			return fmt.Errorf("--description が必要です")
+		}
+		if c.Description != nil {
+			value := v1.NewOptString(*c.Description)
+			request.Description = value
 		}
 	}
 	if c.runtime.ValidateOutput == nil {

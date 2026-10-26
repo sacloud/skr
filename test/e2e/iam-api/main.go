@@ -115,6 +115,18 @@ type resource struct {
 	pendingName string
 }
 
+// managedResource tracks a temporary resource that is created and deleted by
+// its own scenario. The current name follows rename steps so that the cleanup
+// can verify the identity before deleting a resource left behind by a
+// failure.
+type managedResource struct {
+	kind        string
+	name        string
+	currentName string
+	id          string
+	attempted   bool
+}
+
 type scenario struct {
 	client           cli
 	password         string
@@ -122,10 +134,16 @@ type scenario struct {
 	user             resource
 	group            resource
 	folder           resource
+	childFolder      resource
 	project          resource
 	servicePrincipal resource
+	scim             managedResource
+	ssoProfile       managedResource
+	projectAPIKey    managedResource
 	email            string
 	renamed          string
+	principalID      int64
+	limitedProjectID int64
 }
 
 func (s *scenario) call(ctx context.Context, step string, args ...string) ([]byte, error) {
@@ -277,7 +295,7 @@ func (s *scenario) preflight(ctx context.Context) error {
 	if strings.TrimSpace(string(profile)) == "" {
 		return errors.New("selected SDK profile name is empty")
 	}
-	for _, target := range []resource{s.user, s.group, s.folder, s.project, s.servicePrincipal} {
+	for _, target := range []resource{s.user, s.group, s.folder, s.childFolder, s.project, s.servicePrincipal} {
 		items, err := s.list(ctx, "preflight-"+target.kind+"s", target.kind, target.name)
 		if err != nil {
 			return err
@@ -620,7 +638,14 @@ func (s *scenario) cleanup() error {
 	ctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer cancel()
 	var result error
-	for _, target := range []*resource{&s.servicePrincipal, &s.group, &s.user, &s.project, &s.folder} {
+	// Managed resources belong to the organization or the project of this run,
+	// so they are removed before the project and folders themselves.
+	for _, target := range []*managedResource{&s.scim, &s.ssoProfile, &s.projectAPIKey} {
+		if err := s.cleanupManaged(ctx, target); err != nil {
+			result = errors.Join(result, err)
+		}
+	}
+	for _, target := range []*resource{&s.servicePrincipal, &s.group, &s.user, &s.project, &s.childFolder, &s.folder} {
 		if err := s.cleanupResource(ctx, target); err != nil {
 			result = errors.Join(result, err)
 		}
@@ -638,16 +663,40 @@ func (s *scenario) run(ctx context.Context) (result error) {
 		}
 	}()
 
+	if err := s.readOnlyScenario(ctx); err != nil {
+		return err
+	}
 	if err := s.createFolder(ctx); err != nil {
 		return err
 	}
 	if err := s.createProject(ctx); err != nil {
 		return err
 	}
+	if err := s.readResourcePolicies(ctx); err != nil {
+		return err
+	}
+	if err := s.policyScenario(ctx); err != nil {
+		return err
+	}
+	if err := s.hierarchyScenario(ctx); err != nil {
+		return err
+	}
 	if err := s.createUser(ctx); err != nil {
 		return err
 	}
 	if err := s.createServicePrincipal(ctx); err != nil {
+		return err
+	}
+	if err := s.servicePrincipalScenario(ctx); err != nil {
+		return err
+	}
+	if err := s.projectAPIKeyScenario(ctx); err != nil {
+		return err
+	}
+	if err := s.scimScenario(ctx); err != nil {
+		return err
+	}
+	if err := s.ssoScenario(ctx); err != nil {
 		return err
 	}
 	if err := s.verifyUser(ctx); err != nil {
@@ -707,7 +756,7 @@ func randomPassword() (string, error) {
 
 func runMain() (exitCode int) {
 	binary := flag.String("skr", "./skr", "Path to a built skr binary")
-	confirmed := flag.Bool("confirm-iam-live", false, "Confirm creating, updating, and deleting a test IAM user, group, folder, project, and service principal in the authenticated organization")
+	confirmed := flag.Bool("confirm-iam-live", false, "Confirm creating, updating, and deleting test IAM users, groups, folders, a project, service principals with keys, a project API key, a SCIM configuration, and an SSO profile in the authenticated organization")
 	flag.Parse()
 	if flag.NArg() != 0 || !*confirmed {
 		fmt.Fprintln(os.Stderr, "usage: go run ./test/e2e/iam-api --skr ./skr --confirm-iam-live")
@@ -755,7 +804,8 @@ func runMain() (exitCode int) {
 	}
 	name := resourceNamePrefix + suffix
 	desc := resourceDescription + suffix
-	fmt.Println("IAM folder, project, service principal, user and group:", name)
+	fmt.Println("IAM folder, child folder, project, service principal, user and group:", name)
+	fmt.Println("Temporary SCIM configuration, SSO profile, project API key and service principal keys:", name+"-*")
 	fmt.Println("Check `skr config current` before running; this command uses the selected SDK profile.")
 	fmt.Println("This command creates test IAM resources in the selected organization, verifies them, then deletes only those resources.")
 
@@ -769,9 +819,21 @@ func runMain() (exitCode int) {
 		user:     resource{kind: "user", name: name, code: "e2e_" + suffix, description: desc},
 		group:    resource{kind: "group", name: name, description: desc},
 		folder:   resource{kind: "folder", name: name, description: desc},
-		project:  resource{kind: "project", name: name, code: "e2e" + suffix, description: desc},
+		childFolder: resource{
+			kind: "folder", name: name + "-child", description: desc,
+		},
+		project: resource{kind: "project", name: name, code: "e2e" + suffix, description: desc},
 		servicePrincipal: resource{
 			kind: "service-principal", name: name, description: desc,
+		},
+		scim: managedResource{
+			kind: "scim", name: name + "-scim",
+		},
+		ssoProfile: managedResource{
+			kind: "sso", name: name + "-sso",
+		},
+		projectAPIKey: managedResource{
+			kind: "project-api-key", name: name + "-pak",
 		},
 		email:   "skr-e2e-iam@example.com",
 		renamed: name + "-renamed",
