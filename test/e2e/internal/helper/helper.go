@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -157,4 +158,19 @@ func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, descriptio
 
 	require.NoError(t, runErr, stderr.String())
 	return stdout.Bytes()
+}
+
+// WriteRequestJSONFile は --request @path で CLI に渡すリクエストファイルを作成し、パスを返します。
+func (h *Helper) WriteRequestJSONFile(t *testing.T, name string, value any) string {
+	t.Helper()
+
+	data, err := json.Marshal(value)
+	require.NoError(t, err, "marshal request %s: %v", name, err)
+
+	t.Logf("Writing %s.json: %s", name, string(data))
+
+	path := filepath.Join(t.TempDir(), name+".json")
+	err = os.WriteFile(path, data, 0o600)
+	require.NoError(t, err, "write request file %s: %v", name, err)
+	return path
 }

@@ -59,7 +59,7 @@ func TestScenarioRegistry(t *testing.T) {
 		}
 	}()
 
-	findRequest := writeJSONFile(t, "find", map[string]any{"Names": []string{name}})
+	findRequest := h.WriteRequestJSONFile(t, "find", map[string]any{"Names": []string{name}})
 
 	// 1. 作成前に同名レジストリが存在しないことを確認する
 	before := findRegistries(t, h, "作成前に同名レジストリが存在しないことを確認する", findRequest)
@@ -80,7 +80,7 @@ func TestScenarioRegistry(t *testing.T) {
 	requireRegistryIdentity(t, listed[0], registryID, name, description)
 
 	// 4. レジストリの説明を更新する
-	updateRequest := writeJSONFile(t, "update", map[string]any{"Description": updatedDescription})
+	updateRequest := h.WriteRequestJSONFile(t, "update", map[string]any{"Description": updatedDescription})
 	data = h.Call(t, "レジストリの説明を更新する",
 		"container-registry-api", "registry", "update", registryID, "--request", "@"+updateRequest)
 	requireRegistryIdentity(t, parseRegistry(t, data), registryID, name, updatedDescription)
@@ -129,7 +129,7 @@ func TestScenarioRegistry(t *testing.T) {
 func cleanupRegistry(t *testing.T, h *helper.Helper, name, originalDescription, updatedDescription, knownID string) {
 	t.Helper()
 
-	findRequest := writeJSONFile(t, "cleanup-find", map[string]any{"Names": []string{name}})
+	findRequest := h.WriteRequestJSONFile(t, "cleanup-find", map[string]any{"Names": []string{name}})
 	matches := findRegistries(t, h, "後片付け対象のレジストリを特定する", findRequest)
 	if len(matches) == 0 {
 		return
@@ -261,17 +261,5 @@ func writePasswordFile(t *testing.T) string {
 	path := filepath.Join(t.TempDir(), "registry-password")
 	err := os.WriteFile(path, []byte(randomSuffix(t)), 0o600)
 	require.NoError(t, err, "write private E2E password file: %v", err)
-	return path
-}
-
-// writeJSONFile は --request @path で CLI に渡すリクエストファイルを作成し、パスを返します。
-func writeJSONFile(t *testing.T, name string, value any) string {
-	t.Helper()
-
-	data, err := json.Marshal(value)
-	require.NoError(t, err, "marshal request %s: %v", name, err)
-	path := filepath.Join(t.TempDir(), name+".json")
-	err = os.WriteFile(path, data, 0o600)
-	require.NoError(t, err, "write request file %s: %v", name, err)
 	return path
 }
