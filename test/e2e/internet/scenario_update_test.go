@@ -64,7 +64,7 @@ func TestUpdateInternetAndVerifyUpdatesRestoresAndReads(t *testing.T) {
 		NetworkMaskLen: 28, BandWidthMbps: 100,
 	}
 	fake.internet.Switch.ID = 13
-	test := testScenario(fake, t.TempDir())
+	test := testScenario(t, fake, t.TempDir())
 	if err := test.updateInternetAndVerify(context.Background(), 12, namePrefix+"test", 13); err != nil {
 		t.Fatal(err)
 	}
@@ -93,14 +93,14 @@ func TestUpdateInternetAndVerifyReportsFailures(t *testing.T) {
 	}
 	t.Run("update api error", func(t *testing.T) {
 		fake := &fakeCLI{failStep: "test-update-internet", internet: newInternet()}
-		err := testScenario(fake, t.TempDir()).updateInternetAndVerify(context.Background(), 12, namePrefix+"test", 13)
+		err := testScenario(t, fake, t.TempDir()).updateInternetAndVerify(context.Background(), 12, namePrefix+"test", 13)
 		if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
 			t.Fatalf("error = %v, want update API failure", err)
 		}
 	})
 	t.Run("update ignored", func(t *testing.T) {
 		fake := &fakeCLI{internet: newInternet()}
-		test := testScenario(fake, t.TempDir())
+		test := testScenario(t, fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update-internet" {
 				// 更新を無視して成功を装う。次の Read でそれを検出する必要がある。
@@ -115,14 +115,14 @@ func TestUpdateInternetAndVerifyReportsFailures(t *testing.T) {
 	})
 	t.Run("restore api error", func(t *testing.T) {
 		fake := &fakeCLI{failStep: "test-update-internet-restore", internet: newInternet()}
-		err := testScenario(fake, t.TempDir()).updateInternetAndVerify(context.Background(), 12, namePrefix+"test", 13)
+		err := testScenario(t, fake, t.TempDir()).updateInternetAndVerify(context.Background(), 12, namePrefix+"test", 13)
 		if err == nil || !strings.Contains(err.Error(), "restore Internet Name and Description") {
 			t.Fatalf("error = %v, want restore failure", err)
 		}
 	})
 	t.Run("restore ignored", func(t *testing.T) {
 		fake := &fakeCLI{internet: newInternet()}
-		test := testScenario(fake, t.TempDir())
+		test := testScenario(t, fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update-internet-restore" {
 				// 復元を無視して成功を装う。次の Read でそれを検出する必要がある。
@@ -139,7 +139,7 @@ func TestUpdateInternetAndVerifyReportsFailures(t *testing.T) {
 
 func TestScenarioKeepsInternetWhenRestoreFails(t *testing.T) {
 	fake := &fakeCLI{failStep: "test-update-internet-restore"}
-	test := testScenario(fake, t.TempDir())
+	test := testScenario(t, fake, t.TempDir())
 	err := test.run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "restore Internet Name and Description") {
 		t.Fatalf("scenario error = %v, want restore failure", err)

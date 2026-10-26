@@ -85,7 +85,7 @@ func TestUpdatedNextHopIsFreeAddressInPrimarySubnet(t *testing.T) {
 func TestSubnetScenarioAddsUpdatesDeletesAndVerifiesAbsence(t *testing.T) {
 	fake := &fakeCLI{internet: &internetItem{ID: 12, Name: "router", Description: internetDesc}}
 	fake.internet.Switch.ID = 13
-	test := testScenario(fake, t.TempDir())
+	test := testScenario(t, fake, t.TempDir())
 	if err := test.subnetScenario(context.Background(), 12, "192.0.2.2"); err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestSubnetScenarioReportsFailures(t *testing.T) {
 	}
 	t.Run("update ignored", func(t *testing.T) {
 		fake := base()
-		test := testScenario(fake, t.TempDir())
+		test := testScenario(t, fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update-subnet" {
 				return []byte(`{"ID":15,"NextHop":"192.0.2.2","NetworkAddress":"198.51.100.0","NetworkMaskLen":28}`), nil
@@ -119,7 +119,7 @@ func TestSubnetScenarioReportsFailures(t *testing.T) {
 	})
 	t.Run("delete keeps block", func(t *testing.T) {
 		fake := base()
-		test := testScenario(fake, t.TempDir())
+		test := testScenario(t, fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-delete-subnet" {
 				return nil, nil
@@ -133,7 +133,7 @@ func TestSubnetScenarioReportsFailures(t *testing.T) {
 	})
 	t.Run("api error", func(t *testing.T) {
 		fake := base()
-		test := testScenario(fake, t.TempDir())
+		test := testScenario(t, fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-add-subnet" {
 				return nil, errors.New("injected CLI failure")
@@ -149,7 +149,7 @@ func TestSubnetScenarioReportsFailures(t *testing.T) {
 func TestIPv6ScenarioEnablesReadsAndDisables(t *testing.T) {
 	fake := &fakeCLI{internet: &internetItem{ID: 12, Name: "router", Description: internetDesc}}
 	fake.internet.Switch.ID = 13
-	test := testScenario(fake, t.TempDir())
+	test := testScenario(t, fake, t.TempDir())
 	if err := test.ipv6Scenario(context.Background(), 12); err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestIPv6ScenarioReportsFailures(t *testing.T) {
 	}
 	t.Run("read-ipv6 succeeds after disable", func(t *testing.T) {
 		fake := base()
-		test := testScenario(fake, t.TempDir())
+		test := testScenario(t, fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-disable-ipv6" {
 				return nil, nil
@@ -183,7 +183,7 @@ func TestIPv6ScenarioReportsFailures(t *testing.T) {
 	})
 	t.Run("read mismatch", func(t *testing.T) {
 		fake := base()
-		test := testScenario(fake, t.TempDir())
+		test := testScenario(t, fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-read-ipv6" {
 				return []byte(`{"ID":99,"IPv6Prefix":"2001:db8:1::","IPv6PrefixLen":64}`), nil

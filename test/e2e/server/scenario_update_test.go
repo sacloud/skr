@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	"github.com/sacloud/skr/test/e2e/internal/sshrun"
 )
 
 // updateFunc はテスト関数をシナリオの cli インターフェースに適合させる。
@@ -27,6 +28,12 @@ type updateFunc func(context.Context, string, map[string]any) ([]byte, error)
 
 func (f updateFunc) call(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 	return f(ctx, step, request)
+}
+
+// observe は待機中の状態確認を模擬する。更新と復元の検証では呼び出されない。
+func (f updateFunc) observe(ctx context.Context, step string, request map[string]any) ([]byte, sshrun.Observation, error) {
+	data, err := f.call(ctx, step, request)
+	return data, sshrun.Observation{Binary: "./skr", Args: nil}, err
 }
 
 func TestServerUpdateArgsUseUpdateOptions(t *testing.T) {
@@ -67,7 +74,7 @@ func TestServerUpdateArgsRejectInvalidRequests(t *testing.T) {
 func TestUpdateAndVerifyUpdatesRestoresAndReads(t *testing.T) {
 	fake := &fakeCLI{}
 	fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: description}
-	test := testScenario(fake)
+	test := testScenario(t, fake)
 	if err := test.updateAndVerify(context.Background(), 123, namePrefix+"test"); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +96,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 	t.Run("update api error", func(t *testing.T) {
 		fake := &fakeCLI{failStep: "test-update"}
 		fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: description}
-		err := testScenario(fake).updateAndVerify(context.Background(), 123, namePrefix+"test")
+		err := testScenario(t, fake).updateAndVerify(context.Background(), 123, namePrefix+"test")
 		if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
 			t.Fatalf("error = %v, want update API failure", err)
 		}
@@ -97,7 +104,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 	t.Run("update ignored", func(t *testing.T) {
 		fake := &fakeCLI{}
 		fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: description}
-		test := testScenario(fake)
+		test := testScenario(t, fake)
 		test.client = updateFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update" {
 				// 更新を無視して成功を装う。次の Read でそれを検出する必要がある。
@@ -113,7 +120,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 	t.Run("restore api error", func(t *testing.T) {
 		fake := &fakeCLI{failStep: "test-update-restore"}
 		fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: description}
-		err := testScenario(fake).updateAndVerify(context.Background(), 123, namePrefix+"test")
+		err := testScenario(t, fake).updateAndVerify(context.Background(), 123, namePrefix+"test")
 		if err == nil || !strings.Contains(err.Error(), "restore Server Name and Description") {
 			t.Fatalf("error = %v, want restore failure", err)
 		}
@@ -121,7 +128,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 	t.Run("restore ignored", func(t *testing.T) {
 		fake := &fakeCLI{}
 		fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: description}
-		test := testScenario(fake)
+		test := testScenario(t, fake)
 		test.client = updateFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update-restore" {
 				// 復元を無視して成功を装う。次の Read でそれを検出する必要がある。
@@ -138,7 +145,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 
 func TestScenarioKeepsServerWhenRestoreFails(t *testing.T) {
 	fake := &fakeCLI{failStep: "test-update-restore"}
-	test := testScenario(fake)
+	test := testScenario(t, fake)
 	err := test.run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "restore Server Name and Description") {
 		t.Fatalf("scenario error = %v, want restore failure", err)

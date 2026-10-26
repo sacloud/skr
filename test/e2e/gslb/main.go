@@ -35,6 +35,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
+	"github.com/sacloud/skr/test/e2e/internal/sshrun"
 )
 
 const (
@@ -91,16 +92,13 @@ func (r cliRunner) call(ctx context.Context, step string, args []string, request
 type scenario struct {
 	call          func(context.Context, string, []string, any) ([]byte, error)
 	lookupDNS     func(context.Context, string, string) ([]string, error)
-	connectSSH    func(context.Context, string, string, string, string) error
-	shutdownSSH   func(context.Context, string, string, string, string) error
+	ssh           sshrun.Runner
 	serverName    string
 	archiveID     int64
 	diskPlanID    int64
 	diskSizeGB    int64
 	diskID        types.ID
 	userDataPath  string
-	privateKey    string
-	knownHosts    string
 	pollInterval  time.Duration
 	serverTimeout time.Duration
 	dnsTimeout    time.Duration
@@ -329,10 +327,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		return fmt.Errorf("read settings do not match created GSLB %s", id)
 	}
 
-	if s.shutdownSSH == nil {
-		return errors.New("SSH shutdown check is not configured")
-	}
-	if err := s.shutdownSSH(ctx, "server-shutdown", serverIP, s.privateKey, s.knownHosts); err != nil {
+	if err := s.ssh.Run(ctx, "server-shutdown", serverIP, "sudo -n systemctl poweroff --no-block"); err != nil {
 		return err
 	}
 	if err := s.waitForServerDown(ctx, server.ID); err != nil {
@@ -448,12 +443,12 @@ func runMain() (exitCode int) {
 	defer stop()
 	runner := cliRunner{binary: path, evidence: recorder}
 	dns := dnsRunner{evidence: recorder}
-	ssh := sshRunner{evidence: recorder}
 	test := scenario{
-		call: runner.call, lookupDNS: dns.lookup, connectSSH: ssh.connect, shutdownSSH: ssh.shutdown,
+		call: runner.call, lookupDNS: dns.lookup,
+		ssh:        sshrun.Runner{Recorder: recorder, PrivateKey: privateKey, KnownHosts: knownHosts},
 		serverName: name + "-server", archiveID: *archiveID, diskPlanID: *diskPlanID,
-		diskSizeGB: *diskSizeGB, userDataPath: userDataPath, privateKey: privateKey,
-		knownHosts: knownHosts, pollInterval: 10 * time.Second,
+		diskSizeGB: *diskSizeGB, userDataPath: userDataPath,
+		pollInterval:  10 * time.Second,
 		serverTimeout: 20 * time.Minute, dnsTimeout: 10 * time.Minute,
 	}
 	if err := test.run(ctx, name); err != nil {

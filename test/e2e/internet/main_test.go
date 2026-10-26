@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	"github.com/sacloud/skr/test/e2e/internal/evidence"
+	"github.com/sacloud/skr/test/e2e/internal/sshrun"
 )
 
 func TestInternetArgsBuildScopedRequests(t *testing.T) {
@@ -116,6 +118,19 @@ type fakeCLI struct {
 	subnetJSON  string
 	addedSubnet *subnetResponse
 	ipv6Net     *ipv6NetItem
+}
+
+// observe は待機中の状態確認用の読み取りを模擬します。証跡には記録せず、
+// 最後の確認内容を Observation として返します。
+func (f *fakeCLI) observe(ctx context.Context, step string, request map[string]any) ([]byte, sshrun.Observation, error) {
+	data, err := f.call(ctx, step, request)
+	obs := sshrun.Observation{Binary: "./skr", Args: []string{"iaas-api", "server", "read"}}
+	if err != nil {
+		obs.Err = err
+		return nil, obs, fmt.Errorf("%s: skr failed: %w", step, err)
+	}
+	obs.Stdout = strings.TrimSpace(string(data))
+	return data, obs, nil
 }
 
 func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) ([]byte, error) {
@@ -307,15 +322,21 @@ func (f *fakeCLI) subnetListJSON() ([]byte, error) {
 	return json.Marshal(subnets)
 }
 
-func testScenario(fake *fakeCLI, dir string) scenario {
+func testScenario(t *testing.T, fake *fakeCLI, dir string) scenario {
+	t.Helper()
+	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "internet-api-test"), time.Now(), evidence.Scenario{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	return scenario{
 		client: fake, archiveID: 234, diskPlanID: 4, diskSizeGB: 20,
 		userDataPath: filepath.Join(dir, "user-data.yaml"),
 		publicKey:    "ssh-rsa AAAA temporary",
-		privateKey:   filepath.Join(dir, "ssh-key"),
-		knownHosts:   filepath.Join(dir, "known_hosts"),
-		connect: func(context.Context, string, string, string) error {
-			return nil
+		ssh: sshrun.Runner{
+			Recorder: recorder, PrivateKey: filepath.Join(dir, "ssh-key"), KnownHosts: filepath.Join(dir, "known_hosts"),
+			SSH: func(context.Context, []string) (string, string, error) {
+				return "test-server\n", "", nil
+			},
 		},
 		pollInterval:    time.Millisecond,
 		sshTimeout:      20 * time.Millisecond,
@@ -327,6 +348,19 @@ type cliFunc func(context.Context, string, map[string]any) ([]byte, error)
 
 func (f cliFunc) call(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 	return f(ctx, step, request)
+}
+
+// observe は待機中の状態確認用の読み取りを模擬します。証跡には記録せず、
+// 最後の確認内容を Observation として返します。
+func (f cliFunc) observe(ctx context.Context, step string, request map[string]any) ([]byte, sshrun.Observation, error) {
+	data, err := f.call(ctx, step, request)
+	obs := sshrun.Observation{Binary: "./skr", Args: []string{"iaas-api", "server", "read"}}
+	if err != nil {
+		obs.Err = err
+		return nil, obs, fmt.Errorf("%s: skr failed: %w", step, err)
+	}
+	obs.Stdout = strings.TrimSpace(string(data))
+	return data, obs, nil
 }
 
 func TestOperationTimeoutBudgets(t *testing.T) {
@@ -347,7 +381,7 @@ func TestScenarioRecoversInterruptedInternetCreation(t *testing.T) {
 	for _, mode := range []string{"cancelled", "invalid output"} {
 		t.Run(mode, func(t *testing.T) {
 			fake := &fakeCLI{}
-			test := testScenario(fake, t.TempDir())
+			test := testScenario(t, fake, t.TempDir())
 			test.recoveryTimeout = time.Second
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -401,7 +435,7 @@ func TestInternetRecoveryRefusesUnsafeMatches(t *testing.T) {
 	for _, mode := range []string{"ambiguous", "identity", "read identity"} {
 		t.Run(mode, func(t *testing.T) {
 			fake := &fakeCLI{}
-			test := testScenario(fake, t.TempDir())
+			test := testScenario(t, fake, t.TempDir())
 			test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 				data, err := fake.call(ctx, step, request)
 				if step == "test-create-internet" {
@@ -439,7 +473,7 @@ func TestInternetRecoveryExpiresWithExplicitFailure(t *testing.T) {
 	for _, mode := range []string{"empty", "search error", "read error"} {
 		t.Run(mode, func(t *testing.T) {
 			fake := &fakeCLI{}
-			test := testScenario(fake, t.TempDir())
+			test := testScenario(t, fake, t.TempDir())
 			attempts := 0
 			test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 				if step == "test-create-internet" {
@@ -477,7 +511,7 @@ func TestCleanupContinuesAfterServerDeletionResponseFailure(t *testing.T) {
 	for _, internetFails := range []bool{false, true} {
 		t.Run(fmt.Sprint(internetFails), func(t *testing.T) {
 			fake := &fakeCLI{}
-			test := testScenario(fake, t.TempDir())
+			test := testScenario(t, fake, t.TempDir())
 			deleteErr := errors.New("Server deletion response or evidence failed")
 			internetErr := errors.New("Internet deletion failed")
 			test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
@@ -504,14 +538,14 @@ func TestCleanupContinuesAfterServerDeletionResponseFailure(t *testing.T) {
 
 func TestScenarioCreatesRouterServerAndCleansEverything(t *testing.T) {
 	fake := &fakeCLI{}
-	test := testScenario(fake, t.TempDir())
+	test := testScenario(t, fake, t.TempDir())
 	connected := false
-	test.connect = func(_ context.Context, address, _, _ string) error {
-		if address != "192.0.2.2" {
-			t.Fatalf("SSH address = %q, want usable subnet address", address)
+	test.ssh.SSH = func(_ context.Context, args []string) (string, string, error) {
+		if args[len(args)-2] != sshUser+"@192.0.2.2" {
+			t.Fatalf("SSH destination = %q, want usable subnet address", args[len(args)-2])
 		}
 		connected = true
-		return nil
+		return "test-server\n", "", nil
 	}
 	if err := test.run(context.Background(), namePrefix+"test"); err != nil {
 		t.Fatal(err)
@@ -540,7 +574,7 @@ func TestScenarioCreatesRouterServerAndCleansEverything(t *testing.T) {
 
 func TestScenarioCleansInternetAfterServerCreateFailure(t *testing.T) {
 	fake := &fakeCLI{failStep: "test-create-server"}
-	test := testScenario(fake, t.TempDir())
+	test := testScenario(t, fake, t.TempDir())
 	err := test.run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
 		t.Fatalf("scenario error = %v, want injected CLI failure", err)
@@ -560,7 +594,7 @@ func TestNetworkRejectsMissingOrUnusableSubnetAddresses(t *testing.T) {
 		`[{"IPAddress":"198.51.100.2"},{"IPAddress":"invalid"},{"IPAddress":"2001:db8::1"}]`,
 	} {
 		fake := &fakeCLI{subnetJSON: `[{"InternetID":12,"DefaultRoute":"192.0.2.1","NetworkAddress":"192.0.2.0","NetworkMaskLen":28,"IPAddresses":` + addresses + `}]`}
-		test := testScenario(fake, t.TempDir())
+		test := testScenario(t, fake, t.TempDir())
 		_, _, _, err := test.network(context.Background(), 12, 13, serverItem{
 			Interfaces: []serverInterface{{SwitchID: 13, MACAddress: "02:00:00:00:00:01", IPAddress: "192.0.2.2"}},
 		})
@@ -575,7 +609,7 @@ func TestScenarioRefusesExistingInternet(t *testing.T) {
 		ID: 9, Name: namePrefix + "test", Description: "unrelated Internet",
 	}}
 	fake.internet.Switch.ID = 10
-	err := testScenario(fake, t.TempDir()).run(context.Background(), namePrefix+"test")
+	err := testScenario(t, fake, t.TempDir()).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("scenario error = %v, want name collision refusal", err)
 	}
@@ -586,7 +620,7 @@ func TestScenarioRefusesExistingInternet(t *testing.T) {
 
 func TestScenarioDoesNotDeleteInternetIfServerCleanupFails(t *testing.T) {
 	fake := &fakeCLI{failStep: "cleanup-delete-server"}
-	test := testScenario(fake, t.TempDir())
+	test := testScenario(t, fake, t.TempDir())
 	err := test.run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
 		t.Fatalf("scenario error = %v, want cleanup failure", err)
@@ -619,9 +653,9 @@ func TestFinalizeRunRecordsFailureWhenCleanupFails(t *testing.T) {
 
 func TestScenarioWaitsForFailedSSHAndCleansResources(t *testing.T) {
 	fake := &fakeCLI{}
-	test := testScenario(fake, t.TempDir())
-	test.connect = func(context.Context, string, string, string) error {
-		return errors.New("SSH unavailable")
+	test := testScenario(t, fake, t.TempDir())
+	test.ssh.SSH = func(context.Context, []string) (string, string, error) {
+		return "", "", errors.New("SSH unavailable")
 	}
 	err := test.run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "SSH login check timed out") {
