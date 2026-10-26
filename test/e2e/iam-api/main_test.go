@@ -770,7 +770,6 @@ func (f *fakeCLI) accountResponse(step string, args []string) ([]byte, error, bo
 func readRequestBody(args []string) map[string]any {
 	request := argument(args, "--request")
 	if strings.HasPrefix(request, "@") {
-		//nolint:gosec // Test fixture path constructed from os.TempDir().
 		data, err := os.ReadFile(strings.TrimPrefix(request, "@"))
 		if err != nil {
 			return nil

@@ -112,7 +112,7 @@ func TestRecordExpectedErrorMarksTheStepAsExpected(t *testing.T) {
 	if err := recorder.RecordExpectedError("u2fa-read-missing-security-key", "./skr", []string{"iam-api", "user-2fa", "read-security-key", "999999999999"}, nil, "", "iam: API Error 404", &exec.ExitError{}, false); err != nil {
 		t.Fatal(err)
 	}
-	order, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-u2fa-read-missing-security-key.json")) //nolint:gosec // The path is created under t.TempDir.
+	order, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-u2fa-read-missing-security-key.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

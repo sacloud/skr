@@ -183,15 +183,6 @@ func TestUpdateTriggerAndVerifyReportsFailures(t *testing.T) {
 	})
 }
 
-func mustMarshal(t *testing.T, value any) []byte {
-	t.Helper()
-	data, err := json.Marshal(value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return data
-}
-
 func mustResponse(t *testing.T, data []byte, err error) []byte {
 	t.Helper()
 	if err != nil {

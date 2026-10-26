@@ -29,10 +29,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// servicePrincipalTokenAudience is the OAuth2 token endpoint of the IAM API.
+// servicePrincipalOAuth2Endpoint is the OAuth2 token endpoint of the IAM API.
 // The API validates the aud claim against this endpoint. The endpoint can be
 // overridden with SAKURA_ENDPOINTS_IAM.
-const servicePrincipalTokenAudience = "https://secure.sakura.ad.jp/cloud/api/iam/1.0/service-principals/oauth2/token"
+const servicePrincipalOAuth2Endpoint = "https://secure.sakura.ad.jp/cloud/api/iam/1.0/service-principals/oauth2/token"
 
 type servicePrincipalKey struct {
 	ID     string `json:"id"`
@@ -189,8 +189,8 @@ func (s *scenario) servicePrincipalKeysScenario(ctx context.Context) error {
 // contains the token, so the query projects only the token type and lifetime.
 func (s *scenario) issueServicePrincipalToken(ctx context.Context, privateKey *rsa.PrivateKey, kid string) error {
 	now := time.Now()
-	audience := servicePrincipalTokenAudience
-	if override, ok := servicePrincipalTokenAudienceOverride(); ok {
+	audience := servicePrincipalOAuth2Endpoint
+	if override, ok := servicePrincipalOAuth2EndpointOverride(); ok {
 		audience = override
 	}
 	claims := jwt.MapClaims{
@@ -274,9 +274,9 @@ func checkServicePrincipalKey(step string, data []byte, expected servicePrincipa
 	return false, nil
 }
 
-// servicePrincipalTokenAudienceOverride returns the token endpoint audience
+// servicePrincipalOAuth2EndpointOverride returns the token endpoint audience
 // derived from SAKURA_ENDPOINTS_IAM when set.
-func servicePrincipalTokenAudienceOverride() (string, bool) {
+func servicePrincipalOAuth2EndpointOverride() (string, bool) {
 	endpoint := os.Getenv("SAKURA_ENDPOINTS_IAM")
 	if endpoint == "" {
 		return "", false

@@ -106,11 +106,3 @@ func (o *filterOverrideCLI) call(ctx context.Context, step string, args ...strin
 func (o *filterOverrideCLI) callRoot(ctx context.Context, step string, args ...string) ([]byte, error) {
 	return o.base.callRoot(ctx, step, args...)
 }
-
-func mustFilterJSON(t *testing.T, enabled bool) []byte {
-	t.Helper()
-	if enabled {
-		return []byte(`{"is_enabled":true,"settings":[{"from_ip":"192.0.2.1","from_ip_prefix_length":32}]}`)
-	}
-	return []byte(`{"is_enabled":false,"settings":[]}`)
-}

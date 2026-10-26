@@ -49,7 +49,9 @@ func TestCheckVersionOutput(t *testing.T) {
 func fakeBinary(t *testing.T, script string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "fake-skr")
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+	// The fake binary is an executable test script under t.TempDir(), so the
+	// owner-executable permission is required.
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil { //nolint:gosec // G306 expects 0600 or less, but the test script must be executable.
 		t.Fatal(err)
 	}
 	return path
@@ -65,7 +67,7 @@ func TestVersionRunnerRecordsEvidenceAndVerifiesOutput(t *testing.T) {
 	if err := test.run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	//nolint:gosec // path is a fixed filename in this test's evidence directory.
+
 	data, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-version-print.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +91,7 @@ func TestVersionRunnerReportsFailures(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "skr version failed") {
 			t.Fatalf("error = %v, want command failure", err)
 		}
-		//nolint:gosec // path is a fixed filename in this test's evidence directory.
+
 		data, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-version-print.json"))
 		if err != nil {
 			t.Fatal(err)
