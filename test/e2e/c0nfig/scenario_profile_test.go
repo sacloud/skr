@@ -1,22 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
+	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +15,7 @@ const (
 )
 
 func TestScenarioProfile(t *testing.T) {
-	h := NewHelper(t, "c0nfig", "設定ファイルの作成/更新/確認が可能であることを確認する")
+	h := helper.New(t, "c0nfig", "設定ファイルの作成/更新/確認が可能であることを確認する")
 	keyPath := h.WritePrivateKey(t)
 
 	_ = h.Call(t, "新しいプロファイルを作成し、同時に current に設定する",
@@ -93,146 +82,4 @@ func requireProfileAttribute(t *testing.T, attrs map[string]any, key, want strin
 	got, ok := attrs[key].(string)
 	require.True(t, ok, "key %q not found in %q", key, attrs)
 	require.Equal(t, want, got, "attribute %q = %q, want %q", key, got, want)
-}
-
-type Helper struct {
-	name           string
-	description    string
-	binary         string
-	profileDir     string
-	defaultTimeout time.Duration
-	results        []Result
-	mu             sync.Mutex
-}
-
-type Result interface {
-	Description() string
-	Render() string
-}
-
-type commandResult struct {
-	description string
-	args        []string
-	stdout      string
-	stderr      string
-	duration    time.Duration
-}
-
-func (c *commandResult) Description() string { return c.description }
-func (c *commandResult) Render() string {
-	var buf bytes.Buffer
-	buf.WriteString("**command**:\n```\n")
-	buf.WriteString(strings.Join(append([]string{"skr"}, c.args...), " "))
-	buf.WriteString("\n```\n\n")
-	buf.WriteString("**duration**:\n")
-	buf.WriteString(fmt.Sprintf("%v\n\n", c.duration))
-	buf.WriteString("**stdout**:\n```\n")
-	buf.WriteString(c.stdout)
-	buf.WriteString("\n```\n\n")
-	buf.WriteString("**stderr**:\n```\n")
-	buf.WriteString(c.stderr)
-	buf.WriteString("\n```\n\n")
-	return buf.String()
-}
-
-func NewHelper(t *testing.T, name, description string) *Helper {
-	t.Helper()
-
-	if os.Getenv("SKR_E2E") == "" {
-		t.Skip("SKR_E2E not set, skipping E2E test")
-	}
-
-	profileDir := t.TempDir()
-	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
-
-	h := &Helper{
-		name:           name,
-		description:    description,
-		binary:         "../../../skr",
-		profileDir:     profileDir,
-		defaultTimeout: 10 * time.Minute,
-	}
-
-	t.Cleanup(func() {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		if len(h.results) == 0 {
-			return
-		}
-
-		// $PROJECTROOT/e2e-output/${h.name}-YYYYMMDDHHMMSS.md を出力する。
-		// 実行されたコマンドの出力結果を記録する。
-		dir := "e2e-output"
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			t.Errorf("failed to create e2e-output directory: %v", err)
-			return
-		}
-
-		filename := fmt.Sprintf("%s-%s.md", h.name, time.Now().Format("20060102150405"))
-		path := filepath.Join(dir, filename)
-
-		var buf bytes.Buffer
-		buf.WriteString(fmt.Sprintf("# %s\n%s\n", h.name, h.description))
-		for _, res := range h.results {
-			buf.WriteString(fmt.Sprintf("## %s\n\n", res.Description()))
-			buf.WriteString(res.Render())
-		}
-
-		if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
-			t.Errorf("failed to write report file: %v", err)
-		}
-		t.Logf("report file: %s", path)
-	})
-
-	return h
-}
-
-func (h *Helper) WritePrivateKey(t *testing.T) string {
-	t.Helper()
-
-	dir := t.TempDir()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err, "could not generate rsa key: %v", err)
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	require.NoError(t, err, "could not marshal private key: %v", err)
-	path := filepath.Join(dir, "key.pem")
-	block := &pem.Block{Type: "PRIVATE KEY", Bytes: der}
-	err = os.WriteFile(path, pem.EncodeToMemory(block), 0o600)
-	require.NoError(t, err, "could not write private key: %v", err)
-	return path
-}
-
-func (h *Helper) Call(t *testing.T, description string, args ...string) []byte {
-	t.Helper()
-
-	return h.CallWithTimeout(t, h.defaultTimeout, description, args...)
-}
-
-// CallWithTimeout は指定されたコマンドを実行する。タイムアウト秒数経過してもコマンドが終了しない場合はエラーとなる。
-// 返り値は stdout のバイト列
-func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, description string, args ...string) []byte {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(t.Context(), timeout)
-	defer cancel()
-
-	command := exec.CommandContext(ctx, h.binary, args...) //nolint:gosec // 選択されたローカルの skr 実行ファイルと構造化された引数を、シェルなしで直接実行する。
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	start := time.Now()
-	runErr := command.Run()
-
-	h.mu.Lock()
-	h.results = append(h.results, &commandResult{
-		description: description,
-		args:        args,
-		stdout:      stdout.String(),
-		stderr:      stderr.String(),
-		duration:    time.Since(start),
-	})
-	h.mu.Unlock()
-
-	require.NoError(t, runErr, stderr.String())
-	return stdout.Bytes()
 }
