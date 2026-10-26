@@ -8,19 +8,20 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: このメソッドは E2E 指定があるときだけ動くこと
 func TestScenarioProfile(t *testing.T) {
-	h := NewHelper(t, "c0nfig")
+	h := NewHelper(t, "c0nfig", "設定ファイルの作成/更新/確認が可能であることを確認する")
 	keyPath := h.WritePrivateKey(t)
 
 	_ = h.Call(t, "新しいプロファイルを作成し、同時に current に設定する",
@@ -91,28 +92,79 @@ func requireProfileAttribute(t *testing.T, attrs map[string]any, key, want strin
 
 type Helper struct {
 	name           string
+	description    string
 	binary         string
 	profileDir     string
 	defaultTimeout time.Duration
+	results        []commandResult
+	mu             sync.Mutex
 }
 
-func NewHelper(t *testing.T, name string) *Helper {
+type commandResult struct {
+	description string
+	args        []string
+	stdout      string
+	stderr      string
+}
+
+func NewHelper(t *testing.T, name, description string) *Helper {
 	t.Helper()
+
+	if os.Getenv("SKR_E2E") == "" {
+		t.Skip("SKR_E2E not set, skipping E2E test")
+	}
 
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
-	t.Cleanup(func() {
-		// TODO: write report file
-		// $PROJECTROOT/e2e-output/YYYYMMDDHHMMSS.md を出力する。
-		// 実行されたコマンドの出力結果を記録する。
-	})
 
-	return &Helper{
+	h := &Helper{
 		name:           name,
+		description:    description,
 		binary:         "../../../skr",
 		profileDir:     profileDir,
 		defaultTimeout: 10 * time.Minute,
 	}
+
+	t.Cleanup(func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		if len(h.results) == 0 {
+			return
+		}
+
+		// $PROJECTROOT/e2e-output/${h.name}-YYYYMMDDHHMMSS.md を出力する。
+		// 実行されたコマンドの出力結果を記録する。
+		dir := "e2e-output"
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Errorf("failed to create e2e-output directory: %v", err)
+			return
+		}
+
+		filename := fmt.Sprintf("%s-%s.md", h.name, time.Now().Format("20060102150405"))
+		path := filepath.Join(dir, filename)
+
+		var buf bytes.Buffer
+		buf.WriteString(fmt.Sprintf("# %s\n%s\n", h.name, h.description))
+		for _, res := range h.results {
+			buf.WriteString(fmt.Sprintf("## %s\n\n", res.description))
+			buf.WriteString("**command**:\n```\n")
+			buf.WriteString(strings.Join(append([]string{h.binary}, res.args...), " "))
+			buf.WriteString("\n```\n\n")
+			buf.WriteString("**stdout**:\n```\n")
+			buf.WriteString(res.stdout)
+			buf.WriteString("\n```\n\n")
+			buf.WriteString("**stderr**:\n```\n")
+			buf.WriteString(res.stderr)
+			buf.WriteString("\n```\n\n")
+		}
+
+		if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
+			t.Errorf("failed to write report file: %v", err)
+		}
+		t.Logf("report file: %s", path)
+	})
+
+	return h
 }
 
 func (h *Helper) WritePrivateKey(t *testing.T) string {
@@ -149,6 +201,16 @@ func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, descriptio
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	runErr := command.Run()
+
+	h.mu.Lock()
+	h.results = append(h.results, commandResult{
+		description: description,
+		args:        args,
+		stdout:      stdout.String(),
+		stderr:      stderr.String(),
+	})
+	h.mu.Unlock()
+
 	require.NoError(t, runErr, stderr.String())
 	return stdout.Bytes()
 }
