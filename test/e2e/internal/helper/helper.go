@@ -11,10 +11,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,27 +24,52 @@ type Helper struct {
 	name           string
 	description    string
 	binary         string
-	profileDir     string
 	defaultTimeout time.Duration
 	results        []Result
 	mu             sync.Mutex
 }
 
+// e2eProfileName はライブ API 認証に使うプロファイル名です。
+const e2eProfileName = "skr-e2e"
+
 func New(t *testing.T, name, description string) *Helper {
 	t.Helper()
 
+	// ライブ実行は SKR_E2E の設定を明示的な同意とする。通常の go test では実環境を変更しない。
 	if os.Getenv("SKR_E2E") == "" {
 		t.Skip("SKR_E2E not set, skipping E2E test")
 	}
 
-	profileDir := t.TempDir()
-	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	t.Setenv("SAKURA_PROFILE", e2eProfileName)
+
+	// ライブ API の認証に使う skr-e2e プロファイルが存在しない場合はテストをスキップする。
+	op, err := saclient.NewProfileOp(os.Environ())
+	require.NoError(t, err, "could not create profile operator: %v", err)
+	if _, err := op.Read(e2eProfileName); err != nil {
+		t.Skipf("profile %q is not available in %s, skipping E2E test: %v", e2eProfileName, op.Dir(), err)
+	}
+
+	return newHelper(t, name, description)
+}
+
+// NewWithTemporaryProfileDir はテスト専用の一時プロファイルディレクトリを使う helper を返します。
+// テスト自身が config コマンドなどでプロファイルを作成・管理するシナリオで使用し、
+// ライブ API 認証用の skr-e2e プロファイルの有無は確認しません。
+func NewWithTemporaryProfileDir(t *testing.T, name, description string) *Helper {
+	t.Helper()
+
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+
+	return newHelper(t, name, description)
+}
+
+func newHelper(t *testing.T, name, description string) *Helper {
+	t.Helper()
 
 	h := &Helper{
 		name:           name,
 		description:    description,
 		binary:         "../../../skr",
-		profileDir:     profileDir,
 		defaultTimeout: 10 * time.Minute,
 	}
 
@@ -108,6 +135,8 @@ func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, descriptio
 
 	ctx, cancel := context.WithTimeout(t.Context(), timeout)
 	defer cancel()
+
+	t.Logf("%s: %s", description, strings.Join(args, " "))
 
 	command := exec.CommandContext(ctx, h.binary, args...) //nolint:gosec // 選択されたローカルの skr 実行ファイルと構造化された引数を、シェルなしで直接実行する。
 	var stdout, stderr bytes.Buffer

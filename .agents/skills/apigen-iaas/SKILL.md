@@ -17,7 +17,7 @@ description: cmd/apigen-iaas を使って IaaS API コマンドの設定を更�
 
 - 生成したコマンドを含め、公開するすべての末端サブコマンドにはライブ E2E テストを必須とします。チュートリアルの有無にかかわらず正常応答を確認し、コマンドツリーとシナリオの対応をテストします。複数のシナリオに分けても構いません。未実行や API エラーを成功扱いにせず、延期は利用者と合意して追跡 Issue を作成します。
 - 後片付けも変更操作として扱い、削除・無効化・切断・設定復元の直前に現在値を読み直します。保持したリソース ID・所属と今回設定した値を照合し、`defer` やキャンセル後でも省略しません。不在なら変更せず終了し、不一致・不正応答・照会失敗なら変更を拒否します。設定の別 ID への置換やキャンセル直後の変更でも変更 API を呼ばない照合を、後片付けの実装として必須にします。詳細は [`generate-skr-api-command`](../generate-skr-api-command/SKILL.md) の後片付け要件に従います。
-- 配置と命名は [`AGENTS.md` の E2E 規則](../../../AGENTS.md#e2e-の配置と命名)に従います。E2E シナリオは testing.T ベースの `scenario_<snake_case>_test.go` にし、共有の helper (`test/e2e/internal/helper`) でビルド済みの skr を実行します。`SKR_E2E` が未設定ならテストをスキップします。実行記録の識別名は `helper.New` で指定し、`config` は `c0nfig` に置き換えます。
+- 配置と命名は [`AGENTS.md` の E2E 規則](../../../AGENTS.md#e2e-の配置と命名)に従います。E2E シナリオは testing.T ベースの `scenario_<snake_case>_test.go` にし、共有の helper (`test/e2e/internal/helper`) でビルド済みの skr を実行します。`SKR_E2E` が未設定、または `skr-e2e` プロファイルが存在しないならテストをスキップします。実行記録の識別名は `helper.New` で指定し、`config` は `c0nfig` に置き換えます。
 
 ## 許容する CLI 拡張
 

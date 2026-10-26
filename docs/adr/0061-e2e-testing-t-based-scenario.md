@@ -14,7 +14,7 @@ c0nfig の E2E テストを testing.T ベースで書き直した結果、標準
 - E2E シナリオは `test/e2e/<service-or-resource>/scenario_<snake_case>_test.go` に testing.T ベースのテスト関数として書きます。
 - 共有の helper (`test/e2e/internal/helper`) で skr バイナリを実行し、実行結果は Markdown で `e2e-output/` 配下に保存します。
 - `helper.New` は `SKR_E2E` 環境変数が未設定のときにテストをスキップするため、通常の `go test` では実環境を変更しません。ライブ実行は明示的に `SKR_E2E` を設定して行います。
-- helper は `SAKURA_PROFILE_DIR` をテスト用の一時ディレクトリに分離するため、ライブ実行の認証は `skr` が対応する `SAKURA_ACCESS_TOKEN` / `SAKURA_ACCESS_TOKEN_SECRET` 環境変数を使います。
+- helper は `SAKURA_PROFILE` に `skr-e2e` を設定し、ライブ実行の認証はプロファイルディレクトリの `skr-e2e` プロファイルを使います。`skr-e2e` プロファイルが存在しない場合もテストをスキップします。テスト自身がプロファイルを作成・管理するシナリオ（config コマンドの検証など）は `NewWithTemporaryProfileDir` で一時プロファイルディレクトリを使います。
 - 途中で失敗した場合の後片付けはテスト関数内の `defer` で行います。`t.Cleanup` はテスト終了後に `t.Context()` がキャンセルされた状態で呼ばれるため、CLI 呼び出しを伴う後片付けは `defer` で実行します。
 - ADR 0060 の共有ライブラリ (`test/e2e/internal/e2e`) は本方針に置き換えるため廃止します。
 - 既存 runner の一括移行は行わず、各サービスの作業時に段階的に移行します。移行しない runner の挙動は変更しません。

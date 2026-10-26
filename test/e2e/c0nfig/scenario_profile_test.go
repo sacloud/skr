@@ -15,7 +15,7 @@ const (
 )
 
 func TestScenarioProfile(t *testing.T) {
-	h := helper.New(t, "c0nfig", "設定ファイルの作成/更新/確認が可能であることを確認する")
+	h := helper.NewWithTemporaryProfileDir(t, "c0nfig", "設定ファイルの作成/更新/確認が可能であることを確認する")
 	keyPath := h.WritePrivateKey(t)
 
 	_ = h.Call(t, "新しいプロファイルを作成し、同時に current に設定する",
