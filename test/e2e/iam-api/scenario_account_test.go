@@ -24,7 +24,7 @@ import (
 func TestAccountScenarioUpdatesWithReadValues(t *testing.T) {
 	fake := newFakeCLI()
 	s := testScenario(t, fake)
-	// The user-2FA commands target the user created by this run.
+	// user-2FA コマンドはこの実行で作成した user を対象とする。
 	if err := s.createUser(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +55,8 @@ func TestAccountScenarioUpdatesWithReadValues(t *testing.T) {
 			t.Errorf("account scenario did not call %s: %v", want, fake.calls)
 		}
 	}
-	// The password policy update must carry every field and the read
-	// min_length value.
+	// パスワードポリシーの更新はすべてのフィールドと、
+	// 読み込んだ min_length の値を含める必要がある。
 	var updated passwordPolicy
 	if err := json.Unmarshal(updateRequestBody(fake, "account-update-password-policy"), &updated); err != nil {
 		t.Fatalf("decode account-update-password-policy request: %v", err)
@@ -64,8 +64,8 @@ func TestAccountScenarioUpdatesWithReadValues(t *testing.T) {
 	if updated.MinLength != 8 {
 		t.Errorf("password policy request min_length = %d, want the read value 8", updated.MinLength)
 	}
-	// The authentication conditions update must reuse the raw read response,
-	// including fields this run does not model.
+	// 認証条件の更新は生の読み込み応答を再利用する必要があり、
+	// この実行でモデル化していないフィールドも含める。
 	request := updateRequestBody(fake, "account-update-auth-conditions")
 	var rawConditions map[string]any
 	if err := json.Unmarshal(request, &rawConditions); err != nil {
@@ -77,11 +77,11 @@ func TestAccountScenarioUpdatesWithReadValues(t *testing.T) {
 	if restriction, ok := rawConditions["ip_restriction"].(map[string]any); !ok || restriction["mode"] != "allow_all" {
 		t.Errorf("auth conditions request ip_restriction = %v, want the read mode allow_all", rawConditions["ip_restriction"])
 	}
-	// The organization name update must reuse the name that was read before.
+	// organization name の更新は事前に読み込んだ名前を再利用する必要がある。
 	if fake.orgName != "" {
 		t.Errorf("organization name = %q, want the unchanged empty name", fake.orgName)
 	}
-	// The service policy flip must end disabled.
+	// サービスポリシーの切り替えは無効で終了する必要がある。
 	if fake.servicePolicyEnabled {
 		t.Error("the service policy must end disabled after the flip")
 	}
@@ -94,7 +94,7 @@ func TestAccountScenarioRestoresServicePolicyWhenUpdateFails(t *testing.T) {
 	if err := s.servicePolicyFlip(context.Background()); err == nil {
 		t.Fatal("service policy update succeeded although it was rejected")
 	}
-	// The deferred restore must have disabled the policy again.
+	// defer された復元はポリシーを再度無効にしている必要がある。
 	if fake.servicePolicyEnabled {
 		t.Error("the service policy must be disabled after the failed flip")
 	}
@@ -167,7 +167,7 @@ func TestUser2FAScenarioFailsWhenListIsRejected(t *testing.T) {
 	}
 }
 
-// updateRequestBody returns the JSON request body passed with --request.
+// updateRequestBody は --request とともに渡された JSON リクエスト本文を返します。
 func updateRequestBody(fake *fakeCLI, step string) []byte {
 	args := fake.argsByStep[step]
 	for i, arg := range args {

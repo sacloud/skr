@@ -59,7 +59,7 @@ func ReadPasswordFile(path string) (string, error) {
 	if path == "-" {
 		return readPassword(os.Stdin, "read password from standard input")
 	}
-	file, err := os.Open(path) // #nosec G304 -- The password file path is explicitly provided by the CLI user.
+	file, err := os.Open(path) // #nosec G304 -- パスワードファイルのパスは CLI ユーザーが明示的に指定する。
 	if err != nil {
 		return "", fmt.Errorf("read password file: %w", err)
 	}

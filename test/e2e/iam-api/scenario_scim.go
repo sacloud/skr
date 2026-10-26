@@ -30,10 +30,10 @@ type secretTokenLength struct {
 	TokenLength int `json:"token_length"`
 }
 
-// scimScenario creates a user provisioning configuration, reads, updates,
-// lists, regenerates its secret token, and deletes it. The configuration is
-// organization-wide, so it is deleted inside the scenario; the cleanup only
-// removes it when a previous step failed.
+// scimScenario は user provisioning configuration を作成、読み込み、更新、一覧表示、
+// 秘密トークンの再生成、削除を行います。
+// configuration は organization 全体のものであるため、シナリオ内で削除されます。
+// cleanup は前のステップが失敗した場合のみ削除します。
 func (s *scenario) scimScenario(ctx context.Context) error {
 	s.scim.attempted = true
 	s.scim.currentName = s.scim.name
@@ -93,8 +93,8 @@ func (s *scenario) scimScenario(ctx context.Context) error {
 		return fmt.Errorf("list-scim: configuration %s is missing from the list", s.scim.id)
 	}
 
-	// The response contains the secret token, so the query projects only its
-	// length and the evidence never stores the token itself.
+	// 応答には秘密トークンが含まれるため、
+	// query はその長さのみを投影し、evidence にはトークン自体が保存されない。
 	data, err = s.call(ctx, "regenerate-scim-token", "iam-api", "scim", "regenerate-token", s.scim.id,
 		"--query", "{token_length: (.secret_token | length)}")
 	if err != nil {

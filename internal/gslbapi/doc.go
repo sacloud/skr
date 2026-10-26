@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package gslbapi provides the GSLB API commands.
+// Package gslbapi は GSLB API コマンドを提供します。
 package gslbapi

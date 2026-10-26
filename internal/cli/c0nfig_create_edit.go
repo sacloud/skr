@@ -333,7 +333,7 @@ func validatePrivateKeyFile(path string) error {
 		return fmt.Errorf("private key file %q permissions are too lax (%o): group and other permissions must be disabled", path, info.Mode().Perm())
 	}
 
-	//nolint:gosec // The private key path is provided by the user and intentionally read.
+	//nolint:gosec // 秘密鍵のパスはユーザーが指定したものであり、意図的に読み込みます。
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read private key file %q: %w", path, err)

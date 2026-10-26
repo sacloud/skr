@@ -72,7 +72,7 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The caller selects a local skr binary; structured arguments are not passed through a shell.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // 呼び出し元がローカルの skr バイナリを選択し、構造化された引数はシェル経由で渡されない。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

@@ -81,7 +81,7 @@ func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]by
 	timeout, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
 
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The caller selects a local skr binary and passes structured arguments; no shell is used.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // 呼び出し元がローカルの skr バイナリを選択し、構造化された引数を渡す。シェルは使用しない。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -524,7 +524,7 @@ func (s *scenario) run(ctx context.Context) (result error) {
 	if err != nil {
 		return err
 	}
-	//nolint:gosec // The API key is written only to a private, mode-0600 temporary file.
+	//nolint:gosec // API キーはプライベートな mode-0600 の一時ファイルにのみ書き込まれる。
 	keyFileContents, err := json.Marshal(struct {
 		APIKey string `json:"APIKey"`
 	}{APIKey: apiKey})

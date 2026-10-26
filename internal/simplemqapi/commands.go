@@ -300,7 +300,7 @@ func readSecretFile(path string) ([]byte, error) {
 		}
 		return data, nil
 	}
-	//nolint:gosec // Path is explicitly provided by the user via --api-key-file.
+	//nolint:gosec // パスは --api-key-file 経由でユーザーが明示的に指定したものです。
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read secret file: %w", err)

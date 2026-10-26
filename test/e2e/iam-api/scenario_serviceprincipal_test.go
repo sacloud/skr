@@ -89,7 +89,7 @@ func TestServicePrincipalScenarioCoversKeyLifecycle(t *testing.T) {
 	if !fake.spKeyDeleted {
 		t.Error("the key was not deleted after the lifecycle")
 	}
-	// The public key and the assertion are written to private files.
+	// 公開鍵と assertion はプライベートなファイルに書き込まれる。
 	if got := fake.argsByStep["upload-key"]; !slices.Contains(got, "--public-key-file") {
 		t.Errorf("upload-key args = %v, want --public-key-file", got)
 	}

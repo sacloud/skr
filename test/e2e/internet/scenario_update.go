@@ -21,17 +21,17 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
-// updatedInternetDescription is the temporary description used while verifying the update.
+// updatedInternetDescription は更新確認中に使用される一時的な description である。
 const updatedInternetDescription = internetDesc + " (updated)"
 
-// updatedInternetName returns the temporary name used while verifying the update.
+// updatedInternetName は更新確認中に使用される一時的な name を返す。
 func updatedInternetName(name string) string {
 	return name + "-upd"
 }
 
-// updateInternetAndVerify updates the created Router + Switch's Name and Description,
-// verifies the reflection with Read, restores the original values, and verifies the
-// restore so that the existing delete flow can identify the Internet again.
+// updateInternetAndVerify は、作成した Router + Switch の Name と Description を更新し、
+// Read で反映を確認してから元の値に戻し、復元を確認します。
+// これにより既存の削除フローが Internet を再び識別できるようになります。
 func (s scenario) updateInternetAndVerify(ctx context.Context, id types.ID, name string, switchID types.ID) error {
 	if err := s.updateInternet(ctx, "test-update-internet", id, updatedInternetName(name), updatedInternetDescription); err != nil {
 		return err

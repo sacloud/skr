@@ -48,8 +48,8 @@ func TestScimScenarioCoversLifecycle(t *testing.T) {
 	if !fake.scimDeleted {
 		t.Error("scim scenario left the configuration undeleted")
 	}
-	// The configuration is deleted inside the scenario, so the cleanup finds
-	// nothing left to remove.
+	// configuration はシナリオ内で削除されるため、
+	// cleanup は削除すべきものが残っていない。
 	if err := s.cleanupManaged(context.Background(), &s.scim); err != nil {
 		t.Fatalf("cleanupManaged after a completed scenario: %v", err)
 	}

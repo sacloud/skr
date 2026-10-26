@@ -41,12 +41,12 @@ type ssoProfile struct {
 	Description string `json:"description"`
 }
 
-// ssoScenario creates an SSO profile with a generated IdP certificate, reads,
-// lists, updates, and deletes it. The profile is organization-wide, so it is
-// deleted inside the scenario; the cleanup only removes it when a previous
-// step failed. Link and unlink change the login method of every cloud user in
-// the organization, so they are covered by a dedicated tracking issue instead
-// of this runner.
+// ssoScenario は生成された IdP 証明書を持つ SSO profile を作成、読み込み、一覧表示、更新、削除します。
+// profile は organization 全体のものであるため、
+// シナリオ内で削除されます。
+// link と unlink は organization 内のすべてのクラウドユーザーのログイン方法を変更するため、
+// この runner ではなく専用の追跡 Issue で対象となります。
+// この runner の対象とする。
 func (s *scenario) ssoScenario(ctx context.Context) error {
 	s.ssoProfile.attempted = true
 	s.ssoProfile.currentName = s.ssoProfile.name
@@ -151,9 +151,9 @@ func decodeSSOProfile(step string, data []byte) (ssoProfile, error) {
 	return profile, nil
 }
 
-// writeIdPCertificate generates a self-signed X.509 certificate that stands
-// in for the identity provider certificate, writes it to a private file, and
-// returns the path with a cleanup function.
+// writeIdPCertificate は identity provider の証明書の代わりとなる自己署名の X.509 証明書を生成し、
+// プライベートなファイルに書き込み、
+// クリーンアップ関数付きでパスを返します。
 func (s *scenario) writeIdPCertificate() (string, func(), error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -187,10 +187,10 @@ func (s *scenario) writeIdPCertificate() (string, func(), error) {
 	}, nil
 }
 
-// writeSSORequest writes the create or update request JSON for the SSO
-// profile. The certificate is read from the generated certificate file.
+// writeSSORequest は SSO profile の作成または更新用リクエスト JSON を書き込みます。
+// 証明書は生成された証明書ファイルから読み込まれます。
 func (s *scenario) writeSSORequest(purpose, name, certificateFile string) (string, error) {
-	certificate, err := os.ReadFile(certificateFile) //nolint:gosec // The path is created by this runner in os.TempDir().
+	certificate, err := os.ReadFile(certificateFile) //nolint:gosec // パスはこの runner によって os.TempDir() 内に作成される。
 	if err != nil {
 		return "", fmt.Errorf("read IdP certificate file: %w", err)
 	}

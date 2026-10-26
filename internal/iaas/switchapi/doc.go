@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package switchapi contains generated low-level IaaS Switch API commands.
+// Package switchapi は生成された低レベルな IaaS Switch API コマンドを含みます。
 package switchapi

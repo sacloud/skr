@@ -37,7 +37,7 @@ func DecodeRequest(input string, destination any) error {
 			return fmt.Errorf("request file path is empty")
 		}
 		var err error
-		data, err = os.ReadFile(path) // #nosec G304 -- The user explicitly supplies the request file path.
+		data, err = os.ReadFile(path) // #nosec G304 -- リクエストファイルのパスはユーザーが明示的に指定する。
 		if err != nil {
 			return fmt.Errorf("read request file: %w", err)
 		}

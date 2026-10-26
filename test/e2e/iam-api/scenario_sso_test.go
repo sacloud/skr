@@ -38,8 +38,8 @@ func TestSSOScenarioCoversLifecycle(t *testing.T) {
 			t.Errorf("sso scenario did not call %s: %v", want, fake.calls)
 		}
 	}
-	// The IdP certificate contains newlines, so the request must be read from
-	// a private file instead of an inline value.
+	// IdP 証明書には改行が含まれるため、
+	// リクエストはインライン値ではなくプライベートなファイルから読み込む必要がある。
 	if got := fake.argsByStep["create-sso"]; !requestFromFile(got) {
 		t.Errorf("create-sso args = %v, want --request @path", got)
 	}

@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package serverapi contains generated low-level IaaS Server API commands.
+// Package serverapi は生成された低レベルな IaaS Server API コマンドを含みます。
 package serverapi

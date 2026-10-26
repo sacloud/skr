@@ -135,7 +135,7 @@ func TestSSHRunnerRecordsLoginResult(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, file := range []string{"ORDER.txt", "REPORT.md"} {
-				//nolint:gosec // Fixed evidence filenames inside this test's temporary directory.
+				//nolint:gosec // このテストの一時ディレクトリ内の固定された evidence ファイル名。
 				data, err := os.ReadFile(filepath.Join(recorder.Dir(), file))
 				if err != nil || !strings.Contains(string(data), "test-ssh-login") {
 					t.Fatalf("%s does not contain SSH evidence: %v", file, err)
@@ -150,7 +150,7 @@ func TestSSHEvidenceFailureStopsRetriesAndCleansUp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Replace the expected evidence file with a directory to force a write failure.
+	// 予期される evidence ファイルをディレクトリで置き換え、書き込み失敗を強制する。
 	if err := os.Mkdir(filepath.Join(recorder.Dir(), "001-test-ssh-login.json"), 0o700); err != nil {
 		t.Fatal(err)
 	}

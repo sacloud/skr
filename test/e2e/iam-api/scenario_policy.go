@@ -27,10 +27,10 @@ const (
 	policyPrincipalTyp = "service-principal"
 )
 
-// policyScenario updates the IAM policy bindings of the folder and project
-// created by this run and then restores the original bindings. The update
-// replaces the whole binding list, so the original bindings are captured
-// before the update and restored afterwards.
+// policyScenario は、この実行で作成した folder と project の IAM ポリシー binding を更新し、
+// 元の binding に戻します。
+// 更新は binding リスト全体を置き換えるため、
+// 更新前に元の binding を取得し、後で復元します。
 func (s *scenario) policyScenario(ctx context.Context) error {
 	if err := s.updateFolderPolicy(ctx); err != nil {
 		return err
@@ -38,8 +38,8 @@ func (s *scenario) policyScenario(ctx context.Context) error {
 	return s.updateProjectPolicy(ctx)
 }
 
-// updateFolderPolicy grants the folder role to the principal of this run,
-// verifies the binding, then restores the original bindings.
+// updateFolderPolicy はこの実行の principal に folder ロールを付与し、
+// binding を確認してから元の binding に戻します。
 func (s *scenario) updateFolderPolicy(ctx context.Context) error {
 	original, err := s.readPolicyBindings(ctx, "read-folder-policy-before", "policy", "read-folder", s.folder.id)
 	if err != nil {
@@ -58,11 +58,11 @@ func (s *scenario) updateFolderPolicy(ctx context.Context) error {
 	return s.checkPolicyBindings(ctx, "read-folder-policy-restored", "policy", "read-folder", s.folder.id, original)
 }
 
-// updateProjectPolicy grants the project role to the principal of this run in
-// addition to the original bindings, verifies both, then restores the
-// original bindings. A freshly created project starts with the owner binding
-// for the principal that created it, so restoring only the captured bindings
-// keeps the run's own access intact.
+// updateProjectPolicy は元の binding に加えて、この実行の principal に project ロールを付与し、
+// 両方を確認してから元の binding に戻します。
+// 新しく作成された project は作成した principal への owner binding から始まるため、
+// 取得した binding のみを復元すれば、
+// この実行自身のアクセスは維持されます。
 func (s *scenario) updateProjectPolicy(ctx context.Context) error {
 	original, err := s.readPolicyBindings(ctx, "read-project-policy-before", "policy", "read-project", s.project.id)
 	if err != nil {
@@ -88,8 +88,8 @@ func (s *scenario) policyBinding(roleID string) policyBinding {
 	}
 }
 
-// updatePolicyBindings replaces the IAM policy bindings of the resource with
-// the given JSON array request.
+// updatePolicyBindings はリソースの IAM ポリシー binding を
+// 指定した JSON 配列のリクエストで置き換えます。
 func (s *scenario) updatePolicyBindings(ctx context.Context, step, kind, subcommand, resourceID string, bindings []policyBinding) error {
 	request, err := policyRequestJSON(bindings)
 	if err != nil {
@@ -99,8 +99,8 @@ func (s *scenario) updatePolicyBindings(ctx context.Context, step, kind, subcomm
 	return err
 }
 
-// checkPolicyBindings reads the bindings and compares them with the expected
-// list.
+// checkPolicyBindings は binding を読み込み、
+// 期待されるリストと比較します。
 func (s *scenario) checkPolicyBindings(ctx context.Context, step, kind, subcommand, resourceID string, expected []policyBinding) error {
 	actual, err := s.readPolicyBindings(ctx, step, kind, subcommand, resourceID)
 	if err != nil {

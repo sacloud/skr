@@ -150,7 +150,7 @@ type requestUpdate struct {
 
 func readRequest(value string) (requestFind, error) {
 	path := strings.TrimPrefix(value, "@")
-	data, err := os.ReadFile(path) // #nosec G304 -- The path comes from a request file created under t.TempDir.
+	data, err := os.ReadFile(path) // #nosec G304 -- パスは t.TempDir 内に作成されたリクエストファイルから取得する。
 	if err != nil {
 		return requestFind{}, err
 	}
@@ -163,7 +163,7 @@ func readRequest(value string) (requestFind, error) {
 
 func readCreateRequest(value string) (requestCreate, error) {
 	path := strings.TrimPrefix(value, "@")
-	data, err := os.ReadFile(path) // #nosec G304 -- The path comes from a request file created under t.TempDir.
+	data, err := os.ReadFile(path) // #nosec G304 -- パスは t.TempDir 内に作成されたリクエストファイルから取得する。
 	if err != nil {
 		return requestCreate{}, err
 	}
@@ -176,7 +176,7 @@ func readCreateRequest(value string) (requestCreate, error) {
 
 func readUpdateRequest(value string) (requestUpdate, error) {
 	path := strings.TrimPrefix(value, "@")
-	data, err := os.ReadFile(path) // #nosec G304 -- The path comes from a request file created under t.TempDir.
+	data, err := os.ReadFile(path) // #nosec G304 -- パスは t.TempDir 内に作成されたリクエストファイルから取得する。
 	if err != nil {
 		return requestUpdate{}, err
 	}
@@ -307,7 +307,7 @@ func containsStep(steps []string, want string) bool {
 func TestCLIRunnerRecordsRequestFileContents(t *testing.T) {
 	tempDir := t.TempDir()
 	binary := filepath.Join(tempDir, "skr")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf 'ok\\n'\n"), 0o700); err != nil { // #nosec G306 -- The test executable must be executable and is created under t.TempDir.
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf 'ok\\n'\n"), 0o700); err != nil { // #nosec G306 -- テスト実行ファイルは実行可能である必要があり、t.TempDir 内に作成される。
 		t.Fatal(err)
 	}
 	requestPath := filepath.Join(tempDir, "create.json")

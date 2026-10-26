@@ -368,7 +368,7 @@ func TestDecodeRequestSourcesAndUnknownFields(t *testing.T) {
 	}
 
 	previousStdin := os.Stdin
-	stdin, err := os.Open(path) // #nosec G304 -- path was created under t.TempDir above.
+	stdin, err := os.Open(path) // #nosec G304 -- パスは上記で t.TempDir 内に作成された。
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +401,7 @@ func TestDecodeRequestReportsStdinReadError(t *testing.T) {
 
 func mustOpen(t *testing.T, path string) *os.File {
 	t.Helper()
-	file, err := os.Open(path) // #nosec G304 -- callers pass a path from t.TempDir.
+	file, err := os.Open(path) // #nosec G304 -- 呼び出し元は t.TempDir からのパスを渡す。
 	if err != nil {
 		t.Fatal(err)
 	}

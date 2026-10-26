@@ -63,9 +63,9 @@ func (i item) id() string {
 	return strconv.Itoa(i.ID)
 }
 
-// markedForThisRun reports whether the resource was created by this E2E run.
-// The description carries the unique run suffix and never changes, so it stays
-// valid even after the user is renamed.
+// markedForThisRun はリソースがこの E2E 実行によって作成されたものかどうかを報告します。
+// Description には実行固有のサフィックスが含まれて変更されないため、
+// user の名前が変更されても有効なままです。
 func (i item) markedForThisRun(suffix string) bool {
 	return i.Description == resourceDescription+suffix
 }
@@ -84,10 +84,10 @@ func (r *cliRunner) call(ctx context.Context, step string, args ...string) ([]by
 	return r.run(ctx, step, args, false)
 }
 
-// callExpectError runs the command expecting a failure, such as the
-// not-found check for a missing resource ID. The evidence marks the step as
-// an expected error, and the returned error lets the caller verify the
-// error classification.
+// callExpectError はコマンドを失敗を期待して実行します。
+// 例えば、存在しないリソース ID の not-found チェックです。
+// evidence はステップを予期されたエラーとして記録し、
+// 返されたエラーで呼び出し元はエラーの分類を確認できます。
 func (r *cliRunner) callExpectError(ctx context.Context, step string, args ...string) error {
 	_, err := r.run(ctx, step, args, true)
 	return err
@@ -100,7 +100,7 @@ func (r *cliRunner) run(ctx context.Context, step string, args []string, expectE
 	timeout, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
 
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The caller selects a local skr binary and passes structured arguments; no shell is used.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // 呼び出し元がローカルの skr バイナリを選択し、構造化された引数を渡す。シェルは使用しない。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -120,14 +120,14 @@ func (r *cliRunner) run(ctx context.Context, step string, args []string, expectE
 	}
 	if runErr != nil {
 		if expectError {
-			// The caller verifies the error classification, so the failure is
-			// the expected outcome and not a CLI failure.
+			// 呼び出し元はエラーの分類を確認するため、
+			// その失敗は予期された結果であり CLI の失敗ではない。
 			return nil, fmt.Errorf("%s: %w: %s", step, runErr, stderr.String())
 		}
 		return nil, fmt.Errorf("%s: skr failed: %w: %s", step, runErr, stderr.String())
 	}
 	if expectError {
-		return nil, nil // The caller reports the unexpected success.
+		return nil, nil // 呼び出し元が予期せぬ成功を報告する。
 	}
 	return stdout.Bytes(), nil
 }
@@ -143,10 +143,10 @@ type resource struct {
 	pendingName string
 }
 
-// managedResource tracks a temporary resource that is created and deleted by
-// its own scenario. The current name follows rename steps so that the cleanup
-// can verify the identity before deleting a resource left behind by a
-// failure.
+// managedResource は自身のシナリオによって作成・削除される一時的なリソースを追跡します。
+// 現在の名前は名前変更ステップに追従し、
+// 失敗で残されたリソースを削除する前に cleanup が identity を確認できるようにします。
+// 失敗。
 type managedResource struct {
 	kind        string
 	name        string
@@ -467,7 +467,7 @@ func (s *scenario) updateUser(ctx context.Context) error {
 	if err := checkIdentity(updated, expected); err != nil {
 		return fmt.Errorf("update-user: %w", err)
 	}
-	// The renamed user keeps its code and description, so the run identity stays valid.
+	// 名前変更された user は code と description を保持するため、実行の identity は有効なままである。
 	s.user.name = s.renamed
 	s.user.pendingName = ""
 	return nil
@@ -666,8 +666,8 @@ func (s *scenario) cleanup() error {
 	ctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer cancel()
 	var result error
-	// Managed resources belong to the organization or the project of this run,
-	// so they are removed before the project and folders themselves.
+	// managed resource はこの実行の organization または project に属するため、
+	// project や folder 自体より先に削除される。
 	for _, target := range []*managedResource{&s.scim, &s.ssoProfile, &s.projectAPIKey} {
 		if err := s.cleanupManaged(ctx, target); err != nil {
 			result = errors.Join(result, err)
@@ -774,8 +774,8 @@ func randomSuffix() (string, error) {
 const passwordChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-."
 
 func randomPassword() (string, error) {
-	// 24 characters starting with a letter and a digit so that the IAM password
-	// requirement (letters and digits) is satisfied.
+	// IAM パスワード要件（文字と数字）を満たすため、
+	// 先頭が文字と数字である24文字とする。
 	const prefix = "Sk9"
 	value := make([]byte, 21)
 	for index := range value {

@@ -213,7 +213,7 @@ func TestUpdateRequestUsesProtectedFile(t *testing.T) {
 	if !strings.HasSuffix(path, "update.json") {
 		t.Fatalf("update request path = %q, want update.json", path)
 	}
-	// the fake rejects a request that does not use the protected file
+	// fake は保護されたファイルを使わないリクエストを拒否する
 	fake.value = newFakeApp("app")
 	fake.calls = nil
 	if _, err := fake.call(context.Background(), "update-application", "application", "update", "app-id", "--request", "@"+path); err != nil {

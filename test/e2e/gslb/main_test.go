@@ -183,7 +183,7 @@ func (f *fakeGSLBCLI) lookupDNS(_ context.Context, step, _ string) ([]string, er
 	if f.item != nil && f.item.SorryServer != "" {
 		return []string{f.item.SorryServer}, nil
 	}
-	// Without a sorry server, all-down returns all registered addresses.
+	// sorry server がない場合、all-down は登録済みのすべてのアドレスを返す。
 	return []string{testServerIP}, nil
 }
 
@@ -550,7 +550,7 @@ func TestFinalizeRunRecordsCleanupFailure(t *testing.T) {
 				t.Fatalf("code=%d, want success", code)
 			}
 			for _, file := range []string{"RESULT.txt", "REPORT.md"} {
-				data, err := os.ReadFile(filepath.Join(recorder.Dir(), file)) //nolint:gosec // Fixed evidence filenames inside this test's temporary directory.
+				data, err := os.ReadFile(filepath.Join(recorder.Dir(), file)) //nolint:gosec // このテストの一時ディレクトリ内の固定された evidence ファイル名。
 				if err != nil || !strings.Contains(string(data), want) {
 					t.Fatalf("%s: data=%s error=%v, want %s", file, data, err, want)
 				}
@@ -576,7 +576,7 @@ func TestFinalizeRunPreservesEarlyFailureAndRunsCleanup(t *testing.T) {
 
 func TestDNSRunnerRecordsResponseFailures(t *testing.T) {
 	binDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(binDir, "dig"), []byte("#!/bin/sh\nprintf '%s\\n' \"$GSLB_TEST_DNS\"\n"), 0o700); err != nil { //nolint:gosec // The test helper must be executable and is created under t.TempDir.
+	if err := os.WriteFile(filepath.Join(binDir, "dig"), []byte("#!/bin/sh\nprintf '%s\\n' \"$GSLB_TEST_DNS\"\n"), 0o700); err != nil { //nolint:gosec // テストヘルパーは実行可能である必要があり、t.TempDir 内に作成される。
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", binDir)

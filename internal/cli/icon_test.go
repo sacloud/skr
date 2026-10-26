@@ -107,7 +107,7 @@ func TestIaaSIconAPIWithLocalMock(t *testing.T) {
 	}
 
 	imagePath := t.TempDir() + "/icon.png"
-	file, err := os.Create(imagePath) //nolint:gosec // imagePath is constructed under t.TempDir.
+	file, err := os.Create(imagePath) //nolint:gosec // imagePath は t.TempDir 内で構築される。
 	if err != nil {
 		t.Fatal(err)
 	}

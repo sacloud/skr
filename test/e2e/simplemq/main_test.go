@@ -240,7 +240,7 @@ func TestCLIRunnerRedactsAPIKeyFromEvidence(t *testing.T) {
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "fake-skr")
 	script := "#!/bin/sh\nprintf '%s' '{\"APIKey\":\"test-only-api-key\"}'\n"
-	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil { //nolint:gosec // The test helper must be executable.
+	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil { //nolint:gosec // テストヘルパーは実行可能である必要がある。
 		t.Fatal(err)
 	}
 	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "simplemq-api"), time.Now(), evidence.Scenario{})
@@ -263,7 +263,7 @@ func TestCLIRunnerRedactsAPIKeyFromEvidence(t *testing.T) {
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("evidence permissions = %04o, want 0600", info.Mode().Perm())
 	}
-	evidence, err := os.ReadFile(evidencePath) //nolint:gosec // Path is constructed under t.TempDir.
+	evidence, err := os.ReadFile(evidencePath) //nolint:gosec // パスは t.TempDir 内で構築される。
 	if err != nil {
 		t.Fatal(err)
 	}

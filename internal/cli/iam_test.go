@@ -422,7 +422,7 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 	}
 	postMock := func(path, body string) []byte {
 		t.Helper()
-		response, err := http.Post(server.TestURL()+path, "application/json", strings.NewReader(body)) //nolint:noctx // Test setup against the local mock server.
+		response, err := http.Post(server.TestURL()+path, "application/json", strings.NewReader(body)) //nolint:noctx // ローカルモックサーバーへのテスト準備。
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -709,13 +709,13 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("SAKURA_ENDPOINTS_IAM", server.TestURL())
 
-	// The project/folder IAM policy operations require an existing project and
-	// folder; create them in the mock as test setup.
+	// プロジェクト/フォルダの IAM ポリシー操作には既存のプロジェクトとフォルダが必要なため、
+	// モック内でテスト準備として作成する。
 	createInMock := func(path, body string) struct {
 		ID int `json:"id"`
 	} {
 		t.Helper()
-		response, err := http.Post(server.TestURL()+path, "application/json", strings.NewReader(body)) //nolint:noctx // Test setup against the local mock server.
+		response, err := http.Post(server.TestURL()+path, "application/json", strings.NewReader(body)) //nolint:noctx // ローカルモックサーバーへのテスト準備。
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -759,7 +759,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		return stdout.Bytes()
 	}
 
-	// user create
+	// user の作成
 	var created struct {
 		ID          int    `json:"id"`
 		Name        string `json:"name"`
@@ -779,7 +779,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 	}
 	userID := created.ID
 
-	// user list (array output)
+	// user の一覧（配列出力）
 	var listed []struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
@@ -801,7 +801,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatalf("projected output = %+v, want created user ID and name", projected)
 	}
 
-	// user read
+	// user の読み込み
 	var read struct {
 		ID          int    `json:"id"`
 		Name        string `json:"name"`
@@ -814,7 +814,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatalf("read returned %#v, want user %d", read, userID)
 	}
 
-	// user update without password file keeps the password
+	// パスワードファイルなしの user 更新はパスワードを保持する
 	var updated struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -828,7 +828,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatalf("update returned %#v, want renamed-user and updated", updated)
 	}
 
-	// user update with password file
+	// パスワードファイルありの user 更新
 	if err := json.Unmarshal(runCommand(
 		"iam-api", "user", "update", strconv.Itoa(userID),
 		"--name", "renamed-user", "--description", "updated", "--password-file", newPasswordFile,
@@ -836,7 +836,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// register-email / unregister-email
+	// register-email / unregister-email の実行
 	runCommand("iam-api", "user", "register-email", strconv.Itoa(userID), "--email", "user@example.com")
 	var withEmail struct {
 		Email string `json:"email"`
@@ -855,7 +855,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatalf("email after unregister = %q, want empty", withEmail.Email)
 	}
 
-	// group create / memberships
+	// group の作成 / メンバーシップ
 	var groupCreated struct {
 		ID          int    `json:"id"`
 		Name        string `json:"name"`
@@ -888,7 +888,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatalf("read-memberships returned %#v, want user %d", memberships, userID)
 	}
 
-	// group list filtered by user
+	// user で絞り込んだ group の一覧
 	var groupListed []struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
@@ -900,7 +900,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatalf("group list returned %#v, want group %d", groupListed, groupID)
 	}
 
-	// group update / read
+	// group の更新 / 読み込み
 	var groupUpdated struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -914,7 +914,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatalf("group update returned %#v, want renamed-group and renamed", groupUpdated)
 	}
 
-	// IAM policy bindings
+	// IAM ポリシーの binding
 	bindingsRequest := `[{"role":{"type":"preset","id":"iam-role-id"},"principals":[{"type":"user","id":1}]}]`
 	for _, target := range []struct {
 		operation string
@@ -981,7 +981,7 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		t.Fatalf("read-folder returned %#v, want binding for iam-role-id", folderBindings)
 	}
 
-	// delete user and group, then verify the lists are empty
+	// user と group を削除し、一覧が空になることを確認する
 	runCommand("iam-api", "user", "delete", strconv.Itoa(userID))
 	runCommand("iam-api", "group", "delete", strconv.Itoa(groupID))
 	listed = nil
@@ -1012,7 +1012,7 @@ func TestIAMAPIPasswordFromStdin(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("SAKURA_ENDPOINTS_IAM", server.TestURL())
 
-	// Replace standard input with a pipe carrying the password.
+	// 標準入力をパスワードを流すパイプに置き換える。
 	stdin := os.Stdin
 	t.Cleanup(func() { os.Stdin = stdin })
 	read, write, err := os.Pipe()

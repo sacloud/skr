@@ -71,7 +71,7 @@ func (r cliRunner) call(ctx context.Context, step string, args []string, request
 	}
 	timeout, cancel := context.WithTimeout(ctx, timeoutDuration)
 	defer cancel()
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The runner only executes the explicitly selected local skr binary.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // runner は明示的に選択されたローカルの skr バイナリのみを実行する。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

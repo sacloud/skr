@@ -21,17 +21,17 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
-// updatedServerDescription is the temporary description used while verifying the update.
+// updatedServerDescription は更新確認中に使用される一時的な description である。
 const updatedServerDescription = description + " (updated)"
 
-// updatedServerName returns the temporary name used while verifying the update.
+// updatedServerName は更新確認中に使用される一時的な name を返す。
 func updatedServerName(name string) string {
 	return name + "-upd"
 }
 
-// updateAndVerify updates the created Server's Name and Description, verifies the
-// reflection with Read, restores the original values, and verifies the restore so
-// that the existing delete flow can identify the Server again.
+// updateAndVerify は、作成した Server の Name と Description を更新し、
+// Read で反映を確認してから元の値に戻し、復元を確認します。
+// これにより既存の削除フローが Server を再び識別できるようになります。
 func (s scenario) updateAndVerify(ctx context.Context, id types.ID, name string) error {
 	if err := s.updateServer(ctx, "test-update", id, updatedServerName(name), updatedServerDescription); err != nil {
 		return err

@@ -49,7 +49,7 @@ type fakeCLI struct {
 	failAt            string
 	failAfterApply    string
 
-	// knobs for the read-only scenario responses
+	// read-only シナリオの応答用ノブ
 	emptyRoleCatalog   bool
 	iamRoleReadID      string
 	idRoleReadID       string
@@ -59,7 +59,7 @@ type fakeCLI struct {
 	brokenPolicyJSON   bool
 	emptyRuleTemplates bool
 
-	// state for the managed resource scenarios
+	// managed resource シナリオの状態
 	scimName     string
 	scimDeleted  bool
 	ssoName      string
@@ -74,13 +74,13 @@ type fakeCLI struct {
 	folderPolicyBindings  []policyBinding
 	projectPolicyBindings []policyBinding
 
-	// lastPakRequest records the parsed create-project-api-key request body.
+	// lastPakRequest はパース済みの create-project-api-key リクエスト本文を記録する。
 	lastPakRequest map[string]any
 
-	// knob for the hierarchy scenario parent verification
+	// hierarchy シナリオの親検証用ノブ
 	childFolderParentID int64
 
-	// state for the account scenario
+	// account シナリオの状態
 	orgName                    string
 	servicePolicyEnabled       bool
 	servicePolicyRules         json.RawMessage
@@ -160,7 +160,7 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		if passwordFile == "" {
 			return nil, errInvalid("create-user requires --password-file")
 		}
-		//nolint:gosec // The path is created by this test in t.TempDir().
+		//nolint:gosec // パスはこのテストで t.TempDir() 内に作成された。
 		password, err := os.ReadFile(passwordFile)
 		if err != nil {
 			return nil, err
@@ -335,8 +335,8 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 	}
 }
 
-// readOnlyResponse serves the fixed read-only iam-api responses. The third
-// return value reports whether the step belongs to the read-only scenario.
+// readOnlyResponse は固定された read-only な iam-api の応答を提供します。
+// 3番目の戻り値は、そのステップが read-only シナリオに属するかどうかを報告します。
 func (f *fakeCLI) readOnlyResponse(step string, args []string) ([]byte, error, bool) {
 	switch step {
 	case "iam-role-list":
@@ -440,8 +440,8 @@ func (f *fakeCLI) managedResponse(step string, args []string) ([]byte, error, bo
 		}
 		return mustRoleJSON(map[string]any{"items": items}), nil, true
 	case "regenerate-scim-token":
-		// The scenario projects the secret token to its length with --query,
-		// so the fake serves the projected shape.
+		// シナリオは --query で秘密トークンをその長さに投影するため、
+		// fake は投影後の形で応答する。
 		return mustRoleJSON(map[string]any{"token_length": len("fake-secret-token")}), nil, true
 	case "delete-scim":
 		f.scimDeleted = true
@@ -651,10 +651,10 @@ func parsePolicyBindings(args []string) []policyBinding {
 	return bindings
 }
 
-// accountResponse serves the organization-scoped write steps of the account
-// and user 2FA scenarios. The scenario updates each setting with the values it
-// read before, so the fake stores the request and serves it back on the
-// verify read.
+// accountResponse は account と user 2FA シナリオの organization スコープな書き込みステップを提供します。
+// シナリオは各設定を事前に読み込んだ値で更新するため、
+// fake はリクエストを保存し、
+// 確認用の read でそれを返します。
 func (f *fakeCLI) accountResponse(step string, args []string) ([]byte, error, bool) {
 	switch step {
 	case "account-read-password-policy":
@@ -737,7 +737,7 @@ func (f *fakeCLI) accountResponse(step string, args []string) ([]byte, error, bo
 		}
 		return []byte("false\n"), nil, true
 	case "account-update-service-policy":
-		// The rules can only be updated while the policy is enabled.
+		// ルールはポリシーが有効な間のみ更新できる。
 		if !f.servicePolicyEnabled {
 			return nil, errInvalid("account-update-service-policy: API Error 409 - サービスポリシーが有効化されていません"), true
 		}
@@ -943,7 +943,7 @@ func testScenario(t *testing.T, fake *fakeCLI) *scenario {
 	t.Helper()
 	suffix := "test00ff"
 	name := "skr-e2e-iam-" + suffix
-	//nolint:gosec // The scenario uses a fake password only in an in-memory CLI test.
+	//nolint:gosec // シナリオはインメモリの CLI テスト内でのみ仮のパスワードを使用する。
 	return &scenario{
 		client:   fake,
 		password: "Sk9-Password-Test-0000000000",

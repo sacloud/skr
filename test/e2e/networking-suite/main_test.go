@@ -555,7 +555,7 @@ func TestCleanupRunningServers(t *testing.T) {
 						current.Interfaces = []serverInterface{{ID: 999}}
 					}
 					if strings.HasPrefix(step, "cleanup-read-server-") {
-						// Fail the first stop-poll read, but allow the subsequent deletion identity read.
+						// 最初の stop-poll read を失敗させるが、その後の削除 identity read は許可する。
 						if outcome == "wait failure" && sshCalls == 2 {
 							sshCalls++
 							return nil, stopError
@@ -799,7 +799,7 @@ func TestPythonTCPCommandExchangesBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	command := exec.Command("python3", "-c", pythonTCPCode(host, port, "ping")) //nolint:gosec // The generated code targets only a test-local listener.
+	command := exec.Command("python3", "-c", pythonTCPCode(host, port, "ping")) //nolint:gosec // 生成されたコードはテスト用のローカルリスナーのみを対象とする。
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("pythonTCPCommand failed: %v\n%s", err, output)

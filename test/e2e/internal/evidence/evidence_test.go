@@ -69,7 +69,7 @@ func TestRecorderOrdersAndRedactsEvidence(t *testing.T) {
 	}
 
 	recordPath := filepath.Join(recorder.Dir(), "002-rotate-api-key.json")
-	record, err := os.ReadFile(recordPath) //nolint:gosec // The path is created under t.TempDir.
+	record, err := os.ReadFile(recordPath) //nolint:gosec // パスは t.TempDir 内に作成される。
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestSetResultWritesPrivateResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	resultPath := filepath.Join(recorder.Dir(), "RESULT.txt")
-	data, err := os.ReadFile(resultPath) //nolint:gosec // The path is created under t.TempDir.
+	data, err := os.ReadFile(resultPath) //nolint:gosec // パスは t.TempDir 内に作成される。
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +225,7 @@ func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
 	if err := recorder.RecordWithDescription("http-get", "HTTP リクエストの正常応答を確認する", "/path/to/skr", []string{"http", "--query", "map({ID,Name})"}, nil, "line 1\n```\n", "", nil, false); err != nil {
 		t.Fatal(err)
 	}
-	failure := exec.Command(os.Args[0], "-test.run=TestEvidenceExitStatusHelper") //nolint:gosec // The test binary is invoked with a fixed test selector; no user input reaches the command.
+	failure := exec.Command(os.Args[0], "-test.run=TestEvidenceExitStatusHelper") //nolint:gosec // テストバイナリは固定のテストセレクターで起動され、ユーザー入力はコマンドに到達しない。
 	failure.Env = append(os.Environ(), "EVIDENCE_EXIT_STATUS_HELPER=1")
 	runErr := failure.Run()
 	if runErr == nil {

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package iaas provides a Switch-, PacketFilter-, and Zone-focused in-memory mock for IaaS API calls.
-// Its constructor and lifecycle mirror the sakumock test-server convention.
+// Package iaas は IaaS API 呼び出し用の Switch・PacketFilter・Zone に特化したインメモリモックを提供します。
+// コンストラクタとライフサイクルは sakumock のテストサーバー規約に合わせています。
 package iaas
 
 import (
@@ -30,12 +30,12 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 )
 
-// Config holds mock options.
+// Config はモックのオプションを保持します。
 type Config struct {
 	Zones []string
 }
 
-// Server stores mock Switch and PacketFilter resources and implements the IaaS SDK caller interface.
+// Server はモックの Switch と PacketFilter のリソースを保持し、IaaS SDK の caller インターフェースを実装します。
 type Server struct {
 	mu            sync.Mutex
 	switches      map[string]map[string]json.RawMessage
@@ -45,7 +45,7 @@ type Server struct {
 	nextID        int
 }
 
-// NewTestServer creates an in-memory mock API caller.
+// NewTestServer はインメモリのモック API caller を作成します。
 func NewTestServer(config Config) *Server {
 	return &Server{
 		switches:      make(map[string]map[string]json.RawMessage),
@@ -56,7 +56,7 @@ func NewTestServer(config Config) *Server {
 	}
 }
 
-// Close is provided to match the sakumock test-server lifecycle.
+// Close は sakumock のテストサーバー規約に合わせて提供されています。
 func (s *Server) Close() {}
 
 func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, error) {

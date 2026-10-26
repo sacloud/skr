@@ -21,9 +21,9 @@ import (
 	"strconv"
 )
 
-// managedListQuery projects a list response down to the resource ID and name.
-// The ID is converted to a string because scim and SSO identifiers are UUIDs
-// while project API key identifiers are integers.
+// managedListQuery は一覧応答をリソース ID と name に投影します。
+// scim と SSO の識別子は UUID だが project API key の識別子は整数のため、
+// ID は文字列に変換されます。
 const managedListQuery = "{items: [.items[] | {id: (.id | tostring), name: .name}]}"
 
 type nameID struct {
@@ -35,8 +35,8 @@ type nameIDList struct {
 	Items []nameID `json:"items"`
 }
 
-// decodeNamedResource decodes an {id, name} projection. The ID may be a UUID
-// string or an integer depending on the resource kind.
+// decodeNamedResource は {id, name} の投影をデコードします。
+// ID はリソース種別によって UUID 文字列または整数の場合があります。
 func decodeNamedResource(step string, data []byte) (id string, name string, err error) {
 	var result struct {
 		ID   any    `json:"id"`
@@ -59,8 +59,8 @@ func decodeNamedResource(step string, data []byte) (id string, name string, err 
 	return id, result.Name, nil
 }
 
-// findManaged lists the resource kind and returns the item with the given
-// name.
+// findManaged はリソース種別を一覧表示し、指定した name の項目を返します。
+// name を指定する。
 func (s *scenario) findManaged(ctx context.Context, step, kind, name string) (nameID, bool, error) {
 	data, err := s.call(ctx, step, "iam-api", kind, "list", "--query", managedListQuery)
 	if err != nil {
@@ -78,8 +78,8 @@ func (s *scenario) findManaged(ctx context.Context, step, kind, name string) (na
 	return nameID{}, false, nil
 }
 
-// checkManagedListed reports whether the list contains the resource with the
-// given ID and name.
+// checkManagedListed は一覧に指定した ID と name のリソースが含まれているかどうかを報告します。
+// 指定した ID と name であること。
 func checkManagedListed(step string, data []byte, id, name string) (bool, error) {
 	var list nameIDList
 	if err := json.Unmarshal(data, &list); err != nil {
@@ -96,9 +96,9 @@ func checkManagedListed(step string, data []byte, id, name string) (bool, error)
 	return false, nil
 }
 
-// cleanupManaged removes the resource created by a managed scenario that
-// failed before deleting it. The resource identity is verified by reading it
-// back before the deletion, and the deletion is confirmed with a list check.
+// cleanupManaged は、managed シナリオが削除前に失敗して作成されたリソースを削除します。
+// リソースの identity は削除前に読み込んで確認し、
+// 削除は一覧チェックで確認します。
 func (s *scenario) cleanupManaged(ctx context.Context, target *managedResource) error {
 	if !target.attempted {
 		return nil

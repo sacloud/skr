@@ -24,9 +24,9 @@ import (
 
 const missingTwoFactorResourceID = "999999999999"
 
-// accountScenario exercises the organization-scoped write commands. Every
-// update sends the values that were read before, so the organization-wide
-// configuration stays unchanged while the write paths are covered.
+// accountScenario は organization スコープの書き込みコマンドを実行します。
+// すべての更新は事前に読み込んだ値を送信するため、
+// 書き込み経路を網羅しつつ organization 全体の設定は変更されません。
 func (s *scenario) accountScenario(ctx context.Context) error {
 	if err := s.updatePasswordPolicy(ctx); err != nil {
 		return err
@@ -46,9 +46,9 @@ func (s *scenario) accountScenario(ctx context.Context) error {
 	return s.servicePolicyFlip(ctx)
 }
 
-// updatePasswordPolicy reads the current password policy and updates it with
-// the same values. The update requires every field, so the request reuses the
-// read response verbatim.
+// updatePasswordPolicy は現在のパスワードポリシーを読み込み、同じ値で更新します。
+// 更新にはすべてのフィールドが必要なため、
+// リクエストは読み込んだ応答をそのまま再利用します。
 func (s *scenario) updatePasswordPolicy(ctx context.Context) error {
 	data, err := s.call(ctx, "account-read-password-policy", "iam-api", "auth", "read-password-policy")
 	if err != nil {
@@ -75,9 +75,9 @@ func (s *scenario) updatePasswordPolicy(ctx context.Context) error {
 	return nil
 }
 
-// updateAuthConditions reads the current authentication conditions and updates
-// them with the same values. The raw JSON is sent back verbatim so fields this
-// run does not model, such as datetime_restriction, stay intact.
+// updateAuthConditions は現在の認証条件を読み込み、同じ値で更新します。
+// 生の JSON をそのまま送り返すため、
+// この実行でモデル化していない datetime_restriction などのフィールドも保持されます。
 func (s *scenario) updateAuthConditions(ctx context.Context) error {
 	data, err := s.call(ctx, "account-read-auth-conditions", "iam-api", "auth", "read-auth-conditions")
 	if err != nil {
@@ -107,8 +107,8 @@ func (s *scenario) updateAuthConditions(ctx context.Context) error {
 	return nil
 }
 
-// updateIDPolicy replaces the organization ID policy bindings with the
-// bindings that were read before, so the assignments stay unchanged.
+// updateIDPolicy は organization の ID ポリシー binding を、事前に読み込んだ binding で置き換えます。
+// これにより割り当ては変更されません。
 func (s *scenario) updateIDPolicy(ctx context.Context) error {
 	original, err := s.readPolicyBindings(ctx, "account-read-id-policy", "id-policy", "read-organization", "")
 	if err != nil {
@@ -131,8 +131,8 @@ func (s *scenario) updateIDPolicy(ctx context.Context) error {
 	return nil
 }
 
-// updateOrganizationPolicyBindings replaces the organization IAM policy
-// bindings with the bindings that were read before.
+// updateOrganizationPolicyBindings は organization の IAM ポリシー binding を、
+// 事前に読み込んだ binding で置き換えます。
 func (s *scenario) updateOrganizationPolicyBindings(ctx context.Context) error {
 	original, err := s.readPolicyBindings(ctx, "account-read-organization-policy", "policy", "read-organization", "")
 	if err != nil {
@@ -155,8 +155,8 @@ func (s *scenario) updateOrganizationPolicyBindings(ctx context.Context) error {
 	return nil
 }
 
-// updateOrganizationName updates the organization name with the name that was
-// read before, so the visible organization stays unchanged.
+// updateOrganizationName は organization name を、事前に読み込んだ名前で更新します。
+// これにより表示される organization は変更されません。
 func (s *scenario) updateOrganizationName(ctx context.Context) error {
 	data, err := s.call(ctx, "account-read-organization", "iam-api", "organization", "read")
 	if err != nil {
@@ -183,11 +183,11 @@ func (s *scenario) updateOrganizationName(ctx context.Context) error {
 	return nil
 }
 
-// servicePolicyFlip enables the organization service policy, updates the rules
-// with the values that were read before, and disables the policy again. The
-// rules can only be updated while the policy is enabled, so the flip is needed
-// to cover the update. The policy starts and ends disabled, and the deferred
-// restore keeps that state even when a step fails.
+// servicePolicyFlip は organization のサービスポリシーを有効にし、
+// 事前に読み込んだ値でルールを更新してから、再び無効にします。
+// ルールはポリシーが有効な間のみ更新できるため、
+// 更新を網羅するには有効化が必要です。
+// ポリシーは無効の状態で開始・終了し、defer された復元はステップが失敗してもその状態を保ちます。
 func (s *scenario) servicePolicyFlip(ctx context.Context) error {
 	data, err := s.call(ctx, "account-read-service-policy", "iam-api", "organization", "read-service-policy")
 	if err != nil {
@@ -254,11 +254,11 @@ func (s *scenario) checkServicePolicyEnabled(ctx context.Context, step string, w
 	return nil
 }
 
-// user2faScenario exercises the user 2FA commands against the user created by
-// this run. The user has no OTP, trusted devices, or security keys, so the
-// list commands return empty pages, the deactivate and clear commands succeed
-// without changing the login method, and the commands for a missing resource
-// ID return the not-found error.
+// user2faScenario は、この実行で作成した user に対して user 2FA コマンドを実行します。
+// user は OTP、trusted device、security key を持たないため、
+// 一覧コマンドは空のページを返し、
+// deactivate と clear コマンドはログイン方法を変更せずに成功し、
+// 存在しないリソース ID に対するコマンドは not-found エラーを返します。
 func (s *scenario) user2faScenario(ctx context.Context) error {
 	if err := s.checkEmpty2FAPage(ctx, "u2fa-list-trusted-devices", "list-trusted-devices"); err != nil {
 		return err
@@ -281,8 +281,8 @@ func (s *scenario) user2faScenario(ctx context.Context) error {
 	return s.expectNotFound(ctx, "u2fa-delete-missing-security-key", "iam-api", "user-2fa", "delete-security-key", "--user-id", s.user.id, missingTwoFactorResourceID)
 }
 
-// checkEmpty2FAPage lists the 2FA resources of the user and verifies that the
-// page is empty.
+// checkEmpty2FAPage は user の 2FA リソースを一覧表示し、
+// そのページが空であることを確認します。
 func (s *scenario) checkEmpty2FAPage(ctx context.Context, step, subcommand string) error {
 	data, err := s.call(ctx, step, "iam-api", "user-2fa", subcommand, "--user-id", s.user.id)
 	if err != nil {
@@ -298,8 +298,8 @@ func (s *scenario) checkEmpty2FAPage(ctx context.Context, step, subcommand strin
 	return nil
 }
 
-// expectNotFound verifies that the command fails with the 404 not-found
-// classification instead of succeeding silently.
+// expectNotFound は、
+// コマンドが静かに成功するのではなく 404 not-found 分類で失敗することを確認します。
 func (s *scenario) expectNotFound(ctx context.Context, step string, args ...string) error {
 	err := s.client.callExpectError(ctx, step, args...)
 	if err == nil {

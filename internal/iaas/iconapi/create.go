@@ -90,7 +90,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 func readImageFile(path string) (string, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // The image path is explicit CLI input from the user.
+	data, err := os.ReadFile(path) //nolint:gosec // 画像パスはユーザーからの明示的な CLI 入力である。
 	if err != nil {
 		return "", fmt.Errorf("read icon image file: %w", err)
 	}

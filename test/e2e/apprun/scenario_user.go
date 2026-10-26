@@ -26,9 +26,9 @@ type appUser struct {
 	} `json:"limit"`
 }
 
-// userScenario exercises user read, and user create when the account has not
-// signed up yet. The signup is irreversible at the account level, so the
-// create is skipped when the account already has an AppRun user.
+// userScenario は user の読み込みと、アカウントがまだサインアップしていない場合の user 作成を実行します。
+// サインアップはアカウントレベルで不可逆なため、
+// 既に AppRun user が存在する場合は作成をスキップします。
 func (s *scenario) userScenario(ctx context.Context) error {
 	createdData, createErr := s.call(ctx, "create-user", "user", "create")
 	var signedUp appUser
@@ -38,8 +38,8 @@ func (s *scenario) userScenario(ctx context.Context) error {
 			return fmt.Errorf("decode AppRun signup: %w", err)
 		}
 	} else {
-		// The account has most likely already signed up; the following read
-		// verifies the actual state.
+		// アカウントは既にサインアップ済みの可能性が高いです。
+		// 次の read で実際の状態を確認します。
 		fmt.Println("AppRun user create returned an error; assuming the account already signed up.")
 	}
 	read, err := s.readUser(ctx, "read-user")

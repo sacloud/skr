@@ -70,7 +70,7 @@ func TestCheckMonitorValuesAcceptsWellFormedData(t *testing.T) {
 			t.Errorf("checkMonitorValues(%s) = %v, want nil", output, err)
 		}
 	}
-	// No data points is a valid response for a fresh Router + Switch without traffic.
+	// データポイントがないことは、トラフィックのない新しい Router + Switch に対する有効な応答である。
 	if err := checkMonitorValues([]byte(`null`)); err != nil {
 		t.Errorf("checkMonitorValues(null) = %v, want nil", err)
 	}

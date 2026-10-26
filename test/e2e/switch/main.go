@@ -82,7 +82,7 @@ func (r cliRunner) call(ctx context.Context, step string, request any) ([]byte, 
 
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // Binary is an explicitly selected local skr executable; arguments are structured JSON, not a shell.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // バイナリは明示的に選択されたローカルの skr 実行ファイルであり、引数は構造化された JSON でシェルではない。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -146,7 +146,7 @@ func switchArgs(step string, value any) ([]string, error) {
 		if op != "find" {
 			return nil, fmt.Errorf("%s: Names only supported by find", step)
 		}
-		// Names is a slice in the SDK request; keep the JSON path for complex inputs.
+		// Names は SDK リクエスト内のスライスである。複雑な入力には JSON パスを維持する。
 		data, err := json.Marshal(request)
 		if err != nil {
 			return nil, fmt.Errorf("%s: encode request: %w", step, err)

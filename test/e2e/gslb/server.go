@@ -423,7 +423,7 @@ func (s scenario) cleanupOrphanDisk(ctx context.Context) error {
 
 func createSSHMaterial(dir string) (userDataPath, privateKey, knownHosts string, err error) {
 	privateKey = filepath.Join(dir, "ssh-key")
-	keygen := exec.Command("ssh-keygen", "-t", "rsa", "-b", "3072", "-N", "", "-f", privateKey) //nolint:gosec // Generates an ephemeral local test key without a shell.
+	keygen := exec.Command("ssh-keygen", "-t", "rsa", "-b", "3072", "-N", "", "-f", privateKey) //nolint:gosec // シェルを使わずに一時的なローカルのテストキーを生成する。
 	keygen.Stdout = nil
 	keygen.Stderr = nil
 	if err := keygen.Run(); err != nil {
@@ -432,7 +432,7 @@ func createSSHMaterial(dir string) (userDataPath, privateKey, knownHosts string,
 	if err := os.Chmod(privateKey, 0o600); err != nil {
 		return "", "", "", fmt.Errorf("protect temporary SSH key: %w", err)
 	}
-	publicKey, err := os.ReadFile(privateKey + ".pub") //nolint:gosec // The public key is created inside the runner's private temporary directory.
+	publicKey, err := os.ReadFile(privateKey + ".pub") //nolint:gosec // 公開鍵は runner のプライベートな一時ディレクトリ内に作成される。
 	if err != nil {
 		return "", "", "", fmt.Errorf("read temporary SSH public key: %w", err)
 	}
@@ -441,7 +441,7 @@ func createSSHMaterial(dir string) (userDataPath, privateKey, knownHosts string,
 		"#cloud-config\nusers:\n  - default\n  - name: skr-e2e\n    shell: /bin/bash\n    sudo: ALL=(ALL) NOPASSWD:ALL\n    ssh_authorized_keys:\n      - %s\n",
 		strings.TrimSpace(string(publicKey)),
 	)
-	//nolint:gosec // userDataPath is inside the private temporary directory created by this runner.
+	//nolint:gosec // userDataPath はこの runner が作成したプライベートな一時ディレクトリ内にある。
 	if err := os.WriteFile(userDataPath, []byte(userData), 0o600); err != nil {
 		return "", "", "", fmt.Errorf("write temporary cloud-init user-data: %w", err)
 	}
@@ -469,7 +469,7 @@ func (r sshRunner) run(ctx context.Context, step, ip, privateKey, knownHosts, re
 		"-o", "UserKnownHostsFile=" + knownHosts,
 		"skr-e2e@" + ip, remoteCommand,
 	}
-	command := exec.CommandContext(timeout, "ssh", args...) //nolint:gosec // Arguments target the temporary server with a fixed remote command, without a local shell.
+	command := exec.CommandContext(timeout, "ssh", args...) //nolint:gosec // 引数は固定されたリモートコマンドで一時サーバーを対象とし、ローカルシェルは使用しない。
 	output, runErr := command.CombinedOutput()
 	if err := r.evidence.Record(step, "ssh", args, nil, string(output), "", runErr, false); err != nil {
 		return errors.Join(runErr, err)
@@ -488,7 +488,7 @@ func (r dnsRunner) lookup(ctx context.Context, step, fqdn string) ([]string, err
 	args := []string{"+noall", "+comments", "+answer", "+time=3", "+tries=1", fqdn, "A"}
 	timeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	command := exec.CommandContext(timeout, "dig", args...) //nolint:gosec // The API-returned FQDN is passed as a structured argument without a shell.
+	command := exec.CommandContext(timeout, "dig", args...) //nolint:gosec // API から返された FQDN はシェルなしの構造化された引数として渡される。
 	output, runErr := command.CombinedOutput()
 	var answers []string
 	if runErr == nil {

@@ -227,7 +227,7 @@ func (s crudScenario) runCRUD(ctx context.Context, suffix string) (result error)
 	if !strings.HasSuffix(profile, "\n") {
 		fmt.Println()
 	}
-	// Capture existing routing settings before any writes so their priorities can be checked afterwards.
+	// 書き込み前に既存のルーティング設定を取得し、後でその優先順位を確認できるようにする。
 	before, err := s.listItems(ctx, "crud-routing-before", "routing")
 	if err != nil {
 		return err

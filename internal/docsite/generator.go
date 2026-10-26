@@ -93,7 +93,7 @@ func runHelp(cliPath string, commandPath []string) (string, error) {
 	defer cancel()
 
 	args := append(append([]string(nil), commandPath...), "--help")
-	output, err := exec.CommandContext(ctx, cliPath, args...).CombinedOutput() //nolint:gosec // cliPath is the explicitly selected skr executable; arguments are fixed help flags and no shell is used.
+	output, err := exec.CommandContext(ctx, cliPath, args...).CombinedOutput() //nolint:gosec // cliPath は明示的に選択された skr 実行ファイルであり、引数は固定のヘルプフラグでシェルは使用しない。
 	if err != nil {
 		return "", fmt.Errorf("run skr %s --help: %w\n%s", strings.Join(commandPath, " "), err, output)
 	}
@@ -150,7 +150,7 @@ func renderManual(manualPath, outputPath string) error {
 			return nil
 		}
 
-		source, err := os.ReadFile(sourcePath) //nolint:gosec // WalkDir yields Markdown paths confined to the configured manual tree.
+		source, err := os.ReadFile(sourcePath) //nolint:gosec // WalkDir は設定されたマニュアルツリー内の Markdown パスを返す。
 		if err != nil {
 			return fmt.Errorf("read manual %s: %w", sourcePath, err)
 		}
@@ -167,7 +167,7 @@ func renderManual(manualPath, outputPath string) error {
 		if strings.EqualFold(title, "README") {
 			title = "skr 利用者向けドキュメント"
 		}
-		if err := writePage(outputPath, webPath, title, template.HTML(rendered)); err != nil { //nolint:gosec // Goldmark's default renderer suppresses raw HTML and dangerous links.
+		if err := writePage(outputPath, webPath, title, template.HTML(rendered)); err != nil { //nolint:gosec // Goldmark のデフォルトレンダラーは生の HTML と危険なリンクを抑制する。
 			return fmt.Errorf("write manual page %s: %w", webPath, err)
 		}
 		return nil
@@ -244,7 +244,7 @@ func renderCommandPage(commands []commandHelp, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	return writePage(outputPath, "commands/index.html", "CLI コマンドヘルプ", template.HTML(body)) //nolint:gosec // The body is rendered by html/template with all help values escaped.
+	return writePage(outputPath, "commands/index.html", "CLI コマンドヘルプ", template.HTML(body)) //nolint:gosec // 本文は html/template でレンダリングされ、すべてのヘルプ値はエスケープされる。
 }
 
 func renderCommandBody(data commandPageData) (string, error) {
@@ -316,10 +316,10 @@ func writePage(outputPath, webPath, title string, body template.HTML) error {
 		return err
 	}
 	target := filepath.Join(outputPath, filepath.FromSlash(webPath))
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil { //nolint:gosec // Published static pages need traversable directories in the Pages artifact.
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil { //nolint:gosec // 公開された静的ページは Pages アーティファクト内で traversable なディレクトリを必要とする。
 		return err
 	}
-	if err := os.WriteFile(target, output.Bytes(), 0o644); err != nil { //nolint:gosec // Generated pages are public documentation and must be readable in the artifact.
+	if err := os.WriteFile(target, output.Bytes(), 0o644); err != nil { //nolint:gosec // 生成されたページは公開ドキュメントであり、アーティファクト内で読み取り可能である必要がある。
 		return err
 	}
 	return nil

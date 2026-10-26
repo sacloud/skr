@@ -20,9 +20,9 @@ import (
 	"fmt"
 )
 
-// filterAddress is a documentation range (RFC 5737 TEST-NET-1) used to verify
-// the packet-filter update; the filter is restored to the disabled state
-// afterwards.
+// filterAddress は packet-filter の更新確認に使う文書用の範囲（RFC 5737 TEST-NET-1）です。
+// 後で packet-filter は無効状態に復元されます。
+// その後、元の無効状態に戻す。
 const filterAddress = "192.0.2.1"
 
 type packetFilter struct {
@@ -33,9 +33,9 @@ type packetFilter struct {
 	} `json:"settings"`
 }
 
-// packetFilterScenario exercises packet-filter read and update. The scenario
-// enables the filter with an IPv4 setting, verifies the reflection, and then
-// restores the disabled state.
+// packetFilterScenario は packet-filter の読み込みと更新を実行します。
+// シナリオは IPv4 設定でフィルタを有効にし、反映を確認してから
+// 無効状態に戻します。
 func (s *scenario) packetFilterScenario(ctx context.Context, appID string) error {
 	initial, err := s.readPacketFilter(ctx, "read-packet-filter", appID)
 	if err != nil {

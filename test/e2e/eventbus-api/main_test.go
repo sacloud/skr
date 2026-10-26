@@ -297,7 +297,7 @@ func (f *fakeCLI) scheduleResponse(description string) ([]byte, error) {
 		Description: description,
 	}
 	result.Settings.ProcessConfigurationID = json.RawMessage(`"` + f.scheduleSettings.ProcessConfigurationID + `"`)
-	// The API returns StartsAt as a decimal string in responses.
+	// API はレスポンスで StartsAt を10進文字列として返す。
 	result.Settings.StartsAt = strconv.FormatInt(f.scheduleSettings.StartsAt, 10)
 	result.Settings.RecurringStep = f.scheduleSettings.RecurringStep
 	result.Settings.RecurringUnit = f.scheduleSettings.RecurringUnit
@@ -411,7 +411,7 @@ func TestCLIRunnerOrdersEvidenceAndRedactsAPIKey(t *testing.T) {
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "fake-skr")
 	script := "#!/bin/sh\nif [ \"$1\" = rotate-api-key ]; then\n  printf '%s' '{\"APIKey\":\"test-only-api-key\"}'\nelse\n  printf '%s' 'test-profile\\n'\nfi\n"
-	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil { //nolint:gosec // The test helper must be executable.
+	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil { //nolint:gosec // テストヘルパーは実行可能である必要がある。
 		t.Fatal(err)
 	}
 	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "eventbus-api"), time.Date(2026, 10, 5, 17, 1, 0, 0, time.Local), evidence.Scenario{})
@@ -430,7 +430,7 @@ func TestCLIRunnerOrdersEvidenceAndRedactsAPIKey(t *testing.T) {
 		t.Fatalf("CLI output = %q, want raw API key for caller", output)
 	}
 	recordPath := filepath.Join(recorder.Dir(), "002-rotate-api-key.json")
-	record, err := os.ReadFile(recordPath) //nolint:gosec // The file is created under t.TempDir.
+	record, err := os.ReadFile(recordPath) //nolint:gosec // ファイルは t.TempDir 内に作成される。
 	if err != nil {
 		t.Fatal(err)
 	}

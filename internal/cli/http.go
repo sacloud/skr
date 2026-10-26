@@ -153,7 +153,7 @@ func readHTTPData(input string) ([]byte, error) {
 		return data, nil
 	case strings.HasPrefix(input, "@"):
 		path := strings.TrimPrefix(input, "@")
-		//nolint:gosec // The path is explicitly supplied by the user as request data.
+		//nolint:gosec // パスはリクエストデータとしてユーザーが明示的に指定したものです。
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("read HTTP request body file: %w", err)

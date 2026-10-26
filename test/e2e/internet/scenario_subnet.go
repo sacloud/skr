@@ -23,12 +23,12 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
-// addedSubnetMaskLen is the prefix length of the IP address block added to the
-// created Router + Switch.
+// addedSubnetMaskLen は、作成した Router + Switch に追加された
+// IP アドレスブロックのプレフィックス長である。
 const addedSubnetMaskLen = 28
 
-// subnetResponse is the Subnet resource returned by add-subnet and
-// update-subnet.
+// subnetResponse は add-subnet と update-subnet が返す Subnet リソースである。
+// update-subnet でも返される。
 type subnetResponse struct {
 	ID             types.ID `json:"ID"`
 	NextHop        string   `json:"NextHop"`
@@ -36,9 +36,9 @@ type subnetResponse struct {
 	NetworkMaskLen int      `json:"NetworkMaskLen"`
 }
 
-// updatedNextHop returns the next-hop address used to verify the subnet update:
-// the next address after the Server's address, which stays inside the primary
-// subnet and differs from the initial next hop.
+// updatedNextHop はサブネット更新確認に使用される next-hop アドレスを返します。
+// Server のアドレスの次のアドレスで、プライマリサブネット内にとどまり、
+// 初期の next hop とは異なります。
 func updatedNextHop(serverIP string) (string, error) {
 	address, err := netip.ParseAddr(serverIP)
 	if err != nil || !address.Is4() {
@@ -51,10 +51,10 @@ func updatedNextHop(serverIP string) (string, error) {
 	return next.String(), nil
 }
 
-// subnetScenario exercises add-subnet, update-subnet, and delete-subnet against
-// the created Router + Switch using the Server's address as the next hop. The
-// added IP address block is deleted and its absence is verified before the
-// existing delete flow runs.
+// subnetScenario は、作成した Router + Switch に対し、
+// Server のアドレスを next hop として add-subnet、update-subnet、delete-subnet を実行します。
+// 追加された IP アドレスブロックは削除され、
+// 既存の削除フローが実行される前に不在が確認されます。
 func (s scenario) subnetScenario(ctx context.Context, internetID types.ID, serverIP string) error {
 	nextHop, err := updatedNextHop(serverIP)
 	if err != nil {
@@ -115,8 +115,8 @@ func (s scenario) deleteSubnet(ctx context.Context, step string, internetID, sub
 	return err
 }
 
-// subnetPresent lists the Router + Switch's subnets and reports whether the
-// given IP address block is still assigned.
+// subnetPresent は Router + Switch のサブネットを一覧表示し、
+// 指定した IP アドレスブロックがまだ割り当てられているかどうかを報告します。
 func (s scenario) subnetPresent(ctx context.Context, internetID, subnetID types.ID) (bool, error) {
 	output, err := s.call(ctx, "test-list-subnet", map[string]any{"Zone": zone, "ID": internetID})
 	if err != nil {
