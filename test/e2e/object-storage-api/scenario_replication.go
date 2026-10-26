@@ -19,7 +19,7 @@ type replication struct {
 
 func (s scenario) runReplication(ctx context.Context, source, target, targetSite string) (result error) {
 	read := func(ctx context.Context) ([]byte, error) {
-		return s.client.call(ctx, "replication-read", "object-storage-api", "bucket", "replication", "read", s.siteID, source)
+		return s.client.call(ctx, "replication-read", "バケットのレプリケーション設定を確認する", "object-storage-api", "bucket", "replication", "read", s.siteID, source)
 	}
 	_, err := read(ctx)
 	if !apiNotFound(err, "BucketExtra.ReadReplication") {
@@ -37,7 +37,7 @@ func (s scenario) runReplication(ctx context.Context, source, target, targetSite
 		if err := checkReplication(output, source, s.siteID, target, targetSite); err != nil {
 			return err
 		}
-		if _, err := s.client.call(ctx, "replication-disable", "object-storage-api", "bucket", "replication", "disable", s.siteID, source); err != nil {
+		if _, err := s.client.call(ctx, "replication-disable", "バケットのレプリケーションを無効化する", "object-storage-api", "bucket", "replication", "disable", s.siteID, source); err != nil {
 			return err
 		}
 		return waitFor(ctx, func(ctx context.Context) (bool, error) {
@@ -55,7 +55,7 @@ func (s scenario) runReplication(ctx context.Context, source, target, targetSite
 			result = errors.Join(result, disable(cleanupCtx))
 		}
 	}()
-	output, err := s.client.call(ctx, "replication-enable", "object-storage-api", "bucket", "replication", "enable", s.siteID, source, "--target-bucket", target)
+	output, err := s.client.call(ctx, "replication-enable", "バケットのレプリケーションを有効化する", "object-storage-api", "bucket", "replication", "enable", s.siteID, source, "--target-bucket", target)
 	if err != nil {
 		return err
 	}

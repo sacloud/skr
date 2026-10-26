@@ -476,12 +476,16 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	recorder, err := evidence.New("container-registry-api")
+	recorder, err := evidence.New("container-registry-api", evidence.Scenario{
+		Title:       "コンテナレジストリとユーザーの CRUD",
+		Description: "コンテナレジストリとそのユーザーの作成・参照・更新・削除を実行し、リソースのライフサイクルが正しく動作することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	defer func() {
 		result := "failed"
 		if exitCode == 0 {

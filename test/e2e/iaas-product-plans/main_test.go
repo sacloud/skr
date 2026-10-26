@@ -215,7 +215,7 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	if err != nil {
 		t.Skip("echo executable not found")
 	}
-	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "iaas-product-plans"), time.Now())
+	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "iaas-product-plans"), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 func TestCLIRunnerDoesNotRecordTraceStderr(t *testing.T) {
 	t.Setenv("SAKURACLOUD_TRACE", "all")
 	t.Setenv("SKR_E2E_TRACE_HELPER", "1")
-	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "iaas-product-plans"), time.Now())
+	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "iaas-product-plans"), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -477,12 +477,16 @@ func runMain() (exitCode int) {
 		return 1
 	}
 
-	recorder, err := evidence.New("apprun")
+	recorder, err := evidence.New("apprun", evidence.Scenario{
+		Title:       "AppRun アプリケーションのライフサイクルと設定",
+		Description: "AppRun でアプリケーション、バージョン、トラフィック、パケットフィルタ、ユーザーの作成・参照・更新・削除を実行し、各操作が正常に動作することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	tempDir, err := os.MkdirTemp("", "skr-e2e-apprun-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "create private temporary directory:", err)

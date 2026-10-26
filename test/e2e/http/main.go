@@ -35,7 +35,7 @@ import (
 const zoneListURL = "https://secure.sakura.ad.jp/cloud/zone/is1b/api/cloud/1.1/zone"
 
 type cli interface {
-	call(context.Context, string, ...string) ([]byte, error)
+	call(context.Context, string, string, ...string) ([]byte, error)
 }
 
 type cliRunner struct {
@@ -43,7 +43,7 @@ type cliRunner struct {
 	evidence *evidence.Recorder
 }
 
-func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byte, error) {
+func (r cliRunner) call(ctx context.Context, step, description string, args ...string) ([]byte, error) {
 	if err := evidence.ValidateStep(step); err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byt
 	command.Stderr = &stderr
 	runErr := command.Run()
 
-	if err := r.evidence.Record(step, r.binary, args, nil, stdout.String(), stderr.String(), runErr, false); err != nil {
+	if err := r.evidence.RecordWithDescription(step, description, r.binary, args, nil, stdout.String(), stderr.String(), runErr, false); err != nil {
 		if runErr != nil {
 			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr), err)
 		}
@@ -73,7 +73,7 @@ type scenario struct {
 }
 
 func (s scenario) run(ctx context.Context) error {
-	profile, err := s.client.call(ctx, "profile-current", "config", "current")
+	profile, err := s.client.call(ctx, "profile-current", "現在選択されている SDK プロファイルを確認する", "config", "current")
 	if err != nil {
 		return fmt.Errorf("a selected SDK profile is required: %w", err)
 	}
@@ -81,7 +81,7 @@ func (s scenario) run(ctx context.Context) error {
 		return errors.New("selected SDK profile name is empty")
 	}
 
-	body, err := s.client.call(ctx, "http-get-zones", "http", zoneListURL, "--method", "GET")
+	body, err := s.client.call(ctx, "http-get-zones", "さくらのクラウド zone API への GET リクエストが JSON 応答を返すことを確認する", "http", zoneListURL, "--method", "GET")
 	if err != nil {
 		return err
 	}
@@ -114,12 +114,16 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	recorder, err := evidence.New("http-api")
+	recorder, err := evidence.New("http-api", evidence.Scenario{
+		Title:       "HTTP リクエストコマンド",
+		Description: "skr http コマンドで HTTP リクエストを送信し、応答の取得と終了コードが正しく動作することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	defer func() {
 		result := "failed"
 		if exitCode == 0 {

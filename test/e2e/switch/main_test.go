@@ -263,7 +263,7 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "switch-api"), time.Now())
+	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "switch-api"), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}

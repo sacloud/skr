@@ -87,12 +87,16 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	recorder, err := evidence.New("version")
+	recorder, err := evidence.New("version", evidence.Scenario{
+		Title:       "version コマンドの出力",
+		Description: "skr version コマンドがバージョン、OS、アーキテクチャ、リビジョンを含む期待される形式で出力することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	defer func() {
 		result := "failed"
 		if exitCode == 0 {

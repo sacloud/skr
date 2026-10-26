@@ -97,7 +97,7 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	if err != nil {
 		t.Skip("echo executable not found")
 	}
-	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "serviceclass-api"), time.Now())
+	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "serviceclass-api"), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -522,7 +522,7 @@ func TestDiskIdentityMustBeCapturedBeforeCleanup(t *testing.T) {
 func TestFinalizeRunRecordsCleanupFailure(t *testing.T) {
 	for _, cleanupFails := range []bool{false, true} {
 		t.Run(fmt.Sprint(cleanupFails), func(t *testing.T) {
-			recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+			recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -583,7 +583,7 @@ func TestDNSRunnerRecordsResponseFailures(t *testing.T) {
 	for _, status := range []string{"NOERROR", "SERVFAIL", "NXDOMAIN"} {
 		t.Run(status, func(t *testing.T) {
 			t.Setenv("GSLB_TEST_DNS", ";; ->>HEADER<<- opcode: QUERY, status: "+status+", id: 123")
-			recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+			recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 			if err != nil {
 				t.Fatal(err)
 			}

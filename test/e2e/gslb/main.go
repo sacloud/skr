@@ -434,7 +434,10 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	recorder, err = evidence.New("gslb-api")
+	recorder, err = evidence.New("gslb-api", evidence.Scenario{
+		Title:       "GSLB の作成・更新・削除とヘルスチェック",
+		Description: "GSLB の作成・参照・更新・削除と、サーバーへの実際の名前解決・ヘルスチェック動作を確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1

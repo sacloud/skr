@@ -37,7 +37,7 @@ import (
 )
 
 type cli interface {
-	call(context.Context, string, ...string) ([]byte, error)
+	call(context.Context, string, string, ...string) ([]byte, error)
 }
 
 type cliRunner struct {
@@ -46,7 +46,7 @@ type cliRunner struct {
 	evidence *evidence.Recorder
 }
 
-func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byte, error) {
+func (r cliRunner) call(ctx context.Context, step, description string, args ...string) ([]byte, error) {
 	if err := evidence.ValidateStep(step); err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byt
 	command.Stderr = &stderr
 	runErr := command.Run()
 
-	if err := r.evidence.Record(step, r.binary, args, nil, stdout.String(), stderr.String(), runErr, false); err != nil {
+	if err := r.evidence.RecordWithDescription(step, description, r.binary, args, nil, stdout.String(), stderr.String(), runErr, false); err != nil {
 		if runErr != nil {
 			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr), err)
 		}
@@ -97,7 +97,7 @@ type scenario struct {
 }
 
 func (s scenario) run(ctx context.Context) error {
-	_, err := s.client.call(ctx, "c0nfig-create",
+	_, err := s.client.call(ctx, "c0nfig-create", "新しいプロファイルを作成し、同時に current に設定する",
 		"config", "create", s.profileName,
 		"--service-principal-id", "spid-e2e",
 		"--service-principal-key-id", "kid-e2e",
@@ -108,7 +108,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("create profile: %w", err)
 	}
 
-	current, err := s.client.call(ctx, "c0nfig-current", "config", "current")
+	current, err := s.client.call(ctx, "c0nfig-current", "作成直後の current プロファイル名が期待値であることを確認する", "config", "current")
 	if err != nil {
 		return fmt.Errorf("get current profile: %w", err)
 	}
@@ -116,7 +116,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("current profile = %q, want %q", string(current), s.profileName)
 	}
 
-	_, err = s.client.call(ctx, "c0nfig-create-second",
+	_, err = s.client.call(ctx, "c0nfig-create-second", "2 つ目のプロファイルを作成する",
 		"config", "create", s.secondProfileName,
 		"--service-principal-id", "spid-e2e",
 		"--service-principal-key-id", "kid-e2e",
@@ -126,14 +126,14 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("create second profile: %w", err)
 	}
 
-	_, err = s.client.call(ctx, "c0nfig-use",
+	_, err = s.client.call(ctx, "c0nfig-use", "2 つ目のプロファイルを current に切り替える",
 		"config", "use", s.secondProfileName,
 	)
 	if err != nil {
 		return fmt.Errorf("use profile: %w", err)
 	}
 
-	current, err = s.client.call(ctx, "c0nfig-current-after-use", "config", "current")
+	current, err = s.client.call(ctx, "c0nfig-current-after-use", "use 後の current プロファイル名が切り替わっていることを確認する", "config", "current")
 	if err != nil {
 		return fmt.Errorf("get current profile after use: %w", err)
 	}
@@ -141,7 +141,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("current profile after use = %q, want %q", string(current), s.secondProfileName)
 	}
 
-	list, err := s.client.call(ctx, "c0nfig-list", "config", "list")
+	list, err := s.client.call(ctx, "c0nfig-list", "作成した 2 つのプロファイルが一覧に含まれることを確認する", "config", "list")
 	if err != nil {
 		return fmt.Errorf("list profiles: %w", err)
 	}
@@ -151,7 +151,7 @@ func (s scenario) run(ctx context.Context) error {
 		}
 	}
 
-	show, err := s.client.call(ctx, "c0nfig-show", "config", "show", s.profileName)
+	show, err := s.client.call(ctx, "c0nfig-show", "作成時の属性が show 出力に正しく含まれることを確認する", "config", "show", s.profileName)
 	if err != nil {
 		return fmt.Errorf("show profile: %w", err)
 	}
@@ -169,7 +169,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("after create: %w", err)
 	}
 
-	_, err = s.client.call(ctx, "c0nfig-edit",
+	_, err = s.client.call(ctx, "c0nfig-edit", "ServicePrincipalID を変更する",
 		"config", "edit", s.profileName,
 		"--service-principal-id", "spid-edited",
 	)
@@ -177,7 +177,7 @@ func (s scenario) run(ctx context.Context) error {
 		return fmt.Errorf("edit profile: %w", err)
 	}
 
-	showAfterEdit, err := s.client.call(ctx, "c0nfig-show-after-edit", "config", "show", s.profileName)
+	showAfterEdit, err := s.client.call(ctx, "c0nfig-show-after-edit", "編集後の属性が show 出力に反映されていることを確認する", "config", "show", s.profileName)
 	if err != nil {
 		return fmt.Errorf("show edited profile: %w", err)
 	}
@@ -215,6 +215,14 @@ func assertProfileAttribute(attrs map[string]any, key, want string) error {
 		return fmt.Errorf("attribute %q = %q, want %q", key, got, want)
 	}
 	return nil
+}
+
+func c0nfigScenario() evidence.Scenario {
+	return evidence.Scenario{
+		Title: "config プロファイルの作成・切り替え・編集",
+		Description: "一時的なプロファイルディレクトリで config コマンドの create / current / list / show / use / edit を実行し、" +
+			"プロファイルの作成、現在プロファイルの切り替え、属性の編集が正しく反映されることを確認します。",
+	}
 }
 
 func runMain() (exitCode int) {
@@ -260,7 +268,7 @@ func runMain() (exitCode int) {
 		return 1
 	}
 
-	recorder, err := evidence.New("c0nfig")
+	recorder, err := evidence.New("c0nfig", c0nfigScenario())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1

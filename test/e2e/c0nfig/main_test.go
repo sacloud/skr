@@ -34,7 +34,7 @@ type fakeCLI struct {
 	args      map[string][]string
 }
 
-func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
+func (f *fakeCLI) call(_ context.Context, step, _ string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, step)
 	if f.args == nil {
 		f.args = make(map[string][]string)
@@ -226,7 +226,7 @@ func TestCLIRunnerSetsProfileDirEnv(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "c0nfig"), time.Now())
+	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "c0nfig"), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestCLIRunnerSetsProfileDirEnv(t *testing.T) {
 		env:      []string{"SAKURA_PROFILE_DIR=" + profileDir},
 		evidence: recorder,
 	}
-	output, err := runner.call(context.Background(), "env-check")
+	output, err := runner.call(context.Background(), "env-check", "一時プロファイルディレクトリがコマンドに反映されていることを確認する")
 	if err != nil {
 		t.Fatal(err)
 	}

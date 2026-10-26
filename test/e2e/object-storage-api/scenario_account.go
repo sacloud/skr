@@ -22,14 +22,14 @@ func (s scenario) runAccountWith(ctx context.Context, exercise func(context.Cont
 	if err := siteOnly.checkSite(ctx); err != nil {
 		return err
 	}
-	_, err := s.client.call(ctx, "account-preflight", "object-storage-api", "account", "read", s.siteID)
+	_, err := s.client.call(ctx, "account-preflight", "アカウントが未作成であることを確認する", "object-storage-api", "account", "read", s.siteID)
 	if err == nil {
 		return errors.New("site account already exists; refusing to create or delete an existing account")
 	}
 	if !accountNotFound(err) {
 		return fmt.Errorf("account absence was not confirmed by an Accounts.Read API 404: %w", err)
 	}
-	output, createErr := s.client.call(ctx, "account-create", "object-storage-api", "account", "create", s.siteID)
+	output, createErr := s.client.call(ctx, "account-create", "オブジェクトストレージアカウントを作成する", "object-storage-api", "account", "create", s.siteID)
 	var created account
 	if err := json.Unmarshal(output, &created); err != nil || created.ResourceID == "" {
 		return errors.Join(createErr, errors.New("created account ID is unknown; manual inspection required"))
@@ -48,7 +48,7 @@ func (s scenario) runAccountWith(ctx context.Context, exercise func(context.Cont
 	if err := s.verifyAccount(ctx, created); err != nil {
 		return err
 	}
-	plans, err := s.client.call(ctx, "account-site-plans", "object-storage-api", "site", "plans", s.siteID,
+	plans, err := s.client.call(ctx, "account-site-plans", "サイトで利用可能なプラン一覧を取得する", "object-storage-api", "site", "plans", s.siteID,
 		"--query", "map({service_class_path,type,cluster_id,capacity_gib,fee})")
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (s scenario) runAccountWith(ctx context.Context, exercise func(context.Cont
 }
 
 func (s scenario) verifyAccount(ctx context.Context, expected account) error {
-	output, err := s.client.call(ctx, "account-identity-check", "object-storage-api", "account", "read", s.siteID)
+	output, err := s.client.call(ctx, "account-identity-check", "作成したアカウントの ID が変更されていないことを確認する", "object-storage-api", "account", "read", s.siteID)
 	if err != nil {
 		return err
 	}
@@ -102,15 +102,15 @@ func (s scenario) deleteAccount(ctx context.Context, expected account) error {
 		}
 		return err
 	}
-	buckets, err := s.list(ctx, "account-cleanup-buckets")
+	buckets, err := s.list(ctx, "account-cleanup-buckets", "アカウント削除前にバケットが残っていないことを確認する")
 	if err != nil {
 		return err
 	}
-	permissions, err := s.permissions(ctx, "account-cleanup-permissions")
+	permissions, err := s.permissions(ctx, "account-cleanup-permissions", "アカウント削除前にパーミッションが残っていないことを確認する")
 	if err != nil {
 		return err
 	}
-	keys, err := s.keys(ctx, "account-cleanup-keys", []string{"account", "access-key"}, []string{s.siteID})
+	keys, err := s.keys(ctx, "account-cleanup-keys", "アカウント削除前にアクセスキーが残っていないことを確認する", []string{"account", "access-key"}, []string{s.siteID})
 	if err != nil {
 		return err
 	}
@@ -120,10 +120,10 @@ func (s scenario) deleteAccount(ctx context.Context, expected account) error {
 	if err := s.verifyAccount(ctx, expected); err != nil {
 		return err
 	}
-	if _, err := s.client.call(ctx, "account-delete", "object-storage-api", "account", "delete", s.siteID); err != nil {
+	if _, err := s.client.call(ctx, "account-delete", "オブジェクトストレージアカウントを削除する", "object-storage-api", "account", "delete", s.siteID); err != nil {
 		return err
 	}
-	_, err = s.client.call(ctx, "account-verify-delete", "object-storage-api", "account", "read", s.siteID)
+	_, err = s.client.call(ctx, "account-verify-delete", "アカウント削除後に 404 になることを確認する", "object-storage-api", "account", "read", s.siteID)
 	if !accountNotFound(err) {
 		return errors.Join(err, errors.New("account deletion was not confirmed by an Accounts.Read API 404"))
 	}
