@@ -101,8 +101,13 @@ type Helper struct {
 	binary         string
 	profileDir     string
 	defaultTimeout time.Duration
-	results        []commandResult
+	results        []Result
 	mu             sync.Mutex
+}
+
+type Result interface {
+	Description() string
+	Render() string
 }
 
 type commandResult struct {
@@ -110,6 +115,24 @@ type commandResult struct {
 	args        []string
 	stdout      string
 	stderr      string
+	duration    time.Duration
+}
+
+func (c *commandResult) Description() string { return c.description }
+func (c *commandResult) Render() string {
+	var buf bytes.Buffer
+	buf.WriteString("**command**:\n```\n")
+	buf.WriteString(strings.Join(append([]string{"skr"}, c.args...), " "))
+	buf.WriteString("\n```\n\n")
+	buf.WriteString("**duration**:\n")
+	buf.WriteString(fmt.Sprintf("%v\n\n", c.duration))
+	buf.WriteString("**stdout**:\n```\n")
+	buf.WriteString(c.stdout)
+	buf.WriteString("\n```\n\n")
+	buf.WriteString("**stderr**:\n```\n")
+	buf.WriteString(c.stderr)
+	buf.WriteString("\n```\n\n")
+	return buf.String()
 }
 
 func NewHelper(t *testing.T, name, description string) *Helper {
@@ -151,16 +174,8 @@ func NewHelper(t *testing.T, name, description string) *Helper {
 		var buf bytes.Buffer
 		buf.WriteString(fmt.Sprintf("# %s\n%s\n", h.name, h.description))
 		for _, res := range h.results {
-			buf.WriteString(fmt.Sprintf("## %s\n\n", res.description))
-			buf.WriteString("**command**:\n```\n")
-			buf.WriteString(strings.Join(append([]string{h.binary}, res.args...), " "))
-			buf.WriteString("\n```\n\n")
-			buf.WriteString("**stdout**:\n```\n")
-			buf.WriteString(res.stdout)
-			buf.WriteString("\n```\n\n")
-			buf.WriteString("**stderr**:\n```\n")
-			buf.WriteString(res.stderr)
-			buf.WriteString("\n```\n\n")
+			buf.WriteString(fmt.Sprintf("## %s\n\n", res.Description()))
+			buf.WriteString(res.Render())
 		}
 
 		if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
@@ -205,14 +220,16 @@ func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, descriptio
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
+	start := time.Now()
 	runErr := command.Run()
 
 	h.mu.Lock()
-	h.results = append(h.results, commandResult{
+	h.results = append(h.results, &commandResult{
 		description: description,
 		args:        args,
 		stdout:      stdout.String(),
 		stderr:      stderr.String(),
+		duration:    time.Since(start),
 	})
 	h.mu.Unlock()
 
