@@ -169,6 +169,13 @@ func (h *Helper) WriteRequestJSONFile(t *testing.T, name string, value any) stri
 
 	t.Logf("Writing %s.json: %s", name, string(data))
 
+	h.mu.Lock()
+	h.results = append(h.results, &requestResult{
+		name: name,
+		data: string(data),
+	})
+	h.mu.Unlock()
+
 	path := filepath.Join(t.TempDir(), name+".json")
 	err = os.WriteFile(path, data, 0o600)
 	require.NoError(t, err, "write request file %s: %v", name, err)

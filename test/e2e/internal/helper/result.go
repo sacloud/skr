@@ -36,3 +36,17 @@ func (c *commandResult) Render() string {
 	buf.WriteString("\n```\n\n")
 	return buf.String()
 }
+
+type requestResult struct {
+	name string
+	data string
+}
+
+func (r *requestResult) Description() string { return fmt.Sprintf("Create request file: %s", r.name) }
+func (r *requestResult) Render() string {
+	var buf bytes.Buffer
+	buf.WriteString("**request JSON**:\n```json\n")
+	buf.WriteString(r.data)
+	buf.WriteString("\n```\n\n")
+	return buf.String()
+}
