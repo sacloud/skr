@@ -48,17 +48,6 @@ func TestScenarioRegistry(t *testing.T) {
 	updatedDescription := description + "/updated"
 	passwordPath := writePasswordFile(t)
 
-	// 後片付けは t.Cleanup ではなく defer で行う。t.Cleanup はテスト終了後に
-	// t.Context() がキャンセルされた状態で呼ばれるため、CLI 呼び出しが失敗する。
-	completed := false
-	created := false
-	var registryID string
-	defer func() {
-		if created && !completed {
-			cleanupRegistry(t, h, name, description, updatedDescription, registryID)
-		}
-	}()
-
 	findRequest := h.WriteRequestJSONFile(t, "find", map[string]any{"Names": []string{name}})
 
 	// 1. 作成前に同名レジストリが存在しないことを確認する
@@ -71,93 +60,55 @@ func TestScenarioRegistry(t *testing.T) {
 	createdRegistry := parseRegistry(t, data)
 	require.Equal(t, name, createdRegistry.Name, "created registry name should match the requested name")
 	require.Equal(t, description, createdRegistry.Description, "created registry description should match the requested description")
-	registryID = createdRegistry.id(t)
-	created = true
+	defer func() {
+		// 11. 作成したレジストリを削除し、一覧に残っていないことを確認する
+		_ = h.Call(t, "作成したレジストリを削除する", "container-registry-api", "registry", "delete", createdRegistry.id(t))
+		remaining := findRegistries(t, h, "削除後にレジストリが一覧に残っていないことを確認する", findRequest)
+		require.Empty(t, remaining, "registry %s should not remain after deletion", name)
+	}()
 
 	// 3. 作成したレジストリが一覧に含まれることを確認する
 	listed := findRegistries(t, h, "作成したレジストリが一覧に含まれることを確認する", findRequest)
 	require.Len(t, listed, 1, "registry list should contain exactly one match for %q", name)
-	requireRegistryIdentity(t, listed[0], registryID, name, description)
+	requireRegistryIdentity(t, listed[0], createdRegistry.id(t), name, description)
 
 	// 4. レジストリの説明を更新する
 	updateRequest := h.WriteRequestJSONFile(t, "update", map[string]any{"Description": updatedDescription})
 	data = h.Call(t, "レジストリの説明を更新する",
-		"container-registry-api", "registry", "update", registryID, "--request", "@"+updateRequest)
-	requireRegistryIdentity(t, parseRegistry(t, data), registryID, name, updatedDescription)
+		"container-registry-api", "registry", "update", createdRegistry.id(t), "--request", "@"+updateRequest)
+	requireRegistryIdentity(t, parseRegistry(t, data), createdRegistry.id(t), name, updatedDescription)
 
 	// 5. 更新後のレジストリを参照する
-	data = h.Call(t, "更新後のレジストリを参照する", "container-registry-api", "registry", "read", registryID)
-	requireRegistryIdentity(t, parseRegistry(t, data), registryID, name, updatedDescription)
+	data = h.Call(t, "更新後のレジストリを参照する", "container-registry-api", "registry", "read", createdRegistry.id(t))
+	requireRegistryIdentity(t, parseRegistry(t, data), createdRegistry.id(t), name, updatedDescription)
 
 	// 6. レジストリユーザーを追加する
 	_ = h.Call(t, "レジストリユーザーを追加する",
-		"container-registry-api", "registry", "user", "add", registryID,
+		"container-registry-api", "registry", "user", "add", createdRegistry.id(t),
 		"--user-name", userName, "--password-file", passwordPath, "--permission", "readwrite")
+	defer func() {
+		// 10. ユーザーを削除し、残っていないことを確認する
+		_ = h.Call(t, "ユーザーを削除する",
+			"container-registry-api", "registry", "user", "delete", createdRegistry.id(t), userName)
+		users := listUsers(t, h, "ユーザー削除後にユーザーが残っていないことを確認する", createdRegistry.id(t))
+		require.Empty(t, users, "user should not remain after deletion")
+	}()
 
 	// 7. 追加したユーザーが一覧に含まれることを確認する
-	users := listUsers(t, h, "追加したユーザーが一覧に含まれることを確認する", registryID)
+	users := listUsers(t, h, "追加したユーザーが一覧に含まれることを確認する", createdRegistry.id(t))
 	require.Len(t, users, 1, "user list should contain exactly the user created by this run")
 	require.Equal(t, userName, users[0].UserName)
 	require.Equal(t, "readwrite", users[0].Permission)
 
 	// 8. ユーザーの権限を変更する
 	_ = h.Call(t, "ユーザーの権限を変更する",
-		"container-registry-api", "registry", "user", "update", registryID, userName, "--permission", "readonly")
+		"container-registry-api", "registry", "user", "update", createdRegistry.id(t), userName, "--permission", "readonly")
 
 	// 9. 権限の変更がユーザー一覧に反映されていることを確認する
-	users = listUsers(t, h, "権限の変更がユーザー一覧に反映されていることを確認する", registryID)
+	users = listUsers(t, h, "権限の変更がユーザー一覧に反映されていることを確認する", createdRegistry.id(t))
 	require.Len(t, users, 1, "user list should contain exactly the user created by this run")
 	require.Equal(t, userName, users[0].UserName)
 	require.Equal(t, "readonly", users[0].Permission)
-
-	// 10. ユーザーを削除し、残っていないことを確認する
-	_ = h.Call(t, "ユーザーを削除する",
-		"container-registry-api", "registry", "user", "delete", registryID, userName)
-	users = listUsers(t, h, "ユーザー削除後にユーザーが残っていないことを確認する", registryID)
-	require.Empty(t, users, "user should not remain after deletion")
-
-	// 11. 作成したレジストリを削除し、一覧に残っていないことを確認する
-	_ = h.Call(t, "作成したレジストリを削除する", "container-registry-api", "registry", "delete", registryID)
-	remaining := findRegistries(t, h, "削除後にレジストリが一覧に残っていないことを確認する", findRequest)
-	require.Empty(t, remaining, "registry %s should not remain after deletion", name)
-
-	completed = true
-}
-
-// cleanupRegistry は途中で失敗した場合に、作成が試行されたレジストリとそのユーザーだけを後片付けします。
-// 正常終了時はレジストリが削除済みのため、後片付けは何もしません。
-func cleanupRegistry(t *testing.T, h *helper.Helper, name, originalDescription, updatedDescription, knownID string) {
-	t.Helper()
-
-	findRequest := h.WriteRequestJSONFile(t, "cleanup-find", map[string]any{"Names": []string{name}})
-	matches := findRegistries(t, h, "後片付け対象のレジストリを特定する", findRequest)
-	if len(matches) == 0 {
-		return
-	}
-	require.Len(t, matches, 1, "cannot safely identify the E2E container registry; manual cleanup required")
-	id := matches[0].id(t)
-	if knownID != "" {
-		require.Equal(t, knownID, id, "registry ID differs from the ID created by this run; refusing cleanup")
-	}
-	requireRegistryIdentity(t, matches[0], id, name, originalDescription, updatedDescription)
-
-	// 削除前に現在値を再取得し、今回設定した値と照合する。
-	data := h.Call(t, "削除前にレジストリの内容を再取得する", "container-registry-api", "registry", "read", id)
-	requireRegistryIdentity(t, parseRegistry(t, data), id, name, originalDescription, updatedDescription)
-
-	users := listUsers(t, h, "削除前にレジストリのユーザー一覧を確認する", id)
-	require.LessOrEqual(t, len(users), 1, "container registry contains an unexpected user; refusing cleanup")
-	if len(users) == 1 {
-		require.Equal(t, userName, users[0].UserName, "container registry contains an unexpected user; refusing cleanup")
-		_ = h.Call(t, "テストで作成したユーザーを削除する",
-			"container-registry-api", "registry", "user", "delete", id, userName)
-		users = listUsers(t, h, "ユーザー削除後のユーザー一覧を確認する", id)
-		require.Empty(t, users, "E2E container registry user remains after deletion")
-	}
-
-	_ = h.Call(t, "テストで作成したレジストリを削除する", "container-registry-api", "registry", "delete", id)
-	remaining := findRegistries(t, h, "削除後にレジストリが一覧に残っていないことを確認する", findRequest)
-	require.Empty(t, remaining, "container registry %s remains after deletion", id)
 }
 
 type registryItem struct {
