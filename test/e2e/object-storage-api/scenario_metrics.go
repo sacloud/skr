@@ -64,7 +64,7 @@ func (s scenario) runMetrics(ctx context.Context, name, id string) error {
 	if err := s.checkSite(ctx); err != nil {
 		return err
 	}
-	items, err := s.list(ctx, "metrics-bucket-identity")
+	items, err := s.list(ctx, "metrics-bucket-identity", "メトリクス対象バケットが存在しリソース ID が一致することを確認する")
 	if err != nil {
 		return err
 	}
@@ -77,17 +77,18 @@ func (s scenario) runMetrics(ctx context.Context, name, id string) error {
 
 func (s scenario) readMetrics(ctx context.Context, name string) (result error) {
 	for _, test := range []struct {
-		step   string
-		args   []string
-		fields []string
+		step        string
+		args        []string
+		fields      []string
+		description string
 	}{
-		{"site-status-read", []string{"site", "status", "read", s.siteID}, []string{"accept_new", "status_code"}},
-		{"site-quota", []string{"site", "status", "quota", s.siteID}, []string{"num_buckets", "num_permissions"}},
-		{"bucket-penalty", []string{"bucket", "penalty", s.siteID, name}, []string{"num_objects_per_bucket", "amount_gib_per_bucket"}},
-		{"bucket-usage", []string{"bucket", "usage", s.siteID, name}, []string{"num_objects_per_bucket", "amount_gib_per_bucket"}},
-		{"bucket-quota", []string{"bucket", "quota", s.siteID, name}, []string{"num_objects_per_bucket", "amount_gib_per_bucket"}},
+		{"site-status-read", []string{"site", "status", "read", s.siteID}, []string{"accept_new", "status_code"}, "サイトの稼働状態を確認する"},
+		{"site-quota", []string{"site", "status", "quota", s.siteID}, []string{"num_buckets", "num_permissions"}, "サイトのクォータ情報を確認する"},
+		{"bucket-penalty", []string{"bucket", "penalty", s.siteID, name}, []string{"num_objects_per_bucket", "amount_gib_per_bucket"}, "バケットのペナルティ情報を確認する"},
+		{"bucket-usage", []string{"bucket", "usage", s.siteID, name}, []string{"num_objects_per_bucket", "amount_gib_per_bucket"}, "バケットの使用量を確認する"},
+		{"bucket-quota", []string{"bucket", "quota", s.siteID, name}, []string{"num_objects_per_bucket", "amount_gib_per_bucket"}, "バケットのクォータを確認する"},
 	} {
-		output, err := s.client.call(ctx, test.step, append([]string{"object-storage-api"}, test.args...)...)
+		output, err := s.client.call(ctx, test.step, test.description, append([]string{"object-storage-api"}, test.args...)...)
 		if err != nil {
 			result = errors.Join(result, err)
 			continue
@@ -113,7 +114,7 @@ func (s scenario) readMetrics(ctx context.Context, name string) (result error) {
 	now := time.Now().UTC()
 	to := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	from := to.AddDate(0, -1, 0)
-	output, err := s.client.call(ctx, "bucket-metering", "object-storage-api", "site", "status", "bucket-metering", s.siteID, name,
+	output, err := s.client.call(ctx, "bucket-metering", "バケットの月次課金メトリクスを確認する", "object-storage-api", "site", "status", "bucket-metering", s.siteID, name,
 		"--from", from.Format(time.RFC3339), "--to", to.Format(time.RFC3339))
 	if err != nil {
 		return errors.Join(result, err)

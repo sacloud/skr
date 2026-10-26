@@ -30,7 +30,7 @@ func notFound(method string) error {
 	return &commandError{step: "test", stderr: "object-storage: " + method + ": API Error 404: Not found", cause: errors.New("exit status 1")}
 }
 
-func (f *accountCLI) call(ctx context.Context, step string, args ...string) ([]byte, error) {
+func (f *accountCLI) call(ctx context.Context, step, _ string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, step)
 	if f.args == nil {
 		f.args = map[string][]string{}
@@ -72,7 +72,7 @@ func (f *accountCLI) call(ctx context.Context, step string, args ...string) ([]b
 		f.key = false
 		return nil, nil
 	}
-	return f.fakeCLI.call(ctx, step, args...)
+	return f.fakeCLI.call(ctx, step, "", args...)
 }
 
 func TestAccountLifecycleAndSafety(t *testing.T) {
@@ -134,7 +134,7 @@ type advancedCLI struct {
 	replication bool
 }
 
-func (f *advancedCLI) call(ctx context.Context, step string, args ...string) ([]byte, error) {
+func (f *advancedCLI) call(ctx context.Context, step, _ string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, step)
 	if f.args == nil {
 		f.args = map[string][]string{}
@@ -164,7 +164,7 @@ func (f *advancedCLI) call(ctx context.Context, step string, args ...string) ([]
 		f.replication = false
 		return nil, nil
 	}
-	return f.fakeCLI.call(ctx, step, args...)
+	return f.fakeCLI.call(ctx, step, "", args...)
 }
 
 const fakeReplication = `{"source_bucket":{"name":"source","cluster_id":"isk01"},"dest_bucket":{"name":"target","cluster_id":"tky01"},"config_status":"created"}`
@@ -480,7 +480,7 @@ func TestCLIHelperSecretOutput(t *testing.T) {
 
 func TestAccessKeyEvidenceRedactsBothStreams(t *testing.T) {
 	t.Setenv("SKR_TEST_SECRET_HELPER", "1")
-	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}

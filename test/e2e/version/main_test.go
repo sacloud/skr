@@ -59,7 +59,7 @@ func fakeBinary(t *testing.T, script string) string {
 
 func TestVersionRunnerRecordsEvidenceAndVerifiesOutput(t *testing.T) {
 	binary := fakeBinary(t, "#!/bin/sh\necho 'v0.0.4 linux/arm64, build test'\n")
-	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestVersionRunnerRecordsEvidenceAndVerifiesOutput(t *testing.T) {
 func TestVersionRunnerReportsFailures(t *testing.T) {
 	t.Run("command failure", func(t *testing.T) {
 		binary := fakeBinary(t, "#!/bin/sh\necho 'boom' >&2\nexit 3\n")
-		recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+		recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -104,7 +104,7 @@ func TestVersionRunnerReportsFailures(t *testing.T) {
 	})
 	t.Run("unexpected output", func(t *testing.T) {
 		binary := fakeBinary(t, "#!/bin/sh\necho 'not-a-version'\n")
-		recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+		recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 		if err != nil {
 			t.Fatal(err)
 		}

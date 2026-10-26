@@ -657,12 +657,16 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	recorder, err := evidence.New("server-api")
+	recorder, err := evidence.New("server-api", evidence.Scenario{
+		Title:       "サーバーの作成・更新・削除と SSH 接続",
+		Description: "IaaS サーバーの作成・参照・更新・削除を実行し、ディスクと NIC の接続、cloud-init 経由の SSH 接続が正しく動作することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	saveResult = func(result string) error {
 		return recorder.SetResult(result, time.Now())
 	}

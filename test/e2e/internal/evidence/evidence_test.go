@@ -28,11 +28,11 @@ func TestCreateAtUsesTimestampAndAvoidsOverwrite(t *testing.T) {
 	baseDir := filepath.Join(t.TempDir(), "tmp", "eventbus-api")
 	createdAt := time.Date(2026, 10, 5, 17, 1, 0, 0, time.Local)
 
-	first, err := CreateAt(baseDir, createdAt)
+	first, err := CreateAt(baseDir, createdAt, Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := CreateAt(baseDir, createdAt)
+	second, err := CreateAt(baseDir, createdAt, Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,14 +54,17 @@ func TestCreateAtUsesTimestampAndAvoidsOverwrite(t *testing.T) {
 }
 
 func TestRecorderOrdersAndRedactsEvidence(t *testing.T) {
-	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "simplemq-api"), time.Now())
+	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "simplemq-api"), time.Now(), Scenario{
+		Title:       "SimpleMQ キューのライフサイクル",
+		Description: "SimpleMQ キューの作成から削除までを確認します。",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := recorder.Record("profile-current", "./skr", []string{"config", "current"}, nil, "test-profile\n", "", nil, false); err != nil {
+	if err := recorder.RecordWithDescription("profile-current", "選択中の SDK プロファイルを確認する", "./skr", []string{"config", "current"}, nil, "test-profile\n", "", nil, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := recorder.Record("rotate-api-key", "./skr", []string{"rotate-api-key"}, nil, `{"APIKey":"secret"}`, "", nil, true); err != nil {
+	if err := recorder.RecordWithDescription("rotate-api-key", "API キーをローテーションし、機密情報がレポートに残らないことを確認する", "./skr", []string{"rotate-api-key"}, nil, `{"APIKey":"secret"}`, "", nil, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,14 +105,22 @@ func TestRecorderOrdersAndRedactsEvidence(t *testing.T) {
 	if strings.Contains(string(report), "secret") || !strings.Contains(string(report), "[REDACTED: APIKey]") {
 		t.Fatalf("report did not preserve API key redaction: %s", report)
 	}
+	for _, want := range []string{
+		"**タイトル**: SimpleMQ キューのライフサイクル",
+		"**目的**: SimpleMQ キューの作成から削除までを確認します。",
+	} {
+		if !strings.Contains(string(report), want) {
+			t.Errorf("report is missing the scenario section %q:\n%s", want, report)
+		}
+	}
 }
 
 func TestRecordExpectedErrorMarksTheStepAsExpected(t *testing.T) {
-	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "iam-api"), time.Now())
+	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "iam-api"), time.Now(), Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := recorder.RecordExpectedError("u2fa-read-missing-security-key", "./skr", []string{"iam-api", "user-2fa", "read-security-key", "999999999999"}, nil, "", "iam: API Error 404", &exec.ExitError{}, false); err != nil {
+	if err := recorder.RecordExpectedErrorWithDescription("u2fa-read-missing-security-key", "存在しないセキュリティキーの読み取りが 404 で拒否されることを確認する", "./skr", []string{"iam-api", "user-2fa", "read-security-key", "999999999999"}, nil, "", "iam: API Error 404", &exec.ExitError{}, false); err != nil {
 		t.Fatal(err)
 	}
 	order, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-u2fa-read-missing-security-key.json"))
@@ -136,10 +147,13 @@ func TestRecordExpectedErrorMarksTheStepAsExpected(t *testing.T) {
 	if !strings.Contains(string(report), "期待どおりの失敗") {
 		t.Fatalf("report does not mark the expected error: %s", report)
 	}
+	if !strings.Contains(string(report), "存在しないセキュリティキーの読み取りが 404 で拒否されることを確認する") {
+		t.Fatalf("report does not render the registered step description: %s", report)
+	}
 }
 
 func TestSetResultWritesPrivateResult(t *testing.T) {
-	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "switch-api"), time.Now())
+	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "switch-api"), time.Now(), Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +186,7 @@ func TestSetResultWritesPrivateResult(t *testing.T) {
 }
 
 func TestReportIncludesRequestFileContent(t *testing.T) {
-	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "container-registry-api"), time.Now())
+	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "container-registry-api"), time.Now(), Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +194,7 @@ func TestReportIncludesRequestFileContent(t *testing.T) {
 		Path:    "/private/tmp/create.json",
 		Content: "{\n  \"Name\": \"example-registry\"\n}\n",
 	}
-	if err := recorder.Record("registry-create", "./skr", []string{
+	if err := recorder.RecordWithDescription("registry-create", "コンテナレジストリを作成するリクエストファイル付きのコマンドが動作することを確認する", "./skr", []string{
 		"container-registry-api", "registry", "create", "--request", "@" + input.Path,
 	}, input, "", "", nil, false); err != nil {
 		t.Fatal(err)
@@ -204,11 +218,11 @@ func TestReportIncludesRequestFileContent(t *testing.T) {
 }
 
 func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
-	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "http-api"), time.Now())
+	recorder, err := CreateAt(filepath.Join(t.TempDir(), "tmp", "http-api"), time.Now(), Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := recorder.Record("http-get", "/path/to/skr", []string{"http", "--query", "map({ID,Name})"}, nil, "line 1\n```\n", "", nil, false); err != nil {
+	if err := recorder.RecordWithDescription("http-get", "HTTP リクエストの正常応答を確認する", "/path/to/skr", []string{"http", "--query", "map({ID,Name})"}, nil, "line 1\n```\n", "", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	failure := exec.Command(os.Args[0], "-test.run=TestEvidenceExitStatusHelper") //nolint:gosec // The test binary is invoked with a fixed test selector; no user input reaches the command.
@@ -221,7 +235,7 @@ func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
 	if !errors.As(runErr, &exitErr) || exitErr.ExitCode() != 7 {
 		t.Fatalf("helper error = %T, want *exec.ExitError", runErr)
 	}
-	if err := recorder.Record("http-failure", "/path/to/skr", []string{"http", "url with spaces"}, nil, "partial output", "request failed\n", runErr, false); err != nil {
+	if err := recorder.RecordWithDescription("http-failure", "存在しない URL へのアクセスが失敗することを確認する", "/path/to/skr", []string{"http", "url with spaces"}, nil, "partial output", "request failed\n", runErr, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := recorder.SetResult("failed", time.Date(2026, 10, 5, 17, 1, 0, 0, time.Local)); err != nil {
@@ -232,15 +246,16 @@ func TestReportIncludesCommandsOutputAndExitStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"| 001 | `http-get` | 成功 | 0 |",
-		"| 002 | `http-failure` | 失敗 | 7 |",
+		"| 001 | `http-get` | HTTP リクエストの正常応答を確認する | 成功 | 0 |",
+		"| 002 | `http-failure` | 存在しない URL へのアクセスが失敗することを確認する | 失敗 | 7 |",
 		"/path/to/skr http --query 'map({ID,Name})'",
 		"/path/to/skr http 'url with spaces'",
 		"````text\nline 1\n```\n````",
 		"partial output",
 		"request failed",
 		"exit status 7",
-		"## 001 http-get — 成功 (exit status 0)",
+		"### 001 `http-get` — 成功 (exit status 0)",
+		"**確認内容**: HTTP リクエストの正常応答を確認する",
 	} {
 		if !strings.Contains(string(report), want) {
 			t.Errorf("report is missing %q:\n%s", want, report)

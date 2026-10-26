@@ -39,7 +39,7 @@ const bucketListQuery = "map({name,resource_id,plan})"
 var errUnverifiedBucketSetting = errors.New("bucket setting ownership is unverified; refusing bucket deletion; manual inspection required")
 
 type cli interface {
-	call(context.Context, string, ...string) ([]byte, error)
+	call(context.Context, string, string, ...string) ([]byte, error)
 }
 
 type cliRunner struct {
@@ -67,7 +67,7 @@ func accountNotFound(err error) bool {
 		strings.HasPrefix(strings.TrimSpace(failure.stderr), "object-storage: Accounts.Read: API Error 404:")
 }
 
-func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byte, error) {
+func (r cliRunner) call(ctx context.Context, step, description string, args ...string) ([]byte, error) {
 	if err := evidence.ValidateStep(step); err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (r cliRunner) call(ctx context.Context, step string, args ...string) ([]byt
 	if runErr != nil {
 		runErr = &commandError{step: step, stderr: stderr.String(), cause: runErr}
 	}
-	recordErr := r.evidence.Record(step, r.binary, args, request, stdout.String(), recordedStderr, runErr, secret)
+	recordErr := r.evidence.RecordWithDescription(step, description, r.binary, args, request, stdout.String(), recordedStderr, runErr, secret)
 	var failure *commandError
 	if recordErr != nil && errors.As(runErr, &failure) {
 		failure.recordFailed = true
@@ -131,7 +131,7 @@ type scenario struct {
 }
 
 func (s scenario) run(ctx context.Context, name string) (result error) {
-	profile, err := s.client.call(ctx, "profile-current", "config", "current")
+	profile, err := s.client.call(ctx, "profile-current", "現在選択されている SDK プロファイルを確認する", "config", "current")
 	if err != nil {
 		return fmt.Errorf("a selected SDK profile is required: %w", err)
 	}
@@ -142,7 +142,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		return err
 	}
 
-	accountOutput, err := s.client.call(ctx, "site-account-read", "object-storage-api", "account", "read", s.siteID)
+	accountOutput, err := s.client.call(ctx, "site-account-read", "指定サイトのアカウント情報が取得できることを確認する", "object-storage-api", "account", "read", s.siteID)
 	if err != nil {
 		return fmt.Errorf("site account must already exist: %w", err)
 	}
@@ -153,11 +153,11 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if existingAccount.ResourceID == "" {
 		return errors.New("site account read returned no resource ID")
 	}
-	if _, err := s.permissions(ctx, "permission-schema-preflight"); err != nil {
+	if _, err := s.permissions(ctx, "permission-schema-preflight", "パーミッション系 API が利用可能であることを確認する"); err != nil {
 		return err
 	}
 
-	items, err := s.list(ctx, "bucket-preflight")
+	items, err := s.list(ctx, "bucket-preflight", "作成前に同名バケットが存在しないことを確認する")
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if s.plan != "" {
 		createArgs = append(createArgs, "--plan", s.plan)
 	}
-	createdOutput, err := s.client.call(ctx, "bucket-create", createArgs...)
+	createdOutput, err := s.client.call(ctx, "bucket-create", "テスト用バケットを作成する", createArgs...)
 	if err != nil {
 		return fmt.Errorf("bucket creation may have succeeded without returning its identity; inspect site %s and bucket %s before cleanup: %w", s.siteID, name, err)
 	}
@@ -193,7 +193,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 		}
 	}()
 
-	items, err = s.list(ctx, "bucket-verify-create")
+	items, err = s.list(ctx, "bucket-verify-create", "作成したバケットが一覧に含まれることを確認する")
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	if err := s.cleanup(ctx, created, false); err != nil {
 		return err
 	}
-	items, err = s.list(ctx, "bucket-verify-delete")
+	items, err = s.list(ctx, "bucket-verify-delete", "削除後にバケットが一覧に残っていないことを確認する")
 	if err != nil {
 		return err
 	}
@@ -235,8 +235,8 @@ func (s scenario) run(ctx context.Context, name string) (result error) {
 	return nil
 }
 
-func (s scenario) list(ctx context.Context, step string) ([]bucket, error) {
-	output, err := s.client.call(ctx, step,
+func (s scenario) list(ctx context.Context, step, description string) ([]bucket, error) {
+	output, err := s.client.call(ctx, step, description,
 		"object-storage-api", "bucket", "list", s.siteID,
 		"--query", bucketListQuery,
 	)
@@ -253,7 +253,7 @@ func (s scenario) cleanup(ctx context.Context, created createdBucket, retry bool
 		checkStep = "bucket-cleanup-retry-check"
 		deleteStep = "bucket-delete-retry"
 	}
-	items, err := s.list(ctx, checkStep)
+	items, err := s.list(ctx, checkStep, "クリーンアップ前に削除対象バケットが存在することを確認する")
 	if err != nil {
 		return err
 	}
@@ -264,11 +264,11 @@ func (s scenario) cleanup(ctx context.Context, created createdBucket, retry bool
 	if len(matches) != 1 || matches[0].Name != created.Name || created.ResourceID == "" || matches[0].ResourceID != created.ResourceID {
 		return fmt.Errorf("refusing to delete bucket %q because its resource ID does not match the created bucket", created.Name)
 	}
-	_, err = s.client.call(ctx, deleteStep, "object-storage-api", "bucket", "delete", created.ClusterID, created.Name)
+	_, err = s.client.call(ctx, deleteStep, "作成したテスト用バケットを削除する", "object-storage-api", "bucket", "delete", created.ClusterID, created.Name)
 	if err != nil {
 		return err
 	}
-	items, err = s.list(ctx, deleteStep+"-verify")
+	items, err = s.list(ctx, deleteStep+"-verify", "削除後にバケットが一覧に残っていないことを確認する")
 	if err != nil {
 		return err
 	}
@@ -302,6 +302,47 @@ func validateSiteID(siteID string) error {
 		return nil
 	default:
 		return fmt.Errorf("site ID must be a standard Object Storage site: isk01 or tky01")
+	}
+}
+
+func objectStorageScenario(mode, siteID, targetSiteID string) evidence.Scenario {
+	details := "サイト: " + siteID
+	if mode == "replication" && targetSiteID != "" {
+		details += ", レプリケーション先: " + targetSiteID
+	}
+	switch mode {
+	case "tutorial":
+		return evidence.Scenario{
+			Title:       "オブジェクトストレージ チュートリアル",
+			Description: "指定したサイトで一時的なバケット、パーミッション、アクセスキーを作成し、CRUD 操作と後片付けが正常に動作することを確認します。(" + details + ")",
+		}
+	case "metrics":
+		return evidence.Scenario{
+			Title:       "オブジェクトストレージ メトリクス参照",
+			Description: "既存のバケットのメトリクスを参照し、読み取り専用のメトリクス取得が正常に動作することを確認します。(" + details + ")",
+		}
+	case "archive":
+		return evidence.Scenario{
+			Title:       "オブジェクトストレージ アーカイブバケット",
+			Description: "アーカイブプランのバケットを作成し、ライフサイクルとプラン設定が正常に動作することを確認します。(" + details + ")",
+		}
+	case "account":
+		return evidence.Scenario{
+			Title:       "オブジェクトストレージ アカウント作成",
+			Description: "指定したサイトでオブジェクトストレージアカウントを作成し、アカウントとテスト用アクセスキーのライフサイクルが正常に動作することを確認します。(" + details + ")",
+		}
+	case "encryption":
+		return evidence.Scenario{
+			Title:       "オブジェクトストレージ バケット暗号化",
+			Description: "指定したバケットのサーバー側暗号化を有効化・無効化し、KMS キー ID が正しく反映されることを確認します。(" + details + ")",
+		}
+	case "replication":
+		return evidence.Scenario{
+			Title:       "オブジェクトストレージ バケットレプリケーション",
+			Description: "送信元サイトのバケットとレプリケーション先サイトのバケットを作成し、レプリケーション設定と後片付けが正常に動作することを確認します。(" + details + ")",
+		}
+	default:
+		return evidence.Scenario{Title: "オブジェクトストレージ " + mode, Description: "オブジェクトストレージ API の動作を確認します。(" + details + ")"}
 	}
 }
 
@@ -354,7 +395,7 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	recorder, err := evidence.New("object-storage-api-" + *mode)
+	recorder, err := evidence.New("object-storage-api-"+*mode, objectStorageScenario(*mode, *siteID, *targetSiteID))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1

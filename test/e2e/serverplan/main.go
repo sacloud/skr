@@ -152,12 +152,16 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	recorder, err := evidence.New("serverplan-api")
+	recorder, err := evidence.New("serverplan-api", evidence.Scenario{
+		Title:       "サーバープランの検索・参照",
+		Description: "IaaS API でサーバープランの検索・参照が正しく動作することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	defer func() {
 		result := "failed"
 		if exitCode == 0 {

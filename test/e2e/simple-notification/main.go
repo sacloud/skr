@@ -471,12 +471,16 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	recorder, err := evidence.New("simple-notification-api")
+	recorder, err := evidence.New("simple-notification-api", evidence.Scenario{
+		Title:       "シンプル通知の各リソース操作",
+		Description: "シンプル通知 API で宛先、グループ、履歴、ルーティングの作成・参照・更新・削除が正しく動作することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	defer func() {
 		result := "failed"
 		if exitCode == 0 {

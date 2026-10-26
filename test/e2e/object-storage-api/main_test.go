@@ -38,7 +38,7 @@ type fakeCLI struct {
 	responses    map[string][]byte
 }
 
-func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
+func (f *fakeCLI) call(_ context.Context, step, _ string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, step)
 	if f.args == nil {
 		f.args = make(map[string][]string)

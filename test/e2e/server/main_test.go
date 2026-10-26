@@ -91,7 +91,7 @@ func TestSSHRunnerRecordsLoginResult(t *testing.T) {
 		{name: "empty-hostname"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+			recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -146,7 +146,7 @@ func TestSSHRunnerRecordsLoginResult(t *testing.T) {
 }
 
 func TestSSHEvidenceFailureStopsRetriesAndCleansUp(t *testing.T) {
-	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}

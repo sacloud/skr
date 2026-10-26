@@ -243,7 +243,7 @@ func TestCLIRunnerRedactsAPIKeyFromEvidence(t *testing.T) {
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil { //nolint:gosec // The test helper must be executable.
 		t.Fatal(err)
 	}
-	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "simplemq-api"), time.Now())
+	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "simplemq-api"), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}

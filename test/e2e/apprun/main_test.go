@@ -368,7 +368,7 @@ func TestPublicURLRecordsEachAttempt(t *testing.T) {
 		_, _ = w.Write([]byte("Hello from AppRun!"))
 	}))
 	defer server.Close()
-	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestPublicURLFailsWhenEvidenceCannotBeWritten(t *testing.T) {
 		_, _ = w.Write([]byte("Hello from AppRun!"))
 	}))
 	defer server.Close()
-	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +426,7 @@ func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
 }
 
 func TestPublicURLRecordsConnectionFailure(t *testing.T) {
-	recorder, err := evidence.CreateAt(t.TempDir(), time.Now())
+	recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}

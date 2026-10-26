@@ -82,7 +82,7 @@ func validateOptions(mode, siteID, plan string, bucketConfirmed, accountConfirme
 }
 
 func (s scenario) checkSite(ctx context.Context) error {
-	output, err := s.client.call(ctx, "site-list", "object-storage-api", "site", "list",
+	output, err := s.client.call(ctx, "site-list", "利用可能なオブジェクトストレージサイト一覧を取得する", "object-storage-api", "site", "list",
 		"--query", "map({id,display_name,region,plan_family})")
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func (s scenario) checkSite(ctx context.Context) error {
 	if matches != 1 {
 		return fmt.Errorf("expected exactly one site %q, got %d", s.siteID, matches)
 	}
-	output, err = s.client.call(ctx, "site-read", "object-storage-api", "site", "read", s.siteID)
+	output, err = s.client.call(ctx, "site-read", "指定サイトの詳細を確認する", "object-storage-api", "site", "read", s.siteID)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (s scenario) checkSite(ctx context.Context) error {
 	if s.plan == "" {
 		return nil
 	}
-	output, err = s.client.call(ctx, "site-plans", "object-storage-api", "site", "plans", s.siteID,
+	output, err = s.client.call(ctx, "site-plans", "指定サイトで利用可能なプラン一覧を取得する", "object-storage-api", "site", "plans", s.siteID,
 		"--query", "map({service_class_path,type,cluster_id,capacity_gib,fee})")
 	if err != nil {
 		return err
@@ -171,8 +171,8 @@ type accessKey struct {
 	Secret string `json:"secret"`
 }
 
-func (s scenario) permissions(ctx context.Context, step string) ([]permission, error) {
-	output, err := s.client.call(ctx, step, "object-storage-api", "permission", "list", s.siteID,
+func (s scenario) permissions(ctx context.Context, step, description string) ([]permission, error) {
+	output, err := s.client.call(ctx, step, description, "object-storage-api", "permission", "list", s.siteID,
 		"--query", "map({id,display_name,bucket_controls})")
 	if err != nil {
 		return nil, err
@@ -187,7 +187,7 @@ func (s scenario) runPermission(ctx context.Context, name string) (result error)
 	}
 	defer func() { result = errors.Join(result, os.RemoveAll(dir)) }()
 	expected := permission{DisplayName: name, Controls: []bucketControl{{BucketName: name, CanRead: true, CanWrite: true}}}
-	items, err := s.permissions(ctx, "permission-preflight")
+	items, err := s.permissions(ctx, "permission-preflight", "作成前に同名パーミッションが存在しないことを確認する")
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func (s scenario) runPermission(ctx context.Context, name string) (result error)
 	if err := os.WriteFile(requestPath, request, 0o600); err != nil {
 		return err
 	}
-	output, createErr := s.client.call(ctx, "permission-create", "object-storage-api", "permission", "create", s.siteID, "--request", "@"+requestPath)
+	output, createErr := s.client.call(ctx, "permission-create", "テスト用パーミッションを作成する", "object-storage-api", "permission", "create", s.siteID, "--request", "@"+requestPath)
 	var created permission
 	if err := json.Unmarshal(output, &created); err != nil {
 		return errors.Join(createErr, fmt.Errorf("cannot identify created permission; inspect site %s and name %s manually: %w", s.siteID, name, err))
@@ -239,7 +239,7 @@ func (s scenario) runPermission(ctx context.Context, name string) (result error)
 	if err := os.WriteFile(requestPath, request, 0o600); err != nil {
 		return err
 	}
-	if _, err := s.client.call(ctx, "permission-update", "object-storage-api", "permission", "update", s.siteID, permissionID, "--request", "@"+requestPath); err != nil {
+	if _, err := s.client.call(ctx, "permission-update", "パーミッションの書き込み権限を変更する", "object-storage-api", "permission", "update", s.siteID, permissionID, "--request", "@"+requestPath); err != nil {
 		return err
 	}
 	if err := s.verifyPermission(ctx, "permission-verify-update", expected); err != nil {
@@ -253,7 +253,11 @@ func (s scenario) runPermission(ctx context.Context, name string) (result error)
 }
 
 func (s scenario) verifyPermission(ctx context.Context, step string, expected permission) error {
-	items, err := s.permissions(ctx, step)
+	description := "パーミッションの作成または更新内容を確認する"
+	if step == "permission-verify-delete" {
+		description = "パーミッション削除後に対象が一覧に残っていないことを確認する"
+	}
+	items, err := s.permissions(ctx, step, description)
 	if err != nil {
 		return err
 	}
@@ -269,7 +273,7 @@ func (s scenario) verifyPermission(ctx context.Context, step string, expected pe
 	if matches != 1 {
 		return errors.New("created permission ID is missing or ambiguous")
 	}
-	output, err := s.client.call(ctx, step+"-read", "object-storage-api", "permission", "read", s.siteID, strconv.FormatInt(expected.ID, 10))
+	output, err := s.client.call(ctx, step+"-read", "パーミッションの詳細を確認する", "object-storage-api", "permission", "read", s.siteID, strconv.FormatInt(expected.ID, 10))
 	if err != nil {
 		return err
 	}
@@ -285,7 +289,7 @@ func (s scenario) verifyPermission(ctx context.Context, step string, expected pe
 
 func (s scenario) deletePermission(ctx context.Context, expected permission) error {
 	expected.Controls = append([]bucketControl(nil), expected.Controls...)
-	items, err := s.permissions(ctx, "permission-cleanup-presence")
+	items, err := s.permissions(ctx, "permission-cleanup-presence", "パーミッション削除前に対象が存在することを確認する")
 	if err != nil {
 		return err
 	}
@@ -308,17 +312,17 @@ func (s scenario) deletePermission(ctx context.Context, expected permission) err
 		return err
 	}
 	permissionID := strconv.FormatInt(expected.ID, 10)
-	keys, err := s.keys(ctx, "permission-cleanup-keys", []string{"permission", "access-key"}, []string{s.siteID, permissionID})
+	keys, err := s.keys(ctx, "permission-cleanup-keys", "パーミッション削除前にアクセスキーが残っていないことを確認する", []string{"permission", "access-key"}, []string{s.siteID, permissionID})
 	if err != nil {
 		return err
 	}
 	if len(keys) != 0 {
 		return errors.New("permission still has access keys; refusing to delete it")
 	}
-	if _, err := s.client.call(ctx, "permission-delete", "object-storage-api", "permission", "delete", s.siteID, permissionID); err != nil {
+	if _, err := s.client.call(ctx, "permission-delete", "一時的なパーミッションを削除する", "object-storage-api", "permission", "delete", s.siteID, permissionID); err != nil {
 		return err
 	}
-	items, err = s.permissions(ctx, "permission-verify-delete")
+	items, err = s.permissions(ctx, "permission-verify-delete", "パーミッション削除後に対象が一覧に残っていないことを確認する")
 	if err != nil {
 		return err
 	}
@@ -368,10 +372,10 @@ func keyArgs(path []string, operation string, target []string, id string) []stri
 	return args
 }
 
-func (s scenario) keys(ctx context.Context, step string, path, target []string) ([]accessKey, error) {
+func (s scenario) keys(ctx context.Context, step, description string, path, target []string) ([]accessKey, error) {
 	args := keyArgs(path, "list", target, "")
 	args = append(args, "--query", "map({id})")
-	output, err := s.client.call(ctx, step, args...)
+	output, err := s.client.call(ctx, step, description, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -380,14 +384,14 @@ func (s scenario) keys(ctx context.Context, step string, path, target []string) 
 
 func (s scenario) runKey(ctx context.Context, dir string, path, target []string) (result error) {
 	prefix := path[0] + "-key"
-	items, err := s.keys(ctx, prefix+"-preflight", path, target)
+	items, err := s.keys(ctx, prefix+"-preflight", "作成前に既存アクセスキーがないことを確認する", path, target)
 	if err != nil {
 		return err
 	}
 	if len(items) != 0 {
 		return errors.New("access keys already exist; refusing to replace them")
 	}
-	output, createErr := s.client.call(ctx, prefix+"-create", keyArgs(path, "create", target, "")...)
+	output, createErr := s.client.call(ctx, prefix+"-create", "アクセスキーを作成する", keyArgs(path, "create", target, "")...)
 	var created accessKey
 	if err := json.Unmarshal(output, &created); err != nil || created.ID == "" {
 		return errors.Join(createErr, errors.New("cannot identify created access key; inspect the new permission or account manually"))
@@ -424,7 +428,7 @@ func (s scenario) runKey(ctx context.Context, dir string, path, target []string)
 	if string(saved) != string(output) {
 		return errors.New("saved access key output does not match the creation response")
 	}
-	response, err := s.client.call(ctx, prefix+"-read", keyArgs(path, "read", target, created.ID)...)
+	response, err := s.client.call(ctx, prefix+"-read", "作成したアクセスキーの詳細を確認する", keyArgs(path, "read", target, created.ID)...)
 	if err != nil {
 		return err
 	}
@@ -444,7 +448,7 @@ func (s scenario) runKey(ctx context.Context, dir string, path, target []string)
 
 func (s scenario) deleteKey(ctx context.Context, path, target []string, id string) error {
 	prefix := path[0] + "-key"
-	items, err := s.keys(ctx, prefix+"-cleanup-check", path, target)
+	items, err := s.keys(ctx, prefix+"-cleanup-check", "アクセスキー削除前に対象が存在することを確認する", path, target)
 	if err != nil {
 		return err
 	}
@@ -457,10 +461,10 @@ func (s scenario) deleteKey(ctx context.Context, path, target []string, id strin
 	if !found {
 		return nil
 	}
-	if _, err := s.client.call(ctx, prefix+"-delete", keyArgs(path, "delete", target, id)...); err != nil {
+	if _, err := s.client.call(ctx, prefix+"-delete", "アクセスキーを削除する", keyArgs(path, "delete", target, id)...); err != nil {
 		return err
 	}
-	items, err = s.keys(ctx, prefix+"-verify-delete", path, target)
+	items, err = s.keys(ctx, prefix+"-verify-delete", "アクセスキー削除後に対象が一覧に残っていないことを確認する", path, target)
 	if err != nil {
 		return err
 	}

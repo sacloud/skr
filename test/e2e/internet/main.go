@@ -1016,12 +1016,16 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	recorder, err := evidence.New("internet-api")
+	recorder, err := evidence.New("internet-api", evidence.Scenario{
+		Title:       "ルータ＋スイッチの作成・更新・サブネット・IPv6 操作",
+		Description: "IaaS ルータ＋スイッチの作成・参照・更新・削除に加え、サブネット追加・更新・削除と IPv6 有効化・無効化、モニタリングが正しく動作することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	saveResult = func(result string) error {
 		return recorder.SetResult(result, time.Now())
 	}

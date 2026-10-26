@@ -14,7 +14,7 @@ type encryptionTestCLI struct {
 	callFn func(context.Context, string, ...string) ([]byte, error)
 }
 
-func (c encryptionTestCLI) call(ctx context.Context, step string, args ...string) ([]byte, error) {
+func (c encryptionTestCLI) call(ctx context.Context, step, _ string, args ...string) ([]byte, error) {
 	return c.callFn(ctx, step, args...)
 }
 

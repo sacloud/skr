@@ -34,7 +34,7 @@ type fakeCLI struct {
 	args     map[string][]string
 }
 
-func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
+func (f *fakeCLI) call(_ context.Context, step, _ string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, step)
 	if f.args == nil {
 		f.args = make(map[string][]string)
@@ -99,13 +99,13 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "http-api"), time.Now())
+	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "http-api"), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	runner := cliRunner{binary: binary, evidence: recorder}
 	args := []string{"http", zoneListURL, "--method", "GET"}
-	output, err := runner.call(context.Background(), "http-get-zones", args...)
+	output, err := runner.call(context.Background(), "http-get-zones", "さくらのクラウド zone API への GET リクエストが JSON 応答を返すことを確認する", args...)
 	if err != nil {
 		t.Fatal(err)
 	}

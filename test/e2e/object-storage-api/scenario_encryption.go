@@ -20,7 +20,7 @@ func (s scenario) runEncryption(ctx context.Context, name, kmsKeyID string) (res
 	}()
 	args := []string{"object-storage-api", "bucket", "encryption"}
 	read := func(ctx context.Context) ([]byte, error) {
-		return s.client.call(ctx, "encryption-read", append(append([]string{}, args...), "read", s.siteID, name)...)
+		return s.client.call(ctx, "encryption-read", "バケットの暗号化設定を確認する", append(append([]string{}, args...), "read", s.siteID, name)...)
 	}
 	output, err := read(ctx)
 	if err != nil && !apiNotFound(err, "BucketExtra.ReadEncryption") {
@@ -48,7 +48,7 @@ func (s scenario) runEncryption(ctx context.Context, name, kmsKeyID string) (res
 		if keyID != kmsKeyID {
 			return errors.New("encryption key ID does not match this scenario; refusing to disable it")
 		}
-		if _, err := s.client.call(ctx, "encryption-disable", append(append([]string{}, args...), "disable", s.siteID, name)...); err != nil {
+		if _, err := s.client.call(ctx, "encryption-disable", "バケットの暗号化を無効化する", append(append([]string{}, args...), "disable", s.siteID, name)...); err != nil {
 			return err
 		}
 		return waitFor(ctx, func(ctx context.Context) (bool, error) {
@@ -80,7 +80,7 @@ func (s scenario) runEncryption(ctx context.Context, name, kmsKeyID string) (res
 			result = errors.Join(result, err)
 		}
 	}()
-	if _, err := s.client.call(ctx, "encryption-enable", append(append([]string{}, args...), "enable", s.siteID, name, "--kms-key-id", kmsKeyID)...); err != nil {
+	if _, err := s.client.call(ctx, "encryption-enable", "バケットの暗号化を有効化する", append(append([]string{}, args...), "enable", s.siteID, name, "--kms-key-id", kmsKeyID)...); err != nil {
 		return err
 	}
 	if err := waitFor(ctx, func(ctx context.Context) (bool, error) {

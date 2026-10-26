@@ -315,7 +315,7 @@ func TestCLIRunnerRecordsRequestFileContents(t *testing.T) {
 	if err := os.WriteFile(requestPath, []byte(request), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	recorder, err := evidence.CreateAt(filepath.Join(tempDir, "evidence"), time.Now())
+	recorder, err := evidence.CreateAt(filepath.Join(tempDir, "evidence"), time.Now(), evidence.Scenario{})
 	if err != nil {
 		t.Fatal(err)
 	}

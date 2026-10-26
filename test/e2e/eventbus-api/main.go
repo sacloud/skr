@@ -609,12 +609,16 @@ func runMain() (exitCode int) {
 		fmt.Fprintln(os.Stderr, "skr must be an executable built binary")
 		return 1
 	}
-	recorder, err := evidence.New("eventbus-api")
+	recorder, err := evidence.New("eventbus-api", evidence.Scenario{
+		Title:       "EventBus と SimpleMQ の連携",
+		Description: "EventBus のプロセス設定、トリガー、スケジュールと SimpleMQ キューを作成し、イベント連携と各リソースのライフサイクルが正しく動作することを確認します。",
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	fmt.Println("Evidence (private, ignored by Git):", recorder.Dir())
+
 	defer func() {
 		result := "failed"
 		if exitCode == 0 {
