@@ -20,6 +20,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	profileName       = "skr-e2e-config"
+	secondProfileName = "skr-e2e-config-second"
+)
+
 func TestScenarioProfile(t *testing.T) {
 	h := NewHelper(t, "c0nfig", "設定ファイルの作成/更新/確認が可能であることを確認する")
 	keyPath := h.WritePrivateKey(t)
