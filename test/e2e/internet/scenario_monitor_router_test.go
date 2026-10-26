@@ -98,7 +98,7 @@ func TestMonitorRouterCallsCommandWithVerifiedInternet(t *testing.T) {
 		NetworkMaskLen: 28, BandWidthMbps: 100,
 	}
 	fake.internet.Switch.ID = 13
-	test := testScenario(fake, t.TempDir())
+	test := testScenario(t, fake, t.TempDir())
 	if err := test.monitorRouter(context.Background(), 12); err != nil {
 		t.Fatal(err)
 	}

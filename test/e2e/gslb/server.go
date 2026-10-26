@@ -28,6 +28,7 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
+	"github.com/sacloud/skr/test/e2e/internal/sshrun"
 )
 
 const serverDescription = "Temporary GSLB health-check server created by skr live E2E"
@@ -104,7 +105,7 @@ func (s scenario) prepareServer(ctx context.Context, gslbName string) error {
 	if s.serverName == "" || s.archiveID <= 0 || s.diskPlanID <= 0 || s.diskSizeGB <= 0 {
 		return errors.New("server E2E requires a name, cloud-init archive, disk plan, and positive disk size")
 	}
-	if s.lookupDNS == nil || s.connectSSH == nil || s.shutdownSSH == nil {
+	if s.lookupDNS == nil || s.ssh.SSH == nil {
 		return errors.New("DNS and SSH checks are required for server health-check E2E")
 	}
 	args := []string{"iaas-api", "archive", "read", "--zone", zone,
@@ -218,42 +219,23 @@ func (s scenario) bootAndWaitForSSH(ctx context.Context, id types.ID) error {
 }
 
 func (s scenario) waitForSSH(ctx context.Context, id types.ID) error {
-	timeout := s.serverTimeout
-	if timeout <= 0 {
-		timeout = 20 * time.Minute
-	}
-	poll := s.pollInterval
-	if poll <= 0 {
-		poll = 10 * time.Second
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	ticker := time.NewTicker(poll)
-	defer ticker.Stop()
-	var lastSSHError error
-	for {
-		server, err := s.readServer(ctx, "server-read-boot", id)
-		if err != nil {
-			return err
-		}
-		if server.InstanceStatus.IsUp() {
-			ip, err := server.sharedIP()
-			if err == nil {
-				if err := s.connectSSH(ctx, "server-ssh-ready", ip, s.privateKey, s.knownHosts); err == nil {
-					return nil
-				} else {
-					lastSSHError = err
-				}
-			} else {
-				lastSSHError = err
+	return s.ssh.Wait(ctx, "server-ssh-ready", fmt.Sprintf("Server %s の起動後の SSH ログイン確認", id),
+		sshrun.Options{Timeout: s.serverTimeout, PollInterval: s.pollInterval},
+		func(ctx context.Context) (bool, sshrun.Observation, error) {
+			server, err := s.readServer(ctx, "server-read-boot", id)
+			if err != nil {
+				return false, sshrun.Observation{}, err
 			}
-		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("server %s did not become SSH-ready (last check: %v): %w", id, lastSSHError, ctx.Err())
-		case <-ticker.C:
-		}
-	}
+			if !server.InstanceStatus.IsUp() {
+				return false, sshrun.Observation{}, nil
+			}
+			ip, err := server.sharedIP()
+			if err != nil {
+				return false, sshrun.Observation{}, nil
+			}
+			done, login := s.ssh.ProbeLogin(ctx, ip)
+			return done, login, nil
+		})
 }
 
 func (s scenario) waitForServerDown(ctx context.Context, id types.ID) error {
@@ -446,38 +428,6 @@ func createSSHMaterial(dir string) (userDataPath, privateKey, knownHosts string,
 		return "", "", "", fmt.Errorf("write temporary cloud-init user-data: %w", err)
 	}
 	return userDataPath, privateKey, filepath.Join(dir, "known_hosts"), nil
-}
-
-type sshRunner struct {
-	evidence *evidence.Recorder
-}
-
-func (r sshRunner) connect(ctx context.Context, step, ip, privateKey, knownHosts string) error {
-	return r.run(ctx, step, ip, privateKey, knownHosts, "hostname")
-}
-
-func (r sshRunner) shutdown(ctx context.Context, step, ip, privateKey, knownHosts string) error {
-	return r.run(ctx, step, ip, privateKey, knownHosts, "sudo -n systemctl poweroff --no-block")
-}
-
-func (r sshRunner) run(ctx context.Context, step, ip, privateKey, knownHosts, remoteCommand string) error {
-	timeout, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	args := []string{
-		"-i", privateKey, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new",
-		"-o", "UserKnownHostsFile=" + knownHosts,
-		"skr-e2e@" + ip, remoteCommand,
-	}
-	command := exec.CommandContext(timeout, "ssh", args...) //nolint:gosec // 引数は固定されたリモートコマンドで一時サーバーを対象とし、ローカルシェルは使用しない。
-	output, runErr := command.CombinedOutput()
-	if err := r.evidence.Record(step, "ssh", args, nil, string(output), "", runErr, false); err != nil {
-		return errors.Join(runErr, err)
-	}
-	if runErr != nil {
-		return fmt.Errorf("%s: SSH command failed (see evidence): %w", step, runErr)
-	}
-	return nil
 }
 
 type dnsRunner struct {

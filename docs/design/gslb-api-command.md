@@ -29,7 +29,7 @@ $ skr gslb-api create --name example --health-check-protocol ping \
 
 `internal/gslbapi/` の単体テストで構造化入力の正常系・異常系と SDK リクエスト変換を確認します。`internal/cli/` のテストでは全コマンド経路、JSON／フラグ相互排他、API エラー伝播、ヘルプ、SDK が生成する API リクエスト本文を確認します。sakumock v0.13.0 に IaaS API mock は含まれないため、CLI の domain API interface と SDK `APICaller` のテスト double を使います。
 
-`test/e2e/gslb/` の is1b runner は、指定された cloud-init アーカイブとディスクプランを使い、1 vCPU／1 GB メモリの一時サーバーとディスクを各2個作成します。実サーバーとソーリーサーバーとして使い、使い捨て SSH 鍵で両方を起動します。DNS 応答が実サーバーの IP のみであること、SSH 経由で停止した後にソーリーサーバーの IP のみになること、再起動後に元へ戻ることを確認します。空の応答や両 IP の応答は切り替え成功としません。GSLB の Find / Read / Update / Delete も実行します。
+`test/e2e/gslb/` の is1b runner は、指定された cloud-init アーカイブとディスクプランを使い、1 vCPU／1 GB メモリの一時サーバーとディスクを各2個作成します。実サーバーとソーリーサーバーとして使い、使い捨て SSH 鍵で両方を起動します。サーバーの SSH 待機とログイン確認は `test/e2e/internal/sshrun` パッケージに集約します（[ADR 0060](../adr/0060-e2e-sshrun-shared-package.md)）。待機の結果は要約 1 件の証跡に記録し、待機中のポーリングごとの状態確認と失敗した SSH 試行は記録しません。DNS 応答が実サーバーの IP のみであること、SSH 経由で停止した後にソーリーサーバーの IP のみになること、再起動後に元へ戻ることを確認します。空の応答や両 IP の応答は切り替え成功としません。GSLB の Find / Read / Update / Delete も実行します。
 
 全実サーバーが監視エラーの場合、ソーリーサーバー未設定なら全実サーバーの IP、設定済みならソーリーサーバーの IP を応答します（[GSLB FAQ](https://manual.sakura.ad.jp/cloud/support/technical/appliance-gslb.html)）。宛先1台・ソーリーサーバーなしで空応答を期待するシナリオは使いません。
 

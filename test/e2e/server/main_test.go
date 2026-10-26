@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,6 +26,7 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
+	"github.com/sacloud/skr/test/e2e/internal/sshrun"
 )
 
 func TestFinalizeRunCleansUpBeforeRecordingResult(t *testing.T) {
@@ -79,100 +80,7 @@ func TestFinalizeRunBeforeRecorderCreation(t *testing.T) {
 	}
 }
 
-func TestSSHRunnerRecordsLoginResult(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		stdout string
-		stderr string
-		err    error
-	}{
-		{name: "success", stdout: "test-server\n"},
-		{name: "connection-failure", stderr: "Connection refused", err: errors.New("SSH exited")},
-		{name: "empty-hostname"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			runner := sshRunner{
-				evidence: recorder,
-				run: func(_ context.Context, args []string) (string, string, error) {
-					if args[len(args)-1] != "hostname" {
-						t.Fatalf("unexpected SSH arguments: %v", args)
-					}
-					return test.stdout, test.stderr, test.err
-				},
-			}
-			err = runner.connect(context.Background(), sshUser, "203.0.113.1", "/tmp/key", "/tmp/known_hosts")
-			wantFailure := test.err != nil || test.stdout == ""
-			if (err != nil) != wantFailure {
-				t.Fatalf("connect error = %v, wantFailure = %v", err, wantFailure)
-			}
-			data, err := os.ReadFile(filepath.Join(recorder.Dir(), "001-test-ssh-login.json"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			var entry struct {
-				Step       string   `json:"step"`
-				Args       []string `json:"args"`
-				Stdout     string   `json:"stdout"`
-				Stderr     string   `json:"stderr"`
-				Error      string   `json:"error"`
-				ExitStatus *int     `json:"exit_status"`
-			}
-			if err := json.Unmarshal(data, &entry); err != nil {
-				t.Fatal(err)
-			}
-			if entry.Step != "test-ssh-login" || entry.Stdout != test.stdout || entry.Stderr != test.stderr ||
-				(entry.Error != "") != wantFailure {
-				t.Fatalf("unexpected evidence: %+v", entry)
-			}
-			if !wantFailure && (entry.ExitStatus == nil || *entry.ExitStatus != 0) {
-				t.Fatalf("successful SSH exit status = %v", entry.ExitStatus)
-			}
-			if err := recorder.SetResult("passed", time.Now()); err != nil {
-				t.Fatal(err)
-			}
-			for _, file := range []string{"ORDER.txt", "REPORT.md"} {
-				//nolint:gosec // このテストの一時ディレクトリ内の固定された evidence ファイル名。
-				data, err := os.ReadFile(filepath.Join(recorder.Dir(), file))
-				if err != nil || !strings.Contains(string(data), "test-ssh-login") {
-					t.Fatalf("%s does not contain SSH evidence: %v", file, err)
-				}
-			}
-		})
-	}
-}
-
-func TestSSHEvidenceFailureStopsRetriesAndCleansUp(t *testing.T) {
-	recorder, err := evidence.CreateAt(t.TempDir(), time.Now(), evidence.Scenario{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// 予期される evidence ファイルをディレクトリで置き換え、書き込み失敗を強制する。
-	if err := os.Mkdir(filepath.Join(recorder.Dir(), "001-test-ssh-login.json"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	attempts := 0
-	runner := sshRunner{
-		evidence: recorder,
-		run: func(context.Context, []string) (string, string, error) {
-			attempts++
-			return "test-server\n", "", nil
-		},
-	}
-	fake := &fakeCLI{}
-	test := testScenario(fake)
-	test.connect = runner.connect
-	err = test.run(context.Background(), namePrefix+"test")
-	if !errors.Is(err, errSSHEvidence) || attempts != 1 {
-		t.Fatalf("error = %v, attempts = %d; want evidence failure without retry", err, attempts)
-	}
-	if fake.server != nil || fake.disk || len(fake.deleted) != 1 {
-		t.Fatal("resources were not cleaned up after evidence failure")
-	}
-}
+// SSH ログイン確認の成功・失敗と待機の要約は test/e2e/internal/sshrun パッケージの単体テストで検証します。
 
 type fakeCLI struct {
 	server                    *serverItem
@@ -291,13 +199,33 @@ func (f *fakeCLI) call(_ context.Context, step string, request map[string]any) (
 	}
 }
 
-func testScenario(fake *fakeCLI) scenario {
+// observe は待機中の状態確認用の読み取りを模擬します。証跡には記録せず、
+// 最後の確認内容として Observation を返します。
+func (f *fakeCLI) observe(ctx context.Context, step string, request map[string]any) ([]byte, sshrun.Observation, error) {
+	data, err := f.call(ctx, step, request)
+	obs := sshrun.Observation{Binary: "./skr", Args: []string{"iaas-api", "server", "read"}}
+	if err != nil {
+		obs.Err = err
+		return nil, obs, fmt.Errorf("%s: skr failed: %w", step, err)
+	}
+	obs.Stdout = strings.TrimSpace(string(data))
+	return data, obs, nil
+}
+
+func testScenario(t *testing.T, fake *fakeCLI) scenario {
+	t.Helper()
+	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "server-api-test"), time.Now(), evidence.Scenario{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	return scenario{
 		client: fake, archiveID: 234, diskPlanID: 4, diskSizeGB: 20,
-		userDataPath: "/tmp/user-data.yaml", privateKey: "/tmp/ssh-key",
-		knownHosts: "/tmp/known_hosts",
-		connect: func(context.Context, string, string, string, string) error {
-			return nil
+		userDataPath: "/tmp/user-data.yaml",
+		ssh: sshrun.Runner{
+			Recorder: recorder, PrivateKey: "/tmp/ssh-key", KnownHosts: "/tmp/known_hosts",
+			SSH: func(context.Context, []string) (string, string, error) {
+				return "test-server\n", "", nil
+			},
 		},
 		pollInterval: time.Millisecond,
 		sshTimeout:   20 * time.Millisecond,
@@ -306,7 +234,7 @@ func testScenario(fake *fakeCLI) scenario {
 
 func TestScenarioCreatesBootsSSHAndCleansServerAndDisk(t *testing.T) {
 	fake := &fakeCLI{}
-	if err := testScenario(fake).run(context.Background(), namePrefix+"test"); err != nil {
+	if err := testScenario(t, fake).run(context.Background(), namePrefix+"test"); err != nil {
 		t.Fatal(err)
 	}
 	if fake.server != nil || fake.disk || len(fake.deleted) != 1 || fake.deleted[0] != 123 {
@@ -325,7 +253,7 @@ func TestScenarioCreatesBootsSSHAndCleansServerAndDisk(t *testing.T) {
 
 func TestScenarioCleansUpAfterCreateReturnsError(t *testing.T) {
 	fake := &fakeCLI{failStep: "test-create", failCreateAfterSideEffect: true}
-	err := testScenario(fake).run(context.Background(), namePrefix+"test")
+	err := testScenario(t, fake).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
 		t.Fatalf("scenario error = %v, want injected CLI failure", err)
 	}
@@ -336,7 +264,7 @@ func TestScenarioCleansUpAfterCreateReturnsError(t *testing.T) {
 
 func TestScenarioDeletesVerifiedOrphanDisk(t *testing.T) {
 	fake := &fakeCLI{leaveDisk: true}
-	if err := testScenario(fake).run(context.Background(), namePrefix+"test"); err != nil {
+	if err := testScenario(t, fake).run(context.Background(), namePrefix+"test"); err != nil {
 		t.Fatal(err)
 	}
 	if fake.disk || len(fake.deletedDisks) != 1 || fake.deletedDisks[0] != 45 {
@@ -359,7 +287,7 @@ func TestScenarioRefusesUnverifiedOrphanDisk(t *testing.T) {
 		{ID: 45, Name: namePrefix + "test", DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 100 * 1024},
 	} {
 		fake := &fakeCLI{leaveDisk: true, orphanDisk: &disk}
-		err := testScenario(fake).run(context.Background(), namePrefix+"test")
+		err := testScenario(t, fake).run(context.Background(), namePrefix+"test")
 		if err == nil || !strings.Contains(err.Error(), "manual cleanup required") || !fake.disk || len(fake.deletedDisks) != 0 {
 			t.Fatalf("unsafe orphan deletion: disk=%+v error=%v", disk, err)
 		}
@@ -368,7 +296,7 @@ func TestScenarioRefusesUnverifiedOrphanDisk(t *testing.T) {
 
 func TestScenarioReportsDiskWhenPartialCreateHasNoServer(t *testing.T) {
 	fake := &fakeCLI{createDiskOnly: true}
-	err := testScenario(fake).run(context.Background(), namePrefix+"test")
+	err := testScenario(t, fake).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "cannot safely identify orphan Disk") ||
 		!containsStep(fake.calls, "cleanup-find-disk-after") || !fake.disk || len(fake.deletedDisks) != 0 {
 		t.Fatalf("unidentified disk was ignored or deleted: error=%v calls=%v", err, fake.calls)
@@ -378,7 +306,7 @@ func TestScenarioReportsDiskWhenPartialCreateHasNoServer(t *testing.T) {
 func TestScenarioReportsOrphanCleanupFailures(t *testing.T) {
 	for _, step := range []string{"cleanup-find-disk-after", "cleanup-read-disk", "cleanup-delete-disk", "cleanup-find-disk-final"} {
 		fake := &fakeCLI{leaveDisk: true, failStep: step}
-		err := testScenario(fake).run(context.Background(), namePrefix+"test")
+		err := testScenario(t, fake).run(context.Background(), namePrefix+"test")
 		if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
 			t.Fatalf("%s: error=%v", step, err)
 		}
@@ -390,7 +318,7 @@ func TestScenarioRejectsAmbiguousOrRemainingOrphans(t *testing.T) {
 		{leaveDisk: true, multipleOrphans: true},
 		{leaveDisk: true, keepOrphan: true},
 	} {
-		err := testScenario(fake).run(context.Background(), namePrefix+"test")
+		err := testScenario(t, fake).run(context.Background(), namePrefix+"test")
 		if err == nil || !strings.Contains(err.Error(), "manual cleanup required") || !fake.disk {
 			t.Fatalf("orphan not reported: error=%v", err)
 		}
@@ -402,7 +330,7 @@ func TestScenarioRejectsAmbiguousOrRemainingOrphans(t *testing.T) {
 
 func TestScenarioCleansDiskAfterPartialServerDelete(t *testing.T) {
 	fake := &fakeCLI{leaveDisk: true, deleteServerError: true}
-	err := testScenario(fake).run(context.Background(), namePrefix+"test")
+	err := testScenario(t, fake).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "injected partial delete failure") ||
 		fake.disk || len(fake.deletedDisks) != 1 {
 		t.Fatalf("partial delete cleanup: error=%v deleted=%v", err, fake.deletedDisks)
@@ -411,6 +339,11 @@ func TestScenarioCleansDiskAfterPartialServerDelete(t *testing.T) {
 
 type paginatedCLI struct {
 	calls int
+}
+
+// observe はページ検索のテストでは呼び出されない。
+func (f *paginatedCLI) observe(context.Context, string, map[string]any) ([]byte, sshrun.Observation, error) {
+	return nil, sshrun.Observation{}, errors.New("observe is not supported by paginatedCLI")
 }
 
 func (f *paginatedCLI) call(_ context.Context, _ string, request map[string]any) ([]byte, error) {
@@ -436,7 +369,7 @@ func TestScenarioRefusesExistingServer(t *testing.T) {
 	fake := &fakeCLI{server: &serverItem{
 		ID: 456, Name: namePrefix + "test", Description: "unrelated Server",
 	}}
-	err := testScenario(fake).run(context.Background(), namePrefix+"test")
+	err := testScenario(t, fake).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("scenario error = %v, want name collision refusal", err)
 	}
@@ -447,7 +380,7 @@ func TestScenarioRefusesExistingServer(t *testing.T) {
 
 func TestScenarioRefusesCleanupAfterIdentityChange(t *testing.T) {
 	fake := &fakeCLI{changeIdentityAtCleanup: true}
-	err := testScenario(fake).run(context.Background(), namePrefix+"test")
+	err := testScenario(t, fake).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "cleanup refused") {
 		t.Fatalf("scenario error = %v, want cleanup refusal", err)
 	}
@@ -458,9 +391,9 @@ func TestScenarioRefusesCleanupAfterIdentityChange(t *testing.T) {
 
 func TestScenarioTimesOutWhenSSHLoginFailsAndCleansUp(t *testing.T) {
 	fake := &fakeCLI{}
-	test := testScenario(fake)
-	test.connect = func(context.Context, string, string, string, string) error {
-		return errors.New("SSH unavailable")
+	test := testScenario(t, fake)
+	test.ssh.SSH = func(context.Context, []string) (string, string, error) {
+		return "", "", errors.New("SSH unavailable")
 	}
 	err := test.run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "SSH login check timed out") {

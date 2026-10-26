@@ -34,17 +34,15 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
+	"github.com/sacloud/skr/test/e2e/internal/sshrun"
 )
 
 const (
-	zone           = "is1b"
-	namePrefix     = "skr-e2e-server-"
-	description    = "Temporary Server for skr cloud-init E2E"
-	sshUser        = "skr-e2e"
-	sshWaitTimeout = 20 * time.Minute
+	zone        = "is1b"
+	namePrefix  = "skr-e2e-server-"
+	description = "Temporary Server for skr cloud-init E2E"
+	sshUser     = "skr-e2e"
 )
-
-var errSSHEvidence = errors.New("record SSH evidence")
 
 type serverInterface struct {
 	IPAddress    string                     `json:"IPAddress"`
@@ -71,6 +69,7 @@ type diskItem struct {
 
 type cli interface {
 	call(context.Context, string, map[string]any) ([]byte, error)
+	observe(context.Context, string, map[string]any) ([]byte, sshrun.Observation, error)
 }
 
 type cliRunner struct {
@@ -79,13 +78,13 @@ type cliRunner struct {
 	userDataPath string
 }
 
-func (r cliRunner) call(ctx context.Context, step string, request map[string]any) ([]byte, error) {
+func (r cliRunner) execute(ctx context.Context, step string, request map[string]any) (string, string, []string, error) {
 	if err := evidence.ValidateStep(step); err != nil {
-		return nil, err
+		return "", "", nil, err
 	}
 	args, err := serverArgs(step, request, r.userDataPath)
 	if err != nil {
-		return nil, err
+		return "", "", nil, err
 	}
 	timeout, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
@@ -95,7 +94,12 @@ func (r cliRunner) call(ctx context.Context, step string, request map[string]any
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	runErr := command.Run()
-	if err := r.evidence.Record(step, r.binary, args, request, stdout.String(), stderr.String(), runErr, false); err != nil {
+	return stdout.String(), stderr.String(), args, runErr
+}
+
+func (r cliRunner) call(ctx context.Context, step string, request map[string]any) ([]byte, error) {
+	stdout, stderr, args, runErr := r.execute(ctx, step, request)
+	if err := r.evidence.Record(step, r.binary, args, request, stdout, stderr, runErr, false); err != nil {
 		if runErr != nil {
 			return nil, errors.Join(fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr), err)
 		}
@@ -104,7 +108,18 @@ func (r cliRunner) call(ctx context.Context, step string, request map[string]any
 	if runErr != nil {
 		return nil, fmt.Errorf("%s: skr failed: %w (see evidence for stderr)", step, runErr)
 	}
-	return stdout.Bytes(), nil
+	return []byte(stdout), nil
+}
+
+// observe は待機中の状態確認用にコマンドを実行します。証跡には記録せず、最後の確認内容を
+// Observation として返します。待機の結果は sshrun.Wait が 1 件だけ記録します。
+func (r cliRunner) observe(ctx context.Context, step string, request map[string]any) ([]byte, sshrun.Observation, error) {
+	stdout, stderr, args, runErr := r.execute(ctx, step, request)
+	obs := sshrun.Observation{Binary: r.binary, Args: args, Request: request, Stdout: stdout, Stderr: stderr, Err: runErr}
+	if runErr != nil {
+		return nil, obs, fmt.Errorf("%s: skr failed: %w", step, runErr)
+	}
+	return []byte(stdout), obs, nil
 }
 
 func serverArgs(step string, request map[string]any, userDataPath string) ([]string, error) {
@@ -267,9 +282,7 @@ type scenario struct {
 	diskPlanID   int64
 	diskSizeGB   int64
 	userDataPath string
-	privateKey   string
-	knownHosts   string
-	connect      func(context.Context, string, string, string, string) error
+	ssh          sshrun.Runner
 	pollInterval time.Duration
 	sshTimeout   time.Duration
 }
@@ -326,6 +339,10 @@ func (s scenario) read(ctx context.Context, step string, id types.ID) (serverIte
 	if err != nil {
 		return serverItem{}, err
 	}
+	return decodeServerItem(step, output)
+}
+
+func decodeServerItem(step string, output []byte) (serverItem, error) {
 	var item serverItem
 	if err := json.Unmarshal(output, &item); err != nil {
 		return serverItem{}, fmt.Errorf("%s: decode Server: %w", step, err)
@@ -343,64 +360,40 @@ func checkServer(item serverItem, id types.ID, name string) error {
 	return nil
 }
 
-func (s scenario) publicIP(ctx context.Context, id types.ID, name string) (string, error) {
-	item, err := s.read(ctx, "test-read", id)
+// observeServer は待機中の状態確認用に Server を読み取ります。証跡には記録せず、
+// 最後の確認内容を Observation として返します。
+func (s scenario) observeServer(ctx context.Context, step string, id types.ID) (serverItem, sshrun.Observation, error) {
+	output, obs, err := s.client.observe(ctx, step, map[string]any{"Zone": zone, "ID": id})
 	if err != nil {
-		return "", err
+		return serverItem{}, obs, err
 	}
-	if err := checkServer(item, id, name); err != nil {
-		return "", err
-	}
-	if !item.InstanceStatus.IsUp() {
-		return "", nil
-	}
-	for _, iface := range item.Interfaces {
-		if iface.UpstreamType != "shared" || net.ParseIP(iface.IPAddress) == nil {
-			continue
-		}
-		return iface.IPAddress, nil
-	}
-	return "", nil
+	item, err := decodeServerItem(step, output)
+	return item, obs, err
 }
 
 func (s scenario) waitForSSH(ctx context.Context, id types.ID, name string) error {
-	if s.connect == nil {
-		return errors.New("SSH connection check is not configured")
-	}
-	timeout := s.sshTimeout
-	if timeout == 0 {
-		timeout = sshWaitTimeout
-	}
-	deadline := time.NewTimer(timeout)
-	defer deadline.Stop()
-	pollInterval := s.pollInterval
-	if pollInterval <= 0 {
-		pollInterval = 10 * time.Second
-	}
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-	for {
-		ip, err := s.publicIP(ctx, id, name)
-		if err != nil {
-			return err
-		}
-		if ip != "" {
-			err := s.connect(ctx, sshUser, ip, s.privateKey, s.knownHosts)
-			if err == nil {
-				return nil
+	return s.ssh.Wait(ctx, "test-ssh-login", fmt.Sprintf("Server %s の起動後の SSH ログイン確認", id),
+		sshrun.Options{Timeout: s.sshTimeout, PollInterval: s.pollInterval},
+		func(ctx context.Context) (bool, sshrun.Observation, error) {
+			item, obs, err := s.observeServer(ctx, "test-read", id)
+			if err != nil {
+				return false, obs, err
 			}
-			if errors.Is(err, errSSHEvidence) {
-				return err
+			if err := checkServer(item, id, name); err != nil {
+				return false, obs, err
 			}
-		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("SSH login check timed out: %w", ctx.Err())
-		case <-deadline.C:
-			return fmt.Errorf("SSH login check timed out after %s", timeout)
-		case <-ticker.C:
-		}
-	}
+			if !item.InstanceStatus.IsUp() {
+				return false, obs, nil
+			}
+			for _, iface := range item.Interfaces {
+				if iface.UpstreamType != "shared" || net.ParseIP(iface.IPAddress) == nil {
+					continue
+				}
+				done, login := s.ssh.ProbeLogin(ctx, iface.IPAddress)
+				return done, login, nil
+			}
+			return false, obs, nil
+		})
 }
 
 func (s scenario) cleanup(name string, knownID types.ID) error {
@@ -550,48 +543,6 @@ func createSSHMaterial(dir string) (userDataPath, privateKey, knownHosts string,
 	return userDataPath, privateKey, filepath.Join(dir, "known_hosts"), nil
 }
 
-type sshRunner struct {
-	evidence *evidence.Recorder
-	run      func(context.Context, []string) (string, string, error)
-}
-
-func (r sshRunner) connect(ctx context.Context, user, ip, privateKey, knownHosts string) error {
-	timeout, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	args := []string{
-		"-i", privateKey,
-		"-o", "IdentitiesOnly=yes",
-		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=5",
-		"-o", "StrictHostKeyChecking=accept-new",
-		"-o", "UserKnownHostsFile=" + knownHosts,
-		user + "@" + ip,
-		"hostname",
-	}
-	stdout, stderr, runErr := r.run(timeout, args)
-	checkErr := runErr
-	if checkErr == nil && strings.TrimSpace(stdout) == "" {
-		checkErr = errors.New("SSH login returned an empty hostname")
-	}
-	if err := r.evidence.Record("test-ssh-login", "ssh", args, nil, stdout, stderr, checkErr, false); err != nil {
-		return errors.Join(errSSHEvidence, checkErr, err)
-	}
-	if checkErr != nil {
-		return fmt.Errorf("SSH login attempt failed: %w (see evidence for output)", checkErr)
-	}
-	return nil
-}
-
-func runSSH(ctx context.Context, args []string) (string, string, error) {
-	//nolint:gosec // 引数はこの runner によって生成され、シェルを介さず直接渡される。
-	command := exec.CommandContext(ctx, "ssh", args...)
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	err := command.Run()
-	return stdout.String(), stderr.String(), err
-}
-
 func finalizeRun(exitCode int, cleanup func() error, saveResult func(string) error) (int, error) {
 	cleanupErr := cleanup()
 	if cleanupErr != nil {
@@ -681,11 +632,11 @@ func runMain() (exitCode int) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 	runner := cliRunner{binary: path, evidence: recorder, userDataPath: userDataPath}
-	ssh := sshRunner{evidence: recorder, run: runSSH}
 	test := scenario{
 		client: runner, archiveID: *archiveID, diskPlanID: *diskPlanID, diskSizeGB: *diskSizeGB,
-		userDataPath: userDataPath, privateKey: privateKey, knownHosts: knownHosts,
-		connect: ssh.connect, pollInterval: 10 * time.Second,
+		userDataPath: userDataPath,
+		ssh:          sshrun.Runner{Recorder: recorder, PrivateKey: privateKey, KnownHosts: knownHosts},
+		pollInterval: 10 * time.Second,
 	}
 	if err := test.run(ctx, name); err != nil {
 		fmt.Fprintln(os.Stderr, "Server E2E failed:", err)
