@@ -17,14 +17,8 @@ package main
 import (
 	"context"
 	"errors"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 type fakeCLI struct {
@@ -34,7 +28,7 @@ type fakeCLI struct {
 	args      map[string][]string
 }
 
-func (f *fakeCLI) call(_ context.Context, step, _ string, args ...string) ([]byte, error) {
+func (f *fakeCLI) Call(_ context.Context, step, _ string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, step)
 	if f.args == nil {
 		f.args = make(map[string][]string)
@@ -66,12 +60,7 @@ func fakeResponses(spid string) map[string][]byte {
 
 func TestScenarioCreatesAndEditsProfile(t *testing.T) {
 	fake := &fakeCLI{responses: fakeResponses("spid-e2e")}
-	err := (scenario{
-		client:            fake,
-		keyPath:           "/tmp/key.pem",
-		profileName:       "skr-e2e-config",
-		secondProfileName: "skr-e2e-config-second",
-	}).run(context.Background())
+	err := (scenario{client: fake, keyPath: "/tmp/key.pem"}).run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,12 +112,7 @@ func TestScenarioCreatesAndEditsProfile(t *testing.T) {
 
 func TestScenarioFailsWhenCreateFails(t *testing.T) {
 	fake := &fakeCLI{responses: fakeResponses("spid-e2e"), failStep: "c0nfig-create"}
-	err := (scenario{
-		client:            fake,
-		keyPath:           "/tmp/key.pem",
-		profileName:       "skr-e2e-config",
-		secondProfileName: "skr-e2e-config-second",
-	}).run(context.Background())
+	err := (scenario{client: fake, keyPath: "/tmp/key.pem"}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "create profile") {
 		t.Fatalf("scenario error = %v, want create failure", err)
 	}
@@ -138,12 +122,7 @@ func TestScenarioFailsWhenCurrentProfileUnexpected(t *testing.T) {
 	responses := fakeResponses("spid-e2e")
 	responses["c0nfig-current"] = []byte("other-profile\n")
 	fake := &fakeCLI{responses: responses}
-	err := (scenario{
-		client:            fake,
-		keyPath:           "/tmp/key.pem",
-		profileName:       "skr-e2e-config",
-		secondProfileName: "skr-e2e-config-second",
-	}).run(context.Background())
+	err := (scenario{client: fake, keyPath: "/tmp/key.pem"}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "current profile") {
 		t.Fatalf("scenario error = %v, want current profile mismatch", err)
 	}
@@ -151,12 +130,7 @@ func TestScenarioFailsWhenCurrentProfileUnexpected(t *testing.T) {
 
 func TestScenarioFailsWhenUseFails(t *testing.T) {
 	fake := &fakeCLI{responses: fakeResponses("spid-e2e"), failStep: "c0nfig-use"}
-	err := (scenario{
-		client:            fake,
-		keyPath:           "/tmp/key.pem",
-		profileName:       "skr-e2e-config",
-		secondProfileName: "skr-e2e-config-second",
-	}).run(context.Background())
+	err := (scenario{client: fake, keyPath: "/tmp/key.pem"}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "use profile") {
 		t.Fatalf("scenario error = %v, want use failure", err)
 	}
@@ -166,12 +140,7 @@ func TestScenarioFailsWhenCurrentAfterUseUnexpected(t *testing.T) {
 	responses := fakeResponses("spid-e2e")
 	responses["c0nfig-current-after-use"] = []byte("other-profile\n")
 	fake := &fakeCLI{responses: responses}
-	err := (scenario{
-		client:            fake,
-		keyPath:           "/tmp/key.pem",
-		profileName:       "skr-e2e-config",
-		secondProfileName: "skr-e2e-config-second",
-	}).run(context.Background())
+	err := (scenario{client: fake, keyPath: "/tmp/key.pem"}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "current profile after use") {
 		t.Fatalf("scenario error = %v, want current profile mismatch after use", err)
 	}
@@ -181,26 +150,15 @@ func TestScenarioFailsWhenProfileMissingFromList(t *testing.T) {
 	responses := fakeResponses("spid-e2e")
 	responses["c0nfig-list"] = []byte("other-profile\n")
 	fake := &fakeCLI{responses: responses}
-	err := (scenario{
-		client:            fake,
-		keyPath:           "/tmp/key.pem",
-		profileName:       "skr-e2e-config",
-		secondProfileName: "skr-e2e-config-second",
-	}).run(context.Background())
+	err := (scenario{client: fake, keyPath: "/tmp/key.pem"}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "does not contain") {
 		t.Fatalf("scenario error = %v, want missing profile in list", err)
 	}
 }
 
 func TestScenarioFailsWhenShowValueUnexpected(t *testing.T) {
-	responses := fakeResponses("wrong-spid")
-	fake := &fakeCLI{responses: responses}
-	err := (scenario{
-		client:            fake,
-		keyPath:           "/tmp/key.pem",
-		profileName:       "skr-e2e-config",
-		secondProfileName: "skr-e2e-config-second",
-	}).run(context.Background())
+	fake := &fakeCLI{responses: fakeResponses("wrong-spid")}
+	err := (scenario{client: fake, keyPath: "/tmp/key.pem"}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "ServicePrincipalID") {
 		t.Fatalf("scenario error = %v, want unexpected ServicePrincipalID", err)
 	}
@@ -208,53 +166,8 @@ func TestScenarioFailsWhenShowValueUnexpected(t *testing.T) {
 
 func TestScenarioFailsWhenEditFails(t *testing.T) {
 	fake := &fakeCLI{responses: fakeResponses("spid-e2e"), failStep: "c0nfig-edit"}
-	err := (scenario{
-		client:            fake,
-		keyPath:           "/tmp/key.pem",
-		profileName:       "skr-e2e-config",
-		secondProfileName: "skr-e2e-config-second",
-	}).run(context.Background())
+	err := (scenario{client: fake, keyPath: "/tmp/key.pem"}).run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "edit profile") {
 		t.Fatalf("scenario error = %v, want edit failure", err)
-	}
-}
-
-func TestCLIRunnerSetsProfileDirEnv(t *testing.T) {
-	binary, err := exec.LookPath("env")
-	if err != nil {
-		t.Skip("env executable not found")
-	}
-
-	dir := t.TempDir()
-	recorder, err := evidence.CreateAt(filepath.Join(dir, "tmp", "c0nfig"), time.Now(), evidence.Scenario{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	profileDir := filepath.Join(dir, "profiles")
-	if err := os.MkdirAll(profileDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-
-	runner := cliRunner{
-		binary:   binary,
-		env:      []string{"SAKURA_PROFILE_DIR=" + profileDir},
-		evidence: recorder,
-	}
-	output, err := runner.call(context.Background(), "env-check", "一時プロファイルディレクトリがコマンドに反映されていることを確認する")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(output), "SAKURA_PROFILE_DIR="+profileDir) {
-		t.Fatalf("CLI output = %q, want SAKURA_PROFILE_DIR=%q", output, profileDir)
-	}
-
-	path := filepath.Join(recorder.Dir(), "001-env-check.json")
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("evidence permissions = %04o, want 0600", info.Mode().Perm())
 	}
 }

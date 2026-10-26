@@ -22,9 +22,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
 type fakeCLI struct {
@@ -39,13 +36,16 @@ type fakeCLI struct {
 	calls                 []string
 }
 
-func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, error) {
+func (f *fakeCLI) Call(_ context.Context, step, _ string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, step)
 	if f.failStep == step {
 		return nil, errors.New("injected CLI failure")
 	}
 	switch step {
 	case "e2e-profile-current":
+		if len(args) != 2 || args[0] != "config" || args[1] != "current" {
+			return nil, errors.New("unexpected profile command " + strings.Join(args, " "))
+		}
 		return []byte("test-profile\n"), nil
 	case "e2e-preflight-list", "e2e-list-created", "e2e-cleanup-list", "e2e-cleanup-list-after":
 		return f.projectedRegistries(args)
@@ -60,11 +60,10 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 			RegistryName: request.Name,
 			Description:  request.Description,
 		}
-		data, err := json.Marshal(f.registry)
 		if f.badCreateOutput {
 			return []byte("{"), nil
 		}
-		return data, err
+		return json.Marshal(f.registry)
 	case "e2e-update":
 		if f.registry == nil {
 			return nil, errors.New("registry not found")
@@ -114,11 +113,11 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 	}
 }
 
-func (f *fakeCLI) callRoot(ctx context.Context, step string, args ...string) ([]byte, error) {
-	if strings.Join(args, " ") != "config current" {
-		return nil, errors.New("unexpected root CLI command " + strings.Join(args, " "))
+func (f *fakeCLI) CallSubcommand(ctx context.Context, step, description string, args ...string) ([]byte, error) {
+	if len(args) == 0 || args[0] != "registry" {
+		return nil, errors.New("unexpected subcommand " + strings.Join(args, " "))
 	}
-	return f.call(ctx, step, args...)
+	return f.Call(ctx, step, description, args...)
 }
 
 func (f *fakeCLI) projectedRegistries(args []string) ([]byte, error) {
@@ -302,39 +301,4 @@ func containsStep(steps []string, want string) bool {
 		}
 	}
 	return false
-}
-
-func TestCLIRunnerRecordsRequestFileContents(t *testing.T) {
-	tempDir := t.TempDir()
-	binary := filepath.Join(tempDir, "skr")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf 'ok\\n'\n"), 0o700); err != nil { // #nosec G306 -- テスト実行ファイルは実行可能である必要があり、t.TempDir 内に作成される。
-		t.Fatal(err)
-	}
-	requestPath := filepath.Join(tempDir, "create.json")
-	request := "{\n  \"Name\": \"skr-e2e-cr-test\"\n}\n"
-	if err := os.WriteFile(requestPath, []byte(request), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	recorder, err := evidence.CreateAt(filepath.Join(tempDir, "evidence"), time.Now(), evidence.Scenario{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	runner := cliRunner{binary: binary, evidence: recorder}
-	if _, err := runner.call(context.Background(), "e2e-create",
-		"registry", "create", "--request", "@"+requestPath); err != nil {
-		t.Fatal(err)
-	}
-	if err := recorder.SetResult("passed", time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	report, err := os.ReadFile(filepath.Join(recorder.Dir(), "REPORT.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{requestPath, `"Name": "skr-e2e-cr-test"`} {
-		if !strings.Contains(string(report), want) {
-			t.Errorf("report is missing %q:\n%s", want, report)
-		}
-	}
 }

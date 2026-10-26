@@ -3,3 +3,5 @@ dist/
 
 CHANGELOG.md
 AGENTS.md
+
+tmp/**
