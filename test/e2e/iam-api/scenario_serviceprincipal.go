@@ -29,9 +29,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// servicePrincipalOAuth2Endpoint is the OAuth2 token endpoint of the IAM API.
-// The API validates the aud claim against this endpoint. The endpoint can be
-// overridden with SAKURA_ENDPOINTS_IAM.
+// servicePrincipalOAuth2Endpoint は IAM API の OAuth2 トークンエンドポイントです。
+// API は aud クレームをこのエンドポイントと照合します。
+// エンドポイントは SAKURA_ENDPOINTS_IAM で上書きできます。
 const servicePrincipalOAuth2Endpoint = "https://secure.sakura.ad.jp/cloud/api/iam/1.0/service-principals/oauth2/token"
 
 type servicePrincipalKey struct {
@@ -49,11 +49,11 @@ type accessTokenSummary struct {
 	ExpiresIn int64  `json:"expires_in"`
 }
 
-// servicePrincipalScenario updates and restores the service principal of this
-// run, then uploads a generated RSA key pair, verifies the key lifecycle, and
-// issues an access token from a JWT assertion signed with the private key.
-// The private key never leaves this process; only the public key and the
-// signed assertion are written to private files.
+// servicePrincipalScenario は、この実行の service principal を更新・復元し、
+// 生成された RSA キーペアをアップロードしてキーのライフサイクルを確認し、
+// 秘密鍵で署名した JWT assertion から access token を発行します。
+// 秘密鍵はこのプロセスから出ません。
+// 公開鍵と署名済み assertion のみがプライベートなファイルに書き込まれます。
 func (s *scenario) servicePrincipalScenario(ctx context.Context) error {
 	if err := s.updateServicePrincipal(ctx); err != nil {
 		return err
@@ -61,9 +61,9 @@ func (s *scenario) servicePrincipalScenario(ctx context.Context) error {
 	return s.servicePrincipalKeysScenario(ctx)
 }
 
-// updateServicePrincipal renames the service principal and restores the
-// original name. The description stays the run description so that the
-// cleanup identity check keeps working.
+// updateServicePrincipal は service principal の名前を変更し、元の名前に戻します。
+// description は実行の description のままなので、
+// cleanup の identity チェックが機能し続けます。
 func (s *scenario) updateServicePrincipal(ctx context.Context) error {
 	renamed := s.servicePrincipal.name + "-renamed"
 	if err := s.updateServicePrincipalName(ctx, "update-service-principal", renamed); err != nil {
@@ -95,9 +95,9 @@ func (s *scenario) updateServicePrincipalName(ctx context.Context, step, name st
 	return nil
 }
 
-// servicePrincipalKeysScenario uploads a generated public key, verifies the
-// key lifecycle, and issues an access token from a JWT assertion signed with
-// the matching private key.
+// servicePrincipalKeysScenario は生成された公開鍵をアップロードし、
+// キーのライフサイクルを確認して、
+// 対応する秘密鍵で署名した JWT assertion から access token を発行します。
 func (s *scenario) servicePrincipalKeysScenario(ctx context.Context) error {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -184,9 +184,9 @@ func (s *scenario) servicePrincipalKeysScenario(ctx context.Context) error {
 	return nil
 }
 
-// issueServicePrincipalToken signs a JWT bearer assertion with the private
-// key of the uploaded public key and issues an access token. The response
-// contains the token, so the query projects only the token type and lifetime.
+// issueServicePrincipalToken は、アップロードされた公開鍵の秘密鍵で JWT bearer assertion に署名し、
+// access token を発行します。応答にはトークンが含まれるため、
+// query はトークンタイプと有効期間のみを投影します。
 func (s *scenario) issueServicePrincipalToken(ctx context.Context, privateKey *rsa.PrivateKey, kid string) error {
 	now := time.Now()
 	audience := servicePrincipalOAuth2Endpoint
@@ -274,8 +274,8 @@ func checkServicePrincipalKey(step string, data []byte, expected servicePrincipa
 	return false, nil
 }
 
-// servicePrincipalOAuth2EndpointOverride returns the token endpoint audience
-// derived from SAKURA_ENDPOINTS_IAM when set.
+// servicePrincipalOAuth2EndpointOverride は、
+// 設定されている場合に SAKURA_ENDPOINTS_IAM から導出されたトークンエンドポイントの audience を返します。
 func servicePrincipalOAuth2EndpointOverride() (string, bool) {
 	endpoint := os.Getenv("SAKURA_ENDPOINTS_IAM")
 	if endpoint == "" {

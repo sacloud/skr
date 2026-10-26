@@ -35,8 +35,8 @@ func TestUserScenarioVerifiesLimit(t *testing.T) {
 	t.Run("already signed up", func(t *testing.T) {
 		fake := &fakeCLI{userLimit: 20}
 		s := testScenarioForAdditions(t, fake)
-		// the override makes create-user fail, which the scenario tolerates as
-		// "the account already signed up" and falls back to the read
+		// オーバーライドで create-user を失敗させ、シナリオは「アカウントは既にサインアップ済み」として許容し、
+		// read にフォールバックする
 		s.client = &userOverrideCLI{base: fake}
 		if err := s.userScenario(context.Background()); err != nil {
 			t.Fatal(err)
@@ -67,8 +67,8 @@ func TestUserScenarioReportsFailures(t *testing.T) {
 	})
 }
 
-// userOverrideCLI makes the signup fail and optionally fails the read-user
-// response, while delegating everything else to the base fake.
+// userOverrideCLI はサインアップを失敗させ、必要に応じて read-user の応答も失敗させつつ、
+// それ以外はベースの fake に委譲する。
 type userOverrideCLI struct {
 	base     *fakeCLI
 	failRead bool

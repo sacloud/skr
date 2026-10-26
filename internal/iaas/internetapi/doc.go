@@ -1,2 +1,2 @@
-// Package internetapi implements the IaaS Internet API commands.
+// Package internetapi は IaaS Internet API コマンドを実装します。
 package internetapi

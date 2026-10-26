@@ -121,7 +121,7 @@ func TestCLIRunnerRecordsPrivateEvidence(t *testing.T) {
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("evidence permissions = %04o, want 0600", info.Mode().Perm())
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // Path is constructed inside t.TempDir for this test.
+	data, err := os.ReadFile(path) //nolint:gosec // パスはこのテスト用に t.TempDir 内で構築される。
 	if err != nil {
 		t.Fatal(err)
 	}

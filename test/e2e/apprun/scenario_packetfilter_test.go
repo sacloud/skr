@@ -77,8 +77,8 @@ func TestPacketFilterScenarioReportsFailures(t *testing.T) {
 	})
 }
 
-// filterOverrideCLI returns a stale packet-filter state for the reflection
-// reads while delegating everything else to the base fake.
+// filterOverrideCLI は反映確認の読み込みに古い packet-filter 状態を返し、
+// それ以外はベースの fake に委譲する。
 type filterOverrideCLI struct {
 	base         *fakeCLI
 	updateStale  bool

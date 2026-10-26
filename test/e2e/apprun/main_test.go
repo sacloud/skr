@@ -79,7 +79,7 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		if !strings.HasPrefix(args[len(args)-1], "@") {
 			return nil, errors.New("request file required")
 		}
-		data, err := os.ReadFile(strings.TrimPrefix(args[len(args)-1], "@")) // #nosec G304 -- Request file is created under t.TempDir by the scenario.
+		data, err := os.ReadFile(strings.TrimPrefix(args[len(args)-1], "@")) // #nosec G304 -- リクエストファイルはシナリオによって t.TempDir 内に作成される。
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +116,7 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 		if !strings.HasPrefix(args[len(args)-1], "@") {
 			return nil, errors.New("request file required")
 		}
-		data, err := os.ReadFile(strings.TrimPrefix(args[len(args)-1], "@")) // #nosec G304 -- Request file is created under t.TempDir by the scenario.
+		data, err := os.ReadFile(strings.TrimPrefix(args[len(args)-1], "@")) // #nosec G304 -- リクエストファイルはシナリオによって t.TempDir 内に作成される。
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +199,7 @@ func (f *fakeCLI) call(_ context.Context, step string, args ...string) ([]byte, 
 			} `json:"settings"`
 		}
 		if !strings.HasPrefix(args[len(args)-1], "@") && args[len(args)-1] != "-" {
-			// inline JSON request
+			// インライン JSON リクエスト
 			var inline string
 			for i := 0; i+1 < len(args); i++ {
 				if args[i] == "--request" {
@@ -409,7 +409,7 @@ func TestPublicURLFailsWhenEvidenceCannotBeWritten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A directory at the record path makes writing fail even when tests run as root.
+	// record path にディレクトリがあると、テストが root として実行されていても書き込みに失敗する。
 	if err := os.Mkdir(filepath.Join(recorder.Dir(), "001-public-url.json"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -522,7 +522,7 @@ func TestWriteCreateRequestUsesPublicSampleWithoutSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(path) // #nosec G304 -- The path is created under t.TempDir.
+	data, err := os.ReadFile(path) // #nosec G304 -- パスは t.TempDir 内に作成される。
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -213,7 +213,7 @@ func TestCreateImageFileProducesPNG(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	file, err := os.Open(path) //nolint:gosec // createImageFile returns a path created in the system temp directory.
+	file, err := os.Open(path) //nolint:gosec // createImageFile はシステムの一時ディレクトリに作成されたパスを返す。
 	if err != nil {
 		t.Fatal(err)
 	}

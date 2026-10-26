@@ -62,7 +62,7 @@ func TestRunConfigList(t *testing.T) {
 			t.Errorf("stdout = %q, want to contain %q", got, name)
 		}
 	}
-	// stdout is a bytes.Buffer, so terminal detection is false and no marker is printed.
+	// stdout は bytes.Buffer なので端末判定が false となり、マーカーは出力されない。
 	if strings.Contains(got, "* ") {
 		t.Errorf("stdout = %q, want no current-profile marker", got)
 	}
@@ -599,7 +599,7 @@ func TestRunConfigCreateInsecurePrivateKeyPermissionsFail(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 	keyPath := writeTestPrivateKey(t, profileDir)
-	if err := os.Chmod(keyPath, 0o644); err != nil { // #nosec G302 -- Lax permissions are intentional; this test verifies the CLI rejects insecure private key files.
+	if err := os.Chmod(keyPath, 0o644); err != nil { // #nosec G302 -- 緩いパーミッションは意図的なものであり、このテストは CLI が安全でない秘密鍵ファイルを拒否することを検証する。
 		t.Fatal(err)
 	}
 
@@ -688,7 +688,7 @@ func TestRunConfigEditInsecurePrivateKeyPermissionsFail(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 	oldKey := writeTestPrivateKey(t, profileDir)
 	newKey := filepath.Join(profileDir, "insecure.pem")
-	if err := os.WriteFile(newKey, []byte("not used"), 0o644); err != nil { // #nosec G306 -- Lax permissions are intentional; this test verifies the CLI rejects insecure private key files.
+	if err := os.WriteFile(newKey, []byte("not used"), 0o644); err != nil { // #nosec G306 -- 緩いパーミッションは意図的なものであり、このテストは CLI が安全でない秘密鍵ファイルを拒否することを検証する。
 		t.Fatal(err)
 	}
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The version runner verifies the skr version command against a built binary.
+// version runner はビルド済みバイナリに対して skr version コマンドを検証する。
 package main
 
 import (
@@ -33,10 +33,10 @@ import (
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
 )
 
-// commandTimeout bounds a single skr version invocation.
+// commandTimeout は1回の skr version 呼び出しの制限時間である。
 const commandTimeout = 30 * time.Second
 
-// versionPattern matches "v<semver> <os>/<arch>, build <revision>".
+// versionPattern は "v<semver> <os>/<arch>, build <revision>" に一致する。
 var versionPattern = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+ \S+/\S+, build \S+$`)
 
 func checkVersionOutput(output string) error {
@@ -55,7 +55,7 @@ type runner struct {
 func (r runner) run(ctx context.Context) error {
 	timeout, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
-	command := exec.CommandContext(timeout, r.binary, "version") //nolint:gosec // The binary path is validated in runMain.
+	command := exec.CommandContext(timeout, r.binary, "version") //nolint:gosec // バイナリパスは runMain で検証される。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

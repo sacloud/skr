@@ -102,7 +102,7 @@ func executeCLI(ctx context.Context, binary string, args []string) ([]byte, []by
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	command := exec.CommandContext(timeout, binary, args...) //nolint:gosec // Structured arguments are passed without a shell to the selected skr binary.
+	command := exec.CommandContext(timeout, binary, args...) //nolint:gosec // 構造化された引数はシェルを使わずに選択された skr バイナリに渡される。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

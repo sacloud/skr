@@ -91,9 +91,9 @@ type ruleTemplateList struct {
 	Items []ruleTemplateSummary `json:"items"`
 }
 
-// readOnlyScenario exercises the read-only iam-api commands that do not depend
-// on resources created by this run. Every command only reads data, so the
-// organization-wide configuration stays untouched.
+// readOnlyScenario は、この実行で作成したリソースに依存しない read-only な iam-api コマンドを実行します。
+// すべてのコマンドはデータの読み込みのみを行うため、
+// organization 全体の設定は変更されません。
 func (s *scenario) readOnlyScenario(ctx context.Context) error {
 	if err := s.checkRoleCatalog(ctx, "iam-role"); err != nil {
 		return err
@@ -122,9 +122,9 @@ func (s *scenario) readOnlyScenario(ctx context.Context) error {
 	return s.checkServicePolicy(ctx)
 }
 
-// readResourcePolicies reads the policy bindings of the folder and project
-// created by this run. The bindings may be empty because this run does not
-// grant any role to the temporary resources.
+// readResourcePolicies は、この実行で作成した folder と project のポリシー binding を読み込みます。
+// この実行は一時的なリソースにロールを付与しないため、
+// binding は空の場合があります。
 func (s *scenario) readResourcePolicies(ctx context.Context) error {
 	if _, err := s.readPolicyBindings(ctx, "policy-read-folder", "policy", "read-folder", s.folder.id); err != nil {
 		return err
@@ -135,8 +135,8 @@ func (s *scenario) readResourcePolicies(ctx context.Context) error {
 	return nil
 }
 
-// checkRoleCatalog lists the available roles and reads the first one.
-// kind is iam-role or id-role.
+// checkRoleCatalog は利用可能なロールを一覧表示し、最初の1つを読み込みます。
+// kind は iam-role または id-role です。
 func (s *scenario) checkRoleCatalog(ctx context.Context, kind string) error {
 	listStep := kind + "-list"
 	data, err := s.call(ctx, listStep, "iam-api", kind, "list")
@@ -169,8 +169,8 @@ func (s *scenario) checkRoleCatalog(ctx context.Context, kind string) error {
 	return nil
 }
 
-// readPolicyBindings reads IAM policy bindings for the organization, folder,
-// or project. resourceID is empty for the organization.
+// readPolicyBindings は organization、folder、project の IAM ポリシー binding を読み込みます。
+// organization の場合 resourceID は空です。
 func (s *scenario) readPolicyBindings(ctx context.Context, step, kind, subcommand, resourceID string) ([]policyBinding, error) {
 	args := []string{"iam-api", kind, subcommand}
 	if resourceID != "" {

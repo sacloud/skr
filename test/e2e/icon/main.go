@@ -66,7 +66,7 @@ func (r cliRunner) call(ctx context.Context, step string, request map[string]any
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The binary is explicitly selected; arguments are passed without a shell.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // バイナリは明示的に選択され、引数はシェルなしで渡される。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

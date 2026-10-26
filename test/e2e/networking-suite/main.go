@@ -63,7 +63,7 @@ func (r cliRunner) call(ctx context.Context, step string, args []string, request
 	}
 	timeout, cancel := context.WithTimeout(ctx, timeoutDuration)
 	defer cancel()
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The path is an explicitly selected local skr binary; structured arguments are not passed through a shell.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // パスは明示的に選択されたローカルの skr バイナリであり、構造化された引数はシェル経由で渡されない。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -344,7 +344,7 @@ func (s *scenario) ssh(ctx context.Context, step, ip, remoteCommand string) (str
 		"-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new",
 		"-o", "UserKnownHostsFile=" + s.knownHosts, sshUser + "@" + ip, remoteCommand,
 	}
-	command := exec.CommandContext(timeout, "ssh", args...) //nolint:gosec // SSH arguments are assembled from validated addresses and fixed commands.
+	command := exec.CommandContext(timeout, "ssh", args...) //nolint:gosec // SSH 引数は検証済みのアドレスと固定のコマンドから構成される。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -1120,14 +1120,14 @@ func containsAddress(items []addressItem, connection connectionItem, subnetSRN s
 }
 
 func createKey(path string) (string, error) {
-	command := exec.Command("ssh-keygen", "-t", "rsa", "-b", "3072", "-N", "", "-f", path) //nolint:gosec // Generates an ephemeral local test key without a shell.
+	command := exec.Command("ssh-keygen", "-t", "rsa", "-b", "3072", "-N", "", "-f", path) //nolint:gosec // シェルを使わずに一時的なローカルのテストキーを生成する。
 	if output, err := command.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("generate temporary SSH key: %w (%s)", err, strings.TrimSpace(string(output)))
 	}
 	if err := os.Chmod(path, 0o600); err != nil {
 		return "", err
 	}
-	data, err := os.ReadFile(path + ".pub") //nolint:gosec // The public key is created inside the private temporary directory.
+	data, err := os.ReadFile(path + ".pub") //nolint:gosec // 公開鍵はプライベートな一時ディレクトリ内に作成される。
 	if err != nil {
 		return "", fmt.Errorf("read temporary public SSH key: %w", err)
 	}

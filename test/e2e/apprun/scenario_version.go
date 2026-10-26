@@ -63,10 +63,10 @@ type trafficEntry struct {
 	Percent         int    `json:"percent"`
 }
 
-// versionScenario exercises application update, version list/read/status/delete,
-// and traffic list/update. The application update changes the component memory
-// and creates a new version; the scenario waits for the new version to become
-// Healthy, routes all traffic to it, and then deletes the previous version.
+// versionScenario は application の更新、version の一覧/読み込み/ステータス/削除、
+// および traffic の一覧/更新を実行します。application の更新でコンポーネントメモリが変更され、
+// 新しい version が作成されます。シナリオは新しい version が Healthy になるのを待ち、
+// すべてのトラフィックをそちらに振り分けてから、前の version を削除します。
 func (s *scenario) versionScenario(ctx context.Context, appID, appName string) error {
 	updatePath, err := s.writeUpdateRequest()
 	if err != nil {
@@ -249,9 +249,9 @@ func (s *scenario) waitVersionHealthy(ctx context.Context, appID, versionID stri
 	}
 }
 
-// newestAndPrevious returns the version with the newest created_at and the
-// other version. The update creates the newest version after the initial
-// creation, so the newest one is the updated version.
+// newestAndPrevious は最も新しい created_at を持つ version ともう一方の version を返します。
+// 更新は初回作成後に最も新しい version を作成するため、
+// 最新のものが更新後の version です。
 func newestAndPrevious(versions []versionSummary) (versionSummary, versionSummary, error) {
 	if len(versions) < 2 {
 		return versionSummary{}, versionSummary{}, fmt.Errorf("need two versions to identify the updated one; got %d", len(versions))

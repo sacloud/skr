@@ -20,13 +20,13 @@ import (
 )
 
 var (
-	// Version app version
+	// Version はアプリバージョンです。
 	Version = "0.0.4"
-	// Revision git commit short commit hash
-	Revision = "xxxxxx" // set on build time
+	// Revision は Git コミットの短縮ハッシュです。
+	Revision = "xxxxxx" // ビルド時に設定される
 )
 
-// FullVersion return full version text
+// FullVersion は完全なバージョン文字列を返します。
 func FullVersion() string {
 	return fmt.Sprintf("v%s %s/%s, build %s", Version, runtime.GOOS, runtime.GOARCH, Revision)
 }

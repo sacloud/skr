@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package diskapi contains generated low-level IaaS Disk API commands.
+// Package diskapi は生成された低レベルな IaaS Disk API コマンドを含みます。
 package diskapi

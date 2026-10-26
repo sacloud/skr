@@ -74,7 +74,7 @@ func (r cliRunner) call(ctx context.Context, step, description string, args ...s
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The selected binary and structured arguments are not a shell command.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // 選択されたバイナリと構造化された引数はシェルコマンドではない。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -82,7 +82,7 @@ func (r cliRunner) call(ctx context.Context, step, description string, args ...s
 	for i, arg := range args {
 		if arg == "--request" && i+1 < len(args) && strings.HasPrefix(args[i+1], "@") {
 			path := strings.TrimPrefix(args[i+1], "@")
-			content, err := os.ReadFile(path) //nolint:gosec // Records the same explicit request file passed to the CLI.
+			content, err := os.ReadFile(path) //nolint:gosec // CLI に渡されたのと同じ明示的なリクエストファイルを記録する。
 			if err != nil {
 				return nil, fmt.Errorf("read request for evidence: %w", err)
 			}

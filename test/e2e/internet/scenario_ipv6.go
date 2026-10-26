@@ -23,17 +23,17 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
-// ipv6NetItem is the IPv6 network returned by enable-ipv6 and read-ipv6.
+// ipv6NetItem は enable-ipv6 と read-ipv6 が返す IPv6 ネットワークである。
 type ipv6NetItem struct {
 	ID            types.ID `json:"ID"`
 	IPv6Prefix    string   `json:"IPv6Prefix"`
 	IPv6PrefixLen int      `json:"IPv6PrefixLen"`
 }
 
-// ipv6Scenario enables the IPv6 address allocation on the created Router +
-// Switch, verifies the reflection with read-ipv6, disables the allocation, and
-// verifies that read-ipv6 then fails. The allocation is removed before the
-// existing delete flow runs.
+// ipv6Scenario は、作成した Router + Switch で IPv6 アドレス割り当てを有効にし、
+// read-ipv6 で反映を確認してから割り当てを無効にし、
+// read-ipv6 が失敗することを確認します。
+// 既存の削除フローが実行される前に不在が確認されます。
 func (s scenario) ipv6Scenario(ctx context.Context, internetID types.ID) error {
 	enabled, err := s.enableIPv6(ctx, "test-enable-ipv6", internetID)
 	if err != nil {

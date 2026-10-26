@@ -109,7 +109,7 @@ func (r cliRunner) run(ctx context.Context, step string, commandArgs ...string) 
 			continue
 		}
 		path := strings.TrimPrefix(commandArgs[i+1], "@")
-		content, err := os.ReadFile(path) // #nosec G304 -- The request path is created by this E2E runner in a private temporary directory.
+		content, err := os.ReadFile(path) // #nosec G304 -- リクエストパスはこの E2E runner がプライベートな一時ディレクトリ内に作成する。
 		if err != nil {
 			return nil, fmt.Errorf("%s: read request file for evidence: %w", step, err)
 		}
@@ -119,7 +119,7 @@ func (r cliRunner) run(ctx context.Context, step string, commandArgs ...string) 
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	command := exec.CommandContext(timeout, r.binary, commandArgs...) //nolint:gosec // The caller provides a selected skr executable and structured arguments; no shell is used.
+	command := exec.CommandContext(timeout, r.binary, commandArgs...) //nolint:gosec // 呼び出し元が選択した skr 実行ファイルと構造化された引数を提供し、シェルは使用しない。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

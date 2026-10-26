@@ -22,7 +22,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
-// updateFunc adapts a test function to the scenario's cli interface.
+// updateFunc はテスト関数をシナリオの cli インターフェースに適合させる。
 type updateFunc func(context.Context, string, map[string]any) ([]byte, error)
 
 func (f updateFunc) call(ctx context.Context, step string, request map[string]any) ([]byte, error) {
@@ -100,7 +100,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 		test := testScenario(fake)
 		test.client = updateFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update" {
-				// Pretend success while ignoring the update; the next Read must detect it.
+				// 更新を無視して成功を装う。次の Read でそれを検出する必要がある。
 				return nil, nil
 			}
 			return fake.call(ctx, step, request)
@@ -124,7 +124,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 		test := testScenario(fake)
 		test.client = updateFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update-restore" {
-				// Pretend success while ignoring the restore; the next Read must detect it.
+				// 復元を無視して成功を装う。次の Read でそれを検出する必要がある。
 				return nil, nil
 			}
 			return fake.call(ctx, step, request)

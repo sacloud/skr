@@ -21,11 +21,11 @@ import (
 	"time"
 )
 
-// scheduleLeadTime keeps the schedule's first execution one year away so that
-// it never fires during the run.
+// scheduleLeadTime はスケジュールの初回実行を1年後に設定し、
+// 実行中に発火しないようにする。
 const scheduleLeadTime = time.Hour * 24 * 365
 
-// scheduleItem is the schedule read result with its Settings.
+// scheduleItem は schedule の読み込み結果とその Settings である。
 type scheduleItem struct {
 	ID          json.RawMessage `json:"ID"`
 	Name        string          `json:"Name"`
@@ -42,9 +42,9 @@ func (i scheduleItem) id() (string, error) {
 	return decodeResourceID(i.ID)
 }
 
-// scheduleScenario exercises schedule create, list, read, update, and delete
-// against the created process-configuration. The schedule starts one year later
-// and is deleted and verified absent within the run, so it never fires.
+// scheduleScenario は、作成した process-configuration に対して schedule の作成、一覧、読み込み、更新、削除を実行します。
+// スケジュールは1年後に開始され、
+// 実行中に削除されて不在が確認されるため、発火することはありません。
 func (s *scenario) scheduleScenario(ctx context.Context) error {
 	startsAt := time.Now().Add(scheduleLeadTime).UnixMilli()
 	if err := s.createSchedule(ctx, startsAt); err != nil {
@@ -186,8 +186,8 @@ func checkSchedule(read scheduleItem, resource resource, id, configID string, st
 	if err != nil || configReference != configID {
 		return fmt.Errorf("schedule ProcessConfigurationID mismatch for ID %s", id)
 	}
-	// The API returns StartsAt as a decimal string in responses even though
-	// the request accepts an integer.
+	// API はリクエストでは整数を受け入れますが、
+	// レスポンスでは StartsAt を10進文字列として返します。
 	wantStartsAt := fmt.Sprintf("%d", startsAt)
 	if read.Settings.StartsAt != wantStartsAt {
 		return fmt.Errorf("schedule StartsAt mismatch for ID %s: got %q, want %q", id, read.Settings.StartsAt, wantStartsAt)

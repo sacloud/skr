@@ -24,8 +24,8 @@ import (
 func newProjectAPIKeyScenario(t *testing.T, fake *fakeCLI) *scenario {
 	t.Helper()
 	s := testScenario(t, fake)
-	// Capture the auth context the same way the runner does, including the
-	// limited project.
+	// runner と同じ方法で、限定された project を含む認証コンテキストを取得する。
+	// 限定された project も含める。
 	if err := s.checkAuthContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -52,13 +52,13 @@ func TestProjectAPIKeyScenarioCoversLifecycle(t *testing.T) {
 			t.Errorf("project API key scenario did not call %s: %v", want, fake.calls)
 		}
 	}
-	// The create and read responses contain the access token, so the request
-	// must be read from a private file instead of an inline value.
+	// create と read の応答には access token が含まれるため、
+	// リクエストはインライン値ではなくプライベートなファイルから読み込む必要がある。
 	if got := fake.argsByStep["create-project-api-key"]; !requestFromFile(got) {
 		t.Errorf("create-project-api-key args = %v, want --request @path", got)
 	}
-	// The principal is limited to a project in the fake auth context, so the
-	// key must be pinned to that project instead of the project of this run.
+	// fake の認証コンテキストでは principal が project に限定されているため、
+	// key はこの実行の project ではなくその project に固定する必要がある。
 	if pinned, ok := fake.lastPakRequest["project_id"].(float64); !ok || int(pinned) != fakeLimitedProjectID {
 		t.Errorf("create-project-api-key pinned project = %v, want %d", fake.lastPakRequest["project_id"], fakeLimitedProjectID)
 	}

@@ -21,8 +21,8 @@ import (
 	"testing"
 )
 
-// overrideCLI replaces specific step responses while delegating everything else
-// to the base fake CLI.
+// overrideCLI は特定のステップの応答を置き換え、
+// それ以外はベースの fake CLI に委譲する。
 type overrideCLI struct {
 	base    *fakeCLI
 	replace map[string]func() []byte

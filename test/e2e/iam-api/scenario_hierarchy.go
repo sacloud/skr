@@ -33,10 +33,10 @@ type hierarchyProject struct {
 	ParentFolderID *int64 `json:"parent_folder_id"`
 }
 
-// hierarchyScenario moves the child folder into the main folder and the
-// project into the child folder. Both moves are verified by reading the
-// parent back from the API, and the child folder is deleted by the cleanup
-// before the main folder.
+// hierarchyScenario は child folder を main folder に移動し、
+// project を child folder に移動します。両方の移動は API から親を読み込んで確認し、
+// cleanup は main folder の前に child folder を削除します。
+// main folder の前に行う。
 func (s *scenario) hierarchyScenario(ctx context.Context) error {
 	s.childFolder.attempted = true
 	data, err := s.call(ctx, "create-child-folder", "iam-api", "folder", "create",
@@ -67,8 +67,8 @@ func (s *scenario) hierarchyScenario(ctx context.Context) error {
 	return s.checkProjectParent(ctx)
 }
 
-// checkChildFolderParent reads the child folder and verifies that its parent
-// is the main folder of this run.
+// checkChildFolderParent は child folder を読み込み、
+// その親がこの実行の main folder であることを確認します。
 func (s *scenario) checkChildFolderParent(ctx context.Context) error {
 	data, err := s.call(ctx, "read-child-folder", "iam-api", "folder", "read", s.childFolder.id,
 		"--query", "{id: .id, name: .name, parent_id: .parent_id}")
@@ -89,8 +89,8 @@ func (s *scenario) checkChildFolderParent(ctx context.Context) error {
 	return nil
 }
 
-// checkProjectParent reads the project and verifies that its parent folder is
-// the child folder of this run.
+// checkProjectParent は project を読み込み、
+// その親 folder がこの実行の child folder であることを確認します。
 func (s *scenario) checkProjectParent(ctx context.Context) error {
 	data, err := s.call(ctx, "read-project-moved", "iam-api", "project", "read", s.project.id,
 		"--query", "{id: .id, name: .name, parent_folder_id: .parent_folder_id}")

@@ -22,8 +22,8 @@ import (
 	"fmt"
 )
 
-// decodeResourceID decodes a resource ID that may be encoded as a JSON string
-// or number.
+// decodeResourceID は JSON 文字列または数値としてエンコードされたリソース ID をデコードする。
+// または数値の場合がある。
 func decodeResourceID(raw json.RawMessage) (string, error) {
 	if len(raw) == 0 {
 		return "", errors.New("resource ID is missing")
@@ -50,7 +50,7 @@ func decodeResourceID(raw json.RawMessage) (string, error) {
 	}
 }
 
-// configurationItem is the process-configuration read result with its Settings.
+// configurationItem は process-configuration の読み込み結果とその Settings である。
 type configurationItem struct {
 	ID          json.RawMessage `json:"ID"`
 	Name        string          `json:"Name"`
@@ -65,7 +65,7 @@ func (i configurationItem) id() (string, error) {
 	return decodeResourceID(i.ID)
 }
 
-// triggerItem is the trigger read result with its Settings.
+// triggerItem は trigger の読み込み結果とその Settings である。
 type triggerItem struct {
 	ID          json.RawMessage `json:"ID"`
 	Name        string          `json:"Name"`
@@ -86,17 +86,17 @@ func (i triggerItem) id() (string, error) {
 	return decodeResourceID(i.ID)
 }
 
-// updatedExpected is the SimpleMQ message content configured after verifying
-// the process-configuration update. Waiting for a message with this content
-// proves that the live API applied the update before the event fired.
+// updatedExpected は、process-configuration の更新確認後に設定された SimpleMQ メッセージの内容です。
+// この内容のメッセージを待つことで、
+// ライブ API がイベント発火前に更新を適用したことを確認します。
 func (s *scenario) updatedExpected() string {
 	return s.expected + "UPDATED"
 }
 
-// updateConfigurationAndVerify updates the created process-configuration's
-// Settings with the updated message content and verifies the reflection with
-// Read. The following message wait then proves that the live API applied the
-// update.
+// updateConfigurationAndVerify は、作成した process-configuration の Settings を更新後のメッセージ内容で更新し、
+// Read で反映を確認します。
+// その後のメッセージ待ちで、ライブ API が更新を適用したことを確認します。
+// 更新する。
 func (s *scenario) updateConfigurationAndVerify(ctx context.Context) error {
 	parameters, err := json.Marshal(struct {
 		QueueName string `json:"queue_name"`
@@ -131,9 +131,9 @@ func (s *scenario) updateConfigurationAndVerify(ctx context.Context) error {
 	return nil
 }
 
-// updateTriggerAndVerify updates the created trigger's Description and verifies
-// the reflection with Read, then restores the original Description so that the
-// existing identity checks keep matching the trigger.
+// updateTriggerAndVerify は、作成した trigger の Description を更新し、
+// Read で反映を確認します。その後、既存の identity チェックが trigger と一致し続けられるよう
+// 元の Description に戻します。
 func (s *scenario) updateTriggerAndVerify(ctx context.Context) error {
 	updatedDescription := s.trigger.description + " (updated)"
 	if err := s.updateTriggerDescription(ctx, "update-trigger", s.trigger.id, updatedDescription); err != nil {

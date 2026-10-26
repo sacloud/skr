@@ -234,9 +234,9 @@ func (r GroupRuntime) writeOutput(ctx *kong.Context, value any) error {
 	return r.WriteOutput(ctx, value)
 }
 
-// userAPI wraps the SDK UserAPI so that list output is the items array.
-// The SDK returns paging information (count, next, previous) with the items;
-// skr keeps list output a plain JSON array like the other domains.
+// userAPI は SDK の UserAPI をラップし、一覧出力を items 配列にします。
+// SDK は items とともにページング情報（count、next、previous）を返しますが、
+// skr は他のドメインと同様に一覧出力を単純な JSON 配列に保ちます。
 type userAPI struct{ user.UserAPI }
 
 func (a userAPI) List(ctx context.Context, params user.ListParams) ([]v1.User, error) {
@@ -247,7 +247,7 @@ func (a userAPI) List(ctx context.Context, params user.ListParams) ([]v1.User, e
 	return result.Items, nil
 }
 
-// groupAPI wraps the SDK GroupAPI so that list output is the items array.
+// groupAPI は SDK の GroupAPI をラップし、一覧出力を items 配列にします。
 type groupAPI struct{ group.GroupAPI }
 
 func (a groupAPI) List(ctx context.Context, params group.ListParams) ([]v1.Group, error) {
@@ -480,7 +480,7 @@ func readTextInput(path, flag, subject string) (string, error) {
 		}
 	} else {
 		var err error
-		//nolint:gosec // The path is explicitly supplied by the user.
+		//nolint:gosec // パスはユーザーが明示的に指定したものです。
 		data, err = os.ReadFile(path)
 		if err != nil {
 			return "", fmt.Errorf("read %s file: %w", subject, err)
@@ -493,7 +493,7 @@ func readTextInput(path, flag, subject string) (string, error) {
 	return value, nil
 }
 
-// DecodeRequest decodes --request JSON, supporting the @path.json form.
+// DecodeRequest は --request の JSON をデコードし、@path.json 形式もサポートします。
 func DecodeRequest(input string, destination any) error {
 	var data []byte
 	if strings.HasPrefix(input, "@") {
@@ -572,7 +572,7 @@ func DecodeRequest(input string, destination any) error {
 	return nil
 }
 
-// readPassword reads a password from a file or standard input.
+// readPassword はファイルまたは標準入力からパスワードを読み込みます。
 func readPassword(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("--password-file が必要です（標準入力を使う場合は - を指定します）")
@@ -586,7 +586,7 @@ func readPassword(path string) (string, error) {
 		}
 	} else {
 		var err error
-		//nolint:gosec // The path is explicitly supplied by the user through --password-file.
+		//nolint:gosec // パスは --password-file 経由でユーザーが明示的に指定したものです。
 		data, err = os.ReadFile(path)
 		if err != nil {
 			return "", fmt.Errorf("read password file: %w", err)

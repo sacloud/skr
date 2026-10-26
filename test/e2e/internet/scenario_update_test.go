@@ -103,7 +103,7 @@ func TestUpdateInternetAndVerifyReportsFailures(t *testing.T) {
 		test := testScenario(fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update-internet" {
-				// Pretend success while ignoring the update; the next Read must detect it.
+				// 更新を無視して成功を装う。次の Read でそれを検出する必要がある。
 				return nil, nil
 			}
 			return fake.call(ctx, step, request)
@@ -125,7 +125,7 @@ func TestUpdateInternetAndVerifyReportsFailures(t *testing.T) {
 		test := testScenario(fake, t.TempDir())
 		test.client = cliFunc(func(ctx context.Context, step string, request map[string]any) ([]byte, error) {
 			if step == "test-update-internet-restore" {
-				// Pretend success while ignoring the restore; the next Read must detect it.
+				// 復元を無視して成功を装う。次の Read でそれを検出する必要がある。
 				return nil, nil
 			}
 			return fake.call(ctx, step, request)

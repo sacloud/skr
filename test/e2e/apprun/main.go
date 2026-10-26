@@ -96,7 +96,7 @@ func (r cliRunner) run(ctx context.Context, step string, args ...string) ([]byte
 			continue
 		}
 		path := strings.TrimPrefix(args[i+1], "@")
-		data, err := os.ReadFile(path) // #nosec G304 -- The E2E scenario creates request files in a private temporary directory.
+		data, err := os.ReadFile(path) // #nosec G304 -- E2E シナリオはプライベートな一時ディレクトリ内にリクエストファイルを作成する。
 		if err != nil {
 			return nil, fmt.Errorf("%s: read request file for evidence: %w", step, err)
 		}
@@ -105,7 +105,7 @@ func (r cliRunner) run(ctx context.Context, step string, args ...string) ([]byte
 	}
 	timeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // The selected local skr binary and structured arguments are executed without a shell.
+	command := exec.CommandContext(timeout, r.binary, args...) //nolint:gosec // 選択されたローカルの skr バイナリと構造化された引数を、シェルなしで直接実行する。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

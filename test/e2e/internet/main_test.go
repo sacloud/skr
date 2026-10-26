@@ -74,7 +74,7 @@ func TestWriteUserDataConfiguresServerRouterNIC(t *testing.T) {
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("user-data permissions = %o, want 600", info.Mode().Perm())
 	}
-	//nolint:gosec // path is a fixed filename in this test's temporary directory.
+	//nolint:gosec // path はこのテストの一時ディレクトリ内の固定ファイル名である。
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

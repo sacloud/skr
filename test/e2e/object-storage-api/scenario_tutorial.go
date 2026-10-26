@@ -297,7 +297,7 @@ func (s scenario) deletePermission(ctx context.Context, expected permission) err
 	for _, item := range items {
 		if item.ID == expected.ID {
 			present = true
-			// Both values are authorized states of this scenario's update.
+			// 両方の値はこのシナリオの更新における認可済みの状態である。
 			if len(expected.Controls) == 1 && controlsMatch(item.Controls, []bucketControl{{
 				BucketName: expected.Controls[0].BucketName, CanRead: true, CanWrite: true,
 			}}) {
@@ -421,7 +421,7 @@ func (s scenario) runKey(ctx context.Context, dir string, path, target []string)
 	if info.Mode().Perm() != 0o600 {
 		return errors.New("access key output file is not private")
 	}
-	saved, err := os.ReadFile(keyPath) //nolint:gosec // Reads only the key file just written in our private temporary directory.
+	saved, err := os.ReadFile(keyPath) //nolint:gosec // プライベートな一時ディレクトリ内に先ほど書き込まれたキーファイルのみを読み込む。
 	if err != nil {
 		return err
 	}

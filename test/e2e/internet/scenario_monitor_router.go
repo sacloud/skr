@@ -25,11 +25,11 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
-// monitorWindow is the length of the observed time range, ending at the current time.
+// monitorWindow は現在時刻を終端とする観測期間の長さである。
 const monitorWindow = 10 * time.Minute
 
-// monitorRouter reads Router + Switch monitor values for a recent time range and
-// verifies that the command returns well-formed monitor data.
+// monitorRouter は最近の期間の Router + Switch のモニタ値を読み込み、
+// コマンドが形式の整ったモニタデータを返すことを確認します。
 func (s scenario) monitorRouter(ctx context.Context, id types.ID) error {
 	end := time.Now().UTC()
 	output, err := s.call(ctx, "test-monitor-router", map[string]any{

@@ -24,7 +24,7 @@ import (
 func newPolicyScenario(t *testing.T, fake *fakeCLI) *scenario {
 	t.Helper()
 	s := testScenario(t, fake)
-	// Capture the principal ID the same way the runner does.
+	// runner と同じ方法で principal ID を取得する。
 	if err := s.checkAuthContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -92,8 +92,8 @@ func TestPolicyScenarioUpdatesAndRestoresProjectBindings(t *testing.T) {
 	if len(updated) != 2 || updated[1].Role.ID != projectPolicyRole {
 		t.Fatalf("update-project-policy request = %s", updateRequest(fake, "update-project-policy"))
 	}
-	// The fake starts with the owner binding for the principal that created
-	// the project, so restoring the captured bindings keeps that binding.
+	// fake は project を作成した principal への owner binding から始まるため、
+	// 取得した binding を復元すればその binding は維持される。
 	if len(fake.projectPolicyBindings) != 1 || fake.projectPolicyBindings[0].Role.ID != "owner" {
 		t.Fatalf("project bindings = %s, want the restored owner binding", policySummary(fake.projectPolicyBindings))
 	}

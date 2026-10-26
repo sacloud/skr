@@ -25,11 +25,11 @@ import (
 
 const projectAPIKeyRole = "resource-creator"
 
-// projectAPIKeyScenario creates an API key in the project of this run, reads,
-// lists, updates, and deletes it. Create and read responses contain the
-// access token, so every output is projected with --query and the evidence
-// never stores the token itself. The key is deleted inside the scenario; the
-// cleanup only removes it when a previous step failed.
+// projectAPIKeyScenario は、この実行の project 内で API key を作成、読み込み、一覧表示、更新、削除します。
+// create と read の応答には access token が含まれるため、
+// すべての出力は --query で投影され、
+// evidence にはトークン自体が保存されることはありません。
+// cleanup は前のステップが失敗した場合のみ削除します。
 func (s *scenario) projectAPIKeyScenario(ctx context.Context) error {
 	s.projectAPIKey.attempted = true
 	s.projectAPIKey.currentName = s.projectAPIKey.name
@@ -116,10 +116,10 @@ func (s *scenario) projectAPIKeyScenario(ctx context.Context) error {
 	return nil
 }
 
-// writeProjectAPIKeyRequest writes the create or update request JSON. The
-// create request pins the key to the project of this run, or to the project
-// of the authentication context when the principal is limited to a specific
-// project.
+// writeProjectAPIKeyRequest は作成または更新のリクエスト JSON を書き込みます。
+// create リクエストは key をこの実行の project に固定しますが、
+// principal が特定の project に限定されている場合は
+// 認証コンテキストの project に固定します。
 func (s *scenario) writeProjectAPIKeyRequest(purpose, name string, create bool) (string, error) {
 	request := map[string]any{
 		"name":        name,
@@ -145,9 +145,9 @@ func (s *scenario) writeProjectAPIKeyRequest(purpose, name string, create bool) 
 	return path, nil
 }
 
-// projectAPIKeyProjectID returns the project to pin a new API key to. A
-// principal limited to a specific project can only create keys there, so the
-// authentication context's project wins over the project of this run.
+// projectAPIKeyProjectID は新しい API key を固定する project を返します。
+// 特定の project に限定された principal はそこにしか key を作成できないため、
+// 認証コンテキストの project がこの実行の project より優先されます。
 func (s *scenario) projectAPIKeyProjectID() string {
 	if s.limitedProjectID > 0 {
 		return strconv.FormatInt(s.limitedProjectID, 10)
@@ -155,7 +155,7 @@ func (s *scenario) projectAPIKeyProjectID() string {
 	return s.project.id
 }
 
-// decodeAPIKeyProjection decodes the projected {id, name, iam_roles} output.
+// decodeAPIKeyProjection は投影された {id, name, iam_roles} の出力をデコードします。
 func decodeAPIKeyProjection(step string, data []byte) (id string, name string, roles []string, err error) {
 	var result struct {
 		ID       any      `json:"id"`
