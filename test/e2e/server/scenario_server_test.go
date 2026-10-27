@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
@@ -189,4 +190,126 @@ func sharedIPOfServer(item serverItem) string {
 		return iface.IPAddress
 	}
 	return ""
+}
+
+// updatedServerDescription は更新確認中に使用する一時的な説明です。
+const updatedServerDescription = serverDescription + " (updated)"
+
+// updatedServerName は更新確認中に使用する一時的な名前です。
+func updatedServerName(name string) string {
+	return name + "-upd"
+}
+
+// updateAndVerifyServer は Server の名前と説明を skr CLI で更新し、応答で反映を確認してから
+// 元の値に戻し、復元を確認します。復元により後片付けが Server を再び識別できるようになります。
+func updateAndVerifyServer(t *testing.T, c serverCommands, id types.ID, name string) error {
+	t.Helper()
+
+	item, err := c.updateServer(t, "サーバーの名前と説明を更新する", id, updatedServerName(name), updatedServerDescription)
+	if err != nil {
+		return err
+	}
+	if err := checkUpdatedServer(item, id, name); err != nil {
+		return err
+	}
+	item, err = c.updateServer(t, "サーバーの名前と説明を元に戻す", id, name, serverDescription)
+	if err != nil {
+		return fmt.Errorf("restore Server Name and Description: %w", err)
+	}
+	return checkServer(item, id, name)
+}
+
+// cleanupServerResources は後片付けです。作成に成功した Server の ID を優先して SDK で再照合し、
+// ID がない場合は名前検索で回収を試みます。識別できない場合は削除しません。
+// 削除は skr CLI で行い、削除後は SDK で同名リソースの不在を確認し、孤立した Disk の回収まで行います。
+func cleanupServerResources(t *testing.T, c serverCommands, run *serverRun) error {
+	t.Helper()
+
+	id := run.serverID
+	if id.IsEmpty() {
+		matches, err := c.lookupServers(t, run.name)
+		if err != nil {
+			return fmt.Errorf("cannot locate possibly created Server: %w", err)
+		}
+		if len(matches) == 0 {
+			return cleanupOrphanDisks(t, c, run, nil)
+		}
+		if len(matches) != 1 || matches[0].ID.IsEmpty() || matches[0].Description != serverDescription {
+			return errors.New("cannot safely identify created Server; manual cleanup required")
+		}
+		id = matches[0].ID
+	}
+	// 削除前に SDK で再照合し、保持した ID と今回設定した識別情報 (作成時または更新時) が
+	// 一致する場合だけ削除する。更新フェーズで復元が完了していない場合は更新後の値と一致する。
+	current, err := c.fetchServer(t, id)
+	if err != nil {
+		return fmt.Errorf("cannot verify Server before cleanup: %w", err)
+	}
+	identityErr := checkServer(current, id, run.name)
+	if identityErr != nil {
+		identityErr = checkUpdatedServer(current, id, run.name)
+	}
+	if identityErr != nil {
+		return fmt.Errorf("cleanup refused: Server identity changed; manual cleanup required: %w", identityErr)
+	}
+	deleteErr := c.deleteServer(t, "サーバーをディスクとともに削除する", id)
+	if err := requireServerAbsent(t, c, run); err != nil {
+		return errors.Join(deleteErr, err)
+	}
+	return errors.Join(deleteErr, cleanupOrphanDisks(t, c, run, current.Disks))
+}
+
+// requireServerAbsent は Server が元の名前と更新フェーズの名前のどちらでも残っていないことを
+// SDK で確認します。更新フェーズで復元が完了していない場合も、更新後の名前での不在を確認します。
+func requireServerAbsent(t *testing.T, c serverCommands, run *serverRun) error {
+	t.Helper()
+
+	for _, name := range []string{run.name, updatedServerName(run.name)} {
+		matches, err := c.lookupServers(t, name)
+		if err != nil {
+			return fmt.Errorf("verify Server absence after cleanup: %w", err)
+		}
+		if len(matches) != 0 {
+			return fmt.Errorf("Server %q remains after cleanup; manual cleanup required", name)
+		}
+	}
+	return nil
+}
+
+// cleanupOrphanDisks は Server 削除後に残った同名 Disk を回収します。
+// SDK で検索と参照を行い、既知の Disk と一致する場合のみ skr CLI で削除し、
+// 削除後は SDK で不在を確認します。識別できない Disk は変更せず、手動での回収が必要なことを報告します。
+func cleanupOrphanDisks(t *testing.T, c serverCommands, run *serverRun, knownDisks []diskItem) error {
+	t.Helper()
+
+	matches, err := c.lookupDisks(t, run.name)
+	if err != nil {
+		return err
+	}
+	if len(matches) == 0 {
+		return nil
+	}
+	if len(matches) != 1 || len(knownDisks) != 1 || matches[0].ID.IsEmpty() ||
+		matches[0].ID != knownDisks[0].ID || matches[0].Name != run.name {
+		return errors.New("cannot safely identify orphan Disk; manual cleanup required")
+	}
+	id := matches[0].ID
+	current, err := c.fetchDisk(t, id)
+	if err != nil {
+		return fmt.Errorf("cannot verify orphan Disk: %w", err)
+	}
+	if !matchesCreatedDisk(current, id, run.name, run.params) {
+		return errors.New("orphan Disk identity or attachment changed; manual cleanup required")
+	}
+	if err := c.deleteDisk(t, "孤立ディスクを削除する", id); err != nil {
+		return fmt.Errorf("delete orphan Disk %s: %w", id, err)
+	}
+	matches, err = c.lookupDisks(t, run.name)
+	if err != nil {
+		return err
+	}
+	if len(matches) != 0 {
+		return errors.New("Disk remains after cleanup; manual cleanup required")
+	}
+	return nil
 }

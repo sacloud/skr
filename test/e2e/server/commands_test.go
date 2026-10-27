@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -24,6 +25,7 @@ import (
 	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	"github.com/sacloud/skr/test/e2e/internal/helper"
+	"github.com/stretchr/testify/require"
 )
 
 // serverCommands は Server シナリオが使う Server・Disk の操作と SSH ログイン確認です。
@@ -235,4 +237,38 @@ func paginateFind[T any](t *testing.T, fetch func(ctx context.Context, from int)
 			return all, nil
 		}
 	}
+}
+
+// TestFindReadsAllPages は一括検索が全ページを取得することを確認する。
+func TestFindReadsAllPages(t *testing.T) {
+	calls := 0
+	items, err := paginateFind(t, func(ctx context.Context, from int) ([]diskItem, error) {
+		calls++
+		if from != (calls-1)*findPageSize {
+			return nil, fmt.Errorf("unexpected from %d", from)
+		}
+		if calls == 2 {
+			return nil, nil
+		}
+		return make([]diskItem, findPageSize), nil
+	})
+
+	require.NoError(t, err)
+	require.Len(t, items, findPageSize, "the first page should be collected")
+	require.Equal(t, 2, calls, "the second page should be requested")
+}
+
+// TestFindDoesNotTreatPageFailureAsMissing は途中ページの取得に失敗した場合に
+// 不在として扱わないことを確認する。
+func TestFindDoesNotTreatPageFailureAsMissing(t *testing.T) {
+	calls := 0
+	_, err := paginateFind(t, func(context.Context, int) ([]diskItem, error) {
+		calls++
+		if calls == 2 {
+			return nil, errors.New("injected failure")
+		}
+		return make([]diskItem, findPageSize), nil
+	})
+
+	require.ErrorContains(t, err, "injected failure", "a page failure should not be treated as no results")
 }
