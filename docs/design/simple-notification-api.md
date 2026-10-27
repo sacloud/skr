@@ -40,7 +40,7 @@
 
 ## ライブ E2E と後片付け
 
-`test/e2e/simple-notification/` はビルド済み CLI を呼び出す testing.T ベースのシナリオテストです（[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)）。実行には `SKR_E2E` の設定、`skr-e2e` プロファイル、および `SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID` 環境変数で利用者が承認した既存通知先の ID が必要です。既存通知先の ID を環境変数で選択することを実行の明示的な同意とし、未設定の場合はテストをスキップします。
+`test/e2e/simple-notification/` はビルド済み CLI を呼び出す testing.T ベースのシナリオテストです（[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)）。シナリオの概要と実行方法は [`test/e2e/simple-notification/README.md`](../../test/e2e/simple-notification/README.md) を参照してください。実行には `SKR_E2E` の設定、`skr-e2e` プロファイル、および `SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID` 環境変数で利用者が承認した既存通知先の ID が必要です。既存通知先の ID を環境変数で選択することを実行の明示的な同意とし、未設定の場合はテストをスキップします。
 
 ```console
 $ SKR_E2E=1 SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID=DESTINATION-ID go test ./test/e2e/simple-notification/ -run TestScenarioSimpleNotification
