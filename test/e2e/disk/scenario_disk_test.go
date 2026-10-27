@@ -33,7 +33,7 @@ const (
 )
 
 func TestScenarioDisk(t *testing.T) {
-	h := helper.New(t, "disk-api", "IaaS ディスクの作成・参照・更新・削除を実行し、ディスクリソースのライフサイクルが正しく動作することを確認する")
+	h := helper.New(t, "disk-api", "IaaS ディスクを作成・参照・更新・削除し、ディスクリソースのライフサイクルが正しく動作することを確認する")
 
 	suffix := helper.RandomSuffix(t)
 	name := namePrefix + suffix
