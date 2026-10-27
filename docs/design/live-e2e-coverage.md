@@ -98,7 +98,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
     - `scenario_read_only.go`、`scenario_policy.go`、`scenario_hierarchy.go`、`scenario_serviceprincipal.go`、`scenario_projectapikey.go`。
     - `scenario_scim.go`、`scenario_sso.go`、`scenario_account.go`、`scenario_user2fa.go`。
 - 任意の改善候補として、`test/e2e/simple-notification/crud.go` を `scenario_crud_only.go` に改名できます。対応する `crud_test.go` も合わせます。`test/e2e/gslb/server.go` は役割を表す名前のため変更不要です。
-- switch の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/switch/scenario_switch_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。旧 runner の固定名での事前後片付けはランダムな接尾辞付きの名前に置き換え、作成前の同名確認、後片付けの削除前再参照と削除後の不在確認はシナリオ内で行います。検証ゾーンは旧 runner の is1b モードに合わせて is1b の単一シナリオに絞り、旧 runner の Sandbox (tk1v) モードは削除しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
+- switch の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/switch/scenario_switch_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。旧 runner の固定名での事前後片付けはランダムな接尾辞付きの名前に置き換え、作成前の同名確認は [ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従い実行記録を残さない SDK で直接実行し、後片付けの削除前再参照と削除後の不在確認はシナリオ内で行います。検証ゾーンは旧 runner の is1b モードに合わせて is1b の単一シナリオに絞り、旧 runner の Sandbox (tk1v) モードは削除しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 
 ## 参照
 

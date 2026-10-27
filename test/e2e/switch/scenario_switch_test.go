@@ -18,7 +18,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	swytch "github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
+	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sacloud/skr/test/e2e/internal/helper"
@@ -32,6 +35,8 @@ const (
 	namePrefix = "skr-e2e-switch-"
 	// description はテスト用スイッチに付ける説明です。後片付けの識別にも使います。
 	description = "Temporary switch for skr API E2E"
+	// findPageSize は SDK の安全確認で使う1ページの件数です。
+	findPageSize = 100
 )
 
 // switchItem はスイッチの参照結果のうち、確認に使う項目です。
@@ -53,9 +58,11 @@ func TestScenarioSwitch(t *testing.T) {
 	createdTags := []string{"tutorial", "managed"}
 	updatedTags := []string{"tutorial", "updated"}
 
-	// 作成前に同名スイッチが存在しないことを確認する
-	require.Empty(t, findSwitches(t, h, "作成前に同名スイッチが存在しないことを確認する", name), "switch name %q already exists; refusing to modify it", name)
-	require.Empty(t, findSwitches(t, h, "作成前に更新後の同名スイッチが存在しないことを確認する", updatedName), "switch name %q already exists; refusing to modify it", updatedName)
+	// 作成前の同名確認を実施する
+	client, err := iaasclient.New(false)
+	require.NoError(t, err, "create IaaS API client for verification")
+	require.Empty(t, lookupSwitches(t, client, name), "switch name %q already exists; refusing to modify it", name)
+	require.Empty(t, lookupSwitches(t, client, updatedName), "switch name %q already exists; refusing to modify it", updatedName)
 
 	// スイッチを作成する
 	data := h.Call(t, "スイッチを作成する",
@@ -166,4 +173,37 @@ func parseSwitch(t *testing.T, data []byte) switchItem {
 	require.NoError(t, err, "decode switch: %v", err)
 	require.NotZero(t, item.ID, "switch ID is missing")
 	return item
+}
+
+// lookupSwitches は SDK で名前でスイッチを検索します。作成前の同名確認など、
+// 実行記録を残す必要のない安全確認に使います (ADR 0064)。
+func lookupSwitches(t *testing.T, client *iaas.Client, name string) []switchItem {
+	t.Helper()
+
+	switches, err := swytch.New(client).FindWithContext(t.Context(), &swytch.FindRequest{
+		Zone:  zone,
+		Names: []string{name},
+		Count: findPageSize,
+	})
+	require.NoError(t, err, "find switches by name %q", name)
+	items := make([]switchItem, 0, len(switches))
+	for _, s := range switches {
+		if s == nil {
+			continue
+		}
+		items = append(items, switchFromSDK(s))
+	}
+	// 1ページで取りきれない結果は不在の判断に使わない
+	require.Less(t, len(items), findPageSize, "switch find result page is full; cannot conclude absence of %q", name)
+	return items
+}
+
+// switchFromSDK は SDK の Switch を確認用の項目へ変換します。
+func switchFromSDK(s *iaas.Switch) switchItem {
+	return switchItem{
+		ID:          s.ID,
+		Name:        s.Name,
+		Description: s.Description,
+		Tags:        []string(s.Tags),
+	}
 }
