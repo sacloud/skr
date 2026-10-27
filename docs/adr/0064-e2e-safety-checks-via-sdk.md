@@ -15,7 +15,7 @@ Server のライブ E2E において、安全確認と起動待ちを sacloud SD
 
 - 作成前の同名確認 (Server と Disk)、後片付けの削除前の再照合と削除後の不在確認、孤立ディスクの参照は、SDK の `service/iaas/server` と `service/iaas/disk` を使います。`internal/iaas/client` のクライアント工場で組み立て、skr CLI と同じ認証設定 (プロファイル) を使います。
 - 起動待ちのポーリング (サーバー状態の確認と SSH 接続の再試行待ち) も SDK で行い、待機の実行は証跡に残しません。
-- テスト対象の操作は skr CLI で実行し、実行記録に説明付きで残します。Server のシナリオでは `server create`、`server read`、`server find --name`、`server boot`、`server update`、`server delete`、`disk delete` を残します。
+- テスト対象の操作は skr CLI で実行し、実行記録に説明付きで残します。Server のシナリオでは `server create`、`server read`、`server find --name`、`server boot`、`server update`、`server delete`、`disk delete` を残します。削除などリソースを実際に変更する操作は、実行したことを実行記録に残す経路で行います。
 - `server find` と `server read` は作成結果の確認操作として CLI の検証ステップを1つずつ保持します ([ADR 0049](0049-internet-workflow-options.md)、[ADR 0058](0058-live-e2e-command-coverage.md))。
 - シナリオの単体テストは `serverCommands` インターフェースを通じて CLI 操作と SDK 確認の両方を受け取り、偽の実装で各経路を検証します。
 
