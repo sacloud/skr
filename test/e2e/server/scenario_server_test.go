@@ -89,13 +89,13 @@ func createServer(t *testing.T, c skrServerCommands, run *serverRun) {
 	// 作成応答に作成結果が含まれる
 	item, err := c.createServer(t, "テスト用のサーバーを cloud-init ディスク付きで作成する", run.name, run.params)
 	require.NoError(t, err, "create Server with cloud-init disk")
-	require.NoError(t, checkServer(item, item.ID, run.name), "the create response should contain the created Server")
+	require.NoError(t, checkServerIdentity(item, item.ID, run.name, serverDescription), "the create response should contain the created Server")
 	run.serverID = item.ID
 
 	// server read が作成済みの Server を返すことを確認する
 	item, err = c.readServer(t, "作成したサーバーを参照する", run.serverID)
 	require.NoError(t, err, "read the created Server")
-	require.NoError(t, checkServer(item, run.serverID, run.name), "server read should return the created Server")
+	require.NoError(t, checkServerIdentity(item, run.serverID, run.name, serverDescription), "server read should return the created Server")
 
 	// server find --name が作成した Server を見つけられることを確認する
 	matches, err := c.findServers(t, "作成したサーバーを名前で検索する", run.name)
@@ -115,7 +115,7 @@ func waitForServerSSH(t *testing.T, c skrServerCommands, run *serverRun) {
 	for {
 		item, err := c.fetchServer(t, run.serverID)
 		require.NoError(t, err, "read Server while waiting for SSH login")
-		require.NoError(t, checkServer(item, run.serverID, run.name), "the Server should keep its identity while booting")
+		require.NoError(t, checkServerIdentity(item, run.serverID, run.name, serverDescription), "the Server should keep its identity while booting")
 		if item.InstanceStatus.IsUp() {
 			if ip := sharedIPOfServer(item); ip != "" {
 				if err := c.connectSSH(t, "SSH ログインを確認する", ip); err == nil {
@@ -158,10 +158,10 @@ func updateAndVerifyServer(t *testing.T, c skrServerCommands, id types.ID, name 
 
 	item, err := c.updateServer(t, "サーバーの名前と説明を更新する", id, updatedServerName(name), updatedServerDescription)
 	require.NoError(t, err, "update Server Name and Description")
-	require.NoError(t, checkUpdatedServer(item, id, name), "the update should be reflected in the response")
+	require.NoError(t, checkServerIdentity(item, id, updatedServerName(name), updatedServerDescription), "the update should be reflected in the response")
 	item, err = c.updateServer(t, "サーバーの名前と説明を元に戻す", id, name, serverDescription)
 	require.NoError(t, err, "restore Server Name and Description")
-	require.NoError(t, checkServer(item, id, name), "the restore should be reflected in the response")
+	require.NoError(t, checkServerIdentity(item, id, name, serverDescription), "the restore should be reflected in the response")
 }
 
 // cleanupServerResources は後片付けです。作成に成功した Server の ID を優先して SDK で再照合し、
@@ -190,9 +190,9 @@ func cleanupServerResources(t *testing.T, c skrServerCommands, run *serverRun) e
 	if err != nil {
 		return fmt.Errorf("cannot verify Server before cleanup: %w", err)
 	}
-	identityErr := checkServer(current, id, run.name)
+	identityErr := checkServerIdentity(current, id, run.name, serverDescription)
 	if identityErr != nil {
-		identityErr = checkUpdatedServer(current, id, run.name)
+		identityErr = checkServerIdentity(current, id, updatedServerName(run.name), updatedServerDescription)
 	}
 	if identityErr != nil {
 		return fmt.Errorf("cleanup refused: Server identity changed; manual cleanup required: %w", identityErr)

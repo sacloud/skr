@@ -215,18 +215,11 @@ func diskFromSDK(d *iaas.Disk) diskItem {
 	}
 }
 
-// checkServer は参照結果の ID・名前・説明が、今回の実行で作成した内容と一致することを確認します。
-func checkServer(item serverItem, id types.ID, name string) error {
-	if item.ID != id || item.Name != name || item.Description != serverDescription {
-		return fmt.Errorf("Server identity mismatch for ID %s (expected name %q and E2E description)", id, name)
-	}
-	return nil
-}
-
-// checkUpdatedServer は更新後の名前と説明が反映されていることを確認します。
-func checkUpdatedServer(item serverItem, id types.ID, name string) error {
-	if item.ID != id || item.Name != updatedServerName(name) || item.Description != updatedServerDescription {
-		return fmt.Errorf("updated Server identity mismatch for ID %s (expected updated name and description)", id)
+// checkServerIdentity は参照結果が期待する Server (ID・名前・説明) と一致することを確認します。
+// 元の識別情報と更新後の識別情報のどちらも、期待値を渡して同じ関数で確認します。
+func checkServerIdentity(item serverItem, id types.ID, name, description string) error {
+	if item.ID != id || item.Name != name || item.Description != description {
+		return fmt.Errorf("Server identity mismatch for ID %s (expected name %q and description %q)", id, name, description)
 	}
 	return nil
 }
@@ -270,26 +263,19 @@ func TestParseServerParams(t *testing.T) {
 // TestCheckServerIdentity は参照結果の識別確認を確認する。
 func TestCheckServerIdentity(t *testing.T) {
 	item := serverItem{ID: 123, Name: "skr-e2e-server-test", Description: serverDescription}
-	require.NoError(t, checkServer(item, 123, "skr-e2e-server-test"))
+	updated := serverItem{ID: 123, Name: "skr-e2e-server-test-upd", Description: updatedServerDescription}
 
-	for name, tc := range map[string]serverItem{
-		"identity":    {ID: 456, Name: "skr-e2e-server-test", Description: serverDescription},
-		"name":        {ID: 123, Name: "changed", Description: serverDescription},
-		"description": {ID: 123, Name: "skr-e2e-server-test", Description: "changed"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			require.Error(t, checkServer(tc, 123, "skr-e2e-server-test"), "mismatched resources should be refused")
-		})
-	}
-}
+	// 元の識別情報と更新後の識別情報のどちらも、期待値を渡して同じ関数で確認する
+	require.NoError(t, checkServerIdentity(item, 123, item.Name, item.Description))
+	require.NoError(t, checkServerIdentity(updated, 123, updated.Name, updated.Description))
 
-// TestCheckUpdatedServerIdentity は更新後の識別確認を確認する。
-func TestCheckUpdatedServerIdentity(t *testing.T) {
-	item := serverItem{ID: 123, Name: "skr-e2e-server-test-upd", Description: updatedServerDescription}
-	require.NoError(t, checkUpdatedServer(item, 123, "skr-e2e-server-test"))
+	// ID・名前・説明のどれかが違えば拒否する
+	require.Error(t, checkServerIdentity(serverItem{ID: 456, Name: item.Name, Description: item.Description}, 123, item.Name, item.Description), "mismatched resources should be refused")
+	require.Error(t, checkServerIdentity(serverItem{ID: item.ID, Name: "changed", Description: item.Description}, 123, item.Name, item.Description), "mismatched resources should be refused")
+	require.Error(t, checkServerIdentity(serverItem{ID: item.ID, Name: item.Name, Description: "changed"}, 123, item.Name, item.Description), "mismatched resources should be refused")
 
-	stale := serverItem{ID: 123, Name: "skr-e2e-server-test", Description: serverDescription}
-	require.Error(t, checkUpdatedServer(stale, 123, "skr-e2e-server-test"), "unapplied updates should be refused")
+	// 更新が反映されていない古い内容は、更新後の期待値と一致しない
+	require.Error(t, checkServerIdentity(item, 123, updated.Name, updated.Description), "unapplied updates should be refused")
 }
 
 // TestMatchesCreatedDisk は孤立ディスクが今回作成した内容と一致することの確認を確かめる。
