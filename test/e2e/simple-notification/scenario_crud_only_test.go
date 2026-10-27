@@ -46,7 +46,7 @@ type crudResource struct {
 // TestScenarioSimpleNotificationCRUDOnly は既存メール通知先のアドレスで一時通知先・グループ・ルーティングを
 // 作成し、通知を送信せずに作成・参照・更新・削除と不在確認まで行います。既存リソースは変更しません。
 func TestScenarioSimpleNotificationCRUDOnly(t *testing.T) {
-	h := helper.New(t, "simple-notification-api",
+	h := helper.New(t, "simple-notification-crud-only",
 		"既存メール通知先のアドレスで一時通知先・グループ・ルーティングを作成し、通知を送信せずに作成・参照・更新・削除が正しく動作することを確認する")
 
 	destinationID := destinationIDFromEnv(t)

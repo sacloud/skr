@@ -76,7 +76,7 @@ type notificationStatus struct {
 // TestScenarioSimpleNotification は既存通知先へテスト通知を送信し、グループの作成・参照、
 // 通知履歴の確認、削除と不在確認まで行います。既存通知先は変更・削除しません。
 func TestScenarioSimpleNotification(t *testing.T) {
-	h := helper.New(t, "simple-notification-api",
+	h := helper.New(t, "simple-notification-send",
 		"既存通知先へテスト通知を送信し、グループの作成・参照、通知履歴の確認と後片付けが正しく動作することを確認する")
 
 	destinationID := destinationIDFromEnv(t)
