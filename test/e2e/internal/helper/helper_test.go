@@ -187,6 +187,26 @@ func TestWriteRequestJSONFile(t *testing.T) {
 	require.Equal(t, os.FileMode(0600), info.Mode().Perm())
 }
 
+// TestRunLocalCommand は skr 以外のローカルコマンドを実行し、実行結果を実行記録に保存することを確認する。
+func TestRunLocalCommand(t *testing.T) {
+	base := t.TempDir()
+	// stdout・stderr を出力して失敗するダミーコマンドを配置する
+	writeExecutableWithScript(t, filepath.Join(base, "dummy-cmd"), "#!/bin/sh\necho local-ok\necho local-err >&2\nexit 4\n")
+
+	h := &Helper{name: "test", description: "test"}
+	stdout, stderr, err := h.RunLocalCommand(t, 10*time.Second, filepath.Join(base, "dummy-cmd"), "ローカルコマンドを実行する", "-x", "value")
+	require.Error(t, err, "the dummy command should fail")
+	require.Equal(t, "local-ok\n", stdout)
+	require.Equal(t, "local-err\n", stderr)
+
+	// 実行したコマンド名と引数、stdout・stderr を実行記録に保存する
+	require.Len(t, h.results, 1, "the local command should be recorded")
+	rendered := h.results[0].Render()
+	require.Contains(t, rendered, "dummy-cmd -x value", "the report should show the executed command")
+	require.Contains(t, rendered, "local-ok", "the report should contain the stdout")
+	require.Contains(t, rendered, "local-err", "the report should contain the stderr")
+}
+
 // TestCallAllowingFailure は失敗するコマンドでもテストを停止せず、stdout・stderr・エラーを返すことを確認する。
 func TestCallAllowingFailure(t *testing.T) {
 	base := t.TempDir()

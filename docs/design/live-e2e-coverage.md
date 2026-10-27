@@ -49,7 +49,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 
 ### タスク1: 追加リソースなし・費用なしの拡張(完了)
 
-- `server update`(1コマンド): 完了。`test/e2e/server/` の既存 runner に `scenario_update.go` として追加し、作成済みサーバーの名前と説明を更新して Read で反映を確認し、元の値に戻してから既存の削除フローへ進みます。restore に失敗した場合、削除フローは名前の不一致を検出して削除を拒否します。2026-10-23 にライブで正常実行を確認しました。
+- `server update`(1コマンド): 完了。`test/e2e/server/` の E2E に作成済みサーバーの名前と説明を更新して Read で反映を確認し、元に戻すフローとして組み込みました。restore に失敗した場合、削除フローは名前の不一致を検出して削除を拒否します。2026-10-23 にライブで正常実行を確認し、2026-10-27 に [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテストへ移行しました。
 - `internet update` と `internet monitor-router`(2コマンド): 完了。`test/e2e/internet/` の既存 runner に `scenario_update.go` と `scenario_monitor_router.go` として追加します。作成済みルータ＋スイッチの名前・説明の更新と復元を Read で確認し、直近 10 分間の `monitor-router` を `--request` で実行します。トラフィックのない新規ルータに対する空配列は整形式の応答として扱います。2026-10-23 にライブで正常実行を確認しました。
 - `version`(1コマンド): 完了。軽量な専用 runner `test/e2e/version/`(`--confirm-version-live`)を新規作成し、`skr version` が `v<semver> <os>/<arch>, build <revision>` 形式で出力して正常終了することを確認します。2026-10-23 にライブで正常実行を確認しました。
 
@@ -92,6 +92,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 - タスク2の internet runner の証跡ステップは `test-add-subnet`、`test-update-subnet`、`test-delete-subnet`、`test-enable-ipv6`、`test-read-ipv6` などの kebab-case です。
 - タスク2の eventbus runner の証跡ステップは `update-configuration`、`update-trigger`、`schedule-create`、`schedule-read`、`schedule-update` などの kebab-case です。2026-10-27 に testing.T ベースのシナリオテストへ移行しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 - タスク2の apprun は 2026-10-27 に testing.T ベースのシナリオテストへ移行しました。旧 runner の証跡ステップは `update-application`、`list-versions`、`read-version`、`list-traffic`、`update-traffic`、`read-packet-filter` などの kebab-case です。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
+- server の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/server/scenario_server_test.go` ほか) へ移行しました。旧 runner (`main.go`、`scenario_update.go`) は削除し、SSH 鍵の生成と SSH 接続の確認は `test/e2e/internal/helper` に移しました ([ADR 0063](../adr/0063-reusable-ssh-and-local-command-recording.md))。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 - タスク3の iam-api runner は `test/e2e/iam-api/` 配下に次のシナリオと、対応する `_test.go` を追加しました。証跡ステップは `account-read-password-policy`、`account-update-service-policy`、`u2fa-read-missing-security-key` などの kebab-case です。
     - `scenario_read_only.go`、`scenario_policy.go`、`scenario_hierarchy.go`、`scenario_serviceprincipal.go`、`scenario_projectapikey.go`。
     - `scenario_scim.go`、`scenario_sso.go`、`scenario_account.go`、`scenario_user2fa.go`。

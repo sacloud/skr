@@ -209,12 +209,20 @@ func (h *Helper) CallAllowingFailure(t *testing.T, description string, args ...s
 func (h *Helper) run(t *testing.T, timeout time.Duration, hideStdout bool, description string, args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	t.Helper()
 
+	return h.runCommand(t, h.binary, timeout, hideStdout, description, args...)
+}
+
+// runCommand は指定されたコマンド名の実行ファイルを構造化された引数で実行し、実行結果を実行記録へ保存する。
+// skr CLI 以外の検証（SSH 接続や DNS 問い合わせなど）の証跡として使う。
+func (h *Helper) runCommand(t *testing.T, name string, timeout time.Duration, hideStdout bool, description string, args ...string) (bytes.Buffer, bytes.Buffer, error) {
+	t.Helper()
+
 	ctx, cancel := context.WithTimeout(t.Context(), timeout)
 	defer cancel()
 
 	t.Logf("%s: %s", description, strings.Join(args, " "))
 
-	command := exec.CommandContext(ctx, h.binary, args...) //nolint:gosec // 選択されたローカルの skr 実行ファイルと構造化された引数を、シェルなしで直接実行する。
+	command := exec.CommandContext(ctx, name, args...) //nolint:gosec // 選択されたローカルの実行ファイルと構造化された引数を、シェルなしで直接実行する。
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -224,15 +232,27 @@ func (h *Helper) run(t *testing.T, timeout time.Duration, hideStdout bool, descr
 	h.mu.Lock()
 	h.results = append(h.results, &commandResult{
 		description: description,
-		args:        args,
-		stdout:      stdout.String(),
-		stderr:      stderr.String(),
-		duration:    time.Since(start),
-		hideStdout:  hideStdout,
+		// 実行記録にはコマンド名（ベース名）を記録する。skr CLI はフルパスではなく "skr" と表示する。
+		command:    filepath.Base(name),
+		args:       args,
+		stdout:     stdout.String(),
+		stderr:     stderr.String(),
+		duration:   time.Since(start),
+		hideStdout: hideStdout,
 	})
 	h.mu.Unlock()
 
 	return stdout, stderr, runErr
+}
+
+// RunLocalCommand は skr 以外のローカルコマンドを実行し、stdout・stderr・エラーを返す。
+// SSH 接続や DNS 問い合わせのように、CLI 以外の検証の証跡として実行記録へ保存する。
+// コマンドはシェルを経由せず、構造化された引数として渡される。成否の判断は呼び出し元が行う。
+func (h *Helper) RunLocalCommand(t *testing.T, timeout time.Duration, command, description string, args ...string) (string, string, error) {
+	t.Helper()
+
+	stdout, stderr, err := h.runCommand(t, command, timeout, false, description, args...)
+	return stdout.String(), stderr.String(), err
 }
 
 // Sleep は指定された時間だけ待機し、待機した時間を実行記録へ保存する。
