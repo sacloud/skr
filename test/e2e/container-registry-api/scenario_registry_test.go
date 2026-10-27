@@ -15,7 +15,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -23,6 +22,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
@@ -34,9 +35,6 @@ const (
 	descriptionPrefix = "skr-e2e-container-registry/"
 	// userName は今回の実行が作成するレジストリユーザー名です。
 	userName = "skr-e2e"
-	// queryRegistries / queryUsers は --query で必要な項目だけを抽出する式です。
-	queryRegistries = "map({ID,Name,SubDomainLabel,Description})"
-	queryUsers      = "map({UserName,Permission})"
 )
 
 func TestScenarioRegistry(t *testing.T) {
@@ -62,7 +60,7 @@ func TestScenarioRegistry(t *testing.T) {
 	require.Equal(t, description, createdRegistry.Description, "created registry description should match the requested description")
 	defer func() {
 		// 作成したレジストリを削除し、一覧に残っていないことを確認する
-		_ = h.Call(t, "作成したレジストリを削除する", "container-registry-api", "registry", "delete", createdRegistry.id(t))
+		_ = h.Call(t, "作成したレジストリを削除する", "container-registry-api", "registry", "delete", createdRegistry.ID.String())
 		remaining := findRegistries(t, h, "削除後にレジストリが一覧に残っていないことを確認する", findRequest)
 		require.Empty(t, remaining, "registry %s should not remain after deletion", name)
 	}()
@@ -70,129 +68,92 @@ func TestScenarioRegistry(t *testing.T) {
 	// 作成したレジストリが一覧に含まれることを確認する
 	listed := findRegistries(t, h, "作成したレジストリが一覧に含まれることを確認する", findRequest)
 	require.Len(t, listed, 1, "registry list should contain exactly one match for %q", name)
-	requireRegistryIdentity(t, listed[0], createdRegistry.id(t), name, description)
+	requireRegistryIdentity(t, *listed[0], createdRegistry.ID, name, description)
 
 	// レジストリの説明を更新する
 	updateRequest := h.WriteRequestJSONFile(t, "update", map[string]any{"Description": updatedDescription})
 	data = h.Call(t, "レジストリの説明を更新する",
-		"container-registry-api", "registry", "update", createdRegistry.id(t), "--request", "@"+updateRequest)
-	requireRegistryIdentity(t, parseRegistry(t, data), createdRegistry.id(t), name, updatedDescription)
+		"container-registry-api", "registry", "update", createdRegistry.ID.String(), "--request", "@"+updateRequest)
+	requireRegistryIdentity(t, parseRegistry(t, data), createdRegistry.ID, name, updatedDescription)
 
 	// 更新後のレジストリを参照する
-	data = h.Call(t, "更新後のレジストリを参照する", "container-registry-api", "registry", "read", createdRegistry.id(t))
-	requireRegistryIdentity(t, parseRegistry(t, data), createdRegistry.id(t), name, updatedDescription)
+	data = h.Call(t, "更新後のレジストリを参照する", "container-registry-api", "registry", "read", createdRegistry.ID.String())
+	requireRegistryIdentity(t, parseRegistry(t, data), createdRegistry.ID, name, updatedDescription)
 
 	// レジストリユーザーを追加する
 	_ = h.Call(t, "レジストリユーザーを追加する",
-		"container-registry-api", "registry", "user", "add", createdRegistry.id(t),
+		"container-registry-api", "registry", "user", "add", createdRegistry.ID.String(),
 		"--user-name", userName, "--password-file", passwordPath, "--permission", "readwrite")
 	defer func() {
 		// ユーザーを削除し、残っていないことを確認する
 		_ = h.Call(t, "ユーザーを削除する",
-			"container-registry-api", "registry", "user", "delete", createdRegistry.id(t), userName)
-		users := listUsers(t, h, "ユーザー削除後にユーザーが残っていないことを確認する", createdRegistry.id(t))
+			"container-registry-api", "registry", "user", "delete", createdRegistry.ID.String(), userName)
+		users := listUsers(t, h, "ユーザー削除後にユーザーが残っていないことを確認する", createdRegistry.ID.String())
 		require.Empty(t, users, "user should not remain after deletion")
 	}()
 
 	// 追加したユーザーが一覧に含まれることを確認する
-	users := listUsers(t, h, "追加したユーザーが一覧に含まれることを確認する", createdRegistry.id(t))
+	users := listUsers(t, h, "追加したユーザーが一覧に含まれることを確認する", createdRegistry.ID.String())
 	require.Len(t, users, 1, "user list should contain exactly the user created by this run")
 	require.Equal(t, userName, users[0].UserName)
-	require.Equal(t, "readwrite", users[0].Permission)
+	require.Equal(t, types.ContainerRegistryPermissions.ReadWrite, users[0].Permission)
 
 	// ユーザーの権限を変更する
 	_ = h.Call(t, "ユーザーの権限を変更する",
-		"container-registry-api", "registry", "user", "update", createdRegistry.id(t), userName, "--permission", "readonly")
+		"container-registry-api", "registry", "user", "update", createdRegistry.ID.String(), userName, "--permission", "readonly")
 
 	// 権限の変更がユーザー一覧に反映されていることを確認する
-	users = listUsers(t, h, "権限の変更がユーザー一覧に反映されていることを確認する", createdRegistry.id(t))
+	users = listUsers(t, h, "権限の変更がユーザー一覧に反映されていることを確認する", createdRegistry.ID.String())
 	require.Len(t, users, 1, "user list should contain exactly the user created by this run")
 	require.Equal(t, userName, users[0].UserName)
-	require.Equal(t, "readonly", users[0].Permission)
-}
-
-type registryItem struct {
-	ID           json.RawMessage `json:"ID"`
-	Name         string          `json:"Name"`
-	RegistryName string          `json:"SubDomainLabel"`
-	Description  string          `json:"Description"`
-}
-
-// id はレジストリ ID を文字列として返します。API の ID は数値または文字列として出力されるため、両方に対応します。
-func (item registryItem) id(t *testing.T) string {
-	t.Helper()
-
-	if len(item.ID) == 0 {
-		t.Fatal("container registry ID is missing")
-	}
-	var value any
-	decoder := json.NewDecoder(bytes.NewReader(item.ID))
-	decoder.UseNumber()
-	err := decoder.Decode(&value)
-	require.NoError(t, err, "decode container registry ID")
-	switch value := value.(type) {
-	case string:
-		require.NotEmpty(t, value, "container registry ID is empty")
-		return value
-	case json.Number:
-		require.NotEqual(t, "0", value.String(), "container registry ID is empty")
-		return value.String()
-	default:
-		t.Fatalf("container registry ID has unsupported JSON type %T", value)
-		return ""
-	}
-}
-
-type userItem struct {
-	UserName   string `json:"UserName"`
-	Permission string `json:"Permission"`
+	require.Equal(t, types.ContainerRegistryPermissions.ReadOnly, users[0].Permission)
 }
 
 // requireRegistryIdentity は参照結果の ID・名前と説明が、今回の実行で設定した値と一致することを確認します。
-func requireRegistryIdentity(t *testing.T, item registryItem, id, name string, descriptions ...string) {
+func requireRegistryIdentity(t *testing.T, item iaas.ContainerRegistry, id types.ID, name string, descriptions ...string) {
 	t.Helper()
 
-	require.Equal(t, id, item.id(t), "registry ID should match the registry created by this run")
+	require.Equal(t, id, item.ID, "registry ID should match the registry created by this run")
 	require.Equal(t, name, item.Name, "registry name should match the name requested by this run")
-	require.Equal(t, name, item.RegistryName, "registry connection name should match the name requested by this run")
+	require.Equal(t, name, item.SubDomainLabel, "registry connection name should match the name requested by this run")
 	require.Contains(t, descriptions, item.Description, "registry description should be a value set by this run")
 }
 
 // findRegistries は Names で絞り込んだレジストリ一覧を取得します。
-func findRegistries(t *testing.T, h *helper.Helper, description, requestPath string) []registryItem {
+func findRegistries(t *testing.T, h *helper.Helper, description, requestPath string) []*iaas.ContainerRegistry {
 	t.Helper()
 
 	data := h.Call(t, description,
-		"container-registry-api", "registry", "list", "--request", "@"+requestPath, "--query", queryRegistries)
-	var items []registryItem
-	err := json.Unmarshal(data, &items)
-	require.NoError(t, err, "%s: decode projected registries: %v", description, err)
-	require.NotNil(t, items, "%s: expected a JSON registry array", description)
-	return items
+		"container-registry-api", "registry", "list", "--request", "@"+requestPath)
+	var registries []*iaas.ContainerRegistry
+	err := json.Unmarshal(data, &registries)
+	require.NoError(t, err, "%s: decode registries: %v", description, err)
+	require.NotNil(t, registries, "%s: expected a JSON registry array", description)
+	return registries
 }
 
 // listUsers はレジストリのユーザー一覧を取得します。
-func listUsers(t *testing.T, h *helper.Helper, description, registryID string) []userItem {
+func listUsers(t *testing.T, h *helper.Helper, description, registryID string) []iaas.ContainerRegistryUser {
 	t.Helper()
 
 	data := h.Call(t, description,
-		"container-registry-api", "registry", "user", "list", registryID, "--query", queryUsers)
-	var users []userItem
+		"container-registry-api", "registry", "user", "list", registryID)
+	var users []iaas.ContainerRegistryUser
 	err := json.Unmarshal(data, &users)
-	require.NoError(t, err, "%s: decode projected users: %v", description, err)
+	require.NoError(t, err, "%s: decode registry users: %v", description, err)
 	require.NotNil(t, users, "%s: expected a JSON user array", description)
 	return users
 }
 
 // parseRegistry は CLI の JSON 出力をレジストリとして解釈します。
-func parseRegistry(t *testing.T, data []byte) registryItem {
+func parseRegistry(t *testing.T, data []byte) iaas.ContainerRegistry {
 	t.Helper()
 
-	var item registryItem
-	err := json.Unmarshal(data, &item)
+	var registry iaas.ContainerRegistry
+	err := json.Unmarshal(data, &registry)
 	require.NoError(t, err, "decode container registry: %v", err)
-	item.id(t)
-	return item
+	require.NotZero(t, registry.ID, "container registry ID is missing")
+	return registry
 }
 
 // randomSuffix はリソース名の衝突回避用サフィックスを生成します。
