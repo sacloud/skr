@@ -42,6 +42,9 @@ func TestNewSkipsWithoutProfile(t *testing.T) {
 
 // TestNewWithProfile は SKR_E2E と skr-e2e プロファイルが揃ったときに New がスキップしないことを確認する。
 func TestNewWithProfile(t *testing.T) {
+	// newHelper が参照する ../../../skr が解決できるよう、ダミーの実行ファイルを配置する
+	setupDummyBinary(t)
+
 	dir := t.TempDir()
 	createProfile(t, dir, e2eProfileName)
 	t.Setenv("SKR_E2E", "1")
@@ -61,6 +64,9 @@ func TestNewWithProfile(t *testing.T) {
 // TestNewWithTemporaryProfileDir は SKR_E2E が未設定でも NewWithTemporaryProfileDir がスキップせず、
 // 一時プロファイルディレクトリを設定することを確認する。
 func TestNewWithTemporaryProfileDir(t *testing.T) {
+	// newHelper が参照する ../../../skr が解決できるよう、ダミーの実行ファイルを配置する
+	setupDummyBinary(t)
+
 	// skr-e2e プロファイルが存在しないプロファイルディレクトリを設定しても影響しない
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	before := os.Getenv("SAKURA_PROFILE_DIR")
@@ -76,6 +82,43 @@ func TestNewWithTemporaryProfileDir(t *testing.T) {
 		require.DirExists(t, got)
 	})
 	require.True(t, completed, "NewWithTemporaryProfileDir should not skip without SKR_E2E")
+}
+
+// TestNewSkipsWithoutBinary は skr バイナリが存在しないときに New がテストをスキップすることを確認する。
+func TestNewSkipsWithoutBinary(t *testing.T) {
+	// プロファイルが存在する状態にして、バイナリ不足だけがスキップの原因になるようにする
+	dir := t.TempDir()
+	createProfile(t, dir, e2eProfileName)
+	t.Setenv("SKR_E2E", "1")
+	t.Setenv("SAKURA_PROFILE_DIR", dir)
+
+	// skr バイナリが存在しない状態にするため、テスト専用ディレクトリに移動する
+	t.Chdir(t.TempDir())
+
+	completed := false
+	t.Run("new", func(t *testing.T) {
+		New(t, "test", "test")
+		completed = true
+	})
+	if completed {
+		t.Error("New should skip when the skr binary is missing")
+	}
+}
+
+// TestNewWithTemporaryProfileDirSkipsWithoutBinary は skr バイナリが存在しないときに
+// NewWithTemporaryProfileDir もテストをスキップすることを確認する。
+func TestNewWithTemporaryProfileDirSkipsWithoutBinary(t *testing.T) {
+	// skr バイナリが存在しない状態にするため、テスト専用ディレクトリに移動する
+	t.Chdir(t.TempDir())
+
+	completed := false
+	t.Run("new", func(t *testing.T) {
+		NewWithTemporaryProfileDir(t, "test", "test")
+		completed = true
+	})
+	if completed {
+		t.Error("NewWithTemporaryProfileDir should skip when the skr binary is missing")
+	}
 }
 
 // TestWriteRequestJSONFile は --request 用リクエストファイルの作成を確認する。
@@ -101,4 +144,20 @@ func createProfile(t *testing.T, dir, name string) {
 	profileDir := filepath.Join(dir, name)
 	require.NoError(t, os.MkdirAll(profileDir, 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(profileDir, "config.json"), []byte("{}"), 0600))
+}
+
+// setupDummyBinary は newHelper が参照する ../../../skr が解決できるよう、
+// テスト専用ディレクトリにダミーの実行ファイルを配置して移動する。
+// New と NewWithTemporaryProfileDir のテストは Call を実行しないため、ダミーで十分である。
+func setupDummyBinary(t *testing.T) {
+	t.Helper()
+
+	// テストの cwd から 3 つ上に skr バイナリが解決されるため、
+	// E2E シナリオと同じ 3 段階の深さのディレクトリを作成してダミーを配置する。
+	base := t.TempDir()
+	scenarioDir := filepath.Join(base, "test", "e2e", "service")
+	require.NoError(t, os.MkdirAll(scenarioDir, 0700))
+	//nolint:gosec // 実行ファイルとして Stat できることを確認するだけのダミーを、テスト専用ディレクトリ内に作成する。
+	require.NoError(t, os.WriteFile(filepath.Join(base, "skr"), []byte("#!/bin/sh\n"), 0700))
+	t.Chdir(scenarioDir)
 }

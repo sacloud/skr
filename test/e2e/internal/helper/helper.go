@@ -74,6 +74,11 @@ func newHelper(t *testing.T, name, description string) *Helper {
 		defaultTimeout: 10 * time.Minute,
 	}
 
+	// ビルド済みの skr バイナリが存在しない場合はテストをスキップする。
+	if _, err := os.Stat(h.binary); err != nil {
+		t.Skipf("skr binary is not available at %s, run \"make build\" first, skipping E2E test: %v", h.binary, err)
+	}
+
 	t.Cleanup(func() {
 		h.mu.Lock()
 		defer h.mu.Unlock()
