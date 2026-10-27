@@ -92,8 +92,8 @@ func TestNewSkipsWithoutBinary(t *testing.T) {
 	t.Setenv("SKR_E2E", "1")
 	t.Setenv("SAKURA_PROFILE_DIR", dir)
 
-	// skr バイナリが存在しない状態にするため、テスト専用ディレクトリに移動する
-	t.Chdir(t.TempDir())
+	// skr バイナリが存在しないリポジトリにするため、テスト専用ディレクトリに移動する
+	moveToEmptyRepository(t)
 
 	completed := false
 	t.Run("new", func(t *testing.T) {
@@ -108,8 +108,8 @@ func TestNewSkipsWithoutBinary(t *testing.T) {
 // TestNewWithTemporaryProfileDirSkipsWithoutBinary は skr バイナリが存在しないときに
 // NewWithTemporaryProfileDir もテストをスキップすることを確認する。
 func TestNewWithTemporaryProfileDirSkipsWithoutBinary(t *testing.T) {
-	// skr バイナリが存在しない状態にするため、テスト専用ディレクトリに移動する
-	t.Chdir(t.TempDir())
+	// skr バイナリが存在しないリポジトリにするため、テスト専用ディレクトリに移動する
+	moveToEmptyRepository(t)
 
 	completed := false
 	t.Run("new", func(t *testing.T) {
@@ -119,6 +119,55 @@ func TestNewWithTemporaryProfileDirSkipsWithoutBinary(t *testing.T) {
 	if completed {
 		t.Error("NewWithTemporaryProfileDir should skip when the skr binary is missing")
 	}
+}
+
+// TestFindBinary はカレントディレクトリから上に向かって skr バイナリを探す処理を確認する。
+func TestFindBinary(t *testing.T) {
+	// 上のディレクトリに実行可能な skr がある場合、そのパスを返す
+	base := t.TempDir()
+	writeExecutable(t, filepath.Join(base, "skr"))
+	enterScenarioDir(t, base)
+
+	path, err := findBinary()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(base, "skr"), path)
+}
+
+// TestFindBinaryNotFound は skr バイナリがなく go.mod まで辿った場合に空文字列を返すことを確認する。
+func TestFindBinaryNotFound(t *testing.T) {
+	base := t.TempDir()
+	// 探索の打ち切り位置（リポジトリルート）を決めるための go.mod を置く
+	writeGoMod(t, base)
+	enterScenarioDir(t, base)
+
+	path, err := findBinary()
+	require.NoError(t, err)
+	require.Empty(t, path)
+}
+
+// TestFindBinarySkipsNonExecutable は実行可能パーミッションのない skr を見つけないことを確認する。
+func TestFindBinarySkipsNonExecutable(t *testing.T) {
+	base := t.TempDir()
+
+	require.NoError(t, os.WriteFile(filepath.Join(base, "skr"), []byte("#!/bin/sh\n"), 0600))
+	writeGoMod(t, base)
+	enterScenarioDir(t, base)
+
+	path, err := findBinary()
+	require.NoError(t, err)
+	require.Empty(t, path)
+}
+
+// TestFindBinarySkipsDirectory は skr という名前のディレクトリを見つけないことを確認する。
+func TestFindBinarySkipsDirectory(t *testing.T) {
+	base := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(base, "skr"), 0700))
+	writeGoMod(t, base)
+	enterScenarioDir(t, base)
+
+	path, err := findBinary()
+	require.NoError(t, err)
+	require.Empty(t, path)
 }
 
 // TestWriteRequestJSONFile は --request 用リクエストファイルの作成を確認する。
@@ -146,18 +195,47 @@ func createProfile(t *testing.T, dir, name string) {
 	require.NoError(t, os.WriteFile(filepath.Join(profileDir, "config.json"), []byte("{}"), 0600))
 }
 
-// setupDummyBinary は newHelper が参照する ../../../skr が解決できるよう、
+// setupDummyBinary は findBinary が skr バイナリを見つけられるよう、
 // テスト専用ディレクトリにダミーの実行ファイルを配置して移動する。
 // New と NewWithTemporaryProfileDir のテストは Call を実行しないため、ダミーで十分である。
 func setupDummyBinary(t *testing.T) {
 	t.Helper()
 
-	// テストの cwd から 3 つ上に skr バイナリが解決されるため、
-	// E2E シナリオと同じ 3 段階の深さのディレクトリを作成してダミーを配置する。
 	base := t.TempDir()
-	scenarioDir := filepath.Join(base, "test", "e2e", "service")
-	require.NoError(t, os.MkdirAll(scenarioDir, 0700))
-	//nolint:gosec // 実行ファイルとして Stat できることを確認するだけのダミーを、テスト専用ディレクトリ内に作成する。
-	require.NoError(t, os.WriteFile(filepath.Join(base, "skr"), []byte("#!/bin/sh\n"), 0700))
-	t.Chdir(scenarioDir)
+	writeExecutable(t, filepath.Join(base, "skr"))
+	enterScenarioDir(t, base)
+}
+
+// moveToEmptyRepository は skr バイナリが存在しないリポジトリを模したテスト専用ディレクトリに移動する。
+// go.mod が探索の打ち切り位置（リポジトリルート）を決めるため、ダミーの go.mod を配置する。
+func moveToEmptyRepository(t *testing.T) {
+	t.Helper()
+
+	base := t.TempDir()
+	writeGoMod(t, base)
+	enterScenarioDir(t, base)
+}
+
+// enterScenarioDir はテスト専用ディレクトリに E2E シナリオと同じ test/e2e/service の
+// ディレクトリ構造を作成して移動する。
+func enterScenarioDir(t *testing.T, base string) {
+	t.Helper()
+
+	require.NoError(t, os.MkdirAll(filepath.Join(base, "test", "e2e", "service"), 0700))
+	t.Chdir(filepath.Join(base, "test", "e2e", "service"))
+}
+
+// writeExecutable は指定されたパスに実行可能なダミーファイルを作成する。
+func writeExecutable(t *testing.T, path string) {
+	t.Helper()
+
+	//nolint:gosec // 探索対象の実行可能ファイルとして Stat できることを確認するだけのダミーを、テスト専用ディレクトリ内に作成する。
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"), 0700))
+}
+
+// writeGoMod は指定されたディレクトリに探索の打ち切り位置を決めるための go.mod を作成する。
+func writeGoMod(t *testing.T, dir string) {
+	t.Helper()
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/test\n\ngo 1.27.3\n"), 0600))
 }

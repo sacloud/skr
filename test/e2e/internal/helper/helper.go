@@ -33,6 +33,37 @@ type Helper struct {
 // e2eProfileName はライブ API 認証に使うプロファイル名です。
 const e2eProfileName = "skr-e2e"
 
+// skrBinaryName は helper が実行するビルド済み CLI バイナリのファイル名です。
+const skrBinaryName = "skr"
+
+// findBinary はカレントディレクトリから上に向かって実行可能な skr バイナリを探します。
+// 探索は go.mod があるディレクトリ（リポジトリルート）まで行い、見つからない場合は空文字列を返します。
+func findBinary() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	dir := wd
+	for {
+		path := filepath.Join(dir, skrBinaryName)
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0 {
+			return path, nil
+		}
+
+		// リポジトリルート（go.mod）まで辿ったら探索を打ち切る
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return "", nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", nil
+		}
+		dir = parent
+	}
+}
+
 func New(t *testing.T, name, description string) *Helper {
 	t.Helper()
 
@@ -67,16 +98,19 @@ func NewWithTemporaryProfileDir(t *testing.T, name, description string) *Helper 
 func newHelper(t *testing.T, name, description string) *Helper {
 	t.Helper()
 
+	// カレントディレクトリから上に向かってビルド済みの skr バイナリを探す。
+	// 見つからない場合はテストをスキップする。
+	binary, err := findBinary()
+	require.NoError(t, err, "could not get working directory: %v", err)
+	if binary == "" {
+		t.Skipf("skr binary is not available, run \"make build\" first, skipping E2E test")
+	}
+
 	h := &Helper{
 		name:           name,
 		description:    description,
-		binary:         "../../../skr",
+		binary:         binary,
 		defaultTimeout: 10 * time.Minute,
-	}
-
-	// ビルド済みの skr バイナリが存在しない場合はテストをスキップする。
-	if _, err := os.Stat(h.binary); err != nil {
-		t.Skipf("skr binary is not available at %s, run \"make build\" first, skipping E2E test: %v", h.binary, err)
 	}
 
 	t.Cleanup(func() {
