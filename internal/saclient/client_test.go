@@ -23,26 +23,19 @@ import (
 	sacloudsdk "github.com/sacloud/sacloud-sdk-go"
 	saclient "github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"github.com/sacloud/skr/version"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewTraceMode(t *testing.T) {
 	t.Setenv("SAKURACLOUD_TRACE", "error")
 
 	client, err := New(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := client.JSON()["TraceMode"]; got != "error" {
-		t.Errorf("TraceMode without --trace = %v, want error from environment", got)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "error", client.JSON()["TraceMode"], "TraceMode without --trace should come from the environment")
 
 	client, err = New(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := client.JSON()["TraceMode"]; got != "all" {
-		t.Errorf("TraceMode with --trace = %v, want all", got)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "all", client.JSON()["TraceMode"], "TraceMode with --trace")
 }
 
 func TestNewUserAgent(t *testing.T) {
@@ -58,35 +51,20 @@ func TestNewUserAgent(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := client.SetWith(
+	require.NoError(t, err)
+	require.NoError(t, client.SetWith(
 		saclient.WithTestServer(server),
 		saclient.WithUserAgent("iam-api-go/v0.3.0"),
-	); err != nil {
-		t.Fatal(err)
-	}
+	))
 
 	request, err := http.NewRequest(http.MethodGet, server.URL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := response.Body.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if want := "skr/v" + version.Version + " (" + runtime.GOOS + "/" + runtime.GOARCH + "; sacloud-sdk-go/v" + sacloudsdk.Version + ")"; got != want {
-		t.Errorf("User-Agent = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	require.NoError(t, response.Body.Close())
+	require.Equal(t, "skr/v"+version.Version+" ("+runtime.GOOS+"/"+runtime.GOARCH+"; sacloud-sdk-go/v"+sacloudsdk.Version+")", got)
 }
 
 func TestHTTPUserAgent(t *testing.T) {
-	want := "skr-http/v" + version.Version + " (" + runtime.GOOS + "/" + runtime.GOARCH + "; sacloud-sdk-go/v" + sacloudsdk.Version + ")"
-	if got := HTTPUserAgent(); got != want {
-		t.Errorf("HTTPUserAgent() = %q, want %q", got, want)
-	}
+	require.Equal(t, "skr-http/v"+version.Version+" ("+runtime.GOOS+"/"+runtime.GOARCH+"; sacloud-sdk-go/v"+sacloudsdk.Version+")", HTTPUserAgent())
 }
