@@ -17,7 +17,7 @@ Server のライブ E2E において、安全確認と起動待ちを sacloud SD
 - 起動待ちのポーリング (サーバー状態の確認と SSH 接続の再試行待ち) も SDK で行い、待機の実行は証跡に残しません。
 - テスト対象の操作は skr CLI で実行し、実行記録に説明付きで残します。Server のシナリオでは `server create`、`server read`、`server find --name`、`server boot`、`server update`、`server delete`、`disk delete` を残します。削除などリソースを実際に変更する操作は、実行したことを実行記録に残す経路で行います。
 - `server find` と `server read` は作成結果の確認操作として CLI の検証ステップを1つずつ保持します ([ADR 0049](0049-internet-workflow-options.md)、[ADR 0058](0058-live-e2e-command-coverage.md))。
-- シナリオの単体テストは `serverCommands` インターフェースを通じて CLI 操作と SDK 確認の両方を受け取り、偽の実装で各経路を検証します。
+- シナリオの経路はライブ実行で検証します。2026-10-27 のテスト構成の整理で `serverCommands` インターフェースと偽の実装による単体テストは廃止し、実ロジックの単体テスト (解析・変換・識別確認・ページング) だけを残します。
 
 この方針は Server の E2E に適用します。他のリソースの E2E を移行する場合は、この判断を参照しつつ、そのシナリオで証跡が必要な操作を個別に決めます。
 
