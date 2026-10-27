@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	apprunmock "github.com/sacloud/sakumock/apprundedicated"
 )
@@ -57,14 +59,10 @@ func TestRunAppRunDedicatedAPIHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v) code = %d; stderr: %s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help does not contain %q", text)
-				}
+				require.Contains(t, help, text, "help does not contain %q", text)
 			}
 		})
 	}
@@ -76,12 +74,8 @@ func TestRunAppRunDedicatedRejectsInvalidApplicationUpdate(t *testing.T) {
 		{"apprun-dedicated-api", "application", "update", "fd16da34-68dc-4ccb-a3db-391207b5dd40", "--active-version", "1", "--deactivate"},
 	} {
 		var stdout, stderr bytes.Buffer
-		if code := run(args, &stdout, &stderr); code == 0 {
-			t.Errorf("run(%v) succeeded, want invalid update input error", args)
-		}
-		if !strings.Contains(stderr.String(), "--active-version または --deactivate") {
-			t.Errorf("run(%v) error = %q, want mutually-exclusive input error", args, stderr.String())
-		}
+		require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+		require.Contains(t, stderr.String(), "--active-version または --deactivate", "run(%v) error = %q, want mutually-exclusive input error", args, stderr.String())
 	}
 }
 
@@ -92,12 +86,9 @@ func TestRunAppRunDedicatedRequiresPrivateVersionRequestInput(t *testing.T) {
 		"--application-id", "fd16da34-68dc-4ccb-a3db-391207b5dd40",
 		"--request", `{"image":"private-image","registryPassword":"private-secret"}`,
 	}
-	if code := run(args, &stdout, &stderr); code == 0 {
-		t.Fatal("inline secret version request succeeded")
-	}
-	if !strings.Contains(stderr.String(), "@path.json") || strings.Contains(stderr.String(), "private-secret") {
-		t.Fatalf("version request error = %q, want safe file-input guidance without secret", stderr.String())
-	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	require.Contains(t, stderr.String(), "@path.json", "version request error = %q, want safe file-input guidance without secret", stderr.String())
+	require.NotContains(t, stderr.String(), "private-secret", "unexpected text %q", "private-secret")
 }
 
 func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
@@ -111,20 +102,14 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	runCommand := func(args ...string) []byte {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := run(args, &stdout, &stderr); code != 0 {
-			t.Fatalf("run(%v) code = %d; stderr: %s", args, code, stderr.String())
-		}
-		if stderr.Len() > 0 {
-			t.Errorf("run(%v) stderr = %q", args, stderr.String())
-		}
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		require.Empty(t, stderr.String(), "run(%v) stderr = %q", args, stderr.String())
 		return stdout.Bytes()
 	}
 
 	var createdCluster v1.CreatedCluster
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "cluster", "create", "--request",
-		`{"name":"mock-cluster","servicePrincipalID":"123456789012","ports":[{"port":443,"protocol":"https"}]}`), &createdCluster); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "cluster", "create", "--request",
+		`{"name":"mock-cluster","servicePrincipalID":"123456789012","ports":[{"port":443,"protocol":"https"}]}`), &createdCluster))
 	clusterOutput := runCommand("apprun-dedicated-api", "cluster", "list")
 	var clusters struct {
 		Items []struct {
@@ -132,41 +117,31 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 			Name      string       `json:"name"`
 		} `json:"items"`
 	}
-	if err := json.Unmarshal(clusterOutput, &clusters); err != nil {
-		t.Fatal(err)
-	}
-	if len(clusters.Items) != 1 || clusters.Items[0].Name != "mock-cluster" {
-		t.Fatalf("cluster list = %s, want mock-cluster", clusterOutput)
-	}
-	if createdCluster.ClusterID != clusters.Items[0].ClusterID {
-		t.Fatalf("cluster create returned ID %v, list returned %v", createdCluster.ClusterID, clusters.Items[0].ClusterID)
-	}
+	err := json.Unmarshal(clusterOutput, &clusters)
+	require.NoError(t, err)
+	require.Len(t, clusters.Items, 1, "cluster list = %s, want mock-cluster", clusterOutput)
+	require.Equal(t, "mock-cluster", clusters.Items[0].Name, "unexpected value")
+	require.Equal(t, clusters.Items[0].ClusterID, createdCluster.ClusterID, "cluster create returned ID %v, list returned %v", createdCluster.ClusterID, clusters.Items[0].ClusterID)
 	clusterID := jsonString(t, createdCluster.ClusterID)
 
 	var readCluster applicationOutput
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "cluster", "read", clusterID), &readCluster); err != nil {
-		t.Fatal(err)
-	}
-	if readCluster.Name != "mock-cluster" {
-		t.Fatalf("cluster read returned name %q, want mock-cluster", readCluster.Name)
-	}
+	err2 := json.Unmarshal(runCommand("apprun-dedicated-api", "cluster", "read", clusterID), &readCluster)
+	require.NoError(t, err2)
+	require.Equal(t, "mock-cluster", readCluster.Name, "cluster read returned name %q, want mock-cluster", readCluster.Name)
 	runCommand("apprun-dedicated-api", "cluster", "update", clusterID, "--request", `{"servicePrincipalID":"123456789012"}`)
 
 	var createdGroup v1.CreatedAutoScalingGroup
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "auto-scaling-group", "create",
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "auto-scaling-group", "create",
 		"--cluster-id", clusterID,
-		"--request", `{"name":"mock-asg","zone":"is1b","nameServers":["210.188.224.10"],"workerServiceClassPath":"cloud/apprun/dedicated/worker/1vcpu_2gb","minNodes":1,"maxNodes":1,"interfaces":[{"interfaceIndex":0,"upstream":"shared","ipPool":[],"connectsToLB":false}]}`), &createdGroup); err != nil {
-		t.Fatal(err)
-	}
+		"--request", `{"name":"mock-asg","zone":"is1b","nameServers":["210.188.224.10"],"workerServiceClassPath":"cloud/apprun/dedicated/worker/1vcpu_2gb","minNodes":1,"maxNodes":1,"interfaces":[{"interfaceIndex":0,"upstream":"shared","ipPool":[],"connectsToLB":false}]}`), &createdGroup))
 	groupID := jsonString(t, createdGroup.AutoScalingGroupID)
 	var groups struct {
 		Items []struct {
 			AutoScalingGroupID v1.AutoScalingGroupID `json:"autoScalingGroupID"`
 		} `json:"items"`
 	}
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "auto-scaling-group", "list", "--cluster-id", clusterID), &groups); err != nil {
-		t.Fatal(err)
-	}
+	err3 := json.Unmarshal(runCommand("apprun-dedicated-api", "auto-scaling-group", "list", "--cluster-id", clusterID), &groups)
+	require.NoError(t, err3)
 	if len(groups.Items) != 1 || jsonString(t, groups.Items[0].AutoScalingGroupID) != groupID {
 		t.Fatalf("auto-scaling-group list = %#v, want group %s", groups.Items, groupID)
 	}
@@ -177,53 +152,40 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 			WorkerNodeID v1.WorkerNodeID `json:"workerNodeID"`
 		} `json:"items"`
 	}
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "worker-node", "list",
-		"--cluster-id", clusterID, "--auto-scaling-group-id", groupID), &workerNodes); err != nil {
-		t.Fatal(err)
-	}
-	if len(workerNodes.Items) == 0 {
-		t.Fatal("worker-node list returned no nodes")
-	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "worker-node", "list",
+		"--cluster-id", clusterID, "--auto-scaling-group-id", groupID), &workerNodes))
+	require.NotEmpty(t, workerNodes.Items, "worker-node list returned no nodes")
 	workerNodeID := jsonString(t, workerNodes.Items[0].WorkerNodeID)
 	runCommand("apprun-dedicated-api", "worker-node", "read", "--cluster-id", clusterID, "--auto-scaling-group-id", groupID, "--worker-node-id", workerNodeID)
 	runCommand("apprun-dedicated-api", "worker-node", "update", "--cluster-id", clusterID, "--auto-scaling-group-id", groupID, "--worker-node-id", workerNodeID, "--draining", "true")
 	runCommand("apprun-dedicated-api", "worker-node", "update", "--cluster-id", clusterID, "--auto-scaling-group-id", groupID, "--worker-node-id", workerNodeID, "--draining", "false")
 
 	var createdLB v1.CreatedLoadBalancer
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "load-balancer", "create",
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "load-balancer", "create",
 		"--cluster-id", clusterID, "--auto-scaling-group-id", groupID,
-		"--request", `{"name":"mock-lb","serviceClassPath":"cloud/apprun/dedicated/lb/1vcpu_2gb","nameServers":["210.188.224.10"],"interfaces":[{"interfaceIndex":0,"upstream":"shared","ipPool":[]}]}`), &createdLB); err != nil {
-		t.Fatal(err)
-	}
+		"--request", `{"name":"mock-lb","serviceClassPath":"cloud/apprun/dedicated/lb/1vcpu_2gb","nameServers":["210.188.224.10"],"interfaces":[{"interfaceIndex":0,"upstream":"shared","ipPool":[]}]}`), &createdLB))
 	lbID := jsonString(t, createdLB.LoadBalancerID)
 	runCommand("apprun-dedicated-api", "load-balancer", "read", "--cluster-id", clusterID, "--auto-scaling-group-id", groupID, "--load-balancer-id", lbID)
 	var loadBalancers struct {
 		Items []v1.ReadLoadBalancerSummary `json:"items"`
 	}
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "load-balancer", "list",
-		"--cluster-id", clusterID, "--auto-scaling-group-id", groupID), &loadBalancers); err != nil {
-		t.Fatal(err)
-	}
-	if len(loadBalancers.Items) != 1 {
-		t.Fatalf("load-balancer list returned %d results, want 1", len(loadBalancers.Items))
-	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "load-balancer", "list",
+		"--cluster-id", clusterID, "--auto-scaling-group-id", groupID), &loadBalancers))
+	require.Len(t, loadBalancers.Items, 1, "load-balancer list returned %d results, want 1", len(loadBalancers.Items))
 	runCommand("apprun-dedicated-api", "load-balancer", "node", "list",
 		"--cluster-id", clusterID, "--auto-scaling-group-id", groupID, "--load-balancer-id", lbID)
 
 	var createdCertificate v1.CreatedCertificate
 	certificateFile := t.TempDir() + "/certificate.json"
 	certificateJSON := `{"name":"mock-cert","certificatePem":"-----BEGIN CERTIFICATE-----\nMIItest\n-----END CERTIFICATE-----","privatekeyPem":"-----BEGIN PRIVATE KEY-----\nMIItest\n-----END PRIVATE KEY-----"}`
-	if err := os.WriteFile(certificateFile, []byte(certificateJSON), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "certificate", "create", "--cluster-id", clusterID, "--request", "@"+certificateFile), &createdCertificate); err != nil {
-		t.Fatal(err)
-	}
+	err4 := os.WriteFile(certificateFile, []byte(certificateJSON), 0o600)
+	require.NoError(t, err4)
+	err5 := json.Unmarshal(runCommand("apprun-dedicated-api", "certificate", "create", "--cluster-id", clusterID, "--request", "@"+certificateFile), &createdCertificate)
+	require.NoError(t, err5)
 	certificateID := jsonString(t, createdCertificate.CertificateID)
 	runCommand("apprun-dedicated-api", "certificate", "read", "--cluster-id", clusterID, "--certificate-id", certificateID)
-	if err := os.WriteFile(certificateFile, []byte(strings.ReplaceAll(certificateJSON, "mock-cert", "mock-cert-updated")), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err6 := os.WriteFile(certificateFile, []byte(strings.ReplaceAll(certificateJSON, "mock-cert", "mock-cert-updated")), 0o600)
+	require.NoError(t, err6)
 	runCommand("apprun-dedicated-api", "certificate", "update", "--cluster-id", clusterID,
 		"--certificate-id", certificateID, "--request", "@"+certificateFile)
 	runCommand("apprun-dedicated-api", "certificate", "delete", "--cluster-id", clusterID, "--certificate-id", certificateID)
@@ -231,29 +193,21 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	runCommand("apprun-dedicated-api", "service-class", "list-worker")
 
 	var createdApp v1.CreatedApplication
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "application", "create",
-		"--name", "mock-app", "--cluster-id", clusterID), &createdApp); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "application", "create",
+		"--name", "mock-app", "--cluster-id", clusterID), &createdApp))
 	appID := jsonString(t, createdApp.ApplicationID)
 
 	var app applicationOutput
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "application", "read", appID), &app); err != nil {
-		t.Fatal(err)
-	}
-	if app.Name != "mock-app" {
-		t.Fatalf("application name = %q, want mock-app", app.Name)
-	}
+	err7 := json.Unmarshal(runCommand("apprun-dedicated-api", "application", "read", appID), &app)
+	require.NoError(t, err7)
+	require.Equal(t, "mock-app", app.Name, "application name = %q, want mock-app", app.Name)
 
 	requestPath := t.TempDir() + "/version.json"
-	if err := os.WriteFile(requestPath, []byte(`{"cpu":1000,"memory":2048,"scalingMode":"manual","fixedScale":1,"image":"nginx:latest","registryPasswordAction":"keep","exposedPorts":[{"targetPort":80}]}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err8 := os.WriteFile(requestPath, []byte(`{"cpu":1000,"memory":2048,"scalingMode":"manual","fixedScale":1,"image":"nginx:latest","registryPasswordAction":"keep","exposedPorts":[{"targetPort":80}]}`), 0o600)
+	require.NoError(t, err8)
 	var createdVersion v1.ReadApplicationVersionSummary
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "version", "create",
-		"--application-id", appID, "--request", "@"+requestPath), &createdVersion); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "version", "create",
+		"--application-id", appID, "--request", "@"+requestPath), &createdVersion))
 	if createdVersion.Version < 1 {
 		t.Fatalf("created version = %d, want positive version", createdVersion.Version)
 	}
@@ -261,19 +215,15 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	var versions struct {
 		Items []v1.ApplicationVersionDeploymentStatus `json:"items"`
 	}
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "version", "list",
-		"--application-id", appID, "--max-items", "30"), &versions); err != nil {
-		t.Fatal(err)
-	}
-	if len(versions.Items) != 1 || versions.Items[0].Version != createdVersion.Version {
-		t.Fatalf("version list = %#v, want version %d", versions.Items, createdVersion.Version)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "version", "list",
+		"--application-id", appID, "--max-items", "30"), &versions))
+	require.Len(t, versions.Items, 1, "version list = %#v, want version %d", versions.Items, createdVersion.Version)
+	require.Equal(t, createdVersion.Version, versions.Items[0].Version, "unexpected value")
 
 	runCommand("apprun-dedicated-api", "application", "update", appID, "--active-version", "1")
 	var containers []map[string]any
-	if err := json.Unmarshal(runCommand("apprun-dedicated-api", "application", "containers", appID), &containers); err != nil {
-		t.Fatal(err)
-	}
+	err9 := json.Unmarshal(runCommand("apprun-dedicated-api", "application", "containers", appID), &containers)
+	require.NoError(t, err9)
 	runCommand("apprun-dedicated-api", "application", "update", appID, "--deactivate")
 	runCommand("apprun-dedicated-api", "version", "delete", "--application-id", appID, "1")
 	runCommand("apprun-dedicated-api", "application", "delete", appID)
@@ -281,9 +231,8 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	runCommand("apprun-dedicated-api", "auto-scaling-group", "delete", "--cluster-id", clusterID, "--auto-scaling-group-id", groupID)
 	runCommand("apprun-dedicated-api", "cluster", "delete", clusterID)
 
-	if violations := server.SpecViolations(); len(violations) != 0 {
-		t.Fatalf("sakumock recorded OpenAPI response violations: %+v", violations)
-	}
+	violations := server.SpecViolations()
+	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)
 }
 
 type applicationOutput struct {
@@ -293,8 +242,6 @@ type applicationOutput struct {
 func jsonString(t *testing.T, value any) string {
 	t.Helper()
 	data, err := json.Marshal(value)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return strings.Trim(string(data), `"`)
 }

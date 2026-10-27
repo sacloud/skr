@@ -71,18 +71,13 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 		return nil, fmt.Errorf("parse IaaS request URL: %w", err)
 	}
 	parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
-	if method == "GET" && parts[len(parts)-1] == "zone" {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		zones := make([]map[string]string, 0, len(s.zones))
-		for _, name := range s.zones {
-			zones = append(zones, map[string]string{"Name": name})
-		}
-		return marshalJSON(map[string]any{
-			"Total": len(zones),
-			"Count": len(zones),
-			"Zones": zones,
-		})
+	// Zone API のパスは .../api/cloud/1.1/zone[/{id}] です。ベース URL の /cloud/zone/{名前}/ と
+	// 区別するため、パスの末尾で照合します。
+	if n := len(parts); n > 0 && parts[n-1] == "zone" {
+		return s.doZone(method, uri, "")
+	}
+	if n := len(parts); n > 1 && parts[n-2] == "zone" {
+		return s.doZone(method, uri, parts[n-1])
 	}
 	for _, part := range parts {
 		if part == "packetfilter" {
@@ -351,6 +346,49 @@ func (s *Server) findIcons(request map[string]json.RawMessage) ([]map[string]jso
 		end = from + min(condition.Count, total-from)
 	}
 	return items[from:end], total, nil
+}
+
+// doZone は Zone API の検索と参照を処理します。設定されたゾーンに 1 から順に ID を割り当てます。
+func (s *Server) doZone(method string, uri, id string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch {
+	case method == "GET" && id == "":
+		zones := make([]map[string]any, 0, len(s.zones))
+		for i, name := range s.zones {
+			zones = append(zones, map[string]any{"ID": i + 1, "Name": name})
+		}
+		return marshalJSON(map[string]any{
+			"Total": len(zones),
+			"Count": len(zones),
+			"Zones": zones,
+		})
+	case method == "GET":
+		var zoneID int
+		if _, err := fmt.Sscanf(id, "%d", &zoneID); err != nil {
+			return nil, fmt.Errorf("invalid zone ID in IaaS request URL: %s", uri)
+		}
+		if zoneID < 1 || zoneID > len(s.zones) {
+			return nil, zoneNotFound(method, uri, id)
+		}
+		return marshalJSON(map[string]any{
+			"Zone": map[string]any{"ID": zoneID, "Name": s.zones[zoneID-1]},
+		})
+	default:
+		return nil, fmt.Errorf("unsupported IaaS operation: %s %s", method, uri)
+	}
+}
+
+// zoneNotFound は Zone API の存在しないゾーンに対する API 404 エラーを返します。
+func zoneNotFound(method, uri, id string) error {
+	requestURL, err := url.Parse(uri)
+	if err != nil {
+		return fmt.Errorf("parse Zone request URL: %w", err)
+	}
+	return iaas.NewAPIError(method, requestURL, http.StatusNotFound, &iaas.APIErrorResponse{
+		ErrorCode: "not_found", ErrorMessage: fmt.Sprintf("zone %s not found", id),
+	})
 }
 
 func (s *Server) doPacketFilter(method string, parts []string, uri string, body any) ([]byte, error) {

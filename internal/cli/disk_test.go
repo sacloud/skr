@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -27,28 +26,19 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	"github.com/sacloud/skr/internal/apigen"
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDiskGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-disk.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/diskapi/disk_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated Disk commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-disk.json API_OUTPUT=internal/iaas/diskapi/disk_api_generated.go")
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got, "generated Disk commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-disk.json API_OUTPUT=internal/iaas/diskapi/disk_api_generated.go")
 }
 
 func TestRunIaaSDiskHelp(t *testing.T) {
@@ -67,19 +57,13 @@ func TestRunIaaSDiskHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
-				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, exitCode, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help output does not contain %q", text)
-				}
+				require.Contains(t, help, text, "help output does not contain %q", text)
 			}
 			for _, text := range test.notWant {
-				if strings.Contains(help, text) {
-					t.Errorf("help output contains removed text %q", text)
-				}
+				require.NotContains(t, help, text, "help output contains removed text %q", text)
 			}
 		})
 	}
@@ -99,9 +83,9 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 
 	create := `{"Zone":"test-zone","Name":"test-disk","Description":"test description","DiskPlanID":4,"Connection":"virtio","SizeGB":20,"Tags":["test"],"IconID":11,"NoWait":true}`
 	output, stderr, code := run("create", "--request", create)
-	if code != 0 || stderr != "" || !strings.Contains(output, `"Name": "test-disk"`) {
-		t.Fatalf("create: code %d, stderr %q, output %q", code, stderr, output)
-	}
+	require.Equal(t, 0, code, "create: code %d, stderr %q, output %q", code, stderr, output)
+	require.Empty(t, stderr, "should be empty")
+	require.Contains(t, output, `"Name": "test-disk"`, "missing expected text %q", `"Name": "test-disk"`)
 	if api.createRequest == nil || api.createRequest.Zone != "test-zone" ||
 		api.createRequest.Name != "test-disk" || api.createRequest.Description != "test description" ||
 		api.createRequest.DiskPlanID != 4 || api.createRequest.Connection != "virtio" ||
@@ -116,65 +100,56 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		"--disk-plan-id", "4", "--connection", "virtio", "--size-gb", "20",
 		"--tags", "test", "--icon-id", "11", "--no-wait",
 	)
-	if code != 0 || stderr != "" {
-		t.Fatalf("flag create: code %d, stderr %q", code, stderr)
-	}
-	if api.createRequest == nil || !reflect.DeepEqual(*api.createRequest, jsonCreateRequest) {
-		t.Fatalf("flag Create request = %+v, want JSON request %+v", api.createRequest, jsonCreateRequest)
-	}
+	require.Equal(t, 0, code, "flag create: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.NotNil(t, api.createRequest, "flag Create request = %+v, want JSON request %+v", api.createRequest, jsonCreateRequest)
+	require.Equal(t, jsonCreateRequest, *api.createRequest, "unexpected value")
 
 	_, stderr, code = run("create",
 		"--zone", "test-zone", "--name", "test-disk", "--disk-plan-id", "4",
 		"--connection", "virtio", "--size-gb", "20", "--no-wait=false",
 	)
-	if code != 0 || stderr != "" {
-		t.Fatalf("create with explicit false boolean: code %d, stderr %q", code, stderr)
-	}
-	if api.createRequest == nil || api.createRequest.NoWait {
-		t.Fatalf("Create request NoWait = %v, want explicit false", api.createRequest)
-	}
+	require.Equal(t, 0, code, "create with explicit false boolean: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.NotNil(t, api.createRequest, "Create request NoWait = %v, want explicit false", api.createRequest)
+	require.False(t, api.createRequest.NoWait, "unexpected value")
 
 	_, stderr, code = run("find", "--zone", "test-zone", "--tags", "production,web", "--count", "7", "--from", "2")
-	if code != 0 || stderr != "" {
-		t.Fatalf("find: code %d, stderr %q", code, stderr)
-	}
-	if len(api.findRequests) != 1 {
-		t.Fatalf("Find called %d times, want one zone", len(api.findRequests))
-	}
+	require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Len(t, api.findRequests, 1, "Find called %d times, want one zone", len(api.findRequests))
 	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 7 || request.From != 2 ||
 		len(request.Tags) != 2 || request.Tags[0] != "production" || request.Tags[1] != "web" {
 		t.Errorf("Find request = %+v, want test-zone, Count 7, From 2", request)
 	}
 
 	output, stderr, code = run("find", "--zone", "test-zone", "--query", "map({ID,Name,SizeMB})")
-	if code != 0 || stderr != "" {
-		t.Fatalf("projected find: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "projected find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	var projected []struct {
 		ID     json.Number
 		Name   string
 		SizeMB int
 	}
-	if err := json.Unmarshal([]byte(output), &projected); err != nil {
-		t.Fatal(err)
-	}
-	if len(projected) != 1 || projected[0].ID.String() != "123" || projected[0].Name != "test-zone" || projected[0].SizeMB != 20480 {
-		t.Fatalf("projected Disk = %s, want ID, name and size", output)
-	}
+	err := json.Unmarshal([]byte(output), &projected)
+	require.NoError(t, err)
+	require.Len(t, projected, 1, "projected Disk = %s, want ID, name and size", output)
+	require.Equal(t, "123", projected[0].ID.String(), "unexpected value")
+	require.Equal(t, "test-zone", projected[0].Name, "unexpected value")
+	require.EqualValues(t, 20480, projected[0].SizeMB, "unexpected value")
 
 	output, stderr, code = run("read", "--zone", "test-zone", "--id", "123")
-	if code != 0 || stderr != "" || !strings.Contains(output, `"ID": 123`) {
-		t.Fatalf("read: code %d, stderr %q, output %q", code, stderr, output)
-	}
-	if api.readRequest == nil || api.readRequest.Zone != "test-zone" || api.readRequest.ID != 123 {
-		t.Fatalf("Read request = %+v, want zone and ID", api.readRequest)
-	}
+	require.Equal(t, 0, code, "read: code %d, stderr %q, output %q", code, stderr, output)
+	require.Empty(t, stderr, "should be empty")
+	require.Contains(t, output, `"ID": 123`, "missing expected text %q", `"ID": 123`)
+	require.NotNil(t, api.readRequest, "Read request = %+v, want zone and ID", api.readRequest)
+	require.Equal(t, "test-zone", api.readRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, api.readRequest.ID, "unexpected value")
 
 	update := `{"Zone":"test-zone","ID":123,"Name":"updated-disk","Description":"","Tags":["test"],"IconID":0,"Connection":"virtio","NoWait":true}`
 	_, stderr, code = run("update", "--request", update)
-	if code != 0 || stderr != "" {
-		t.Fatalf("update: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "update: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if api.updateRequest == nil || api.updateRequest.ID != 123 ||
 		api.updateRequest.Name == nil || *api.updateRequest.Name != "updated-disk" ||
 		api.updateRequest.Description == nil || *api.updateRequest.Description != "" ||
@@ -191,17 +166,14 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 		"--description", "", "--tags", "test", "--icon-id", "0",
 		"--connection", "virtio", "--no-wait",
 	)
-	if code != 0 || stderr != "" {
-		t.Fatalf("flag update: code %d, stderr %q", code, stderr)
-	}
-	if api.updateRequest == nil || !reflect.DeepEqual(*api.updateRequest, jsonUpdateRequest) {
-		t.Fatalf("flag Update request = %+v, want JSON request %+v", api.updateRequest, jsonUpdateRequest)
-	}
+	require.Equal(t, 0, code, "flag update: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.NotNil(t, api.updateRequest, "flag Update request = %+v, want JSON request %+v", api.updateRequest, jsonUpdateRequest)
+	require.Equal(t, jsonUpdateRequest, *api.updateRequest, "unexpected value")
 
 	_, stderr, code = run("update", "--zone", "test-zone", "--id", "123", "--name", "partial-update")
-	if code != 0 || stderr != "" {
-		t.Fatalf("partial flag update: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "partial flag update: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if api.updateRequest == nil || api.updateRequest.Name == nil || *api.updateRequest.Name != "partial-update" ||
 		api.updateRequest.Description != nil || api.updateRequest.Tags != nil ||
 		api.updateRequest.IconID != nil || api.updateRequest.Connection != nil {
@@ -209,9 +181,8 @@ func TestIaaSDiskCommandsUseSDKRequests(t *testing.T) {
 	}
 
 	_, stderr, code = run("delete", "--zone", "test-zone", "--id", "123", "--fail-if-not-found", "--wait-for-release")
-	if code != 0 || stderr != "" {
-		t.Fatalf("delete: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "delete: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if api.deleteRequest == nil || api.deleteRequest.ID != 123 ||
 		!api.deleteRequest.FailIfNotFound || !api.deleteRequest.WaitForRelease {
 		t.Fatalf("Delete request = %+v, want ID, FailIfNotFound, and WaitForRelease", api.deleteRequest)
@@ -236,9 +207,9 @@ func TestIaaSDiskRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		commandLine := newCLI()
 		setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "disk"}, args...), &stdout, &stderr, commandLine)
-		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
-		}
+		require.NotEqual(t, 0, code, "%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
 	if len(api.findRequests) != 0 || api.readRequest != nil || api.createRequest != nil ||
 		api.updateRequest != nil || api.deleteRequest != nil {

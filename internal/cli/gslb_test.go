@@ -26,6 +26,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/gslb"
 	"github.com/sacloud/skr/internal/gslbapi"
+	"github.com/stretchr/testify/require"
 )
 
 type gslbAPITestDouble struct {
@@ -93,14 +94,10 @@ func TestRunGSLBAPIHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args, "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v): code=%d stderr=%s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, want := range test.want {
-				if !strings.Contains(help, want) {
-					t.Errorf("help does not contain %q: %s", want, help)
-				}
+				require.Contains(t, help, want, "help does not contain %q: %s", want, help)
 			}
 		})
 	}
@@ -114,20 +111,15 @@ func TestGSLBCommandOperations(t *testing.T) {
 	run := func(args ...string) []byte {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-			t.Fatalf("run(%v): code=%d stderr=%s", args, code, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Fatalf("run(%v) stderr=%q", args, stderr.String())
-		}
+		require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
+		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr=%q", args, stderr.String())
 		return stdout.Bytes()
 	}
 
 	listed := run("gslb-api", "find", "--name", "test-gslb", "--tags", "web,production", "--query", "map({ID,Name})")
 	var projection []map[string]json.RawMessage
-	if err := json.Unmarshal(listed, &projection); err != nil {
-		t.Fatal(err)
-	}
+	err := json.Unmarshal(listed, &projection)
+	require.NoError(t, err)
 	if len(projection) != 1 || string(projection[0]["Name"]) != `"test-gslb"` {
 		t.Fatalf("find output = %s", listed)
 	}
@@ -140,9 +132,8 @@ func TestGSLBCommandOperations(t *testing.T) {
 		"--health-check-path", "/health", "--health-check-port", "8080",
 		"--destination-server", "ip-address=192.0.2.10,enabled=true,weight=5")
 	var createResult iaas.GSLB
-	if err := json.Unmarshal(created, &createResult); err != nil {
-		t.Fatal(err)
-	}
+	err2 := json.Unmarshal(created, &createResult)
+	require.NoError(t, err2)
 	if api.createRequest == nil || api.createRequest.Name != "test-gslb" ||
 		api.createRequest.HealthCheck == nil || api.createRequest.HealthCheck.Protocol != types.GSLBHealthCheckProtocols.HTTP ||
 		api.createRequest.HealthCheck.Path != "/health" || api.createRequest.HealthCheck.Port != types.StringNumber(8080) ||
@@ -151,9 +142,8 @@ func TestGSLBCommandOperations(t *testing.T) {
 	}
 
 	run("gslb-api", "read", "--id", "123")
-	if api.readRequest == nil || api.readRequest.ID != 123 {
-		t.Fatalf("read request = %+v", api.readRequest)
-	}
+	require.NotNil(t, api.readRequest, "read request = %+v", api.readRequest)
+	require.EqualValues(t, 123, api.readRequest.ID, "unexpected value")
 
 	run("gslb-api", "update", "--id", "123", "--weighted=false", "--delay-loop", "0",
 		"--description", "", "--monitoring-suite-log-enabled=false")
@@ -163,14 +153,14 @@ func TestGSLBCommandOperations(t *testing.T) {
 		api.updateRequest.MonitoringSuiteLog == nil || api.updateRequest.MonitoringSuiteLog.Enabled {
 		t.Fatalf("update request = %+v", api.updateRequest)
 	}
-	if api.updateRequest.Tags != nil || api.updateRequest.HealthCheck != nil || api.updateRequest.DestinationServers != nil {
-		t.Fatalf("omitted update fields were populated: %+v", api.updateRequest)
-	}
+	require.Nil(t, api.updateRequest.Tags, "omitted update fields were populated: %+v", api.updateRequest)
+	require.Nil(t, api.updateRequest.HealthCheck, "should be nil")
+	require.Nil(t, api.updateRequest.DestinationServers, "should be nil")
 
 	run("gslb-api", "delete", "--id", "123", "--fail-if-not-found")
-	if api.deleteRequest == nil || api.deleteRequest.ID != 123 || !api.deleteRequest.FailIfNotFound {
-		t.Fatalf("delete request = %+v", api.deleteRequest)
-	}
+	require.NotNil(t, api.deleteRequest, "delete request = %+v", api.deleteRequest)
+	require.EqualValues(t, 123, api.deleteRequest.ID, "unexpected value")
+	require.True(t, api.deleteRequest.FailIfNotFound, "unexpected value")
 }
 
 func TestGSLBJSONInputAndMutualExclusion(t *testing.T) {
@@ -186,9 +176,8 @@ func TestGSLBJSONInputAndMutualExclusion(t *testing.T) {
 	}
 	code, stderr := run("gslb-api", "create", "--request",
 		`{"Name":"json-gslb","HealthCheck":{"Protocol":"ping"},"DestinationServers":[]}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("JSON create code=%d stderr=%q", code, stderr)
-	}
+	require.Equal(t, 0, code, "JSON create code=%d stderr=%q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if api.createRequest == nil || api.createRequest.Name != "json-gslb" ||
 		api.createRequest.HealthCheck == nil || api.createRequest.HealthCheck.Protocol != types.GSLBHealthCheckProtocols.Ping ||
 		api.createRequest.DestinationServers == nil {
@@ -201,9 +190,8 @@ func TestGSLBJSONInputAndMutualExclusion(t *testing.T) {
 		{"gslb-api", "delete", "--request", `{"ID":123}`, "--fail-if-not-found=false"},
 	} {
 		code, stderr = run(args...)
-		if code != 1 || !strings.Contains(stderr, "--request と個別フラグ") {
-			t.Errorf("run(%v) = code %d, stderr %q", args, code, stderr)
-		}
+		require.EqualValues(t, 1, code, "run(%v) = code %d, stderr %q", args, code, stderr)
+		require.Contains(t, stderr, "--request と個別フラグ", "missing expected text %q", "--request と個別フラグ")
 	}
 }
 
@@ -250,16 +238,11 @@ func TestGSLBCLIUsesSDKRequestConversion(t *testing.T) {
 		"gslb-api", "create", "--name", "sdk-created", "--health-check-protocol", "ping",
 		"--delay-loop", "10", "--destination-server", "ip-address=192.0.2.10,weight=5",
 	}
-	if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-		t.Fatalf("run(%v): code=%d stderr=%s", args, code, stderr.String())
-	}
-	if caller.method != "POST" || !strings.Contains(caller.uri, "/commonserviceitem") {
-		t.Fatalf("SDK call = %s %s", caller.method, caller.uri)
-	}
+	require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
+	require.Equal(t, "POST", caller.method, "SDK call = %s %s", caller.method, caller.uri)
+	require.Contains(t, caller.uri, "/commonserviceitem", "missing expected text %q", "/commonserviceitem")
 	item, ok := caller.body["CommonServiceItem"].(map[string]any)
-	if !ok {
-		t.Fatalf("SDK request body = %#v", caller.body)
-	}
+	require.True(t, ok, "SDK request body = %#v", caller.body)
 	settings := item["Settings"].(map[string]any)
 	gslbSettings := settings["GSLB"].(map[string]any)
 	healthCheck := gslbSettings["HealthCheck"].(map[string]any)
@@ -273,12 +256,10 @@ func TestGSLBCLIUsesSDKRequestConversion(t *testing.T) {
 		t.Fatalf("converted destination server = %#v", server)
 	}
 	var result iaas.GSLB
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		t.Fatal(err)
-	}
-	if result.ID != 321 || result.FQDN != "site-321.gslbN.sakura.ne.jp" {
-		t.Fatalf("decoded SDK result = %+v", result)
-	}
+	err := json.Unmarshal(stdout.Bytes(), &result)
+	require.NoError(t, err)
+	require.EqualValues(t, 321, result.ID, "decoded SDK result = %+v", result)
+	require.Equal(t, "site-321.gslbN.sakura.ne.jp", result.FQDN, "unexpected value")
 }
 
 func reflectStrings(actual, expected []string) bool {

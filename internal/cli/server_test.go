@@ -30,28 +30,19 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/skr/internal/apigen"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestServerGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-server.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/serverapi/server_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated Server commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-server.json API_OUTPUT=internal/iaas/serverapi/server_api_generated.go")
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got, "generated Server commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-server.json API_OUTPUT=internal/iaas/serverapi/server_api_generated.go")
 }
 
 func TestRunIaaSServerHelp(t *testing.T) {
@@ -71,19 +62,13 @@ func TestRunIaaSServerHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
-				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, exitCode, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help output does not contain %q", text)
-				}
+				require.Contains(t, help, text, "help output does not contain %q", text)
 			}
 			for _, text := range test.notWant {
-				if strings.Contains(help, text) {
-					t.Errorf("help output contains removed text %q", text)
-				}
+				require.NotContains(t, help, text, "help output contains removed text %q", text)
 			}
 		})
 	}
@@ -103,21 +88,19 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 
 	requestPath := filepath.Join(t.TempDir(), "server-create.json")
 	createRequestJSON := `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1,"Description":"test description","IconID":41,"GPU":0,"GPUModel":"gpu-model","CPUModel":"cpu-model","Commitment":"standard","Generation":100,"ConfidentialVM":false,"InterfaceDriver":"virtio","BootAfterCreate":false,"CDROMID":42,"PrivateHostID":43,"Tags":["tutorial"]}`
-	if err := os.WriteFile(requestPath, []byte(createRequestJSON), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(requestPath, []byte(createRequestJSON), 0o600)
+	require.NoError(t, err)
 	output, stderr, code := run("create", "--request", "@"+requestPath)
-	if code != 0 || stderr != "" || !strings.Contains(output, `"Name": "server"`) {
-		t.Fatalf("create: code %d, stderr %q, output %q", code, stderr, output)
-	}
+	require.Equal(t, 0, code, "create: code %d, stderr %q, output %q", code, stderr, output)
+	require.Empty(t, stderr, "should be empty")
+	require.Contains(t, output, `"Name": "server"`, "missing expected text %q", `"Name": "server"`)
 	if api.createRequest == nil || api.createRequest.Zone != "test-zone" ||
 		api.createRequest.Name != "server" || api.createRequest.CPU != 1 || api.createRequest.MemoryGB != 1 {
 		t.Fatalf("Create request = %+v, want JSON values", api.createRequest)
 	}
 	jsonCreateRequest := *api.createRequest
-	if len(jsonCreateRequest.Tags) != 1 || jsonCreateRequest.Tags[0] != "tutorial" {
-		t.Fatalf("Create JSON Tags = %v, want [tutorial]", jsonCreateRequest.Tags)
-	}
+	require.Len(t, jsonCreateRequest.Tags, 1, "Create JSON Tags = %v, want [tutorial]", jsonCreateRequest.Tags)
+	require.Equal(t, "tutorial", jsonCreateRequest.Tags[0], "unexpected value")
 	jsonCreateRequest.Tags = nil
 	_, stderr, code = run(
 		"create",
@@ -139,20 +122,13 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		"--cdrom-id", "42",
 		"--private-host-id", "43",
 	)
-	if code != 0 || stderr != "" {
-		t.Fatalf("create flags: code %d, stderr %q", code, stderr)
-	}
-	if api.createRequest == nil {
-		t.Fatal("Create flag request is nil")
-	}
+	require.Equal(t, 0, code, "create flags: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.NotNil(t, api.createRequest, "Create flag request is nil")
 	wantTags := []string{"production", "web"}
-	if !reflect.DeepEqual([]string(api.createRequest.Tags), wantTags) {
-		t.Fatalf("Create flag Tags = %v, want %v", api.createRequest.Tags, wantTags)
-	}
+	require.Equal(t, wantTags, []string(api.createRequest.Tags), "Create flag Tags = %v, want %v", api.createRequest.Tags, wantTags)
 	api.createRequest.Tags = nil
-	if !reflect.DeepEqual(*api.createRequest, jsonCreateRequest) {
-		t.Fatalf("Create flag request = %+v, want JSON request %+v", api.createRequest, jsonCreateRequest)
-	}
+	require.Equal(t, jsonCreateRequest, *api.createRequest, "Create flag request = %+v, want JSON request %+v", api.createRequest, jsonCreateRequest)
 
 	_, stderr, code = run(
 		"create",
@@ -165,71 +141,63 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		"--nic", "upstream=shared",
 		"--nic", "upstream=disconnected",
 	)
-	if code != 0 || stderr != "" {
-		t.Fatalf("create cloud-init options: code %d, stderr %q", code, stderr)
-	}
-	if api.createRequest == nil || len(api.createRequest.Disks) != 2 {
-		t.Fatalf("Create request disks = %+v, want two disks", api.createRequest)
-	}
+	require.Equal(t, 0, code, "create cloud-init options: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.NotNil(t, api.createRequest, "Create request disks = %+v, want two disks", api.createRequest)
+	require.Len(t, api.createRequest.Disks, 2, "unexpected length")
 	createdDisk := api.createRequest.Disks[0]
 	if createdDisk.Name != "cloudimg-server" || createdDisk.DiskPlanID != 7 ||
 		createdDisk.Connection != "virtio" || createdDisk.SourceArchiveID != 456 || createdDisk.SizeGB != 20 {
 		t.Errorf("cloudimg disk = %+v, want name, plan 7, virtio, archive 456, size 20", createdDisk)
 	}
-	if second := api.createRequest.Disks[1]; second.DiskPlanID != 4 || second.SizeGB != 100 || second.SourceArchiveID != 0 {
-		t.Errorf("second disk = %+v, want empty 100 GB disk", second)
-	}
-	if len(api.createRequest.NetworkInterfaces) != 2 || api.createRequest.NetworkInterfaces[0].Upstream != "shared" || api.createRequest.NetworkInterfaces[1].Upstream != "disconnected" {
-		t.Errorf("Create network interfaces = %+v, want shared then disconnected", api.createRequest.NetworkInterfaces)
-	}
+	second := api.createRequest.Disks[1]
+	require.EqualValues(t, 4, second.DiskPlanID, "second disk = %+v, want empty 100 GB disk", second)
+	require.EqualValues(t, 100, second.SizeGB, "unexpected value")
+	require.EqualValues(t, 0, second.SourceArchiveID, "unexpected value")
+	require.Len(t, api.createRequest.NetworkInterfaces, 2, "Create network interfaces = %+v, want shared then disconnected", api.createRequest.NetworkInterfaces)
+	require.Equal(t, "shared", api.createRequest.NetworkInterfaces[0].Upstream, "unexpected value")
+	require.Equal(t, "disconnected", api.createRequest.NetworkInterfaces[1].Upstream, "unexpected value")
 
 	userDataPath := filepath.Join(t.TempDir(), "cloud-c0nfig.yaml")
 	userData := "#cloud-config\nssh_authorized_keys:\n  - ssh-ed25519 AAAA-example\n"
-	if err := os.WriteFile(userDataPath, []byte(userData), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err2 := os.WriteFile(userDataPath, []byte(userData), 0o600)
+	require.NoError(t, err2)
 	_, stderr, code = run("boot", "--zone", "test-zone", "--id", "123", "--user-data", "@"+userDataPath)
-	if code != 0 || stderr != "" {
-		t.Fatalf("boot: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "boot: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if api.bootRequest == nil || api.bootRequest.Zone != "test-zone" ||
 		api.bootRequest.ID != 123 || api.bootRequest.UserData != userData {
 		t.Fatalf("Boot request = %+v, want zone, ID, and unmodified user-data", api.bootRequest)
 	}
 
 	_, stderr, code = run("boot", "--zone", "test-zone", "--id", "123")
-	if code != 0 || stderr != "" {
-		t.Fatalf("boot without user-data: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "boot without user-data: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if api.bootRequest == nil || api.bootRequest.Zone != "test-zone" ||
 		api.bootRequest.ID != 123 || api.bootRequest.UserData != "" {
 		t.Fatalf("Boot request = %+v, want zone and ID without user-data", api.bootRequest)
 	}
 
 	_, stderr, code = run("find", "--zone", "test-zone", "--tags", "production,web", "--count", "4", "--from", "2")
-	if code != 0 || stderr != "" {
-		t.Fatalf("find: code %d, stderr %q", code, stderr)
-	}
-	if len(api.findRequests) != 1 {
-		t.Fatalf("Find called %d times, want one zone", len(api.findRequests))
-	}
+	require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Len(t, api.findRequests, 1, "Find called %d times, want one zone", len(api.findRequests))
 	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 4 || request.From != 2 ||
 		!reflect.DeepEqual(request.Tags, wantTags) {
 		t.Errorf("Find request = %+v, want test-zone, Count 4, From 2", request)
 	}
 
 	output, stderr, code = run("read", "--zone", "test-zone", "--id", "123")
-	if code != 0 || stderr != "" || !strings.Contains(output, `"ID": 123`) {
-		t.Fatalf("read: code %d, stderr %q, output %q", code, stderr, output)
-	}
-	if api.readRequest == nil || api.readRequest.Zone != "test-zone" || api.readRequest.ID != 123 {
-		t.Fatalf("Read request = %+v, want zone and ID flags", api.readRequest)
-	}
+	require.Equal(t, 0, code, "read: code %d, stderr %q, output %q", code, stderr, output)
+	require.Empty(t, stderr, "should be empty")
+	require.Contains(t, output, `"ID": 123`, "missing expected text %q", `"ID": 123`)
+	require.NotNil(t, api.readRequest, "Read request = %+v, want zone and ID flags", api.readRequest)
+	require.Equal(t, "test-zone", api.readRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, api.readRequest.ID, "unexpected value")
 
 	_, stderr, code = run("update", "--zone", "test-zone", "--id", "123", "--name", "renamed", "--tags", "production,web", "--memory-gb", "0")
-	if code != 0 || stderr != "" {
-		t.Fatalf("update: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "update: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if api.updateRequest == nil || api.updateRequest.Name == nil || *api.updateRequest.Name != "renamed" ||
 		api.updateRequest.MemoryGB == nil || *api.updateRequest.MemoryGB != 0 ||
 		api.updateRequest.Tags == nil || !reflect.DeepEqual([]string(*api.updateRequest.Tags), wantTags) {
@@ -237,12 +205,12 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 	}
 
 	_, stderr, code = run("delete", "--zone", "test-zone", "--id", "123", "--with-disks", "--force")
-	if code != 0 || stderr != "" {
-		t.Fatalf("delete: code %d, stderr %q", code, stderr)
-	}
-	if api.deleteRequest == nil || api.deleteRequest.ID != 123 || !api.deleteRequest.WithDisks || !api.deleteRequest.Force {
-		t.Fatalf("Delete request = %+v, want ID, WithDisks, and Force", api.deleteRequest)
-	}
+	require.Equal(t, 0, code, "delete: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.NotNil(t, api.deleteRequest, "Delete request = %+v, want ID, WithDisks, and Force", api.deleteRequest)
+	require.EqualValues(t, 123, api.deleteRequest.ID, "unexpected value")
+	require.True(t, api.deleteRequest.WithDisks, "unexpected value")
+	require.True(t, api.deleteRequest.Force, "unexpected value")
 }
 
 func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
@@ -266,9 +234,9 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 		commandLine := newCLI()
 		setServerAPIFactory(commandLine, func() (serverapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "server"}, args...), &stdout, &stderr, commandLine)
-		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-			t.Errorf("%v: code %d stdout %q stderr %q; want an error before API call", args, code, stdout.String(), stderr.String())
-		}
+		require.NotEqual(t, 0, code, "%v: code %d stdout %q stderr %q; want an error before API call", args, code, stdout.String(), stderr.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
 	if len(api.findRequests) != 0 || api.readRequest != nil || api.createRequest != nil || api.bootRequest != nil ||
 		api.updateRequest != nil || api.deleteRequest != nil {
@@ -291,12 +259,12 @@ func TestIaaSServerPassesNoWaitWithBootAfterCreateToSDK(t *testing.T) {
 		&stderr,
 		commandLine,
 	)
-	if code != 0 || stderr.Len() != 0 {
-		t.Fatalf("create: code %d, stdout %q, stderr %q; want request forwarded", code, stdout.String(), stderr.String())
-	}
-	if !factoryCalled || api.createRequest == nil || !api.createRequest.NoWait || !api.createRequest.BootAfterCreate {
-		t.Fatalf("request was not forwarded unchanged: %+v", api.createRequest)
-	}
+	require.Equal(t, 0, code, "create: code %d, stdout %q, stderr %q; want request forwarded", code, stdout.String(), stderr.String())
+	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
+	require.True(t, factoryCalled, "request was not forwarded unchanged: %+v", api.createRequest)
+	require.NotNil(t, api.createRequest, "should not be nil")
+	require.True(t, api.createRequest.NoWait, "unexpected value")
+	require.True(t, api.createRequest.BootAfterCreate, "unexpected value")
 }
 
 func TestServerSwitchNICFlagsMatchJSON(t *testing.T) {
@@ -311,17 +279,11 @@ func TestServerSwitchNICFlagsMatchJSON(t *testing.T) {
 		commandLine := newCLI()
 		setServerAPIFactory(commandLine, func() (serverapi.API, error) { return api, nil })
 		var stdout, stderr bytes.Buffer
-		if code := runCLI(append([]string{"iaas-api", "server", "create"}, args...), &stdout, &stderr, commandLine); code != 0 {
-			t.Fatalf("code = %d, stderr = %s", code, &stderr)
-		}
-		if api.createRequest == nil {
-			t.Fatal("Create was not called")
-		}
+		require.Equal(t, 0, runCLI(append([]string{"iaas-api", "server", "create"}, args...), &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
+		require.NotNil(t, api.createRequest, "Create was not called")
 		requests = append(requests, api.createRequest)
 	}
-	if !reflect.DeepEqual(requests[0], requests[1]) {
-		t.Fatalf("flags = %+v, JSON = %+v", requests[0], requests[1])
-	}
+	require.Equal(t, requests[1], requests[0], "flags = %+v, JSON = %+v", requests[0], requests[1])
 }
 
 func TestIaaSServerFindUsesSDKCaller(t *testing.T) {
@@ -333,22 +295,14 @@ func TestIaaSServerFindUsesSDKCaller(t *testing.T) {
 		return server.New(caller), nil
 	})
 	code := runCLI([]string{"iaas-api", "server", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
-	if code != 0 || stderr.Len() != 0 {
-		t.Fatalf("find: code %d, stderr %q", code, stderr.String())
-	}
-	if !strings.Contains(stdout.String(), `"Name": "sdk-server"`) {
-		t.Fatalf("find output = %q, want SDK-decoded server", stdout.String())
-	}
-	if len(caller.calls) != 1 || caller.calls[0].method != "GET" {
-		t.Fatalf("SDK caller requests = %+v, want one GET", caller.calls)
-	}
+	require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr.String())
+	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
+	require.Contains(t, stdout.String(), `"Name": "sdk-server"`, "find output = %q, want SDK-decoded server", stdout.String())
+	require.Len(t, caller.calls, 1, "SDK caller requests = %+v, want one GET", caller.calls)
+	require.Equal(t, "GET", caller.calls[0].method, "unexpected value")
 	parsed, err := url.Parse(caller.calls[0].uri)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasSuffix(parsed.Path, "/zone/test-zone/api/cloud/1.1/server") {
-		t.Errorf("SDK request path = %q, want Server endpoint", parsed.Path)
-	}
+	require.NoError(t, err)
+	require.True(t, strings.HasSuffix(parsed.Path, "/zone/test-zone/api/cloud/1.1/server"), "SDK request path = %q, want Server endpoint", parsed.Path)
 }
 
 type serverAPITestDouble struct {

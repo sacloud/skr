@@ -29,28 +29,19 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/serviceclass"
 	"github.com/sacloud/skr/internal/apigen"
 	serviceclassapi "github.com/sacloud/skr/internal/iaas/serviceclassapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestServiceClassGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-serviceclass.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/serviceclassapi/serviceclass_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated ServiceClass commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-serviceclass.json API_OUTPUT=internal/iaas/serviceclassapi/serviceclass_api_generated.go")
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got, "generated ServiceClass commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-serviceclass.json API_OUTPUT=internal/iaas/serviceclassapi/serviceclass_api_generated.go")
 }
 
 func TestIaaSServiceClassHelp(t *testing.T) {
@@ -63,14 +54,10 @@ func TestIaaSServiceClassHelp(t *testing.T) {
 		{args: []string{"iaas-api", "service-class", "find", "--help"}, want: []string{"--zone", "--count", "--from", "--request", "Sort", "@path.json"}},
 	} {
 		var stdout, stderr bytes.Buffer
-		if code := run(test.args, &stdout, &stderr); code != 0 {
-			t.Fatalf("run(%v) = %d; stderr: %s", test.args, code, stderr.String())
-		}
+		require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 		help := strings.Join(strings.Fields(stdout.String()), " ")
 		for _, text := range test.want {
-			if !strings.Contains(help, text) {
-				t.Errorf("help for %v does not contain %q: %s", test.args, text, help)
-			}
+			require.Contains(t, help, text, "help for %v does not contain %q: %s", test.args, text, help)
 		}
 	}
 }
@@ -87,12 +74,13 @@ func TestIaaSServiceClassFindUsesSDKRequests(t *testing.T) {
 	}
 
 	output, stderr, code := run("find", "--zone", "test-zone", "--count", "3", "--from", "1", "--query", "map({ID,ServiceClassName,ServiceClassPath,DisplayName,IsPublic})")
-	if code != 0 || stderr != "" {
-		t.Fatalf("find flags: code %d, stderr %q", code, stderr)
-	}
-	if request := api.findRequest; request == nil || request.Zone != "test-zone" || request.Count != 3 || request.From != 1 {
-		t.Fatalf("Find request = %+v, want zone, count, and offset", request)
-	}
+	require.Equal(t, 0, code, "find flags: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	request := api.findRequest
+	require.NotNil(t, request, "Find request = %+v, want zone, count, and offset", request)
+	require.Equal(t, "test-zone", request.Zone, "unexpected value")
+	require.EqualValues(t, 3, request.Count, "unexpected value")
+	require.EqualValues(t, 1, request.From, "unexpected value")
 	var result []struct {
 		ID               int64
 		ServiceClassName string
@@ -100,9 +88,8 @@ func TestIaaSServiceClassFindUsesSDKRequests(t *testing.T) {
 		DisplayName      string
 		IsPublic         bool
 	}
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatal(err)
-	}
+	err := json.Unmarshal([]byte(output), &result)
+	require.NoError(t, err)
 	if len(result) != 1 || result[0].ID != 7 || result[0].ServiceClassName != "test-class" ||
 		result[0].ServiceClassPath != "cloud/test-class" || result[0].DisplayName != "Test Class" || !result[0].IsPublic {
 		t.Fatalf("projected Find result = %s", output)
@@ -151,14 +138,13 @@ func TestIaaSServiceClassFindUsesSDKCaller(t *testing.T) {
 
 			var stdout, stderr bytes.Buffer
 			args := append([]string{"iaas-api", "service-class", "find"}, test.args...)
-			if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 || stderr.Len() != 0 {
-				t.Fatalf("find: code %d, stderr %q", code, stderr.String())
-			}
+			code := runCLI(args, &stdout, &stderr, commandLine)
+			require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr.String())
+			require.EqualValues(t, 0, stderr.Len(), "unexpected value")
 
 			var result []iaas.ServiceClass
-			if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-				t.Fatalf("decode SDK result %q: %v", stdout.String(), err)
-			}
+			err := json.Unmarshal(stdout.Bytes(), &result)
+			require.NoError(t, err, "decode SDK result %q", stdout.String())
 			if len(result) != 1 || result[0].ID != 17 ||
 				result[0].ServiceClassName != "decoded-class" ||
 				result[0].ServiceClassPath != "cloud/decoded-class" ||
@@ -166,26 +152,19 @@ func TestIaaSServiceClassFindUsesSDKCaller(t *testing.T) {
 				t.Fatalf("SDK-decoded result = %+v", result)
 			}
 
-			if len(caller.calls) != 1 || caller.calls[0].method != "GET" {
-				t.Fatalf("SDK caller requests = %+v, want one GET", caller.calls)
-			}
+			require.Len(t, caller.calls, 1, "SDK caller requests = %+v, want one GET", caller.calls)
+			require.Equal(t, "GET", caller.calls[0].method, "unexpected value")
 			parsed, err := url.Parse(caller.calls[0].uri)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			wantPath := "/cloud/zone/" + test.zone + "/api/cloud/1.1/public/price"
-			if !strings.HasSuffix(parsed.Path, wantPath) {
-				t.Fatalf("SDK request path = %q, want suffix %q", parsed.Path, wantPath)
-			}
+			require.True(t, strings.HasSuffix(parsed.Path, wantPath), "SDK request path = %q, want suffix %q", parsed.Path, wantPath)
 
 			condition := caller.calls[0]
-			if condition.count != test.count || condition.from != test.from {
-				t.Errorf("SDK FindCondition = %+v, want Count %d and From %d", condition, test.count, test.from)
-			}
+			require.Equal(t, test.count, condition.count, "SDK FindCondition = %+v, want Count %d and From %d", condition, test.count, test.from)
+			require.Equal(t, test.from, condition.from, "unexpected value")
 			if test.wantSort {
-				if len(condition.sort) != 1 || condition.sort[0] != "-Name" {
-					t.Errorf("SDK FindCondition Sort = %+v, want descending Name", condition.sort)
-				}
+				require.Len(t, condition.sort, 1, "SDK FindCondition Sort = %+v, want descending Name", condition.sort)
+				require.Equal(t, "-Name", condition.sort[0], "unexpected value")
 			} else if len(condition.sort) != 0 {
 				t.Errorf("SDK FindCondition Sort = %+v, want empty", condition.sort)
 			}
@@ -207,13 +186,11 @@ func TestIaaSServiceClassRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		setServiceClassAPIFactory(commandLine, func() (serviceclassapi.API, error) { return api, nil })
 		var stdout, stderr bytes.Buffer
 		code := runCLI(append([]string{"iaas-api", "service-class"}, args...), &stdout, &stderr, commandLine)
-		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
-		}
+		require.NotEqual(t, 0, code, "%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
-	if api.findCalls != 0 {
-		t.Fatalf("invalid requests reached API: find calls %d", api.findCalls)
-	}
+	require.EqualValues(t, 0, api.findCalls, "invalid requests reached API: find calls %d", api.findCalls)
 }
 
 func TestIaaSServiceClassPropagatesAPIErrors(t *testing.T) {
@@ -222,9 +199,9 @@ func TestIaaSServiceClassPropagatesAPIErrors(t *testing.T) {
 	setServiceClassAPIFactory(commandLine, func() (serviceclassapi.API, error) { return api, nil })
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "service-class", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
-	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "serviceclass API failure") {
-		t.Fatalf("find error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-	}
+	require.NotEqual(t, 0, code, "find error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+	require.Contains(t, stderr.String(), "serviceclass API failure", "missing expected text %q", "serviceclass API failure")
 }
 
 type serviceClassAPITestDouble struct {

@@ -25,10 +25,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunConfigList(t *testing.T) {
@@ -36,39 +36,27 @@ func TestRunConfigList(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, name := range []string{"default", "production", "staging"} {
-		if err := profileOp.Create(&saclient.Profile{
+		require.NoError(t, profileOp.Create(&saclient.Profile{
 			Name:       name,
 			Attributes: map[string]any{},
-		}); err != nil {
-			t.Fatal(err)
-		}
+		}))
 	}
-	if err := profileOp.SetCurrentName("production"); err != nil {
-		t.Fatal(err)
-	}
+	err = profileOp.SetCurrentName("production")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "list"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"config", "list"}, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	got := stdout.String()
 	for _, name := range []string{"default", "production", "staging"} {
-		if !strings.Contains(got, name) {
-			t.Errorf("stdout = %q, want to contain %q", got, name)
-		}
+		require.Contains(t, got, name, "stdout = %q, want to contain %q", got, name)
 	}
 	// stdout は bytes.Buffer なので端末判定が false となり、マーカーは出力されない。
-	if strings.Contains(got, "* ") {
-		t.Errorf("stdout = %q, want no current-profile marker", got)
-	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	require.NotContains(t, got, "* ", "stdout = %q, want no current-profile marker", got)
+	got2 := stderr.String()
+	require.Empty(t, got2, "stderr = %q, want empty", got2)
 }
 
 func TestRunConfigListWithoutSelection(t *testing.T) {
@@ -76,42 +64,31 @@ func TestRunConfigListWithoutSelection(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.Create(&saclient.Profile{
+	require.NoError(t, err)
+	require.NoError(t, profileOp.Create(&saclient.Profile{
 		Name:       "default",
 		Attributes: map[string]any{},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}))
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "list"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"config", "list"}, &stdout, &stderr), "stderr: %s", stderr.String())
 	if got, want := stdout.String(), "default\n"; got != want {
 		t.Errorf("stdout = %q, want %q", got, want)
 	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	got := stderr.String()
+	require.Empty(t, got, "stderr = %q, want empty", got)
 }
 
 func TestRunConfigListWithUnreadableCurrentProfile(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
-	if err := os.Mkdir(filepath.Join(profileDir, "current"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	err := os.Mkdir(filepath.Join(profileDir, "current"), 0o700)
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "list"}, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stdout.String(); got != "" {
-		t.Errorf("stdout = %q, want empty", got)
-	}
+	require.NotEqual(t, 0, run([]string{"config", "list"}, &stdout, &stderr), "run should fail")
+	got := stdout.String()
+	require.Empty(t, got, "stdout = %q, want empty", got)
 	if got := stderr.String(); got == "" {
 		t.Error("stderr is empty, want an error reading the current profile")
 	}
@@ -121,15 +98,11 @@ func TestRunConfigListEmpty(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "list"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
-	if got := stdout.String(); got != "" {
-		t.Errorf("stdout = %q, want empty", got)
-	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	require.Equal(t, 0, run([]string{"config", "list"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	got := stdout.String()
+	require.Empty(t, got, "stdout = %q, want empty", got)
+	got2 := stderr.String()
+	require.Empty(t, got2, "stderr = %q, want empty", got2)
 }
 
 func TestRunConfigShowCurrent(t *testing.T) {
@@ -137,34 +110,25 @@ func TestRunConfigShowCurrent(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.Create(&saclient.Profile{
+	require.NoError(t, err)
+	require.NoError(t, profileOp.Create(&saclient.Profile{
 		Name:       "production",
 		Attributes: map[string]any{"zone": "is1a"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.SetCurrentName("production"); err != nil {
-		t.Fatal(err)
-	}
+	}))
+	err = profileOp.SetCurrentName("production")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "show"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"config", "show"}, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	var attrs map[string]any
-	if err := json.Unmarshal(stdout.Bytes(), &attrs); err != nil {
-		t.Fatalf("decode stdout: %v", err)
-	}
+	err2 := json.Unmarshal(stdout.Bytes(), &attrs)
+	require.NoError(t, err2, "decode stdout: %v")
 	if got, want := attrs["zone"], "is1a"; got != want {
 		t.Errorf("zone = %q, want %q", got, want)
 	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	got := stderr.String()
+	require.Empty(t, got, "stderr = %q, want empty", got)
 }
 
 func TestRunConfigShowNamed(t *testing.T) {
@@ -172,51 +136,38 @@ func TestRunConfigShowNamed(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, name := range []string{"default", "production"} {
-		if err := profileOp.Create(&saclient.Profile{
+		require.NoError(t, profileOp.Create(&saclient.Profile{
 			Name:       name,
 			Attributes: map[string]any{"name": name},
-		}); err != nil {
-			t.Fatal(err)
-		}
+		}))
 	}
-	if err := profileOp.SetCurrentName("default"); err != nil {
-		t.Fatal(err)
-	}
+	err = profileOp.SetCurrentName("default")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "show", "production"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"config", "show", "production"}, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	var attrs map[string]any
-	if err := json.Unmarshal(stdout.Bytes(), &attrs); err != nil {
-		t.Fatalf("decode stdout: %v", err)
-	}
+	err2 := json.Unmarshal(stdout.Bytes(), &attrs)
+	require.NoError(t, err2, "decode stdout: %v")
 	if got, want := attrs["name"], "production"; got != want {
 		t.Errorf("name = %q, want %q", got, want)
 	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	got := stderr.String()
+	require.Empty(t, got, "stderr = %q, want empty", got)
 }
 
 func TestRunConfigShowWithoutCurrent(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "show"}, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stdout.String(); got != "" {
-		t.Errorf("stdout = %q, want empty", got)
-	}
-	if got := stderr.String(); !strings.Contains(got, "current") {
-		t.Errorf("stderr = %q, want an error mentioning the current profile", got)
-	}
+	require.NotEqual(t, 0, run([]string{"config", "show"}, &stdout, &stderr), "run should fail")
+	got := stdout.String()
+	require.Empty(t, got, "stdout = %q, want empty", got)
+	got2 := stderr.String()
+	require.Contains(t, got2, "current", "stderr = %q, want an error mentioning the current profile", got2)
 }
 
 func TestRunConfigUse(t *testing.T) {
@@ -224,36 +175,25 @@ func TestRunConfigUse(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, name := range []string{"default", "production"} {
-		if err := profileOp.Create(&saclient.Profile{
+		require.NoError(t, profileOp.Create(&saclient.Profile{
 			Name:       name,
 			Attributes: map[string]any{},
-		}); err != nil {
-			t.Fatal(err)
-		}
+		}))
 	}
-	if err := profileOp.SetCurrentName("default"); err != nil {
-		t.Fatal(err)
-	}
+	err = profileOp.SetCurrentName("default")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "use", "production"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
-	if got := stdout.String(); got != "" {
-		t.Errorf("stdout = %q, want empty", got)
-	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	require.Equal(t, 0, run([]string{"config", "use", "production"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	got := stdout.String()
+	require.Empty(t, got, "stdout = %q, want empty", got)
+	got2 := stderr.String()
+	require.Empty(t, got2, "stderr = %q, want empty", got2)
 
 	current, err := profileOp.GetCurrentName()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if got, want := current, "production"; got != want {
 		t.Errorf("current profile = %q, want %q", got, want)
 	}
@@ -264,31 +204,21 @@ func TestRunConfigUseDefaultsToCurrent(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.Create(&saclient.Profile{
+	require.NoError(t, err)
+	require.NoError(t, profileOp.Create(&saclient.Profile{
 		Name:       "production",
 		Attributes: map[string]any{},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.SetCurrentName("production"); err != nil {
-		t.Fatal(err)
-	}
+	}))
+	err = profileOp.SetCurrentName("production")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "use"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"config", "use"}, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	current, err := profileOp.GetCurrentName()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := current, "production"; got != want {
-		t.Errorf("current profile = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	got, want := current, "production"
+	require.Equal(t, want, got, "current profile = %q, want %q")
 }
 
 func TestRunConfigUseUnknownProfile(t *testing.T) {
@@ -296,26 +226,18 @@ func TestRunConfigUseUnknownProfile(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.Create(&saclient.Profile{
+	require.NoError(t, err)
+	require.NoError(t, profileOp.Create(&saclient.Profile{
 		Name:       "default",
 		Attributes: map[string]any{},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}))
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "use", "missing"}, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stdout.String(); got != "" {
-		t.Errorf("stdout = %q, want empty", got)
-	}
-	if got := stderr.String(); !strings.Contains(got, "missing") {
-		t.Errorf("stderr = %q, want an error mentioning the profile", got)
-	}
+	require.NotEqual(t, 0, run([]string{"config", "use", "missing"}, &stdout, &stderr), "run should fail")
+	got := stdout.String()
+	require.Empty(t, got, "stdout = %q, want empty", got)
+	got2 := stderr.String()
+	require.Contains(t, got2, "missing", "stderr = %q, want an error mentioning the profile", got2)
 }
 
 func TestRunConfigUseInvalidName(t *testing.T) {
@@ -324,9 +246,7 @@ func TestRunConfigUseInvalidName(t *testing.T) {
 	for _, invalidName := range []string{".", "..", "a/b"} {
 		t.Run(invalidName, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if exitCode := run([]string{"config", "use", invalidName}, &stdout, &stderr); exitCode == 0 {
-				t.Fatal("run() exit code = 0, want non-zero")
-			}
+			require.NotEqual(t, 0, run([]string{"config", "use", invalidName}, &stdout, &stderr), "run should fail")
 			if got := stderr.String(); got == "" {
 				t.Error("stderr is empty, want an error")
 			}
@@ -338,15 +258,11 @@ func TestRunConfigUseWithoutCurrent(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "use"}, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stdout.String(); got != "" {
-		t.Errorf("stdout = %q, want empty", got)
-	}
-	if got := stderr.String(); !strings.Contains(got, "current") {
-		t.Errorf("stderr = %q, want an error mentioning the current profile", got)
-	}
+	require.NotEqual(t, 0, run([]string{"config", "use"}, &stdout, &stderr), "run should fail")
+	got := stdout.String()
+	require.Empty(t, got, "stdout = %q, want empty", got)
+	got2 := stderr.String()
+	require.Contains(t, got2, "current", "stderr = %q, want an error mentioning the current profile", got2)
 }
 
 func TestRunConfigShowUnknownProfile(t *testing.T) {
@@ -354,32 +270,23 @@ func TestRunConfigShowUnknownProfile(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "show", "missing"}, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stdout.String(); got != "" {
-		t.Errorf("stdout = %q, want empty", got)
-	}
-	if got := stderr.String(); !strings.Contains(got, "missing") {
-		t.Errorf("stderr = %q, want an error mentioning the profile", got)
-	}
+	require.NotEqual(t, 0, run([]string{"config", "show", "missing"}, &stdout, &stderr), "run should fail")
+	got := stdout.String()
+	require.Empty(t, got, "stdout = %q, want empty", got)
+	got2 := stderr.String()
+	require.Contains(t, got2, "missing", "stderr = %q, want an error mentioning the profile", got2)
 }
 
 func writeTestPrivateKey(t *testing.T, dir string) string {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	path := filepath.Join(dir, "key.pem")
 	block := &pem.Block{Type: "PRIVATE KEY", Bytes: der}
-	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err = os.WriteFile(path, pem.EncodeToMemory(block), 0o600)
+	require.NoError(t, err)
 	return path
 }
 
@@ -395,24 +302,17 @@ func TestRunConfigCreateNonInteractive(t *testing.T) {
 		"--service-principal-key-id", "kid-456",
 		"--private-key-file", keyPath,
 	}
-	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
-	if got := stdout.String(); !strings.Contains(got, "prod") || !strings.Contains(got, "created") {
-		t.Errorf("stdout = %q, want creation message", got)
-	}
+	require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+	got := stderr.String()
+	require.Empty(t, got, "stderr = %q, want empty", got)
+	got2 := stdout.String()
+	require.Contains(t, got2, "prod", "stdout = %q, want creation message", got2)
+	require.Contains(t, got2, "created", "missing expected text %q", "created")
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	profile, err := profileOp.Read("prod")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if got, want := profile.Attributes[attrServicePrincipalID], "spid-123"; got != want {
 		t.Errorf("ServicePrincipalID = %q, want %q", got, want)
 	}
@@ -424,9 +324,7 @@ func TestRunConfigCreateNonInteractive(t *testing.T) {
 	}
 
 	current, err := profileOp.GetCurrentName()
-	if err == nil {
-		t.Errorf("current profile = %q, want no current profile set", current)
-	}
+	require.Error(t, err, "current profile = %q, want no current profile set", current)
 }
 
 func TestRunConfigCreateWithUse(t *testing.T) {
@@ -442,21 +340,14 @@ func TestRunConfigCreateWithUse(t *testing.T) {
 		"--private-key-file", keyPath,
 		"--use",
 	}
-	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	current, err := profileOp.GetCurrentName()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := current, "prod"; got != want {
-		t.Errorf("current profile = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	got, want := current, "prod"
+	require.Equal(t, want, got, "current profile = %q, want %q")
 }
 
 func TestRunConfigCreateInvalidName(t *testing.T) {
@@ -469,9 +360,7 @@ func TestRunConfigCreateInvalidName(t *testing.T) {
 		t.Run(invalidName, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			args := append([]string{"config", "create", invalidName}, baseArgs...)
-			if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
-				t.Fatal("run() exit code = 0, want non-zero")
-			}
+			require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
 			if got := stderr.String(); got == "" {
 				t.Error("stderr is empty, want an error")
 			}
@@ -491,14 +380,10 @@ func TestRunConfigCreateDefaultName(t *testing.T) {
 		"--service-principal-key-id", "kid-456",
 		"--private-key-file", keyPath,
 	}
-	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if _, err := profileOp.Read("default"); err != nil {
 		t.Fatalf("read default profile: %v", err)
 	}
@@ -509,12 +394,9 @@ func TestRunConfigCreateExistingProfileFails(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.Create(&saclient.Profile{Name: "prod", Attributes: map[string]any{}}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	err = profileOp.Create(&saclient.Profile{Name: "prod", Attributes: map[string]any{}})
+	require.NoError(t, err)
 	keyPath := writeTestPrivateKey(t, profileDir)
 
 	var stdout, stderr bytes.Buffer
@@ -524,12 +406,9 @@ func TestRunConfigCreateExistingProfileFails(t *testing.T) {
 		"--service-principal-key-id", "kid-456",
 		"--private-key-file", keyPath,
 	}
-	if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stderr.String(); !strings.Contains(got, "already exists") {
-		t.Errorf("stderr = %q, want already exists error", got)
-	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	got := stderr.String()
+	require.Contains(t, got, "already exists", "stderr = %q, want already exists error", got)
 }
 
 func TestRunConfigCreateMissingFlagsFails(t *testing.T) {
@@ -558,9 +437,7 @@ func TestRunConfigCreateMissingFlagsFails(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if exitCode := run(tt.args, &stdout, &stderr); exitCode == 0 {
-				t.Fatal("run() exit code = 0, want non-zero")
-			}
+			require.NotEqual(t, 0, run(tt.args, &stdout, &stderr), "run should fail")
 			if got := stderr.String(); got == "" {
 				t.Error("stderr is empty, want an error")
 			}
@@ -572,9 +449,8 @@ func TestRunConfigCreateInvalidPrivateKeyFails(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 	keyPath := filepath.Join(profileDir, "invalid.pem")
-	if err := os.WriteFile(keyPath, []byte("not a key"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(keyPath, []byte("not a key"), 0o600)
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
 	args := []string{
@@ -583,12 +459,9 @@ func TestRunConfigCreateInvalidPrivateKeyFails(t *testing.T) {
 		"--service-principal-key-id", "kid-456",
 		"--private-key-file", keyPath,
 	}
-	if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stderr.String(); !strings.Contains(got, "private key") {
-		t.Errorf("stderr = %q, want private key error", got)
-	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	got := stderr.String()
+	require.Contains(t, got, "private key", "stderr = %q, want private key error", got)
 }
 
 func TestRunConfigCreateInsecurePrivateKeyPermissionsFail(t *testing.T) {
@@ -610,17 +483,12 @@ func TestRunConfigCreateInsecurePrivateKeyPermissionsFail(t *testing.T) {
 		"--service-principal-key-id", "kid-456",
 		"--private-key-file", keyPath,
 	}
-	if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stderr.String(); !strings.Contains(got, "permissions are too lax") {
-		t.Errorf("stderr = %q, want private key permission error", got)
-	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	got := stderr.String()
+	require.Contains(t, got, "permissions are too lax", "stderr = %q, want private key permission error", got)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if _, err := profileOp.Read("prod"); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("read profile error = %v, want os.ErrNotExist", err)
 	}
@@ -633,10 +501,8 @@ func TestRunConfigEditNonInteractive(t *testing.T) {
 	newKey := writeTestPrivateKey(t, profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.Create(&saclient.Profile{
+	require.NoError(t, err)
+	require.NoError(t, profileOp.Create(&saclient.Profile{
 		Name: "prod",
 		Attributes: map[string]any{
 			attrServicePrincipalID:    "old-spid",
@@ -644,12 +510,9 @@ func TestRunConfigEditNonInteractive(t *testing.T) {
 			attrPrivateKeyPEMPath:     oldKey,
 			"zone":                    "is1a",
 		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.SetCurrentName("prod"); err != nil {
-		t.Fatal(err)
-	}
+	}))
+	err = profileOp.SetCurrentName("prod")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
 	args := []string{
@@ -657,14 +520,10 @@ func TestRunConfigEditNonInteractive(t *testing.T) {
 		"--service-principal-key-id", "new-kid",
 		"--private-key-file", newKey,
 	}
-	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	profile, err := profileOp.Read("prod")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if got, want := profile.Attributes[attrServicePrincipalID], "old-spid"; got != want {
 		t.Errorf("ServicePrincipalID = %q, want %q", got, want)
 	}
@@ -693,31 +552,23 @@ func TestRunConfigEditInsecurePrivateKeyPermissionsFail(t *testing.T) {
 	}
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	attributes := map[string]any{
 		attrServicePrincipalID:    "old-spid",
 		attrServicePrincipalKeyID: "old-kid",
 		attrPrivateKeyPEMPath:     oldKey,
 	}
-	if err := profileOp.Create(&saclient.Profile{Name: "prod", Attributes: attributes}); err != nil {
-		t.Fatal(err)
-	}
+	err = profileOp.Create(&saclient.Profile{Name: "prod", Attributes: attributes})
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
 	args := []string{"config", "edit", "prod", "--private-key-file", newKey}
-	if exitCode := run(args, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
-	if got := stderr.String(); !strings.Contains(got, "permissions are too lax") {
-		t.Errorf("stderr = %q, want private key permission error", got)
-	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	got := stderr.String()
+	require.Contains(t, got, "permissions are too lax", "stderr = %q, want private key permission error", got)
 
 	profile, err := profileOp.Read("prod")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if got, want := profile.Attributes[attrPrivateKeyPEMPath], oldKey; got != want {
 		t.Errorf("PrivateKeyPEMPath = %q, want %q", got, want)
 	}
@@ -729,23 +580,16 @@ func TestRunConfigEditNoFlagsFails(t *testing.T) {
 	keyPath := writeTestPrivateKey(t, profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.Create(&saclient.Profile{
+	require.NoError(t, err)
+	require.NoError(t, profileOp.Create(&saclient.Profile{
 		Name:       "prod",
 		Attributes: map[string]any{attrServicePrincipalID: "spid", attrServicePrincipalKeyID: "kid", attrPrivateKeyPEMPath: keyPath},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := profileOp.SetCurrentName("prod"); err != nil {
-		t.Fatal(err)
-	}
+	}))
+	err = profileOp.SetCurrentName("prod")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "edit"}, &stdout, &stderr); exitCode == 0 {
-		t.Fatal("run() exit code = 0, want non-zero")
-	}
+	require.NotEqual(t, 0, run([]string{"config", "edit"}, &stdout, &stderr), "run should fail")
 	if got := stderr.String(); got == "" {
 		t.Error("stderr is empty, want an error")
 	}
@@ -757,32 +601,23 @@ func TestRunConfigEditUseSwitchesCurrent(t *testing.T) {
 	keyPath := writeTestPrivateKey(t, profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, name := range []string{"default", "prod"} {
 		attrs := map[string]any{attrServicePrincipalID: "spid", attrServicePrincipalKeyID: "kid", attrPrivateKeyPEMPath: keyPath}
-		if err := profileOp.Create(&saclient.Profile{Name: name, Attributes: attrs}); err != nil {
-			t.Fatal(err)
-		}
+		err := profileOp.Create(&saclient.Profile{Name: name, Attributes: attrs})
+		require.NoError(t, err)
 	}
-	if err := profileOp.SetCurrentName("default"); err != nil {
-		t.Fatal(err)
-	}
+	err = profileOp.SetCurrentName("default")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
 	args := []string{"config", "edit", "prod", "--service-principal-id", "new-spid", "--use"}
-	if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	current, err := profileOp.GetCurrentName()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := current, "prod"; got != want {
-		t.Errorf("current profile = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	got, want := current, "prod"
+	require.Equal(t, want, got, "current profile = %q, want %q")
 }
 
 func TestRunConfigEditUseSwitchesCurrentWithoutChanges(t *testing.T) {
@@ -791,31 +626,22 @@ func TestRunConfigEditUseSwitchesCurrentWithoutChanges(t *testing.T) {
 	keyPath := writeTestPrivateKey(t, profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, name := range []string{"default", "prod"} {
 		attrs := map[string]any{attrServicePrincipalID: "spid", attrServicePrincipalKeyID: "kid", attrPrivateKeyPEMPath: keyPath}
-		if err := profileOp.Create(&saclient.Profile{Name: name, Attributes: attrs}); err != nil {
-			t.Fatal(err)
-		}
+		err := profileOp.Create(&saclient.Profile{Name: name, Attributes: attrs})
+		require.NoError(t, err)
 	}
-	if err := profileOp.SetCurrentName("default"); err != nil {
-		t.Fatal(err)
-	}
+	err = profileOp.SetCurrentName("default")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "edit", "prod", "--use"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"config", "edit", "prod", "--use"}, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	current, err := profileOp.GetCurrentName()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := current, "prod"; got != want {
-		t.Errorf("current profile = %q, want %q", got, want)
-	}
+	require.NoError(t, err)
+	got, want := current, "prod"
+	require.Equal(t, want, got, "current profile = %q, want %q")
 }
 
 func TestRunConfigShowMasksSensitiveAttributes(t *testing.T) {
@@ -824,9 +650,7 @@ func TestRunConfigShowMasksSensitiveAttributes(t *testing.T) {
 	keyPath := writeTestPrivateKey(t, profileDir)
 
 	profileOp, err := saclient.NewProfileOp(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if err := profileOp.Create(&saclient.Profile{
 		Name: "prod",
 		Attributes: map[string]any{
@@ -841,19 +665,15 @@ func TestRunConfigShowMasksSensitiveAttributes(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := profileOp.SetCurrentName("prod"); err != nil {
-		t.Fatal(err)
-	}
+	err = profileOp.SetCurrentName("prod")
+	require.NoError(t, err)
 
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"config", "show"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"config", "show"}, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	var attrs map[string]any
-	if err := json.Unmarshal(stdout.Bytes(), &attrs); err != nil {
-		t.Fatalf("decode stdout: %v", err)
-	}
+	err2 := json.Unmarshal(stdout.Bytes(), &attrs)
+	require.NoError(t, err2, "decode stdout: %v")
 	if got, want := attrs["zone"], "is1a"; got != want {
 		t.Errorf("zone = %q, want %q", got, want)
 	}
@@ -868,7 +688,6 @@ func TestRunConfigShowMasksSensitiveAttributes(t *testing.T) {
 			t.Errorf("%s = %q, want masked", key, got)
 		}
 	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	got := stderr.String()
+	require.Empty(t, got, "stderr = %q, want empty", got)
 }

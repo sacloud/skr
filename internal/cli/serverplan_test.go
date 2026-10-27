@@ -29,28 +29,19 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/internal/apigen"
 	serverplanapi "github.com/sacloud/skr/internal/iaas/serverplanapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestServerPlanGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-product-server.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/serverplanapi/serverplan_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated ServerPlan commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-product-server.json API_OUTPUT=internal/iaas/serverplanapi/serverplan_api_generated.go")
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got, "generated ServerPlan commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-product-server.json API_OUTPUT=internal/iaas/serverplanapi/serverplan_api_generated.go")
 }
 
 func TestIaaSServerPlanHelp(t *testing.T) {
@@ -66,14 +57,10 @@ func TestIaaSServerPlanHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v) = %d; stderr: %s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help does not contain %q: %s", text, help)
-				}
+				require.Contains(t, help, text, "help does not contain %q: %s", text, help)
 			}
 		})
 	}
@@ -91,12 +78,13 @@ func TestIaaSServerPlanCommandsUseSDKRequests(t *testing.T) {
 	}
 
 	output, stderr, code := run("find", "--zone", "test-zone", "--count", "3", "--from", "1", "--query", ".ServerPlans | map({ID,Name,CPU,MemoryMB,GPU,CPUModel,GPUModel,Commitment,Generation,ConfidentialVM,Availability})")
-	if code != 0 || stderr != "" {
-		t.Fatalf("find: code %d, stderr %q", code, stderr)
-	}
-	if request := api.findRequest; request == nil || request.Zone != "test-zone" || request.Count != 3 || request.From != 1 {
-		t.Fatalf("Find request = %+v, want zone, count, and offset", request)
-	}
+	require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	request := api.findRequest
+	require.NotNil(t, request, "Find request = %+v, want zone, count, and offset", request)
+	require.Equal(t, "test-zone", request.Zone, "unexpected value")
+	require.EqualValues(t, 3, request.Count, "unexpected value")
+	require.EqualValues(t, 1, request.From, "unexpected value")
 	var projected []struct {
 		ID             json.Number
 		Name           string
@@ -110,9 +98,8 @@ func TestIaaSServerPlanCommandsUseSDKRequests(t *testing.T) {
 		ConfidentialVM bool
 		Availability   types.EAvailability
 	}
-	if err := json.Unmarshal([]byte(output), &projected); err != nil {
-		t.Fatal(err)
-	}
+	err := json.Unmarshal([]byte(output), &projected)
+	require.NoError(t, err)
 	if len(projected) != 1 || projected[0].ID.String() != "17" || projected[0].Name != "test-plan" ||
 		projected[0].CPU != 4 || projected[0].MemoryMB != 8192 {
 		t.Fatalf("projected ServerPlan = %s", output)
@@ -126,12 +113,12 @@ func TestIaaSServerPlanCommandsUseSDKRequests(t *testing.T) {
 	}
 
 	output, stderr, code = run("read", "--zone", "test-zone", "--id", "17")
-	if code != 0 || stderr != "" || !strings.Contains(output, `"Name": "test-plan"`) {
-		t.Fatalf("read: code %d, stderr %q, output %q", code, stderr, output)
-	}
-	if api.readRequest == nil || api.readRequest.Zone != "test-zone" || api.readRequest.ID != types.ID(17) {
-		t.Fatalf("Read request = %+v, want zone and ID", api.readRequest)
-	}
+	require.Equal(t, 0, code, "read: code %d, stderr %q, output %q", code, stderr, output)
+	require.Empty(t, stderr, "should be empty")
+	require.Contains(t, output, `"Name": "test-plan"`, "missing expected text %q", `"Name": "test-plan"`)
+	require.NotNil(t, api.readRequest, "Read request = %+v, want zone and ID", api.readRequest)
+	require.Equal(t, "test-zone", api.readRequest.Zone, "unexpected value")
+	require.EqualValues(t, types.ID(17), api.readRequest.ID, "unexpected value")
 
 	_, stderr, code = run("read", "--request", `{"Zone":"json-zone","ID":17}`)
 	if code != 0 || stderr != "" || api.readRequest == nil ||
@@ -150,21 +137,18 @@ func TestIaaSServerPlanFilterIsPassedToLowLevelAPI(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "product", "server", "find", "--request", `{"Zone":"test-zone","Filter":{"Name":"test-plan","CPU>=":4}}`}, &stdout, &stderr, commandLine)
-	if code != 0 || stderr.Len() != 0 || len(caller.calls) != 1 {
-		t.Fatalf("find: code %d, stderr %q, calls %+v", code, stderr.String(), caller.calls)
-	}
+	require.Equal(t, 0, code, "find: code %d, stderr %q, calls %+v", code, stderr.String(), caller.calls)
+	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
+	require.Len(t, caller.calls, 1, "unexpected length")
 	var condition struct {
 		Filter map[string]json.RawMessage
 	}
-	if err := json.Unmarshal(caller.calls[0].body, &condition); err != nil {
-		t.Fatalf("decode SDK find condition %q: %v", caller.calls[0].body, err)
-	}
-	if got := string(condition.Filter["Name"]); got != `"test-plan"` {
-		t.Fatalf("SDK Name filter = %s, want partial-match string", got)
-	}
-	if got := string(condition.Filter["CPU>="]); got != `"4"` {
-		t.Fatalf("SDK CPU filter = %s, want comparison value", got)
-	}
+	err := json.Unmarshal(caller.calls[0].body, &condition)
+	require.NoError(t, err, "decode SDK find condition %q", caller.calls[0].body)
+	got := string(condition.Filter["Name"])
+	require.Equal(t, `"test-plan"`, got, "SDK Name filter = %s, want partial-match string", got)
+	got2 := string(condition.Filter["CPU>="])
+	require.Equal(t, `"4"`, got2, "SDK CPU filter = %s, want comparison value", got2)
 }
 
 func TestIaaSServerPlanJSONFilterPreservesLargeNumericIDs(t *testing.T) {
@@ -195,19 +179,16 @@ func TestIaaSServerPlanJSONFilterPreservesLargeNumericIDs(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			request := fmt.Sprintf(`{"Zone":"test-zone","Filter":{%s}}`, test.filter)
 			code := runCLI([]string{"iaas-api", "product", "server", "find", "--request", request}, &stdout, &stderr, commandLine)
-			if code != 0 || stderr.Len() != 0 {
-				t.Fatalf("find: code %d, stderr %q", code, stderr.String())
-			}
+			require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr.String())
+			require.EqualValues(t, 0, stderr.Len(), "unexpected value")
 			call := caller.calls[len(caller.calls)-1]
 			var condition struct {
 				Filter map[string]json.RawMessage
 			}
-			if err := json.Unmarshal(call.body, &condition); err != nil {
-				t.Fatalf("decode SDK find condition %q: %v", call.body, err)
-			}
-			if got := string(condition.Filter["ID"]); got != test.wantIDJSON {
-				t.Fatalf("SDK ID filter = %s, want %s", got, test.wantIDJSON)
-			}
+			err := json.Unmarshal(call.body, &condition)
+			require.NoError(t, err, "decode SDK find condition %q", call.body)
+			got := string(condition.Filter["ID"])
+			require.Equal(t, test.wantIDJSON, got, "SDK ID filter = %s, want %s", got, test.wantIDJSON)
 		})
 	}
 }
@@ -230,13 +211,12 @@ func TestIaaSServerPlanRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		commandLine := newCLI()
 		setServerPlanAPIFactory(commandLine, func() (serverplanapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "product", "server"}, args...), &stdout, &stderr, commandLine)
-		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
-		}
+		require.NotEqual(t, 0, code, "%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
-	if api.findRequest != nil || api.readRequest != nil {
-		t.Fatalf("invalid request reached API: %+v", api)
-	}
+	require.Nil(t, api.findRequest, "invalid request reached API: %+v", api)
+	require.Nil(t, api.readRequest, "should be nil")
 }
 
 func TestIaaSServerPlanPropagatesAPIErrors(t *testing.T) {
@@ -255,9 +235,9 @@ func TestIaaSServerPlanPropagatesAPIErrors(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			args := append([]string{"iaas-api", "product", "server"}, test.args...)
 			code := runCLI(args, &stdout, &stderr, commandLine)
-			if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), test.wantErr) {
-				t.Fatalf("code %d, stdout %q, stderr %q; want %q", code, stdout.String(), stderr.String(), test.wantErr)
-			}
+			require.NotEqual(t, 0, code, "code %d, stdout %q, stderr %q; want %q", code, stdout.String(), stderr.String(), test.wantErr)
+			require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+			require.Contains(t, stderr.String(), test.wantErr, "missing expected text %q", test.wantErr)
 		})
 	}
 }
@@ -272,39 +252,30 @@ func TestIaaSServerPlanFindUsesSDKCaller(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "product", "server", "find", "--zone", "test-zone", "--count", "3", "--from", "1"}, &stdout, &stderr, commandLine)
-	if code != 0 || stderr.Len() != 0 {
-		t.Fatalf("find: code %d, stderr %q", code, stderr.String())
-	}
+	require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr.String())
+	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
 	var result iaas.ServerPlanFindResult
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		t.Fatalf("decode SDK result %q: %v", stdout.String(), err)
-	}
+	err := json.Unmarshal(stdout.Bytes(), &result)
+	require.NoError(t, err, "decode SDK result %q", stdout.String())
 	if result.Total != 1 || result.From != 0 || result.Count != 1 ||
 		len(result.ServerPlans) != 1 || result.ServerPlans[0].ID != types.ID(17) ||
 		result.ServerPlans[0].Name != "test-plan" || result.ServerPlans[0].CPU != 4 ||
 		result.ServerPlans[0].MemoryMB != 8192 {
 		t.Fatalf("SDK-decoded ServerPlan = %+v", result)
 	}
-	if len(caller.calls) != 1 || caller.calls[0].method != "GET" {
-		t.Fatalf("SDK caller requests = %+v, want one GET", caller.calls)
-	}
+	require.Len(t, caller.calls, 1, "SDK caller requests = %+v, want one GET", caller.calls)
+	require.Equal(t, "GET", caller.calls[0].method, "unexpected value")
 	parsed, err := url.Parse(caller.calls[0].uri)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasSuffix(parsed.Path, "/api/cloud/1.1/product/server") {
-		t.Fatalf("SDK request path = %q, want ServerPlan endpoint", parsed.Path)
-	}
+	require.NoError(t, err)
+	require.True(t, strings.HasSuffix(parsed.Path, "/api/cloud/1.1/product/server"), "SDK request path = %q, want ServerPlan endpoint", parsed.Path)
 	var condition struct {
 		Count int
 		From  int
 	}
-	if err := json.Unmarshal(caller.calls[0].body, &condition); err != nil {
-		t.Fatalf("decode SDK find condition %q: %v", caller.calls[0].body, err)
-	}
-	if condition.Count != 3 || condition.From != 1 {
-		t.Fatalf("SDK FindCondition = %+v, want Count 3 and From 1", condition)
-	}
+	err2 := json.Unmarshal(caller.calls[0].body, &condition)
+	require.NoError(t, err2, "decode SDK find condition %q", caller.calls[0].body)
+	require.EqualValues(t, 3, condition.Count, "SDK FindCondition = %+v, want Count 3 and From 1", condition)
+	require.EqualValues(t, 1, condition.From, "unexpected value")
 }
 
 func TestIaaSServerPlanEmptyFindPreservesEnvelopeAndQueryArray(t *testing.T) {
@@ -317,27 +288,24 @@ func TestIaaSServerPlanEmptyFindPreservesEnvelopeAndQueryArray(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "product", "server", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
-	if code != 0 || stderr.Len() != 0 {
-		t.Fatalf("find: code %d, stderr %q", code, stderr.String())
-	}
+	require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr.String())
+	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
 	var envelope map[string]json.RawMessage
-	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
-		t.Fatalf("decode empty Find envelope %q: %v", stdout.String(), err)
-	}
+	err := json.Unmarshal(stdout.Bytes(), &envelope)
+	require.NoError(t, err, "decode empty Find envelope %q", stdout.String())
 	for key, want := range map[string]string{
 		"Total": "0", "From": "0", "Count": "0", "ServerPlans": "[]",
 	} {
-		if got := strings.TrimSpace(string(envelope[key])); got != want {
-			t.Errorf("empty Find field %s = %q, want %q", key, got, want)
-		}
+		got := strings.TrimSpace(string(envelope[key]))
+		require.Equal(t, want, got, "empty Find field %s = %q, want %q", key, got, want)
 	}
 
 	stdout.Reset()
 	stderr.Reset()
 	code = runCLI([]string{"iaas-api", "product", "server", "find", "--zone", "test-zone", "--query", ".ServerPlans | map({ID,Name})"}, &stdout, &stderr, commandLine)
-	if code != 0 || stderr.Len() != 0 || stdout.String() != "[]\n" {
-		t.Fatalf("empty Find query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-	}
+	require.Equal(t, 0, code, "empty Find query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
+	require.Equal(t, "[]\n", stdout.String(), "unexpected value")
 }
 
 func TestIaaSServerPlanReadUsesSDKCaller(t *testing.T) {
@@ -350,26 +318,20 @@ func TestIaaSServerPlanReadUsesSDKCaller(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "product", "server", "read", "--zone", "test-zone", "--id", "17"}, &stdout, &stderr, commandLine)
-	if code != 0 || stderr.Len() != 0 {
-		t.Fatalf("read: code %d, stderr %q", code, stderr.String())
-	}
+	require.Equal(t, 0, code, "read: code %d, stderr %q", code, stderr.String())
+	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
 	var result iaas.ServerPlan
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		t.Fatalf("decode SDK result %q: %v", stdout.String(), err)
-	}
-	if result.ID != types.ID(17) || result.Name != "test-plan" || result.CPU != 4 || result.MemoryMB != 8192 {
-		t.Fatalf("SDK-decoded ServerPlan = %+v", result)
-	}
-	if len(caller.calls) != 1 || caller.calls[0].method != "GET" {
-		t.Fatalf("SDK caller requests = %+v, want one GET", caller.calls)
-	}
+	err := json.Unmarshal(stdout.Bytes(), &result)
+	require.NoError(t, err, "decode SDK result %q", stdout.String())
+	require.EqualValues(t, types.ID(17), result.ID, "SDK-decoded ServerPlan = %+v", result)
+	require.Equal(t, "test-plan", result.Name, "unexpected value")
+	require.EqualValues(t, 4, result.CPU, "unexpected value")
+	require.EqualValues(t, 8192, result.MemoryMB, "unexpected value")
+	require.Len(t, caller.calls, 1, "SDK caller requests = %+v, want one GET", caller.calls)
+	require.Equal(t, "GET", caller.calls[0].method, "unexpected value")
 	parsed, err := url.Parse(caller.calls[0].uri)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasSuffix(parsed.Path, "/api/cloud/1.1/product/server/17") {
-		t.Fatalf("SDK request path = %q, want ServerPlan Read endpoint", parsed.Path)
-	}
+	require.NoError(t, err)
+	require.True(t, strings.HasSuffix(parsed.Path, "/api/cloud/1.1/product/server/17"), "SDK request path = %q, want ServerPlan Read endpoint", parsed.Path)
 }
 
 type serverPlanAPITestDouble struct {

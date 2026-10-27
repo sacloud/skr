@@ -30,6 +30,7 @@ import (
 
 	iammock "github.com/sacloud/sakumock/iam"
 	"github.com/sacloud/skr/internal/apigen"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunIAMAPIHelp(t *testing.T) {
@@ -126,19 +127,13 @@ func TestRunIAMAPIHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
-				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, exitCode, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help output does not contain %q", text)
-				}
+				require.Contains(t, help, text, "help output does not contain %q", text)
 			}
 			for _, text := range test.notWant {
-				if strings.Contains(help, text) {
-					t.Errorf("help output unexpectedly contains %q", text)
-				}
+				require.NotContains(t, help, text, "help output unexpectedly contains %q", text)
 			}
 		})
 	}
@@ -167,24 +162,14 @@ func TestIAMGeneratedCodeMatchesConfigs(t *testing.T) {
 		{"api/commands/iam-user.json", "internal/iamapi/iam_user_api_generated.go"},
 	} {
 		configData, err := os.ReadFile(repositoryPath(test.config))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		config, err := apigen.DecodeConfig(configData)
-		if err != nil {
-			t.Fatalf("decode %s: %v", test.config, err)
-		}
+		require.NoError(t, err, "decode %s", test.config)
 		want, err := apigen.Generate(config)
-		if err != nil {
-			t.Fatalf("generate %s: %v", test.config, err)
-		}
+		require.NoError(t, err, "generate %s", test.config)
 		got, err := os.ReadFile(repositoryPath(test.output))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Errorf("generated IAM API command is stale; run make generate-api API_CONFIG=%s API_OUTPUT=%s", test.config, test.output)
-		}
+		require.NoError(t, err)
+		require.Equal(t, want, got, "generated IAM API command is stale; run make generate-api API_CONFIG=%s API_OUTPUT=%s", test.config, test.output)
 	}
 }
 
@@ -197,9 +182,8 @@ func TestIAMAPIExtendedReadOperationsWithSakumock(t *testing.T) {
 	t.Setenv("SAKURA_ENDPOINTS_IAM", server.TestURL())
 
 	passwordFile := filepath.Join(t.TempDir(), "password.txt")
-	if err := os.WriteFile(passwordFile, []byte("Password-Test-1234"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(passwordFile, []byte("Password-Test-1234"), 0o600)
+	require.NoError(t, err)
 	var user struct {
 		ID int `json:"id"`
 	}
@@ -210,17 +194,12 @@ func TestIAMAPIExtendedReadOperationsWithSakumock(t *testing.T) {
 	}, &stdout, &stderr); exitCode != 0 {
 		t.Fatalf("create test user exit code = %d; stderr: %s", exitCode, stderr.String())
 	}
-	if err := json.Unmarshal(stdout.Bytes(), &user); err != nil {
-		t.Fatal(err)
-	}
-	if user.ID == 0 {
-		t.Fatal("created test user has no ID")
-	}
+	err2 := json.Unmarshal(stdout.Bytes(), &user)
+	require.NoError(t, err2)
+	require.NotEqualValues(t, 0, user.ID, "created test user has no ID")
 	t.Cleanup(func() {
 		var cleanupOut, cleanupErr bytes.Buffer
-		if exitCode := run([]string{"iam-api", "user", "delete", strconv.Itoa(user.ID)}, &cleanupOut, &cleanupErr); exitCode != 0 {
-			t.Errorf("delete test user exit code = %d; stderr: %s", exitCode, cleanupErr.String())
-		}
+		require.Equal(t, 0, run([]string{"iam-api", "user", "delete", strconv.Itoa(user.ID)}, &cleanupOut, &cleanupErr), "unexpected exit code")
 	})
 
 	for _, args := range [][]string{
@@ -243,9 +222,7 @@ func TestIAMAPIExtendedReadOperationsWithSakumock(t *testing.T) {
 		{"iam-api", "user-2fa", "list-security-keys", "--user-id", strconv.Itoa(user.ID)},
 	} {
 		var stdout, stderr bytes.Buffer
-		if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-			t.Errorf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
-		}
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
 	}
 }
 
@@ -260,9 +237,7 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 	runCommand := func(args ...string) []byte {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-			t.Fatalf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
-		}
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
 		return stdout.Bytes()
 	}
 
@@ -270,29 +245,24 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "folder", "create", "--name", "mock-folder", "--description", "test folder"), &folder); err != nil {
-		t.Fatal(err)
-	}
-	if folder.ID == 0 || folder.Name != "mock-folder" {
-		t.Fatalf("folder create returned %#v", folder)
-	}
+	err := json.Unmarshal(runCommand("iam-api", "folder", "create", "--name", "mock-folder", "--description", "test folder"), &folder)
+	require.NoError(t, err)
+	require.NotEqualValues(t, 0, folder.ID, "folder create returned %#v", folder)
+	require.Equal(t, "mock-folder", folder.Name, "unexpected value")
 	var childFolder struct {
 		ID int `json:"id"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "folder", "create", "--name", "mock-child-folder", "--description", "child folder",
-	), &childFolder); err != nil {
-		t.Fatal(err)
-	}
+	), &childFolder))
 	runCommand(
 		"iam-api", "folder", "move", "--ids", strconv.Itoa(childFolder.ID), "--parent-id", strconv.Itoa(folder.ID),
 	)
 	var movedFolder struct {
 		ParentID *int `json:"parent_id"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "folder", "read", strconv.Itoa(childFolder.ID)), &movedFolder); err != nil {
-		t.Fatal(err)
-	}
+	err2 := json.Unmarshal(runCommand("iam-api", "folder", "read", strconv.Itoa(childFolder.ID)), &movedFolder)
+	require.NoError(t, err2)
 	if movedFolder.ParentID == nil || *movedFolder.ParentID != folder.ID {
 		t.Fatalf("moved folder parent ID = %v, want %d", movedFolder.ParentID, folder.ID)
 	}
@@ -301,12 +271,10 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "folder", "list", "--page", "1", "--query",
 		".items | map({id,name,description})",
-	), &projectedFolders); err != nil {
-		t.Fatal(err)
-	}
+	), &projectedFolders))
 	foundRootFolder := false
 	for _, projected := range projectedFolders {
 		if projected.ID == folder.ID && projected.Description == "test folder" {
@@ -314,17 +282,15 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 			break
 		}
 	}
-	if len(projectedFolders) != 2 || !foundRootFolder {
-		t.Fatalf("projected folder list = %#v, want both created folders including %d", projectedFolders, folder.ID)
-	}
+	require.Len(t, projectedFolders, 2, "projected folder list = %#v, want both created folders including %d", projectedFolders, folder.ID)
+	require.True(t, foundRootFolder, "unexpected value")
 	var folderList struct {
 		Items []struct {
 			ID int `json:"id"`
 		} `json:"items"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "folder", "list", "--name", "mock-folder"), &folderList); err != nil {
-		t.Fatal(err)
-	}
+	err3 := json.Unmarshal(runCommand("iam-api", "folder", "list", "--name", "mock-folder"), &folderList)
+	require.NoError(t, err3)
 	foundListedFolder := false
 	for _, listed := range folderList.Items {
 		if listed.ID == folder.ID {
@@ -332,32 +298,26 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 			break
 		}
 	}
-	if !foundListedFolder {
-		t.Fatalf("folder list returned %#v, want folder %d", folderList, folder.ID)
-	}
+	require.True(t, foundListedFolder, "folder list returned %#v, want folder %d", folderList, folder.ID)
 	runCommand("iam-api", "folder", "update", strconv.Itoa(folder.ID), "--name", "mock-folder-updated", "--description", "updated")
 
 	var project struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "project", "create", "--code", "mock-project-code", "--name", "mock-project", "--description", "test project",
-	), &project); err != nil {
-		t.Fatal(err)
-	}
-	if project.ID == 0 || project.Name != "mock-project" {
-		t.Fatalf("project create returned %#v", project)
-	}
+	), &project))
+	require.NotEqualValues(t, 0, project.ID, "project create returned %#v", project)
+	require.Equal(t, "mock-project", project.Name, "unexpected value")
 	runCommand(
 		"iam-api", "project", "move", "--ids", strconv.Itoa(project.ID), "--parent-folder-id", strconv.Itoa(folder.ID),
 	)
 	var movedProject struct {
 		ParentFolderID *int `json:"parent_folder_id"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "project", "read", strconv.Itoa(project.ID)), &movedProject); err != nil {
-		t.Fatal(err)
-	}
+	err4 := json.Unmarshal(runCommand("iam-api", "project", "read", strconv.Itoa(project.ID)), &movedProject)
+	require.NoError(t, err4)
 	if movedProject.ParentFolderID == nil || *movedProject.ParentFolderID != folder.ID {
 		t.Fatalf("moved project parent folder ID = %v, want %d", movedProject.ParentFolderID, folder.ID)
 	}
@@ -366,34 +326,24 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "service-principal", "create", "--project-id", strconv.Itoa(project.ID),
 		"--name", "mock-service-principal", "--description", "test principal",
-	), &servicePrincipal); err != nil {
-		t.Fatal(err)
-	}
-	if servicePrincipal.ID == 0 || servicePrincipal.Name != "mock-service-principal" {
-		t.Fatalf("service principal create returned %#v", servicePrincipal)
-	}
-	if err := json.Unmarshal(runCommand(
+	), &servicePrincipal))
+	require.NotEqualValues(t, 0, servicePrincipal.ID, "service principal create returned %#v", servicePrincipal)
+	require.Equal(t, "mock-service-principal", servicePrincipal.Name, "unexpected value")
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "service-principal", "update", strconv.Itoa(servicePrincipal.ID),
 		"--name", "mock-service-principal-flag-updated",
 		"--description", "updated principal",
-	), &servicePrincipal); err != nil {
-		t.Fatal(err)
-	}
-	if servicePrincipal.Name != "mock-service-principal-flag-updated" {
-		t.Fatalf("service principal flag update returned %#v", servicePrincipal)
-	}
-	if err := json.Unmarshal(runCommand(
+	), &servicePrincipal))
+	require.Equal(t, "mock-service-principal-flag-updated", servicePrincipal.Name, "service principal flag update returned %#v", servicePrincipal)
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "service-principal", "update", strconv.Itoa(servicePrincipal.ID), "--request",
 		`{"name":"mock-service-principal-json-updated","description":"updated principal"}`,
-	), &servicePrincipal); err != nil {
-		t.Fatal(err)
-	}
-	if servicePrincipal.Name != "mock-service-principal-json-updated" || servicePrincipal.Description != "updated principal" {
-		t.Fatalf("service principal JSON update returned %#v", servicePrincipal)
-	}
+	), &servicePrincipal))
+	require.Equal(t, "mock-service-principal-json-updated", servicePrincipal.Name, "service principal JSON update returned %#v", servicePrincipal)
+	require.Equal(t, "updated principal", servicePrincipal.Description, "unexpected value")
 
 	runCommand("iam-api", "service-principal", "delete", strconv.Itoa(servicePrincipal.ID))
 	runCommand("iam-api", "project", "delete", strconv.Itoa(project.ID))
@@ -412,24 +362,17 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 	runCommand := func(args ...string) []byte {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-			t.Fatalf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Errorf("run(%v) stderr = %q, want empty", args, stderr.String())
-		}
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr = %q, want empty", args, stderr.String())
 		return stdout.Bytes()
 	}
 	postMock := func(path, body string) []byte {
 		t.Helper()
 		response, err := http.Post(server.TestURL()+path, "application/json", strings.NewReader(body)) //nolint:noctx // ローカルモックサーバーへのテスト準備。
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer func() {
-			if err := response.Body.Close(); err != nil {
-				t.Errorf("close mock response body: %v", err)
-			}
+			err := response.Body.Close()
+			require.NoError(t, err, "close mock response body: %v")
 		}()
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
 			t.Fatalf("POST %s status = %d", path, response.StatusCode)
@@ -447,41 +390,33 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 		RequireLowercase bool `json:"require_lowercase"`
 		RequireSymbols   bool `json:"require_symbols"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "auth", "update-password-policy", "--request",
-		`{"min_length":12,"require_uppercase":true,"require_lowercase":true,"require_symbols":false}`), &passwordPolicy); err != nil {
-		t.Fatal(err)
-	}
-	if passwordPolicy.MinLength != 12 || !passwordPolicy.RequireUppercase || !passwordPolicy.RequireLowercase || passwordPolicy.RequireSymbols {
-		t.Fatalf("updated password policy = %#v, want minimum length 12", passwordPolicy)
-	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand("iam-api", "auth", "update-password-policy", "--request",
+		`{"min_length":12,"require_uppercase":true,"require_lowercase":true,"require_symbols":false}`), &passwordPolicy))
+	require.EqualValues(t, 12, passwordPolicy.MinLength, "updated password policy = %#v, want minimum length 12", passwordPolicy)
+	require.True(t, passwordPolicy.RequireUppercase, "unexpected value")
+	require.True(t, passwordPolicy.RequireLowercase, "unexpected value")
+	require.False(t, passwordPolicy.RequireSymbols, "unexpected value")
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "auth", "update-password-policy", "--min-length", "14",
 		"--require-uppercase", "--require-lowercase=false", "--require-symbols=false",
-	), &passwordPolicy); err != nil {
-		t.Fatal(err)
-	}
-	if passwordPolicy.MinLength != 14 || !passwordPolicy.RequireUppercase || passwordPolicy.RequireLowercase || passwordPolicy.RequireSymbols {
-		t.Fatalf("flag-updated password policy = %#v", passwordPolicy)
-	}
+	), &passwordPolicy))
+	require.EqualValues(t, 14, passwordPolicy.MinLength, "flag-updated password policy = %#v", passwordPolicy)
+	require.True(t, passwordPolicy.RequireUppercase, "unexpected value")
+	require.False(t, passwordPolicy.RequireLowercase, "unexpected value")
+	require.False(t, passwordPolicy.RequireSymbols, "unexpected value")
 	authConditions := `{"datetime_restriction":{"after":"2025-09-01T00:00:00+09:00","before":"2025-10-01T00:00:00+09:00"},"ip_restriction":{"mode":"allow_all"},"require_two_factor_auth":{"enabled":false}}`
-	if got := runCommand("iam-api", "auth", "update-auth-conditions", "--request", authConditions); len(got) == 0 {
-		t.Fatal("update-auth-conditions returned an empty response")
-	}
-	if got := runCommand("iam-api", "id-policy", "update-organization", "--request", "[]"); len(got) == 0 {
-		t.Fatal("update-organization ID policy returned an empty response")
-	}
+	got := runCommand("iam-api", "auth", "update-auth-conditions", "--request", authConditions)
+	require.NotEmpty(t, got, "update-auth-conditions returned an empty response")
+	got2 := runCommand("iam-api", "id-policy", "update-organization", "--request", "[]")
+	require.NotEmpty(t, got2, "update-organization ID policy returned an empty response")
 	var organization struct {
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "organization", "update", "--name", "mock-organization-updated"), &organization); err != nil {
-		t.Fatal(err)
-	}
-	if organization.Name != "mock-organization-updated" {
-		t.Fatalf("organization update returned %#v", organization)
-	}
-	if got := runCommand("iam-api", "organization", "update-service-policy", "--request", "[]"); len(got) == 0 {
-		t.Fatal("update-service-policy returned an empty response")
-	}
+	err := json.Unmarshal(runCommand("iam-api", "organization", "update", "--name", "mock-organization-updated"), &organization)
+	require.NoError(t, err)
+	require.Equal(t, "mock-organization-updated", organization.Name, "organization update returned %#v", organization)
+	got3 := runCommand("iam-api", "organization", "update-service-policy", "--request", "[]")
+	require.NotEmpty(t, got3, "update-service-policy returned an empty response")
 	runCommand("iam-api", "organization", "read-service-policy",
 		"--is-active=false", "--is-dry-run=true", "--name", "mock-service", "--code", "mock-code", "--type", "bool")
 
@@ -496,69 +431,52 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 		`{"project_id":1,"name":"invalid-key","description":"missing roles"}`}, &invalidKeyOut, &invalidKeyErr); exitCode == 0 || !strings.Contains(invalidKeyErr.String(), "iam_roles") {
 		t.Fatalf("API key create without IAM roles exit = %d, stderr = %q; want IAM role validation error", exitCode, invalidKeyErr.String())
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "project-api-key", "create", "--request",
-		`{"project_id":1,"name":"mock-api-key","description":"test key","iam_roles":["role-1"]}`), &apiKey); err != nil {
-		t.Fatal(err)
-	}
-	if apiKey.ID == 0 || apiKey.AccessTokenSecret == "" || len(apiKey.IAMRoles) != 1 || apiKey.IAMRoles[0] != "role-1" {
-		t.Fatalf("API key create returned %#v; expected ID, secret, and required IAM role", apiKey)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("iam-api", "project-api-key", "create", "--request",
+		`{"project_id":1,"name":"mock-api-key","description":"test key","iam_roles":["role-1"]}`), &apiKey))
+	require.NotEqualValues(t, 0, apiKey.ID, "API key create returned %#v; expected ID, secret, and required IAM role", apiKey)
+	require.NotEmpty(t, apiKey.AccessTokenSecret, "should not be empty")
+	require.Len(t, apiKey.IAMRoles, 1, "unexpected length")
+	require.Equal(t, "role-1", apiKey.IAMRoles[0], "unexpected value")
 	var updatedAPIKey struct {
 		Name     string   `json:"name"`
 		IAMRoles []string `json:"iam_roles"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "project-api-key", "update", strconv.Itoa(apiKey.ID), "--request",
-		`{"name":"mock-api-key-updated","description":"updated key","iam_roles":["role-2"]}`), &updatedAPIKey); err != nil {
-		t.Fatal(err)
-	}
-	if updatedAPIKey.Name != "mock-api-key-updated" || len(updatedAPIKey.IAMRoles) != 1 || updatedAPIKey.IAMRoles[0] != "role-2" {
-		t.Fatalf("API key update returned %#v", updatedAPIKey)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("iam-api", "project-api-key", "update", strconv.Itoa(apiKey.ID), "--request",
+		`{"name":"mock-api-key-updated","description":"updated key","iam_roles":["role-2"]}`), &updatedAPIKey))
+	require.Equal(t, "mock-api-key-updated", updatedAPIKey.Name, "API key update returned %#v", updatedAPIKey)
+	require.Len(t, updatedAPIKey.IAMRoles, 1, "unexpected length")
+	require.Equal(t, "role-2", updatedAPIKey.IAMRoles[0], "unexpected value")
 	runCommand("iam-api", "project-api-key", "delete", strconv.Itoa(apiKey.ID))
 
 	var scim struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "scim", "create", "--name", "mock-scim"), &scim); err != nil {
-		t.Fatal(err)
-	}
-	if scim.ID == "" || scim.Name != "mock-scim" {
-		t.Fatalf("SCIM create returned %#v", scim)
-	}
-	if err := json.Unmarshal(runCommand("iam-api", "scim", "update", scim.ID, "--request", `{"name":"mock-scim-updated"}`), &scim); err != nil {
-		t.Fatal(err)
-	}
-	if scim.Name != "mock-scim-updated" {
-		t.Fatalf("SCIM update returned %#v", scim)
-	}
-	if err := json.Unmarshal(runCommand("iam-api", "scim", "update", scim.ID, "--name", "mock-scim-flag-updated"), &scim); err != nil {
-		t.Fatal(err)
-	}
-	if scim.Name != "mock-scim-flag-updated" {
-		t.Fatalf("SCIM flag update returned %#v", scim)
-	}
+	err2 := json.Unmarshal(runCommand("iam-api", "scim", "create", "--name", "mock-scim"), &scim)
+	require.NoError(t, err2)
+	require.NotEmpty(t, scim.ID, "SCIM create returned %#v", scim)
+	require.Equal(t, "mock-scim", scim.Name, "unexpected value")
+	err3 := json.Unmarshal(runCommand("iam-api", "scim", "update", scim.ID, "--request", `{"name":"mock-scim-updated"}`), &scim)
+	require.NoError(t, err3)
+	require.Equal(t, "mock-scim-updated", scim.Name, "SCIM update returned %#v", scim)
+	err4 := json.Unmarshal(runCommand("iam-api", "scim", "update", scim.ID, "--name", "mock-scim-flag-updated"), &scim)
+	require.NoError(t, err4)
+	require.Equal(t, "mock-scim-flag-updated", scim.Name, "SCIM flag update returned %#v", scim)
 	var regeneratedToken struct {
 		SecretToken string `json:"secret_token"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "scim", "regenerate-token", scim.ID), &regeneratedToken); err != nil {
-		t.Fatal(err)
-	}
-	if regeneratedToken.SecretToken == "" {
-		t.Fatal("SCIM token regeneration returned an empty secret")
-	}
+	err5 := json.Unmarshal(runCommand("iam-api", "scim", "regenerate-token", scim.ID), &regeneratedToken)
+	require.NoError(t, err5)
+	require.NotEmpty(t, regeneratedToken.SecretToken, "SCIM token regeneration returned an empty secret")
 	runCommand("iam-api", "scim", "delete", scim.ID)
 
-	if got := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "enable"))); got != "" {
-		t.Fatalf("service-policy enable output = %q, want empty", got)
-	}
-	if got := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "is-enabled"))); got != "true" {
-		t.Fatalf("service-policy enabled status = %q, want true", got)
-	}
+	got4 := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "enable")))
+	require.Empty(t, got4, "service-policy enable output = %q, want empty", got4)
+	got5 := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "is-enabled")))
+	require.Equal(t, "true", got5, "service-policy enabled status = %q, want true", got5)
 	runCommand("iam-api", "service-policy", "disable")
-	if got := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "is-enabled"))); got != "false" {
-		t.Fatalf("service-policy enabled status after disable = %q, want false", got)
-	}
+	got6 := strings.TrimSpace(string(runCommand("iam-api", "service-policy", "is-enabled")))
+	require.Equal(t, "false", got6, "service-policy enabled status after disable = %q, want false", got6)
 
 	ssoRequest := `{"name":"mock-sso","description":"test","idp_entity_id":"https://idp.example.test/entity","idp_login_url":"https://idp.example.test/login","idp_logout_url":"https://idp.example.test/logout","idp_certificate":"test-certificate"}`
 	var ssoProfile struct {
@@ -566,135 +484,99 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 		Name     string `json:"name"`
 		Assigned bool   `json:"assigned"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "sso", "create", "--request", ssoRequest), &ssoProfile); err != nil {
-		t.Fatal(err)
-	}
-	if ssoProfile.ID == 0 || ssoProfile.Name != "mock-sso" {
-		t.Fatalf("SSO create returned %#v", ssoProfile)
-	}
+	err6 := json.Unmarshal(runCommand("iam-api", "sso", "create", "--request", ssoRequest), &ssoProfile)
+	require.NoError(t, err6)
+	require.NotEqualValues(t, 0, ssoProfile.ID, "SSO create returned %#v", ssoProfile)
+	require.Equal(t, "mock-sso", ssoProfile.Name, "unexpected value")
 	ssoID := strconv.Itoa(ssoProfile.ID)
 	ssoUpdate := `{"name":"mock-sso-updated","description":"updated","idp_entity_id":"https://idp.example.test/entity","idp_login_url":"https://idp.example.test/login","idp_logout_url":"https://idp.example.test/logout","idp_certificate":"test-certificate"}`
-	if err := json.Unmarshal(runCommand("iam-api", "sso", "update", ssoID, "--request", ssoUpdate), &ssoProfile); err != nil {
-		t.Fatal(err)
-	}
+	err7 := json.Unmarshal(runCommand("iam-api", "sso", "update", ssoID, "--request", ssoUpdate), &ssoProfile)
+	require.NoError(t, err7)
 	runCommand("iam-api", "sso", "link", ssoID)
-	if err := json.Unmarshal(runCommand("iam-api", "sso", "read", ssoID), &ssoProfile); err != nil {
-		t.Fatal(err)
-	}
-	if !ssoProfile.Assigned {
-		t.Fatal("SSO profile was not linked")
-	}
+	err8 := json.Unmarshal(runCommand("iam-api", "sso", "read", ssoID), &ssoProfile)
+	require.NoError(t, err8)
+	require.True(t, ssoProfile.Assigned, "SSO profile was not linked")
 	runCommand("iam-api", "sso", "unlink", ssoID)
-	if err := json.Unmarshal(runCommand("iam-api", "sso", "read", ssoID), &ssoProfile); err != nil {
-		t.Fatal(err)
-	}
-	if ssoProfile.Assigned {
-		t.Fatal("SSO profile remained linked after unlink")
-	}
+	err9 := json.Unmarshal(runCommand("iam-api", "sso", "read", ssoID), &ssoProfile)
+	require.NoError(t, err9)
+	require.False(t, ssoProfile.Assigned, "SSO profile remained linked after unlink")
 	runCommand("iam-api", "sso", "delete", ssoID)
 
 	passwordFile := filepath.Join(t.TempDir(), "password.txt")
-	if err := os.WriteFile(passwordFile, []byte("Password-Test-2FA-1234"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err10 := os.WriteFile(passwordFile, []byte("Password-Test-2FA-1234"), 0o600)
+	require.NoError(t, err10)
 	var user struct {
 		ID int `json:"id"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "user", "create",
+	require.NoError(t, json.Unmarshal(runCommand("iam-api", "user", "create",
 		"--name", "mock-2fa-mutation-user", "--code", "mock-2fa-mutation-user",
-		"--description", "test", "--password-file", passwordFile), &user); err != nil {
-		t.Fatal(err)
-	}
-	if user.ID == 0 {
-		t.Fatal("created test user has no ID")
-	}
+		"--description", "test", "--password-file", passwordFile), &user))
+	require.NotEqualValues(t, 0, user.ID, "created test user has no ID")
 	userID := strconv.Itoa(user.ID)
 	var trustedDevice struct {
 		ID int `json:"id"`
 	}
-	if err := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/trusted-devices", `{"name":"test-device"}`), &trustedDevice); err != nil {
-		t.Fatal(err)
-	}
+	err11 := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/trusted-devices", `{"name":"test-device"}`), &trustedDevice)
+	require.NoError(t, err11)
 	runCommand("iam-api", "user-2fa", "delete-trusted-device", "--user-id", userID, strconv.Itoa(trustedDevice.ID))
-	if err := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/trusted-devices", `{"name":"test-device-to-clear"}`), &trustedDevice); err != nil {
-		t.Fatal(err)
-	}
+	err12 := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/trusted-devices", `{"name":"test-device-to-clear"}`), &trustedDevice)
+	require.NoError(t, err12)
 	runCommand("iam-api", "user-2fa", "clear-trusted-devices", "--user-id", userID)
 	var securityKey struct {
 		ID int `json:"id"`
 	}
-	if err := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/security-keys", `{"name":"test-security-key"}`), &securityKey); err != nil {
-		t.Fatal(err)
-	}
+	err13 := json.Unmarshal(postMock("/_sakumock/users/"+userID+"/security-keys", `{"name":"test-security-key"}`), &securityKey)
+	require.NoError(t, err13)
 	runCommand("iam-api", "user-2fa", "delete-security-key", "--user-id", userID, strconv.Itoa(securityKey.ID))
 	runCommand("iam-api", "user-2fa", "deactivate-otp", "--user-id", userID)
 	runCommand("iam-api", "user", "delete", userID)
 
 	project, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	publicKeyDER, err := x509.MarshalPKIXPublicKey(&project.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	publicKeyFile := filepath.Join(t.TempDir(), "public-key.pem")
-	if err := os.WriteFile(publicKeyFile, pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKeyDER}), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err14 := os.WriteFile(publicKeyFile, pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKeyDER}), 0o600)
+	require.NoError(t, err14)
 	var servicePrincipal struct {
 		ID int `json:"id"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "service-principal", "create", "--project-id", "1",
-		"--name", "mock-key-operations", "--description", "test"), &servicePrincipal); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("iam-api", "service-principal", "create", "--project-id", "1",
+		"--name", "mock-key-operations", "--description", "test"), &servicePrincipal))
 	var servicePrincipalKey struct {
 		ID string `json:"id"`
 	}
 	servicePrincipalID := strconv.Itoa(servicePrincipal.ID)
-	if err := json.Unmarshal(runCommand("iam-api", "service-principal", "upload-key", servicePrincipalID,
-		"--public-key-file", publicKeyFile), &servicePrincipalKey); err != nil {
-		t.Fatal(err)
-	}
-	if servicePrincipalKey.ID == "" {
-		t.Fatal("uploaded service principal key has no ID")
-	}
+	require.NoError(t, json.Unmarshal(runCommand("iam-api", "service-principal", "upload-key", servicePrincipalID,
+		"--public-key-file", publicKeyFile), &servicePrincipalKey))
+	require.NotEmpty(t, servicePrincipalKey.ID, "uploaded service principal key has no ID")
 	var listedKeys struct {
 		Items []struct {
 			ID string `json:"id"`
 		} `json:"items"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "service-principal", "list-keys", servicePrincipalID,
 		"--page", "1", "--per-page", "10", "--ordering", "created_at",
-	), &listedKeys); err != nil {
-		t.Fatal(err)
-	}
+	), &listedKeys))
 	foundKey := false
 	for _, key := range listedKeys.Items {
 		if key.ID == servicePrincipalKey.ID {
 			foundKey = true
 		}
 	}
-	if !foundKey {
-		t.Fatalf("service principal key list returned %#v, want key %s", listedKeys, servicePrincipalKey.ID)
-	}
-	if err := json.Unmarshal(runCommand(
+	require.True(t, foundKey, "service principal key list returned %#v, want key %s", listedKeys, servicePrincipalKey.ID)
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "service-principal", "list-keys", servicePrincipalID,
 		"--request", `{"page":1,"per_page":10,"ordering":"created_at"}`,
-	), &listedKeys); err != nil {
-		t.Fatal(err)
-	}
+	), &listedKeys))
 	foundKey = false
 	for _, key := range listedKeys.Items {
 		if key.ID == servicePrincipalKey.ID {
 			foundKey = true
 		}
 	}
-	if !foundKey {
-		t.Fatalf("service principal key JSON list returned %#v, want key %s", listedKeys, servicePrincipalKey.ID)
-	}
+	require.True(t, foundKey, "service principal key JSON list returned %#v, want key %s", listedKeys, servicePrincipalKey.ID)
 	runCommand("iam-api", "service-principal", "disable-key", servicePrincipalID, servicePrincipalKey.ID)
 	runCommand("iam-api", "service-principal", "enable-key", servicePrincipalID, servicePrincipalKey.ID)
 	runCommand("iam-api", "service-principal", "delete-key", servicePrincipalID, servicePrincipalKey.ID)
@@ -716,46 +598,34 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 	} {
 		t.Helper()
 		response, err := http.Post(server.TestURL()+path, "application/json", strings.NewReader(body)) //nolint:noctx // ローカルモックサーバーへのテスト準備。
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer func() {
-			if err := response.Body.Close(); err != nil {
-				t.Errorf("close mock response body: %v", err)
-			}
+			err := response.Body.Close()
+			require.NoError(t, err, "close mock response body: %v")
 		}()
-		if response.StatusCode != http.StatusCreated {
-			t.Fatalf("POST %s status = %d", path, response.StatusCode)
-		}
+		require.Equal(t, http.StatusCreated, response.StatusCode, "POST %s status = %d", path, response.StatusCode)
 		var result struct {
 			ID int `json:"id"`
 		}
-		if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-			t.Fatal(err)
-		}
+		err = json.NewDecoder(response.Body).Decode(&result)
+		require.NoError(t, err)
 		return result
 	}
 	project := createInMock("/projects", `{"name":"mock-project","code":"mock-project-code","description":"test"}`)
 	folder := createInMock("/folders", `{"name":"mock-folder","description":"test"}`)
 
 	passwordFile := filepath.Join(t.TempDir(), "password.txt")
-	if err := os.WriteFile(passwordFile, []byte("Password-Test-1234\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(passwordFile, []byte("Password-Test-1234\n"), 0o600)
+	require.NoError(t, err)
 	newPasswordFile := filepath.Join(t.TempDir(), "new-password.txt")
-	if err := os.WriteFile(newPasswordFile, []byte("Password-Test-5678"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err2 := os.WriteFile(newPasswordFile, []byte("Password-Test-5678"), 0o600)
+	require.NoError(t, err2)
 
 	runCommand := func(args ...string) []byte {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if exitCode := run(args, &stdout, &stderr); exitCode != 0 {
-			t.Fatalf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Errorf("run(%v) stderr = %q, want empty", args, stderr.String())
-		}
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr = %q, want empty", args, stderr.String())
 		return stdout.Bytes()
 	}
 
@@ -767,16 +637,14 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		Description string `json:"description"`
 		Email       string `json:"email"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "user", "create",
 		"--name", "mock-user", "--code", "mock-user-code", "--description", "test user",
 		"--password-file", passwordFile,
-	), &created); err != nil {
-		t.Fatal(err)
-	}
-	if created.ID == 0 || created.Name != "mock-user" || created.Code != "mock-user-code" {
-		t.Fatalf("create returned %#v, want user ID, name and code", created)
-	}
+	), &created))
+	require.NotEqualValues(t, 0, created.ID, "create returned %#v, want user ID, name and code", created)
+	require.Equal(t, "mock-user", created.Name, "unexpected value")
+	require.Equal(t, "mock-user-code", created.Code, "unexpected value")
 	userID := created.ID
 
 	// user の一覧（配列出力）
@@ -784,22 +652,19 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "user", "list"), &listed); err != nil {
-		t.Fatal(err)
-	}
-	if len(listed) != 1 || listed[0].ID != userID {
-		t.Fatalf("list returned %#v, want user %d", listed, userID)
-	}
+	err3 := json.Unmarshal(runCommand("iam-api", "user", "list"), &listed)
+	require.NoError(t, err3)
+	require.Len(t, listed, 1, "list returned %#v, want user %d", listed, userID)
+	require.Equal(t, userID, listed[0].ID, "unexpected value")
 	var projected []struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "user", "list", "--query", "map({id,name})"), &projected); err != nil {
-		t.Fatal(err)
-	}
-	if len(projected) != 1 || projected[0].ID != userID || projected[0].Name != "mock-user" {
-		t.Fatalf("projected output = %+v, want created user ID and name", projected)
-	}
+	err4 := json.Unmarshal(runCommand("iam-api", "user", "list", "--query", "map({id,name})"), &projected)
+	require.NoError(t, err4)
+	require.Len(t, projected, 1, "projected output = %+v, want created user ID and name", projected)
+	require.Equal(t, userID, projected[0].ID, "unexpected value")
+	require.Equal(t, "mock-user", projected[0].Name, "unexpected value")
 
 	// user の読み込み
 	var read struct {
@@ -807,53 +672,40 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "user", "read", strconv.Itoa(userID)), &read); err != nil {
-		t.Fatal(err)
-	}
-	if read.ID != userID || read.Name != "mock-user" {
-		t.Fatalf("read returned %#v, want user %d", read, userID)
-	}
+	err5 := json.Unmarshal(runCommand("iam-api", "user", "read", strconv.Itoa(userID)), &read)
+	require.NoError(t, err5)
+	require.Equal(t, userID, read.ID, "read returned %#v, want user %d", read, userID)
+	require.Equal(t, "mock-user", read.Name, "unexpected value")
 
 	// パスワードファイルなしの user 更新はパスワードを保持する
 	var updated struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "user", "update", strconv.Itoa(userID), "--name", "renamed-user", "--description", "updated",
-	), &updated); err != nil {
-		t.Fatal(err)
-	}
-	if updated.Name != "renamed-user" || updated.Description != "updated" {
-		t.Fatalf("update returned %#v, want renamed-user and updated", updated)
-	}
+	), &updated))
+	require.Equal(t, "renamed-user", updated.Name, "update returned %#v, want renamed-user and updated", updated)
+	require.Equal(t, "updated", updated.Description, "unexpected value")
 
 	// パスワードファイルありの user 更新
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "user", "update", strconv.Itoa(userID),
 		"--name", "renamed-user", "--description", "updated", "--password-file", newPasswordFile,
-	), &updated); err != nil {
-		t.Fatal(err)
-	}
+	), &updated))
 
 	// register-email / unregister-email の実行
 	runCommand("iam-api", "user", "register-email", strconv.Itoa(userID), "--email", "user@example.com")
 	var withEmail struct {
 		Email string `json:"email"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "user", "read", strconv.Itoa(userID)), &withEmail); err != nil {
-		t.Fatal(err)
-	}
-	if withEmail.Email != "user@example.com" {
-		t.Fatalf("email = %q, want user@example.com", withEmail.Email)
-	}
+	err6 := json.Unmarshal(runCommand("iam-api", "user", "read", strconv.Itoa(userID)), &withEmail)
+	require.NoError(t, err6)
+	require.Equal(t, "user@example.com", withEmail.Email, "email = %q, want user@example.com", withEmail.Email)
 	runCommand("iam-api", "user", "unregister-email", strconv.Itoa(userID))
-	if err := json.Unmarshal(runCommand("iam-api", "user", "read", strconv.Itoa(userID)), &withEmail); err != nil {
-		t.Fatal(err)
-	}
-	if withEmail.Email != "" {
-		t.Fatalf("email after unregister = %q, want empty", withEmail.Email)
-	}
+	err7 := json.Unmarshal(runCommand("iam-api", "user", "read", strconv.Itoa(userID)), &withEmail)
+	require.NoError(t, err7)
+	require.Empty(t, withEmail.Email, "email after unregister = %q, want empty", withEmail.Email)
 
 	// group の作成 / メンバーシップ
 	var groupCreated struct {
@@ -861,58 +713,46 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "group", "create", "--name", "mock-group", "--description", "test group",
-	), &groupCreated); err != nil {
-		t.Fatal(err)
-	}
-	if groupCreated.ID == 0 || groupCreated.Name != "mock-group" {
-		t.Fatalf("group create returned %#v, want group ID and name", groupCreated)
-	}
+	), &groupCreated))
+	require.NotEqualValues(t, 0, groupCreated.ID, "group create returned %#v, want group ID and name", groupCreated)
+	require.Equal(t, "mock-group", groupCreated.Name, "unexpected value")
 	groupID := groupCreated.ID
 
 	var memberships []struct {
 		ID int `json:"id"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "group", "update-memberships", strconv.Itoa(groupID), "--request", `[`+strconv.Itoa(userID)+`]`), &memberships); err != nil {
-		t.Fatal(err)
-	}
-	if len(memberships) != 1 || memberships[0].ID != userID {
-		t.Fatalf("update-memberships returned %#v, want user %d", memberships, userID)
-	}
+	err8 := json.Unmarshal(runCommand("iam-api", "group", "update-memberships", strconv.Itoa(groupID), "--request", `[`+strconv.Itoa(userID)+`]`), &memberships)
+	require.NoError(t, err8)
+	require.Len(t, memberships, 1, "update-memberships returned %#v, want user %d", memberships, userID)
+	require.Equal(t, userID, memberships[0].ID, "unexpected value")
 	memberships = nil
-	if err := json.Unmarshal(runCommand("iam-api", "group", "read-memberships", strconv.Itoa(groupID)), &memberships); err != nil {
-		t.Fatal(err)
-	}
-	if len(memberships) != 1 || memberships[0].ID != userID {
-		t.Fatalf("read-memberships returned %#v, want user %d", memberships, userID)
-	}
+	err9 := json.Unmarshal(runCommand("iam-api", "group", "read-memberships", strconv.Itoa(groupID)), &memberships)
+	require.NoError(t, err9)
+	require.Len(t, memberships, 1, "read-memberships returned %#v, want user %d", memberships, userID)
+	require.Equal(t, userID, memberships[0].ID, "unexpected value")
 
 	// user で絞り込んだ group の一覧
 	var groupListed []struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "group", "list", "--user-id", strconv.Itoa(userID)), &groupListed); err != nil {
-		t.Fatal(err)
-	}
-	if len(groupListed) != 1 || groupListed[0].ID != groupID {
-		t.Fatalf("group list returned %#v, want group %d", groupListed, groupID)
-	}
+	err10 := json.Unmarshal(runCommand("iam-api", "group", "list", "--user-id", strconv.Itoa(userID)), &groupListed)
+	require.NoError(t, err10)
+	require.Len(t, groupListed, 1, "group list returned %#v, want group %d", groupListed, groupID)
+	require.Equal(t, groupID, groupListed[0].ID, "unexpected value")
 
 	// group の更新 / 読み込み
 	var groupUpdated struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	if err := json.Unmarshal(runCommand(
+	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "group", "update", strconv.Itoa(groupID), "--name", "renamed-group", "--description", "renamed",
-	), &groupUpdated); err != nil {
-		t.Fatal(err)
-	}
-	if groupUpdated.Name != "renamed-group" || groupUpdated.Description != "renamed" {
-		t.Fatalf("group update returned %#v, want renamed-group and renamed", groupUpdated)
-	}
+	), &groupUpdated))
+	require.Equal(t, "renamed-group", groupUpdated.Name, "group update returned %#v, want renamed-group and renamed", groupUpdated)
+	require.Equal(t, "renamed", groupUpdated.Description, "unexpected value")
 
 	// IAM ポリシーの binding
 	bindingsRequest := `[{"role":{"type":"preset","id":"iam-role-id"},"principals":[{"type":"user","id":1}]}]`
@@ -939,12 +779,12 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 				ID   int    `json:"id"`
 			} `json:"principals"`
 		}
-		if err := json.Unmarshal(runCommand(args...), &updated); err != nil {
-			t.Fatal(err)
-		}
-		if len(updated) != 1 || updated[0].Role.ID != "iam-role-id" || len(updated[0].Principals) != 1 || updated[0].Principals[0].ID != 1 {
-			t.Fatalf("%s returned %#v, want binding for iam-role-id and user 1", target.operation, updated)
-		}
+		err11 := json.Unmarshal(runCommand(args...), &updated)
+		require.NoError(t, err11)
+		require.Len(t, updated, 1, "%s returned %#v, want binding for iam-role-id and user 1", target.operation, updated)
+		require.Equal(t, "iam-role-id", updated[0].Role.ID, "unexpected value")
+		require.Len(t, updated[0].Principals, 1, "unexpected length")
+		require.EqualValues(t, 1, updated[0].Principals[0].ID, "unexpected value")
 	}
 
 	var organizationBindings []struct {
@@ -952,56 +792,43 @@ func TestIAMAPIWithSakumock(t *testing.T) {
 			ID string `json:"id"`
 		} `json:"role"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "policy", "read-organization"), &organizationBindings); err != nil {
-		t.Fatal(err)
-	}
-	if len(organizationBindings) != 1 || organizationBindings[0].Role.ID != "iam-role-id" {
-		t.Fatalf("read-organization returned %#v, want binding for iam-role-id", organizationBindings)
-	}
+	err12 := json.Unmarshal(runCommand("iam-api", "policy", "read-organization"), &organizationBindings)
+	require.NoError(t, err12)
+	require.Len(t, organizationBindings, 1, "read-organization returned %#v, want binding for iam-role-id", organizationBindings)
+	require.Equal(t, "iam-role-id", organizationBindings[0].Role.ID, "unexpected value")
 	var projectBindings []struct {
 		Role struct {
 			ID string `json:"id"`
 		} `json:"role"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "policy", "read-project", strconv.Itoa(project.ID)), &projectBindings); err != nil {
-		t.Fatal(err)
-	}
-	if len(projectBindings) != 1 || projectBindings[0].Role.ID != "iam-role-id" {
-		t.Fatalf("read-project returned %#v, want binding for iam-role-id", projectBindings)
-	}
+	err13 := json.Unmarshal(runCommand("iam-api", "policy", "read-project", strconv.Itoa(project.ID)), &projectBindings)
+	require.NoError(t, err13)
+	require.Len(t, projectBindings, 1, "read-project returned %#v, want binding for iam-role-id", projectBindings)
+	require.Equal(t, "iam-role-id", projectBindings[0].Role.ID, "unexpected value")
 	var folderBindings []struct {
 		Role struct {
 			ID string `json:"id"`
 		} `json:"role"`
 	}
-	if err := json.Unmarshal(runCommand("iam-api", "policy", "read-folder", strconv.Itoa(folder.ID)), &folderBindings); err != nil {
-		t.Fatal(err)
-	}
-	if len(folderBindings) != 1 || folderBindings[0].Role.ID != "iam-role-id" {
-		t.Fatalf("read-folder returned %#v, want binding for iam-role-id", folderBindings)
-	}
+	err14 := json.Unmarshal(runCommand("iam-api", "policy", "read-folder", strconv.Itoa(folder.ID)), &folderBindings)
+	require.NoError(t, err14)
+	require.Len(t, folderBindings, 1, "read-folder returned %#v, want binding for iam-role-id", folderBindings)
+	require.Equal(t, "iam-role-id", folderBindings[0].Role.ID, "unexpected value")
 
 	// user と group を削除し、一覧が空になることを確認する
 	runCommand("iam-api", "user", "delete", strconv.Itoa(userID))
 	runCommand("iam-api", "group", "delete", strconv.Itoa(groupID))
 	listed = nil
-	if err := json.Unmarshal(runCommand("iam-api", "user", "list"), &listed); err != nil {
-		t.Fatal(err)
-	}
-	if len(listed) != 0 {
-		t.Errorf("user list after delete returned %#v, want empty", listed)
-	}
+	err15 := json.Unmarshal(runCommand("iam-api", "user", "list"), &listed)
+	require.NoError(t, err15)
+	require.Len(t, listed, 0, "user list after delete returned %#v, want empty", listed)
 	emptyJSON := string(runCommand("iam-api", "user", "list", "--query", "map({id,name})"))
-	if want := "[]\n"; emptyJSON != want {
-		t.Errorf("empty projected output = %q, want %q", emptyJSON, want)
-	}
+	want := "[]\n"
+	require.Equal(t, want, emptyJSON, "empty projected output = %q, want %q", emptyJSON, want)
 	groupListed = nil
-	if err := json.Unmarshal(runCommand("iam-api", "group", "list"), &groupListed); err != nil {
-		t.Fatal(err)
-	}
-	if len(groupListed) != 0 {
-		t.Errorf("group list after delete returned %#v, want empty", groupListed)
-	}
+	err16 := json.Unmarshal(runCommand("iam-api", "group", "list"), &groupListed)
+	require.NoError(t, err16)
+	require.Len(t, groupListed, 0, "group list after delete returned %#v, want empty", groupListed)
 }
 
 func TestIAMAPIPasswordFromStdin(t *testing.T) {
@@ -1016,15 +843,12 @@ func TestIAMAPIPasswordFromStdin(t *testing.T) {
 	stdin := os.Stdin
 	t.Cleanup(func() { os.Stdin = stdin })
 	read, write, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if _, err := write.WriteString("Password-Stdin-1234\n"); err != nil {
 		t.Fatal(err)
 	}
-	if err := write.Close(); err != nil {
-		t.Fatal(err)
-	}
+	err = write.Close()
+	require.NoError(t, err)
 	os.Stdin = read
 
 	var stdout, stderr bytes.Buffer
@@ -1038,12 +862,9 @@ func TestIAMAPIPasswordFromStdin(t *testing.T) {
 	var created struct {
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(stdout.Bytes(), &created); err != nil {
-		t.Fatal(err)
-	}
-	if created.Name != "stdin-user" {
-		t.Fatalf("create returned %#v, want stdin-user", created)
-	}
+	err2 := json.Unmarshal(stdout.Bytes(), &created)
+	require.NoError(t, err2)
+	require.Equal(t, "stdin-user", created.Name, "create returned %#v, want stdin-user", created)
 }
 
 func TestIAMAPICommandInputErrors(t *testing.T) {
@@ -1055,9 +876,8 @@ func TestIAMAPICommandInputErrors(t *testing.T) {
 	t.Setenv("SAKURA_ENDPOINTS_IAM", server.TestURL())
 
 	passwordFile := filepath.Join(t.TempDir(), "password.txt")
-	if err := os.WriteFile(passwordFile, []byte("Password-Test-1234"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(passwordFile, []byte("Password-Test-1234"), 0o600)
+	require.NoError(t, err)
 	for _, args := range [][]string{
 		{"iam-api", "user", "create", "--name", "mock-user", "--code", "mock-user-code", "--description", "test"},
 		{"iam-api", "user", "create", "--name", "mock-user", "--description", "test", "--password-file", passwordFile},
@@ -1090,9 +910,10 @@ func TestIAMAPICommandInputErrors(t *testing.T) {
 		{"iam-api", "service-principal", "upload-key", "1", "--public-key-file", "/missing/key.pem"},
 	} {
 		var stdout, stderr bytes.Buffer
-		if exitCode := run(args, &stdout, &stderr); exitCode == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-			t.Errorf("run(%v) = %d stdout %q stderr %q; want an explicit error", args, exitCode, stdout.String(), stderr.String())
-		}
+		exitCode := run(args, &stdout, &stderr)
+		require.NotEqual(t, 0, exitCode, "run(%v) = %d stdout %q stderr %q; want an explicit error", args, exitCode, stdout.String(), stderr.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
 }
 
@@ -1104,7 +925,6 @@ func TestIAMAPIUserCreateRequiresPasswordFile(t *testing.T) {
 	}, &stdout, &stderr); exitCode == 0 {
 		t.Fatal("user create without --password-file succeeded")
 	}
-	if stdout.Len() != 0 || !strings.Contains(stderr.String(), "--password-file が必要です") {
-		t.Fatalf("user create output = %q, error = %q; want an explicit --password-file error", stdout.String(), stderr.String())
-	}
+	require.EqualValues(t, 0, stdout.Len(), "user create output = %q, error = %q; want an explicit --password-file error", stdout.String(), stderr.String())
+	require.Contains(t, stderr.String(), "--password-file が必要です", "missing expected text %q", "--password-file が必要です")
 }

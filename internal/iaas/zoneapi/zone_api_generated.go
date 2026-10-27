@@ -5,18 +5,22 @@ package zoneapi
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
+	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	zone "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 )
 
 type Commands struct {
 	Find FindCommand "cmd:\"\" help:\"ゾーン一覧を取得します。名前の抽出例: skr iaas-api zone find --query 'map(.Name)'\""
+	Read ReadCommand "cmd:\"\" help:\"指定した ID のゾーン情報を取得します。例: skr iaas-api zone read --id ZONE-ID\""
 }
 
 type API interface {
 	FindWithContext(context.Context, *zone.FindRequest) ([]*iaas.Zone, error)
+	ReadWithContext(context.Context, *zone.ReadRequest) (*iaas.Zone, error)
 }
 
 type APIFactory func() (API, error)
@@ -31,5 +35,63 @@ func NewCommands(runtime Runtime, factory APIFactory) Commands {
 	var commands Commands
 	commands.Find.runtime = runtime
 	commands.Find.factory = factory
+	commands.Read.runtime = runtime
+	commands.Read.factory = factory
 	return commands
+}
+
+type ReadCommand struct {
+	Request *string "help:\"必須: ID (数値)。--id または ReadRequest JSON を直接／@path.json で指定します。個別フラグと --request は併用できません。\""
+	ID      *int64  "name:\"id\" help:\"必須: 参照するゾーン ID です。\""
+	factory APIFactory
+	runtime Runtime
+}
+
+func (c *ReadCommand) Run(ctx *kong.Context) error {
+	flagsSet := false
+	flagsSet = flagsSet || c.ID != nil
+	if c.Request != nil && flagsSet {
+		return fmt.Errorf("--request と個別フラグは併用できません")
+	}
+	request := &zone.ReadRequest{}
+	if c.Request != nil {
+		if c.runtime.DecodeRequest == nil {
+			return fmt.Errorf("API リクエスト処理が設定されていません")
+		}
+		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
+			return err
+		}
+	} else {
+		if !flagsSet {
+			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.ID == nil {
+			return fmt.Errorf("--id が必要です")
+		}
+		if c.ID != nil {
+			value := types.ID(*c.ID)
+			request.ID = value
+		}
+	}
+	if c.runtime.ValidateOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
+		return err
+	}
+	if c.factory == nil {
+		return fmt.Errorf("API クライアントが設定されていません")
+	}
+	op, err := c.factory()
+	if err != nil {
+		return err
+	}
+	result, err := op.ReadWithContext(context.Background(), request)
+	if err != nil {
+		return err
+	}
+	if c.runtime.WriteOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	return c.runtime.WriteOutput(ctx, result)
 }

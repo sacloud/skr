@@ -34,6 +34,7 @@ import (
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
 	internetapi "github.com/sacloud/skr/internal/iaas/internetapi"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIaaSSingleNameSearch(t *testing.T) {
@@ -82,9 +83,8 @@ func TestIaaSSingleNameSearch(t *testing.T) {
 						called, names = true, diskAPI.findRequests[0].Names
 					}
 				}
-				if called == test.fail || !reflect.DeepEqual(names, test.want) {
-					t.Fatalf("called = %v, Names = %#v, want %#v", called, names, test.want)
-				}
+				require.NotEqual(t, test.fail, called, "called = %v, Names = %#v, want %#v", called, names, test.want)
+				require.Equal(t, test.want, names, "unexpected value")
 			})
 		}
 	}
@@ -123,26 +123,18 @@ func TestSingleNameSearchUsesSDKFilter(t *testing.T) {
 			name := "router, 日本語 name"
 			var stdout, stderr bytes.Buffer
 			code := runCLI([]string{"iaas-api", resource, "find", "--zone", "is1b", "--name", name}, &stdout, &stderr, commandLine)
-			if code != 0 {
-				t.Fatalf("code = %d, stderr = %s", code, &stderr)
-			}
+			require.Equal(t, 0, code, "code = %d, stderr = %s", code, &stderr)
 			var payload struct {
 				Filter map[string]json.RawMessage
 			}
-			if err := json.Unmarshal(caller.payload, &payload); err != nil {
-				t.Fatal(err)
-			}
+			err := json.Unmarshal(caller.payload, &payload)
+			require.NoError(t, err)
 			var encodedName string
-			if err := json.Unmarshal(payload.Filter["Name"], &encodedName); err != nil {
-				t.Fatal(err)
-			}
+			err2 := json.Unmarshal(payload.Filter["Name"], &encodedName)
+			require.NoError(t, err2)
 			decodedName, err := url.PathUnescape(encodedName)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if decodedName != name {
-				t.Fatalf("Name filter = %q, want %q; payload = %s", decodedName, name, caller.payload)
-			}
+			require.NoError(t, err)
+			require.Equal(t, name, decodedName, "Name filter = %q, want %q; payload = %s", decodedName, name, caller.payload)
 		})
 	}
 }
@@ -169,9 +161,7 @@ func TestInternetDeleteFlags(t *testing.T) {
 				t.Fatalf("code = %d, stderr = %s", code, &stderr)
 			}
 			if test.fail {
-				if api.deleteRequest != nil {
-					t.Fatal("invalid request reached API")
-				}
+				require.Nil(t, api.deleteRequest, "invalid request reached API")
 			} else if request := api.deleteRequest; request == nil || request.Force != test.force || request.FailIfNotFound != test.failIfNotFound {
 				t.Fatalf("unexpected request: %+v", request)
 			}
@@ -232,24 +222,14 @@ func (api *internetAPITestDouble) DeleteSubnetWithContext(_ context.Context, req
 
 func TestInternetGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-internet.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/internetapi/internet_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated Internet commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-internet.json API_OUTPUT=internal/iaas/internetapi/internet_api_generated.go")
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got, "generated Internet commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-internet.json API_OUTPUT=internal/iaas/internetapi/internet_api_generated.go")
 }
 
 func TestIaaSInternetHelp(t *testing.T) {
@@ -268,14 +248,10 @@ func TestIaaSInternetHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v) = %d; stderr: %s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, expected := range test.want {
-				if !strings.Contains(help, expected) {
-					t.Errorf("help does not contain %q: %s", expected, help)
-				}
+				require.Contains(t, help, expected, "help does not contain %q: %s", expected, help)
 			}
 		})
 	}
@@ -296,9 +272,8 @@ func TestIaaSInternetCommandsBuildSDKRequests(t *testing.T) {
 
 	_, stderr, code := run("create", "--zone", "test-zone", "--name", "router",
 		"--description", "tutorial", "--tags", "edge,managed", "--network-mask-len", "28", "--band-width-mbps", "100")
-	if code != 0 || stderr != "" {
-		t.Fatalf("create flags: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "create flags: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	flagRequest := *api.createRequest
 	if flagRequest.Zone != "test-zone" || flagRequest.Name != "router" ||
 		flagRequest.NetworkMaskLen != 28 || flagRequest.BandWidthMbps != 100 ||
@@ -307,35 +282,29 @@ func TestIaaSInternetCommandsBuildSDKRequests(t *testing.T) {
 	}
 
 	_, stderr, code = run("create", "--request", `{"Zone":"test-zone","Name":"router","Description":"tutorial","Tags":["edge","managed"],"NetworkMaskLen":28,"BandWidthMbps":100}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("create JSON: code %d, stderr %q", code, stderr)
-	}
-	if !reflect.DeepEqual(flagRequest, *api.createRequest) {
-		t.Fatalf("Create JSON request = %+v, want same as flag request %+v", api.createRequest, flagRequest)
-	}
+	require.Equal(t, 0, code, "create JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Equal(t, *api.createRequest, flagRequest, "Create JSON request = %+v, want same as flag request %+v", api.createRequest, flagRequest)
 
 	_, stderr, code = run("find", "--zone", "test-zone", "--tags", "edge,managed", "--count", "10", "--from", "2")
-	if code != 0 || stderr != "" {
-		t.Fatalf("find flags: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "find flags: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if request := api.findRequest; request.Zone != "test-zone" || request.Count != 10 || request.From != 2 ||
 		!reflect.DeepEqual(request.Tags, []string{"edge", "managed"}) {
 		t.Fatalf("Find request = %+v", request)
 	}
 
 	_, stderr, code = run("find", "--request", `{"Zone":"test-zone","Names":["router"],"SwitchIDs":["789"]}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("find JSON: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "find JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if request := api.findRequest; !reflect.DeepEqual(request.Names, []string{"router"}) ||
 		!reflect.DeepEqual(request.SwitchIDs, []string{"789"}) {
 		t.Fatalf("Find JSON request = %+v", request)
 	}
 
 	_, stderr, code = run("update", "--zone", "test-zone", "--id", "123", "--name", "", "--tags", "updated")
-	if code != 0 || stderr != "" {
-		t.Fatalf("update flags: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "update flags: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if request := api.updateRequest; request.ID != 123 || request.Name == nil || *request.Name != "" ||
 		request.Tags == nil || !reflect.DeepEqual([]string(*request.Tags), []string{"updated"}) ||
 		request.Description != nil {
@@ -343,38 +312,34 @@ func TestIaaSInternetCommandsBuildSDKRequests(t *testing.T) {
 	}
 
 	_, stderr, code = run("update", "--request", `{"Zone":"test-zone","ID":123,"EnableIPv6":true,"BandWidthMbps":200}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("update JSON helpers: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "update JSON helpers: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if request := api.updateRequest; request.EnableIPv6 == nil || !*request.EnableIPv6 ||
 		request.BandWidthMbps == nil || *request.BandWidthMbps != 200 {
 		t.Fatalf("Update JSON request = %+v, want bandwidth and IPv6 values", request)
 	}
 
 	_, stderr, code = run("add-subnet", "--zone", "test-zone", "--id", "123", "--network-mask-len", "28", "--next-hop", "192.0.2.1")
-	if code != 0 || stderr != "" {
-		t.Fatalf("add-subnet: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "add-subnet: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	if request := api.addSubnetRequest; request.Zone != "test-zone" || request.ID != 123 ||
 		request.NetworkMaskLen != 28 || request.NextHop != "192.0.2.1" {
 		t.Fatalf("AddSubnet request = %+v", request)
 	}
 
 	_, stderr, code = run("delete", "--request", `{"Zone":"test-zone","ID":123,"Force":true,"FailIfNotFound":true}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("delete JSON: code %d, stderr %q", code, stderr)
-	}
-	if request := api.deleteRequest; !request.Force || !request.FailIfNotFound {
-		t.Fatalf("Delete request = %+v, want explicit Force and FailIfNotFound", request)
-	}
+	require.Equal(t, 0, code, "delete JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	request := api.deleteRequest
+	require.True(t, request.Force, "Delete request = %+v, want explicit Force and FailIfNotFound", request)
+	require.True(t, request.FailIfNotFound, "unexpected value")
 
 	_, stderr, code = run("delete-subnet", "--request", `{"Zone":"test-zone","ID":123,"SubnetID":456}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("delete-subnet JSON: code %d, stderr %q", code, stderr)
-	}
-	if request := api.deleteSubnetRequest; request.ID != 123 || request.SubnetID != 456 {
-		t.Fatalf("DeleteSubnet request = %+v", request)
-	}
+	require.Equal(t, 0, code, "delete-subnet JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	request2 := api.deleteSubnetRequest
+	require.EqualValues(t, 123, request2.ID, "DeleteSubnet request = %+v", request2)
+	require.EqualValues(t, 456, request2.SubnetID, "unexpected value")
 }
 
 func TestIaaSInternetRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
@@ -394,9 +359,9 @@ func TestIaaSInternetRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		setInternetAPIFactory(commandLine, func() (internetapi.API, error) { return api, nil })
 		var stdout, stderr bytes.Buffer
 		code := runCLI(append([]string{"iaas-api", "internet"}, args...), &stdout, &stderr, commandLine)
-		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-			t.Errorf("%v: code %d stdout %q stderr %q; want an input error", args, code, stdout.String(), stderr.String())
-		}
+		require.NotEqual(t, 0, code, "%v: code %d stdout %q stderr %q; want an input error", args, code, stdout.String(), stderr.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
 	if api.findRequest != nil || api.createRequest != nil || api.updateRequest != nil ||
 		api.deleteRequest != nil || api.addSubnetRequest != nil || api.deleteSubnetRequest != nil {
@@ -413,7 +378,7 @@ func TestIaaSInternetPropagatesAPIErrors(t *testing.T) {
 	code := runCLI([]string{"iaas-api", "internet", "create", "--zone", "test-zone", "--name", "router",
 		"--network-mask-len", "28", "--band-width-mbps", "100"},
 		&stdout, &stderr, commandLine)
-	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), apiFailure.Error()) {
-		t.Fatalf("create error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-	}
+	require.NotEqual(t, 0, code, "create error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+	require.Contains(t, stderr.String(), apiFailure.Error(), "missing expected text %q", apiFailure.Error())
 }

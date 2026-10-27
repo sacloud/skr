@@ -14,10 +14,13 @@ type Result interface {
 
 type commandResult struct {
 	description string
-	args        []string
-	stdout      string
-	stderr      string
-	duration    time.Duration
+	// command は実行したコマンド名です。skr CLI は skrBinaryName、
+	// SSH など CLI 以外の検証は各コマンド名になります。
+	command  string
+	args     []string
+	stdout   string
+	stderr   string
+	duration time.Duration
 	// hideStdout は stdout に秘密情報が含まれる場合に、実行記録へ stdout を残さないためのフラグです。
 	hideStdout bool
 }
@@ -26,7 +29,7 @@ func (c *commandResult) Description() string { return c.description }
 func (c *commandResult) Render() string {
 	var buf bytes.Buffer
 	buf.WriteString("**command**:\n```\n")
-	buf.WriteString(strings.Join(append([]string{"skr"}, c.args...), " "))
+	buf.WriteString(strings.Join(append([]string{c.command}, c.args...), " "))
 	buf.WriteString("\n```\n\n")
 	buf.WriteString("**duration**:\n")
 	buf.WriteString(fmt.Sprintf("%v\n\n", c.duration))
