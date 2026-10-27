@@ -1,11 +1,11 @@
-# ADR 0061: E2E テストを testing.T ベースのシナリオテストで書く
+# ADR 0062: E2E テストを testing.T ベースのシナリオテストで書く
 
 - Status: Accepted
 - Date: 2026-10-27
 
 ## Context
 
-[ADR 0060](0060-e2e-runner-shared-library.md) で E2E runner を共有ライブラリ化し、シナリオを scenario ファイルに分離しました。しかし runner は `main.go` と flag 解析、独自の後片付けを伴い、テスト実行の仕組みが skr 固有のままでした。通常の `go test` から実行できず、`go test -run` による個別実行や fail-fast といった標準的な仕組みも使えませんでした。
+[ADR 0061](0061-e2e-runner-shared-library.md) で E2E runner を共有ライブラリ化し、シナリオを scenario ファイルに分離しました。しかし runner は `main.go` と flag 解析、独自の後片付けを伴い、テスト実行の仕組みが skr 固有のままでした。通常の `go test` から実行できず、`go test -run` による個別実行や fail-fast といった標準的な仕組みも使えませんでした。
 
 c0nfig の E2E テストを testing.T ベースで書き直した結果、標準の `go test` でシナリオを実行できる方が簡潔でした。
 

@@ -74,7 +74,7 @@
 - 途中で失敗した場合の後片付けはテスト関数内の `defer` で行います。リソースを作成して内容を確認した直後に、削除と不在確認を含む `defer` をその場で登録し、フラグによる状態追跡や後片付け専用の関数への切り出しはしません。`t.Cleanup` はテスト終了後に `t.Context()` がキャンセルされた状態で呼ばれるため、CLI 呼び出しを伴う後片付けは `defer` で実行します。
 - 入力処理や後片付けなどの共有処理は、`privatekey.go` や `cleanup.go` のように役割を表す snake_case にし、テストも同名の `_test.go` に置きます。複数シナリオを横断するテストは `scenarios_test.go` に置けます。曖昧な `advanced.go` や、意味のない連番だけの名前は使いません。
 - 実行記録は helper が Git 対象外の `e2e-output/` 配下に `<識別名>-<実行日時>.md` の Markdown で保存します。識別名は `helper.New` の引数で指定し、`config` を含む名前は `c0nfig` に置き換えます。名前に秘密情報を含めません。
-- この規則は新規作成・分割する E2E に適用します。旧 runner 方式 (`main.go` と evidence 機構) の既存 runner は一括移行せず、各サービスの作業時に段階的に移行します。背景と判断は [ADR 0058](docs/adr/0058-live-e2e-command-coverage.md) と [ADR 0061](docs/adr/0061-e2e-testing-t-based-scenario.md) を参照してください。
+- この規則は新規作成・分割する E2E に適用します。旧 runner 方式 (`main.go` と evidence 機構) の既存 runner は一括移行せず、各サービスの作業時に段階的に移行します。背景と判断は [ADR 0058](docs/adr/0058-live-e2e-command-coverage.md) と [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) を参照してください。
 
 ## 検証
 

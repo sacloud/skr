@@ -30,7 +30,7 @@
 
 ## 検証
 
-`internal/containerregistryapi` の SDK caller test は公開 `iaas.APICaller` を通じて SDK の Container Registry API 操作とレスポンス変換を検証します。`internal/cli` のテストは実際の Kong コマンドパス、JSON の厳密なデコード、パスワードファイル、出力および入力エラーを確認します。`test/e2e/container-registry-api` は testing.T ベースのライブシナリオ ([ADR 0061](../adr/0061-e2e-testing-t-based-scenario.md)) で、ユニークなレジストリ・ユーザーを作成して照合し、今回作成した対象だけを削除します。
+`internal/containerregistryapi` の SDK caller test は公開 `iaas.APICaller` を通じて SDK の Container Registry API 操作とレスポンス変換を検証します。`internal/cli` のテストは実際の Kong コマンドパス、JSON の厳密なデコード、パスワードファイル、出力および入力エラーを確認します。`test/e2e/container-registry-api` は testing.T ベースのライブシナリオ ([ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)) で、ユニークなレジストリ・ユーザーを作成して照合し、今回作成した対象だけを削除します。
 
 ビルド済み CLI とプロファイルディレクトリの `skr-e2e` プロファイルを確認し、ライブ API に接続する操作を承認した場合のみ、次のコマンドを実行します。
 
