@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	sdk "github.com/sacloud/sacloud-sdk-go/service/iaas/containerregistry"
 	"github.com/sacloud/skr/internal/containerregistryapi"
+	"github.com/stretchr/testify/require"
 )
 
 type containerRegistryAPIMock struct {
@@ -105,14 +105,10 @@ func TestRunContainerRegistryAPIHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v): code %d, stderr %s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, item := range test.want {
-				if !strings.Contains(help, item) {
-					t.Errorf("help does not contain %q: %s", item, help)
-				}
+				require.Contains(t, help, item, "help does not contain %q: %s", item, help)
 			}
 		})
 	}
@@ -129,52 +125,40 @@ func TestContainerRegistryCommandOperations(t *testing.T) {
 	run := func(args ...string) []byte {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-			t.Fatalf("run(%v): code %d, stderr %s", args, code, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Fatalf("run(%v) stderr = %q", args, stderr.String())
-		}
+		require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
+		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr = %q", args, stderr.String())
 		return stdout.Bytes()
 	}
 
 	listed := run("container-registry-api", "registry", "list", "--request", `{"Names":["registry"]}`, "--query", "map({ID,Name})")
 	var projection []map[string]json.RawMessage
-	if err := json.Unmarshal(listed, &projection); err != nil {
-		t.Fatal(err)
-	}
+	err := json.Unmarshal(listed, &projection)
+	require.NoError(t, err)
 	if len(projection) != 1 || string(projection[0]["Name"]) != `"registry"` {
 		t.Fatalf("list output = %s", listed)
 	}
-	if len(api.findRequest.Names) != 1 || api.findRequest.Names[0] != "registry" {
-		t.Fatalf("Find request = %+v", api.findRequest)
-	}
+	require.Len(t, api.findRequest.Names, 1, "Find request = %+v", api.findRequest)
+	require.Equal(t, "registry", api.findRequest.Names[0], "unexpected value")
 
 	created := run("container-registry-api", "registry", "create", "--request", `{"Name":"registry","Description":"test"}`)
 	var createResult iaas.ContainerRegistry
-	if err := json.Unmarshal(created, &createResult); err != nil {
-		t.Fatal(err)
-	}
+	err2 := json.Unmarshal(created, &createResult)
+	require.NoError(t, err2)
 	if createResult.ID != 123 || api.createRequest.Name != "registry" ||
 		api.createRequest.SubDomainLabel != "registry" || api.createRequest.Description != "test" {
 		t.Fatalf("Create result/request = %+v / %+v", createResult, api.createRequest)
 	}
 	jsonRequest := *api.createRequest
 	run("container-registry-api", "registry", "create", "--name", "registry", "--description", "test")
-	if !reflect.DeepEqual(jsonRequest, *api.createRequest) {
-		t.Fatalf("flag and JSON requests differ: %+v / %+v", jsonRequest, api.createRequest)
-	}
+	require.Equal(t, *api.createRequest, jsonRequest, "flag and JSON requests differ: %+v / %+v", jsonRequest, api.createRequest)
 	run("container-registry-api", "registry", "create", "--request", `{"Name":"registry","Description":"","IconID":0,"VirtualDomain":""}`)
 	jsonRequest = *api.createRequest
 	run("container-registry-api", "registry", "create", "--name", "registry", "--description", "", "--icon-id", "0", "--virtual-domain", "")
-	if !reflect.DeepEqual(jsonRequest, *api.createRequest) {
-		t.Fatalf("explicit zero-value requests differ: %+v / %+v", jsonRequest, api.createRequest)
-	}
+	require.Equal(t, *api.createRequest, jsonRequest, "explicit zero-value requests differ: %+v / %+v", jsonRequest, api.createRequest)
 
 	run("container-registry-api", "registry", "read", "123")
-	if api.readRequest == nil || api.readRequest.ID != 123 {
-		t.Fatalf("Read request = %+v", api.readRequest)
-	}
+	require.NotNil(t, api.readRequest, "Read request = %+v", api.readRequest)
+	require.EqualValues(t, 123, api.readRequest.ID, "unexpected value")
 
 	run("container-registry-api", "registry", "update", "123", "--request", `{"Description":"updated"}`)
 	if api.updateRequest == nil || api.updateRequest.ID != 123 || api.updateRequest.Description == nil || *api.updateRequest.Description != "updated" || api.updateRequest.Name != nil {
@@ -188,41 +172,37 @@ func TestContainerRegistryCommandOperations(t *testing.T) {
 
 	passwordFile := filepath.Join(t.TempDir(), "registry-password")
 	const password = "pass.word-123"
-	if err := os.WriteFile(passwordFile, []byte(password+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err3 := os.WriteFile(passwordFile, []byte(password+"\n"), 0o600)
+	require.NoError(t, err3)
 	if output := run("container-registry-api", "registry", "user", "add", "123",
 		"--user-name", "builder",
 		"--password-file", passwordFile,
 		"--permission", "readwrite"); len(output) != 0 {
 		t.Fatalf("user add output = %q, want empty", output)
 	}
-	if api.addUser == nil || api.addUser.Password != password || api.addUser.UserName != "builder" || api.addUser.Permission != types.ContainerRegistryPermissions.ReadWrite {
-		t.Fatalf("AddUser request = %+v", api.addUser)
-	}
+	require.NotNil(t, api.addUser, "AddUser request = %+v", api.addUser)
+	require.Equal(t, password, api.addUser.Password, "unexpected value")
+	require.Equal(t, "builder", api.addUser.UserName, "unexpected value")
+	require.Equal(t, types.ContainerRegistryPermissions.ReadWrite, api.addUser.Permission, "unexpected value")
 
 	run("container-registry-api", "registry", "user", "update", "123", "builder", "--permission", "readonly")
-	if api.updateUser == nil || api.updateUser.Permission != types.ContainerRegistryPermissions.ReadOnly || api.updateUser.Password != "" {
-		t.Fatalf("UpdateUser request = %+v", api.updateUser)
-	}
+	require.NotNil(t, api.updateUser, "UpdateUser request = %+v", api.updateUser)
+	require.Equal(t, types.ContainerRegistryPermissions.ReadOnly, api.updateUser.Permission, "unexpected value")
+	require.Empty(t, api.updateUser.Password, "should be empty")
 	run("container-registry-api", "registry", "user", "update", "123", "builder", "--password-file", passwordFile, "--permission", "all")
-	if api.updateUser == nil || api.updateUser.Permission != types.ContainerRegistryPermissions.All || api.updateUser.Password != password {
-		t.Fatalf("UpdateUser password request = %+v", api.updateUser)
-	}
+	require.NotNil(t, api.updateUser, "UpdateUser password request = %+v", api.updateUser)
+	require.Equal(t, types.ContainerRegistryPermissions.All, api.updateUser.Permission, "unexpected value")
+	require.Equal(t, password, api.updateUser.Password, "unexpected value")
 	run("container-registry-api", "registry", "user", "update", "123", "builder", "--password-file", passwordFile)
-	if api.updateUser.Permission != types.ContainerRegistryPermissions.ReadWrite || api.updateUser.Password != password {
-		t.Fatalf("password-only update did not preserve permission: %+v", api.updateUser)
-	}
+	require.Equal(t, types.ContainerRegistryPermissions.ReadWrite, api.updateUser.Permission, "password-only update did not preserve permission: %+v", api.updateUser)
+	require.Equal(t, password, api.updateUser.Password, "unexpected value")
 
 	run("container-registry-api", "registry", "user", "delete", "123", "builder")
-	if api.deleteUser != "builder" {
-		t.Fatalf("DeleteUser user = %q", api.deleteUser)
-	}
+	require.Equal(t, "builder", api.deleteUser, "DeleteUser user = %q", api.deleteUser)
 
 	run("container-registry-api", "registry", "delete", "123")
-	if api.deleteRequest == nil || api.deleteRequest.ID != 123 {
-		t.Fatalf("Delete request = %+v", api.deleteRequest)
-	}
+	require.NotNil(t, api.deleteRequest, "Delete request = %+v", api.deleteRequest)
+	require.EqualValues(t, 123, api.deleteRequest.ID, "unexpected value")
 }
 
 func TestContainerRegistryRequestAndUserValidationBeforeAPICall(t *testing.T) {
@@ -248,9 +228,9 @@ func TestContainerRegistryRequestAndUserValidationBeforeAPICall(t *testing.T) {
 		{"container-registry-api", "registry", "user", "update", "123", "builder"},
 	} {
 		var stdout, stderr bytes.Buffer
-		if code := runCLI(args, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 {
-			t.Fatalf("run(%v) = code %d, stdout %q, want validation error", args, code, stdout.String())
-		}
+		code := runCLI(args, &stdout, &stderr, commandLine)
+		require.NotEqual(t, 0, code, "run(%v) = code %d, stdout %q, want validation error", args, code, stdout.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
 	}
 }
 

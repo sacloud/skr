@@ -31,6 +31,7 @@ import (
 	"github.com/sacloud/skr/internal/iaas/internetplanapi"
 	"github.com/sacloud/skr/internal/iaas/licenseinfoapi"
 	"github.com/sacloud/skr/internal/iaas/privatehostplanapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIaaSProductPlanGeneratedCodeMatchesConfig(t *testing.T) {
@@ -45,24 +46,14 @@ func TestIaaSProductPlanGeneratedCodeMatchesConfig(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			configData, err := os.ReadFile(repositoryPath("api/commands/" + test.config + ".json"))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			config, err := apigen.DecodeConfig(configData)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			want, err := apigen.Generate(config)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			got, err := os.ReadFile(repositoryPath(test.output))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !bytes.Equal(got, want) {
-				t.Fatalf("generated %s commands are stale; regenerate from %s", test.name, test.config)
-			}
+			require.NoError(t, err)
+			require.Equal(t, want, got, "generated %s commands are stale; regenerate from %s", test.name, test.config)
 		})
 	}
 }
@@ -84,14 +75,10 @@ func TestIaaSProductPlanHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v) = %d; stderr: %s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help does not contain %q: %s", text, help)
-				}
+				require.Contains(t, help, text, "help does not contain %q: %s", text, help)
 			}
 		})
 	}
@@ -119,69 +106,59 @@ func TestIaaSProductPlanCommandsUseSDKRequests(t *testing.T) {
 	}
 
 	output, stderr, code := run("internet", "find", "--zone", "is1b", "--count", "1", "--from", "0")
-	if code != 0 || stderr != "" {
-		t.Fatalf("InternetPlan Find: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "InternetPlan Find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	var internetFind internetplanapi.FindResult
-	if err := json.Unmarshal([]byte(output), &internetFind); err != nil {
-		t.Fatal(err)
-	}
+	err := json.Unmarshal([]byte(output), &internetFind)
+	require.NoError(t, err)
 	if internetFind.Total != 1 || len(internetFind.InternetPlans) != 1 ||
 		internetFind.InternetPlans[0].ID != types.ID(11) || internetFind.InternetPlans[0].BandWidthMbps != 100 {
 		t.Fatalf("InternetPlan Find result = %+v", internetFind)
 	}
 
 	_, stderr, code = run("internet", "find", "--request", `{"Zone":"is1b","Filter":{"Name":"internet"}}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("InternetPlan JSON Find: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "InternetPlan JSON Find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	output, stderr, code = run("internet", "read", "--zone", "is1b", "--id", "11")
-	if code != 0 || stderr != "" || !strings.Contains(output, `"BandWidthMbps": 100`) {
-		t.Fatalf("InternetPlan Read: code %d, stderr %q, output %q", code, stderr, output)
-	}
+	require.Equal(t, 0, code, "InternetPlan Read: code %d, stderr %q, output %q", code, stderr, output)
+	require.Empty(t, stderr, "should be empty")
+	require.Contains(t, output, `"BandWidthMbps": 100`, "missing expected text %q", `"BandWidthMbps": 100`)
 
 	output, stderr, code = run("license", "find")
-	if code != 0 || stderr != "" {
-		t.Fatalf("LicenseInfo empty-input Find: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "LicenseInfo empty-input Find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	var licenseFind licenseinfoapi.FindResult
-	if err := json.Unmarshal([]byte(output), &licenseFind); err != nil {
-		t.Fatal(err)
-	}
+	err2 := json.Unmarshal([]byte(output), &licenseFind)
+	require.NoError(t, err2)
 	if licenseFind.Total != 1 || len(licenseFind.LicenseInfo) != 1 ||
 		licenseFind.LicenseInfo[0].ID != types.ID(42) {
 		t.Fatalf("LicenseInfo Find result = %+v", licenseFind)
 	}
 	_, stderr, code = run("license", "find", "--request", `{"Filter":{"Name":"license"}}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("LicenseInfo JSON Find: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "LicenseInfo JSON Find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	var licenseCondition struct {
 		Filter map[string]json.RawMessage
 	}
-	if err := json.Unmarshal(caller.calls[len(caller.calls)-1].body, &licenseCondition); err != nil {
-		t.Fatal(err)
-	}
-	if got := string(licenseCondition.Filter["Name"]); got != `"license"` {
-		t.Fatalf("LicenseInfo SDK Filter Name = %s, want partial-match string", got)
-	}
+	err3 := json.Unmarshal(caller.calls[len(caller.calls)-1].body, &licenseCondition)
+	require.NoError(t, err3)
+	got := string(licenseCondition.Filter["Name"])
+	require.Equal(t, `"license"`, got, "LicenseInfo SDK Filter Name = %s, want partial-match string", got)
 
 	output, stderr, code = run("privatehost", "find", "--zone", "is1b", "--count", "1", "--from", "0")
-	if code != 0 || stderr != "" {
-		t.Fatalf("PrivateHostPlan Find: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "PrivateHostPlan Find: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	var privateHostFind privatehostplanapi.FindResult
-	if err := json.Unmarshal([]byte(output), &privateHostFind); err != nil {
-		t.Fatal(err)
-	}
+	err4 := json.Unmarshal([]byte(output), &privateHostFind)
+	require.NoError(t, err4)
 	if privateHostFind.Total != 1 || len(privateHostFind.PrivateHostPlans) != 1 ||
 		privateHostFind.PrivateHostPlans[0].ID != types.ID(8) || privateHostFind.PrivateHostPlans[0].MemoryMB != 229376 {
 		t.Fatalf("PrivateHostPlan Find result = %+v", privateHostFind)
 	}
 	output, stderr, code = run("privatehost", "read", "--zone", "is1b", "--id", "8")
-	if code != 0 || stderr != "" || !strings.Contains(output, `"Dedicated": true`) {
-		t.Fatalf("PrivateHostPlan Read: code %d, stderr %q, output %q", code, stderr, output)
-	}
+	require.Equal(t, 0, code, "PrivateHostPlan Read: code %d, stderr %q, output %q", code, stderr, output)
+	require.Empty(t, stderr, "should be empty")
+	require.Contains(t, output, `"Dedicated": true`, "missing expected text %q", `"Dedicated": true`)
 
 	if got, want := len(caller.calls), 7; got != want {
 		t.Fatalf("API calls = %d, want %d: %+v", got, want, caller.calls)
@@ -197,16 +174,16 @@ func TestIaaSProductPlanRejectsMixedInputsAndPropagatesErrors(t *testing.T) {
 	})
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "product", "license", "find", "--count", "1", "--request", `{"Count":1}`}, &stdout, &stderr, commandLine)
-	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "--request と個別フラグは併用できません") {
-		t.Fatalf("mixed input: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-	}
+	require.NotEqual(t, 0, code, "mixed input: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+	require.Contains(t, stderr.String(), "--request と個別フラグは併用できません", "missing expected text %q", "--request と個別フラグは併用できません")
 
 	stdout.Reset()
 	stderr.Reset()
 	code = runCLI([]string{"iaas-api", "product", "license", "find"}, &stdout, &stderr, commandLine)
-	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), failure.Error()) {
-		t.Fatalf("API error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-	}
+	require.NotEqual(t, 0, code, "API error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+	require.Contains(t, stderr.String(), failure.Error(), "missing expected text %q", failure.Error())
 }
 
 type productPlanAPICaller struct {

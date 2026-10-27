@@ -27,28 +27,19 @@ import (
 	"github.com/sacloud/skr/internal/apigen"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSwitchGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-switch.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/switchapi/switch_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated Switch commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=internal/iaas/switchapi/switch_api_generated.go")
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got, "generated Switch commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=internal/iaas/switchapi/switch_api_generated.go")
 }
 
 func TestRunIaaSAPIHelp(t *testing.T) {
@@ -89,20 +80,14 @@ func TestRunIaaSAPIHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
-				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, exitCode, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help output does not contain %q", text)
-				}
+				require.Contains(t, help, text, "help output does not contain %q", text)
 			}
 			for _, text := range test.notWant {
-				if strings.Contains(help, text) {
-					t.Errorf("help output contains removed text %q", text)
-				}
+				require.NotContains(t, help, text, "help output contains removed text %q", text)
 			}
 		})
 	}
@@ -120,82 +105,61 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 		setSwitchAPIFactory(commandLine, func() (switchapi.API, error) {
 			return swytch.New(server), nil
 		})
-		if exitCode := runCLI(args, &stdout, &stderr, commandLine); exitCode != 0 {
-			t.Fatalf("run(%v) exit code = %d; stderr: %s", args, exitCode, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Errorf("run(%v) stderr = %q, want empty", args, stderr.String())
-		}
+		require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
+		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr = %q, want empty", args, stderr.String())
 		return stdout.Bytes()
 	}
 
 	var created iaas.Switch
 	create := `{"Zone":"test-zone","Name":"TEST-SWITCH-NAME","Description":"Temporary switch for skr API tutorial"}`
-	if err := json.Unmarshal(runCommand("iaas-api", "switch", "create", "--request", create), &created); err != nil {
-		t.Fatal(err)
-	}
-	if created.ID == 0 || created.Name != "TEST-SWITCH-NAME" || created.Description != "Temporary switch for skr API tutorial" {
-		t.Fatalf("create returned %#v, want created switch fields", created)
-	}
+	err := json.Unmarshal(runCommand("iaas-api", "switch", "create", "--request", create), &created)
+	require.NoError(t, err)
+	require.NotEqualValues(t, 0, created.ID, "create returned %#v, want created switch fields", created)
+	require.Equal(t, "TEST-SWITCH-NAME", created.Name, "unexpected value")
+	require.Equal(t, "Temporary switch for skr API tutorial", created.Description, "unexpected value")
 
 	var found []*iaas.Switch
-	if err := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`), &found); err != nil {
-		t.Fatal(err)
-	}
-	if len(found) != 1 || found[0].ID != created.ID {
-		t.Fatalf("find returned %#v, want switch %d", found, created.ID)
-	}
+	err2 := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`), &found)
+	require.NoError(t, err2)
+	require.Len(t, found, 1, "find returned %#v, want switch %d", found, created.ID)
+	require.Equal(t, created.ID, found[0].ID, "unexpected value")
 	var projected []struct {
 		ID   json.Number
 		Name string
 	}
-	if err := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--query", "map({ID,Name})"), &projected); err != nil {
-		t.Fatal(err)
-	}
-	if len(projected) != 1 || projected[0].ID.String() != created.ID.String() || projected[0].Name != created.Name {
-		t.Fatalf("projected output = %+v, want created switch ID and name", projected)
-	}
+	err3 := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--query", "map({ID,Name})"), &projected)
+	require.NoError(t, err3)
+	require.Len(t, projected, 1, "projected output = %+v, want created switch ID and name", projected)
+	require.Equal(t, created.ID.String(), projected[0].ID.String(), "unexpected value")
+	require.Equal(t, created.Name, projected[0].Name, "unexpected value")
 
 	var read iaas.Switch
 	readRequestBytes, err := json.Marshal(map[string]any{"Zone": "test-zone", "ID": created.ID})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	readRequest := string(readRequestBytes)
-	if err := json.Unmarshal(runCommand("iaas-api", "switch", "read", "--request", readRequest), &read); err != nil {
-		t.Fatal(err)
-	}
-	if read.ID != created.ID || read.Name != created.Name {
-		t.Errorf("read returned %#v, want switch %d", read, created.ID)
-	}
+	err4 := json.Unmarshal(runCommand("iaas-api", "switch", "read", "--request", readRequest), &read)
+	require.NoError(t, err4)
+	require.Equal(t, created.ID, read.ID, "read returned %#v, want switch %d", read, created.ID)
+	require.Equal(t, created.Name, read.Name, "unexpected value")
 
 	updateRequestBytes, err := json.Marshal(map[string]any{"Zone": "test-zone", "ID": created.ID, "Name": "updated-switch"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	updateRequest := string(updateRequestBytes)
 	var updated iaas.Switch
-	if err := json.Unmarshal(runCommand("iaas-api", "switch", "update", "--request", updateRequest), &updated); err != nil {
-		t.Fatal(err)
-	}
-	if updated.Name != "updated-switch" || updated.Description != "Temporary switch for skr API tutorial" {
-		t.Errorf("update returned %#v, want updated name and unchanged description", updated)
-	}
+	err5 := json.Unmarshal(runCommand("iaas-api", "switch", "update", "--request", updateRequest), &updated)
+	require.NoError(t, err5)
+	require.Equal(t, "updated-switch", updated.Name, "update returned %#v, want updated name and unchanged description", updated)
+	require.Equal(t, "Temporary switch for skr API tutorial", updated.Description, "unexpected value")
 
-	if output := runCommand("iaas-api", "switch", "delete", "--request", readRequest); len(output) != 0 {
-		t.Errorf("delete output = %s, want empty", output)
-	}
+	output := runCommand("iaas-api", "switch", "delete", "--request", readRequest)
+	require.Len(t, output, 0, "delete output = %s, want empty", output)
 	found = nil
-	if err := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`), &found); err != nil {
-		t.Fatal(err)
-	}
-	if len(found) != 0 {
-		t.Errorf("find after delete returned %#v, want no switches", found)
-	}
+	err6 := json.Unmarshal(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`), &found)
+	require.NoError(t, err6)
+	require.Len(t, found, 0, "find after delete returned %#v, want no switches", found)
 	emptyJSON := string(runCommand("iaas-api", "switch", "find", "--request", `{"Zone":"test-zone"}`, "--query", "map({ID,Name})"))
-	if want := "[]\n"; emptyJSON != want {
-		t.Errorf("empty projected output = %q, want %q", emptyJSON, want)
-	}
+	want := "[]\n"
+	require.Equal(t, want, emptyJSON, "empty projected output = %q, want %q", emptyJSON, want)
 }
 
 type switchFindRecordAPI struct {
@@ -231,12 +195,11 @@ func TestGeneratedFindRejectsInvalidZoneBeforeCallingAPI(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			args := append([]string{"iaas-api", "switch", "find"}, test.args...)
 			exitCode := runCLI(args, &stdout, &stderr, commandLine)
-			if exitCode == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-				t.Fatalf("find with invalid zone: code %d, stdout %q, stderr %q; want validation error", exitCode, stdout.String(), stderr.String())
-			}
-			if factoryCalled || len(api.requests) != 0 {
-				t.Fatalf("invalid zone reached API setup: factory called=%t, requests=%+v", factoryCalled, api.requests)
-			}
+			require.NotEqual(t, 0, exitCode, "find with invalid zone: code %d, stdout %q, stderr %q; want validation error", exitCode, stdout.String(), stderr.String())
+			require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+			require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
+			require.False(t, factoryCalled, "invalid zone reached API setup: factory called=%t, requests=%+v", factoryCalled, api.requests)
+			require.Len(t, api.requests, 0, "unexpected length")
 		})
 	}
 }
@@ -256,64 +219,51 @@ func TestSwitchFlagInputs(t *testing.T) {
 	mustRun := func(args ...string) []byte {
 		t.Helper()
 		out, stderr, code := call(args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("%v: code %d, stderr %s", args, code, stderr)
-		}
+		require.Equal(t, 0, code, "%v: code %d, stderr %s", args, code, stderr)
+		require.Empty(t, stderr, "should be empty")
 		return out
 	}
 	var created iaas.Switch
-	if err := json.Unmarshal(mustRun("create", "--zone", "test-zone", "--name", "flag-switch", "--description", "created", "--tags", "production,web"), &created); err != nil {
-		t.Fatal(err)
-	}
+	err := json.Unmarshal(mustRun("create", "--zone", "test-zone", "--name", "flag-switch", "--description", "created", "--tags", "production,web"), &created)
+	require.NoError(t, err)
 	if created.Name != "flag-switch" || created.Description != "created" ||
 		len(created.Tags) != 2 || created.Tags[0] != "production" || created.Tags[1] != "web" {
 		t.Fatalf("unexpected create result: %+v", created)
 	}
 	id := created.ID.String()
 	var found []*iaas.Switch
-	if err := json.Unmarshal(mustRun("find", "--zone", "test-zone", "--tags", "production,web", "--count", "0", "--from", "0"), &found); err != nil {
-		t.Fatal(err)
-	}
-	if len(found) != 1 || found[0].ID != created.ID {
-		t.Fatalf("unexpected find result: %+v", found)
-	}
+	err2 := json.Unmarshal(mustRun("find", "--zone", "test-zone", "--tags", "production,web", "--count", "0", "--from", "0"), &found)
+	require.NoError(t, err2)
+	require.Len(t, found, 1, "unexpected find result: %+v", found)
+	require.Equal(t, created.ID, found[0].ID, "unexpected value")
 	var read iaas.Switch
-	if err := json.Unmarshal(mustRun("read", "--zone", "test-zone", "--id", id), &read); err != nil {
-		t.Fatal(err)
-	}
-	if read.ID != created.ID {
-		t.Fatalf("unexpected read result: %+v", read)
-	}
+	err3 := json.Unmarshal(mustRun("read", "--zone", "test-zone", "--id", id), &read)
+	require.NoError(t, err3)
+	require.Equal(t, created.ID, read.ID, "unexpected read result: %+v", read)
 	var updated iaas.Switch
-	if err := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--name", "renamed", "--tags", "updated,cli"), &updated); err != nil {
-		t.Fatal(err)
-	}
+	err4 := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--name", "renamed", "--tags", "updated,cli"), &updated)
+	require.NoError(t, err4)
 	if updated.Name != "renamed" || updated.Description != "created" ||
 		len(updated.Tags) != 2 || updated.Tags[0] != "cli" || updated.Tags[1] != "updated" {
 		t.Fatalf("update lost an omitted value: %+v", updated)
 	}
-	if err := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--description", ""), &updated); err != nil {
-		t.Fatal(err)
-	}
+	err5 := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--description", ""), &updated)
+	require.NoError(t, err5)
 	if updated.Description != "" || updated.Name != "renamed" ||
 		len(updated.Tags) != 2 || updated.Tags[0] != "cli" || updated.Tags[1] != "updated" {
 		t.Fatalf("explicit empty description not applied: %+v", updated)
 	}
-	if err := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--network-mask-len", "0"), &updated); err != nil {
-		t.Fatal(err)
-	}
+	err6 := json.Unmarshal(mustRun("update", "--zone", "test-zone", "--id", id, "--network-mask-len", "0"), &updated)
+	require.NoError(t, err6)
 	if updated.NetworkMaskLen != 0 || updated.Name != "renamed" || updated.Description != "" ||
 		len(updated.Tags) != 2 || updated.Tags[0] != "cli" || updated.Tags[1] != "updated" {
 		t.Fatalf("explicit zero network mask or omitted fields were not preserved: %+v", updated)
 	}
 	mustRun("delete", "--zone", "test-zone", "--id", id, "--fail-if-not-found")
 	found = nil
-	if err := json.Unmarshal(mustRun("find", "--zone", "test-zone"), &found); err != nil {
-		t.Fatal(err)
-	}
-	if len(found) != 0 {
-		t.Fatalf("deleted Switch still listed: %+v", found)
-	}
+	err7 := json.Unmarshal(mustRun("find", "--zone", "test-zone"), &found)
+	require.NoError(t, err7)
+	require.Len(t, found, 0, "deleted Switch still listed: %+v", found)
 	for _, args := range [][]string{
 		{"create", "--name", "missing-zone"},
 		{"create", "--zone", "test-zone"},
@@ -336,9 +286,9 @@ func TestSwitchFlagInputs(t *testing.T) {
 		{"delete", "--zone", "all", "--id", "123"},
 	} {
 		out, stderr, code := call(args...)
-		if code == 0 || len(out) != 0 || stderr == "" {
-			t.Errorf("%v: code %d stdout %s stderr %s; want explicit error", args, code, out, stderr)
-		}
+		require.NotEqual(t, 0, code, "%v: code %d stdout %s stderr %s; want explicit error", args, code, out, stderr)
+		require.Len(t, out, 0, "unexpected length")
+		require.NotEmpty(t, stderr, "should not be empty")
 	}
 }
 
@@ -349,36 +299,30 @@ func TestSwitchCreateRequiresZoneAndName(t *testing.T) {
 	} {
 		var stdout, stderr bytes.Buffer
 		exitCode := run([]string{"iaas-api", "switch", "create", "--request", request}, &stdout, &stderr)
-		if exitCode == 0 {
-			t.Errorf("create with request %s succeeded, want validation error", request)
-		}
+		require.NotEqual(t, 0, exitCode, "create with request %s succeeded, want validation error", request)
 
-		if stdout.Len() != 0 {
-			t.Errorf("create with request %s wrote stdout %q, want empty", request, stdout.String())
-		}
+		require.EqualValues(t, 0, stdout.Len(), "create with request %s wrote stdout %q, want empty", request, stdout.String())
 	}
 }
 
 func TestSwitchHelpJSONExamplesDecode(t *testing.T) {
 	var find swytch.FindRequest
-	if err := decodeRequest(`{"Zone":"tk1v","Names":["example"],"Sort":[{"Key":"Name","Order":0}]}`, &find); err != nil {
-		t.Fatal(err)
-	}
+	err := decodeRequest(`{"Zone":"tk1v","Names":["example"],"Sort":[{"Key":"Name","Order":0}]}`, &find)
+	require.NoError(t, err)
 	if find.Zone != "tk1v" || len(find.Names) != 1 || find.Names[0] != "example" ||
 		len(find.Sort) != 1 || find.Sort[0].Key != "Name" || find.Sort[0].Order != 0 {
 		t.Fatalf("unexpected find request: %+v", find)
 	}
 	var create swytch.CreateRequest
-	if err := decodeRequest(`{"Zone":"tk1v","Name":"example","Tags":["test"]}`, &create); err != nil {
-		t.Fatal(err)
-	}
-	if create.Zone != "tk1v" || create.Name != "example" || len(create.Tags) != 1 || create.Tags[0] != "test" {
-		t.Fatalf("unexpected create request: %+v", create)
-	}
+	err2 := decodeRequest(`{"Zone":"tk1v","Name":"example","Tags":["test"]}`, &create)
+	require.NoError(t, err2)
+	require.Equal(t, "tk1v", create.Zone, "unexpected create request: %+v", create)
+	require.Equal(t, "example", create.Name, "unexpected value")
+	require.Len(t, create.Tags, 1, "unexpected length")
+	require.Equal(t, "test", create.Tags[0], "unexpected value")
 	var update swytch.UpdateRequest
-	if err := decodeRequest(`{"Zone":"tk1v","ID":123456789012,"Tags":["test"]}`, &update); err != nil {
-		t.Fatal(err)
-	}
+	err3 := decodeRequest(`{"Zone":"tk1v","ID":123456789012,"Tags":["test"]}`, &update)
+	require.NoError(t, err3)
 	if update.Zone != "tk1v" || update.ID != 123456789012 || update.Tags == nil ||
 		len(*update.Tags) != 1 || (*update.Tags)[0] != "test" {
 		t.Fatalf("unexpected update request: %+v", update)

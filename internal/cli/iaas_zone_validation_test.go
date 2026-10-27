@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/sacloud/skr/internal/apigen"
 	"github.com/sacloud/skr/internal/iaas/archiveapi"
 	"github.com/sacloud/skr/internal/iaas/diskapi"
@@ -50,19 +52,15 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 	}
 	for _, resource := range resources {
 		data, err := os.ReadFile(repositoryPath("api/commands/" + resource.config + ".json"))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err, "read %s config", resource.name)
 		config, err := apigen.DecodeConfig(data)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err, "decode %s config", resource.name)
 		for _, operation := range config.Operations {
 			if operation.Handwritten {
 				continue
 			}
 			if !operation.ValidateZone {
-				t.Fatalf("%s %s does not enable common zone validation", resource.name, operation.Name)
+				require.Fail(t, "common zone validation is not enabled", "%s %s", resource.name, operation.Name)
 			}
 			for _, zone := range []string{"", "all"} {
 				for _, input := range []string{"flags", "JSON", "missing Zone JSON"} {
@@ -114,9 +112,10 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 						if zone == "all" {
 							want = "Zone に \"all\" は指定できません。検索対象のゾーン名を指定してください\n"
 						}
-						if code != 1 || stdout.Len() != 0 || stderr.String() != want || factoryCalled {
-							t.Fatalf("code=%d stdout=%q stderr=%q factoryCalled=%t, want common zone error %q before API setup", code, stdout.String(), stderr.String(), factoryCalled, want)
-						}
+						require.Equal(t, 1, code, "common zone error %q before API setup", want)
+						require.Empty(t, stdout, "common zone error should not write output")
+						require.Equal(t, want, stderr.String(), "common zone error for %v", args)
+						require.False(t, factoryCalled, "the API factory should not be called before zone validation")
 					})
 				}
 			}
@@ -139,9 +138,10 @@ func TestServerBootCommonZoneValidation(t *testing.T) {
 			if zone == "all" {
 				want = `Zone に "all"`
 			}
-			if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), want) || factoryCalled {
-				t.Fatalf("code=%d stdout=%q stderr=%q factoryCalled=%t, want zone error", code, stdout.String(), stderr.String(), factoryCalled)
-			}
+			require.Equal(t, 1, code, "boot should fail with a zone error")
+			require.Empty(t, stdout, "boot zone error should not write output")
+			require.Contains(t, stderr.String(), want, "boot zone error %q", stderr.String())
+			require.False(t, factoryCalled, "the API factory should not be called before zone validation")
 		})
 	}
 }

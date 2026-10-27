@@ -27,28 +27,19 @@ import (
 	"github.com/sacloud/skr/internal/apigen"
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPacketFilterGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-packetfilter.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/packetfilterapi/packetfilter_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated PacketFilter commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-packetfilter.json API_OUTPUT=internal/iaas/packetfilterapi/packetfilter_api_generated.go")
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got, "generated PacketFilter commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-packetfilter.json API_OUTPUT=internal/iaas/packetfilterapi/packetfilter_api_generated.go")
 }
 
 func TestRunIaaSPacketFilterHelp(t *testing.T) {
@@ -64,14 +55,10 @@ func TestRunIaaSPacketFilterHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v) code = %d; stderr: %s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help does not contain %q", text)
-				}
+				require.Contains(t, help, text, "help does not contain %q", text)
 			}
 		})
 	}
@@ -89,23 +76,19 @@ func TestIaaSPacketFilterAPIWithLocalMock(t *testing.T) {
 		setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) {
 			return packetfilter.New(server), nil
 		})
-		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-			t.Fatalf("run(%v) code = %d; stderr: %s", args, code, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Errorf("run(%v) stderr = %q", args, stderr.String())
-		}
+		require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
+		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr = %q", args, stderr.String())
 		return stdout.Bytes()
 	}
 
 	expressions := `[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","DestinationPort":"443","Action":"allow","Description":"Allow HTTPS"}]`
 	var created iaas.PacketFilter
-	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "create", "--zone", "test-zone", "--name", "packetfilter-test", "--description", "test filter", "--expressions", expressions), &created); err != nil {
-		t.Fatal(err)
-	}
-	if created.ID == 0 || created.Name != "packetfilter-test" || len(created.Expression) != 1 || created.ExpressionHash != "mock-expression-hash" {
-		t.Fatalf("create returned %#v", created)
-	}
+	err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "create", "--zone", "test-zone", "--name", "packetfilter-test", "--description", "test filter", "--expressions", expressions), &created)
+	require.NoError(t, err)
+	require.NotEqualValues(t, 0, created.ID, "create returned %#v", created)
+	require.Equal(t, "packetfilter-test", created.Name, "unexpected value")
+	require.Len(t, created.Expression, 1, "unexpected length")
+	require.Equal(t, "mock-expression-hash", created.ExpressionHash, "unexpected value")
 	rule := created.Expression[0]
 	if rule.Protocol != types.Protocols.TCP || rule.SourceNetwork != "192.0.2.0/24" ||
 		rule.DestinationPort != "443" || rule.Action != types.Actions.Allow {
@@ -114,49 +97,37 @@ func TestIaaSPacketFilterAPIWithLocalMock(t *testing.T) {
 
 	findRequest := `{"Zone":"test-zone","Names":["packetfilter-test"]}`
 	var found []*iaas.PacketFilter
-	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "find", "--request", findRequest), &found); err != nil {
-		t.Fatal(err)
-	}
-	if len(found) != 1 || found[0].ID != created.ID {
-		t.Fatalf("find returned %#v, want PacketFilter %s", found, created.ID)
-	}
+	err2 := json.Unmarshal(runCommand("iaas-api", "packetfilter", "find", "--request", findRequest), &found)
+	require.NoError(t, err2)
+	require.Len(t, found, 1, "find returned %#v, want PacketFilter %s", found, created.ID)
+	require.Equal(t, created.ID, found[0].ID, "unexpected value")
 
 	var read iaas.PacketFilter
 	readRequest, err := json.Marshal(map[string]any{"Zone": "test-zone", "ID": created.ID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "read", "--request", string(readRequest)), &read); err != nil {
-		t.Fatal(err)
-	}
-	if read.ID != created.ID || len(read.Expression) != 1 {
-		t.Fatalf("read returned %#v", read)
-	}
+	require.NoError(t, err)
+	err3 := json.Unmarshal(runCommand("iaas-api", "packetfilter", "read", "--request", string(readRequest)), &read)
+	require.NoError(t, err3)
+	require.Equal(t, created.ID, read.ID, "read returned %#v", read)
+	require.Len(t, read.Expression, 1, "unexpected length")
 
 	rulesPath := t.TempDir() + "/rules.json"
 	updatedExpressions := `[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","DestinationPort":"8443","Action":"allow","Description":"Allow HTTPS alternative"}]`
-	if err := os.WriteFile(rulesPath, []byte(updatedExpressions), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err4 := os.WriteFile(rulesPath, []byte(updatedExpressions), 0o600)
+	require.NoError(t, err4)
 	var updated iaas.PacketFilter
-	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "update", "--zone", "test-zone", "--id", created.ID.String(), "--name", "updated-filter", "--expressions", "@"+rulesPath, "--original-expression-hash", created.ExpressionHash), &updated); err != nil {
-		t.Fatal(err)
-	}
+	err5 := json.Unmarshal(runCommand("iaas-api", "packetfilter", "update", "--zone", "test-zone", "--id", created.ID.String(), "--name", "updated-filter", "--expressions", "@"+rulesPath, "--original-expression-hash", created.ExpressionHash), &updated)
+	require.NoError(t, err5)
 	if updated.ID != created.ID || updated.Name != "updated-filter" || updated.Description != "test filter" ||
 		len(updated.Expression) != 1 || updated.Expression[0].DestinationPort != "8443" {
 		t.Fatalf("update did not preserve omitted values: %+v", updated)
 	}
 
-	if output := runCommand("iaas-api", "packetfilter", "delete", "--zone", "test-zone", "--id", created.ID.String(), "--fail-if-not-found"); len(output) != 0 {
-		t.Fatalf("delete output = %q, want empty", output)
-	}
+	output := runCommand("iaas-api", "packetfilter", "delete", "--zone", "test-zone", "--id", created.ID.String(), "--fail-if-not-found")
+	require.Len(t, output, 0, "delete output = %q, want empty", output)
 	found = nil
-	if err := json.Unmarshal(runCommand("iaas-api", "packetfilter", "find", "--request", `{"Zone":"test-zone"}`), &found); err != nil {
-		t.Fatal(err)
-	}
-	if len(found) != 0 {
-		t.Fatalf("find after delete returned %#v, want empty", found)
-	}
+	err6 := json.Unmarshal(runCommand("iaas-api", "packetfilter", "find", "--request", `{"Zone":"test-zone"}`), &found)
+	require.NoError(t, err6)
+	require.Len(t, found, 0, "find after delete returned %#v, want empty", found)
 }
 
 func TestPacketFilterRejectsInvalidRequestsBeforeFactory(t *testing.T) {
@@ -177,21 +148,19 @@ func TestPacketFilterRejectsInvalidRequestsBeforeFactory(t *testing.T) {
 			})
 			var stdout, stderr bytes.Buffer
 			args := append([]string{"iaas-api", "packetfilter"}, test.args...)
-			if code := runCLI(args, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-				t.Fatalf("run(%v): code=%d stdout=%q stderr=%q; want input error", args, code, stdout.String(), stderr.String())
-			}
-			if factoryCalled {
-				t.Fatal("invalid request created an API client")
-			}
+			code := runCLI(args, &stdout, &stderr, commandLine)
+			require.NotEqual(t, 0, code, "run(%v): code=%d stdout=%q stderr=%q; want input error", args, code, stdout.String(), stderr.String())
+			require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+			require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
+			require.False(t, factoryCalled, "invalid request created an API client")
 		})
 	}
 }
 
 func TestPacketFilterHelpExampleDecodes(t *testing.T) {
 	var request packetfilter.CreateRequest
-	if err := decodeRequest(`{"Zone":"is1b","Name":"example","Expression":[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","DestinationPort":"443","Action":"allow","Description":"Allow HTTPS"}]}`, &request); err != nil {
-		t.Fatal(err)
-	}
+	err := decodeRequest(`{"Zone":"is1b","Name":"example","Expression":[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","DestinationPort":"443","Action":"allow","Description":"Allow HTTPS"}]}`, &request)
+	require.NoError(t, err)
 	if request.Zone != "is1b" || request.Name != "example" || len(request.Expression) != 1 ||
 		request.Expression[0].Protocol != types.Protocols.TCP || request.Expression[0].Action != types.Actions.Allow {
 		t.Fatalf("decoded request = %+v", request)
@@ -201,20 +170,15 @@ func TestPacketFilterHelpExampleDecodes(t *testing.T) {
 func TestDecodePacketFilterExpressions(t *testing.T) {
 	path := t.TempDir() + "/rules.json"
 	fileContent := `[{"Protocol":"udp","DestinationPort":"53","Action":"allow"}]`
-	if err := os.WriteFile(path, []byte(fileContent), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(path, []byte(fileContent), 0o600)
+	require.NoError(t, err)
 	for _, input := range []string{
 		`[{"Protocol":"tcp","DestinationPort":"443","Action":"allow"}]`,
 		"@" + path,
 	} {
 		expressions, err := decodePacketFilterExpressions([]string{input})
-		if err != nil {
-			t.Fatalf("decodePacketFilterExpressions(%q): %v", input, err)
-		}
-		if len(expressions) != 1 {
-			t.Fatalf("decoded %q to %d expressions, want 1", input, len(expressions))
-		}
+		require.NoError(t, err, "decodePacketFilterExpressions(%q)", input)
+		require.Len(t, expressions, 1, "decoded %q to %d expressions, want 1", input, len(expressions))
 	}
 	for _, inputs := range [][]string{
 		{"{"},

@@ -26,6 +26,7 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	skrSaclient "github.com/sacloud/skr/internal/saclient"
+	"github.com/stretchr/testify/require"
 )
 
 type authenticatedHTTPDoerFunc func(*http.Request) (*http.Response, error)
@@ -36,9 +37,8 @@ func (f authenticatedHTTPDoerFunc) Do(request *http.Request) (*http.Response, er
 
 func TestRunHTTPCommand(t *testing.T) {
 	requestBody := filepath.Join(t.TempDir(), "request.json")
-	if err := os.WriteFile(requestBody, []byte(`{"name":"sample"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(requestBody, []byte(`{"name":"sample"}`), 0o600)
+	require.NoError(t, err)
 
 	var gotMethod, gotURL, gotContentType, gotCustomHeader, gotBody string
 	commandLine := newCLI()
@@ -71,30 +71,17 @@ func TestRunHTTPCommand(t *testing.T) {
 		"--data", "@" + requestBody,
 		"--query", ".id",
 	}
-	if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-		t.Fatalf("runCLI() = %d; stderr: %s", code, stderr.String())
-	}
-	if gotMethod != http.MethodPost {
-		t.Errorf("request method = %q, want %q", gotMethod, http.MethodPost)
-	}
-	if gotURL != "https://api.example.test/v1/resources?limit=2" {
-		t.Errorf("request URL = %q", gotURL)
-	}
-	if gotContentType != "application/json" {
-		t.Errorf("Content-Type = %q, want application/json", gotContentType)
-	}
-	if gotCustomHeader != "enabled" {
-		t.Errorf("X-Feature = %q, want enabled", gotCustomHeader)
-	}
-	if gotBody != `{"name":"sample"}` {
-		t.Errorf("request body = %q", gotBody)
-	}
+	require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
+	require.Equal(t, http.MethodPost, gotMethod, "request method = %q, want %q", gotMethod, http.MethodPost)
+	require.Equal(t, "https://api.example.test/v1/resources?limit=2", gotURL, "request URL = %q", gotURL)
+	require.Equal(t, "application/json", gotContentType, "Content-Type = %q, want application/json", gotContentType)
+	require.Equal(t, "enabled", gotCustomHeader, "X-Feature = %q, want enabled", gotCustomHeader)
+	require.Equal(t, `{"name":"sample"}`, gotBody, "request body = %q", gotBody)
 	if got, want := stdout.String(), "{\"id\":\"123\"}\n"; got != want {
 		t.Errorf("response body = %q, want unchanged body %q", got, want)
 	}
-	if got := stderr.String(); got != "" {
-		t.Errorf("stderr = %q, want empty", got)
-	}
+	got := stderr.String()
+	require.Empty(t, got, "stderr = %q, want empty", got)
 }
 
 func TestRunHTTPCommandReturnsErrorForUnsuccessfulStatus(t *testing.T) {
@@ -110,15 +97,10 @@ func TestRunHTTPCommandReturnsErrorForUnsuccessfulStatus(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	if code := runCLI([]string{"http", "https://api.example.test/resource"}, &stdout, &stderr, commandLine); code == 0 {
-		t.Fatal("runCLI() = 0, want non-zero for an unsuccessful HTTP status")
-	}
-	if got, want := stdout.String(), "upstream unavailable"; got != want {
-		t.Errorf("response body = %q, want %q", got, want)
-	}
-	if !strings.Contains(stderr.String(), "502 Bad Gateway") {
-		t.Errorf("stderr = %q, want HTTP status", stderr.String())
-	}
+	require.NotEqual(t, 0, runCLI([]string{"http", "https://api.example.test/resource"}, &stdout, &stderr, commandLine), "run should fail")
+	got, want := stdout.String(), "upstream unavailable"
+	require.Equal(t, want, got, "response body = %q, want %q")
+	require.Contains(t, stderr.String(), "502 Bad Gateway", "stderr = %q, want HTTP status", stderr.String())
 }
 
 func TestRunHTTPCommandRejectsInvalidURLBeforeInitializingClient(t *testing.T) {
@@ -136,13 +118,9 @@ func TestRunHTTPCommandRejectsInvalidURLBeforeInitializingClient(t *testing.T) {
 		"https://api.example.test/resource#section",
 	} {
 		var stdout, stderr bytes.Buffer
-		if code := runCLI([]string{"http", rawURL}, &stdout, &stderr, commandLine); code == 0 {
-			t.Errorf("runCLI(%q) = 0, want non-zero", rawURL)
-		}
+		require.NotEqual(t, 0, runCLI([]string{"http", rawURL}, &stdout, &stderr, commandLine), "run should fail")
 	}
-	if called {
-		t.Fatal("HTTP client factory was called for an invalid URL")
-	}
+	require.False(t, called, "HTTP client factory was called for an invalid URL")
 }
 
 func TestAddHTTPHeadersValidatesInput(t *testing.T) {
@@ -152,55 +130,39 @@ func TestAddHTTPHeadersValidatesInput(t *testing.T) {
 		"X-Feature: first\r\nInjected: second",
 	} {
 		request, err := http.NewRequest(http.MethodGet, "https://api.example.test", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := addHTTPHeaders(request, []string{header}); err == nil {
-			t.Errorf("addHTTPHeaders(%q) succeeded, want an error", header)
-		}
+		require.NoError(t, err)
+		err = addHTTPHeaders(request, []string{header})
+		require.Error(t, err, "addHTTPHeaders(%q) succeeded, want an error", header)
 	}
 }
 
 func TestReadHTTPData(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "body.bin")
 	wantFile := []byte{0, 1, 2, 255}
-	if err := os.WriteFile(path, wantFile, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(path, wantFile, 0o600)
+	require.NoError(t, err)
 	gotFile, err := readHTTPData("@" + path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(gotFile, wantFile) {
-		t.Errorf("file data = %v, want %v", gotFile, wantFile)
-	}
+	require.NoError(t, err)
+	require.Equal(t, wantFile, gotFile, "file data = %v, want %v", gotFile, wantFile)
 
 	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	originalStdin := os.Stdin
 	os.Stdin = reader
 	t.Cleanup(func() {
 		os.Stdin = originalStdin
-		if err := reader.Close(); err != nil {
-			t.Errorf("close standard input pipe: %v", err)
-		}
+		err2 := reader.Close()
+		require.NoError(t, err2, "close standard input pipe: %v")
 	})
 	wantStdin := []byte("stdin body")
 	if _, err := writer.Write(wantStdin); err != nil {
 		t.Fatal(err)
 	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
+	err3 := writer.Close()
+	require.NoError(t, err3)
 	gotStdin, err := readHTTPData("-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(gotStdin, wantStdin) {
-		t.Errorf("standard input data = %q, want %q", gotStdin, wantStdin)
-	}
+	require.NoError(t, err)
+	require.Equal(t, wantStdin, gotStdin, "standard input data = %q, want %q", gotStdin, wantStdin)
 }
 
 func TestHTTPCommandUsesSDKAuthenticationAndUserAgent(t *testing.T) {
@@ -256,30 +218,18 @@ func TestHTTPCommandUsesSDKAuthenticationAndUserAgent(t *testing.T) {
 
 			args := append([]string{"http", server.URL}, test.args...)
 			var stdout, stderr bytes.Buffer
-			if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-				t.Fatalf("runCLI() = %d; stderr: %s", code, stderr.String())
-			}
-			if authorization == "" {
-				t.Fatal("request has no Authorization header")
-			}
-			if userAgent != test.wantAgent {
-				t.Errorf("User-Agent = %q, want %q", userAgent, test.wantAgent)
-			}
-			if userAgentPresent != test.wantAgentPresent {
-				t.Errorf("User-Agent present = %t, want %t", userAgentPresent, test.wantAgentPresent)
-			}
-			if strings.Contains(authorization, "http-test-secret") {
-				t.Fatal("request exposed the access token secret")
-			}
+			require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
+			require.NotEmpty(t, authorization, "request has no Authorization header")
+			require.Equal(t, test.wantAgent, userAgent, "User-Agent = %q, want %q", userAgent, test.wantAgent)
+			require.Equal(t, test.wantAgentPresent, userAgentPresent, "User-Agent present = %t, want %t", userAgentPresent, test.wantAgentPresent)
+			require.NotContains(t, authorization, "http-test-secret", "request exposed the access token secret")
 		})
 	}
 }
 
 func TestRunHTTPCommandHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if code := run([]string{"http", "--help"}, &stdout, &stderr); code != 0 {
-		t.Fatalf("run() = %d; stderr: %s", code, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"http", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
 	for _, text := range []string{
 		"--method",
 		"--data",
@@ -290,8 +240,6 @@ func TestRunHTTPCommandHelp(t *testing.T) {
 		"SDK の認証情報",
 		"--query による加工は行いません",
 	} {
-		if !strings.Contains(stdout.String(), text) {
-			t.Errorf("http help does not contain %q", text)
-		}
+		require.Contains(t, stdout.String(), text, "http help does not contain %q", text)
 	}
 }

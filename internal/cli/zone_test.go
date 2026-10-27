@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	"github.com/sacloud/skr/internal/apigen"
@@ -30,24 +32,14 @@ import (
 
 func TestZoneGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-zone.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "read zone config")
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "decode zone config")
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "generate zone commands")
 	got, err := os.ReadFile(repositoryPath("internal/iaas/zoneapi/zone_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated Zone commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-zone.json API_OUTPUT=internal/iaas/zoneapi/zone_api_generated.go")
-	}
+	require.NoError(t, err, "read generated zone commands")
+	require.Equal(t, want, got, "generated Zone commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-zone.json API_OUTPUT=internal/iaas/zoneapi/zone_api_generated.go")
 }
 
 func TestIaaSZoneHelp(t *testing.T) {
@@ -60,14 +52,11 @@ func TestIaaSZoneHelp(t *testing.T) {
 		{args: []string{"iaas-api", "zone", "read", "--help"}, want: []string{"--id", "--request", "@path.json", "ZONE-ID", "併用できません"}},
 	} {
 		var stdout, stderr bytes.Buffer
-		if code := run(test.args, &stdout, &stderr); code != 0 {
-			t.Fatalf("run(%v) = %d; stderr: %s", test.args, code, stderr.String())
-		}
+		code := run(test.args, &stdout, &stderr)
+		require.Equal(t, 0, code, "run(%v) stderr: %s", test.args, stderr.String())
 		help := strings.Join(strings.Fields(stdout.String()), " ")
 		for _, text := range test.want {
-			if !strings.Contains(help, text) {
-				t.Errorf("help for %v does not contain %q: %s", test.args, text, help)
-			}
+			require.Contains(t, help, text, "help for %v", test.args)
 		}
 	}
 }
@@ -84,31 +73,22 @@ func TestIaaSZoneFindWithLocalMockAndQuery(t *testing.T) {
 	runCommand := func(args ...string) string {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-			t.Fatalf("run(%v) = %d; stderr: %s", args, code, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Errorf("run(%v) stderr = %q, want empty", args, stderr.String())
-		}
+		code := runCLI(args, &stdout, &stderr, commandLine)
+		require.Equal(t, 0, code, "run(%v) stderr: %s", args, stderr.String())
+		require.Empty(t, stderr, "run(%v) stderr should be empty", args)
 		return stdout.String()
 	}
 
 	var zones []*iaas.Zone
-	if err := json.Unmarshal([]byte(runCommand("iaas-api", "zone", "find")), &zones); err != nil {
-		t.Fatal(err)
-	}
-	if len(zones) != 2 || zones[0].Name != "test-zone-a" || zones[1].Name != "test-zone-b" {
-		t.Fatalf("zone find returned %#v, want configured mock zones", zones)
-	}
+	require.NoError(t, json.Unmarshal([]byte(runCommand("iaas-api", "zone", "find")), &zones), "decode zone find output")
+	require.Len(t, zones, 2, "configured mock zones")
+	require.Equal(t, "test-zone-a", zones[0].Name, "zone 0 name")
+	require.Equal(t, "test-zone-b", zones[1].Name, "zone 1 name")
 
 	queryOutput := runCommand("iaas-api", "zone", "find", "--query", "map(.Name)")
 	var names []string
-	if err := json.Unmarshal([]byte(queryOutput), &names); err != nil {
-		t.Fatalf("decode query output %q: %v", queryOutput, err)
-	}
-	if len(names) != 2 || names[0] != "test-zone-a" || names[1] != "test-zone-b" {
-		t.Errorf("query output = %#v, want configured zone names", names)
-	}
+	require.NoError(t, json.Unmarshal([]byte(queryOutput), &names), "decode query output %q", queryOutput)
+	require.Equal(t, []string{"test-zone-a", "test-zone-b"}, names, "configured zone names")
 }
 
 func TestIaaSZoneReadWithLocalMock(t *testing.T) {
@@ -123,20 +103,15 @@ func TestIaaSZoneReadWithLocalMock(t *testing.T) {
 	runCommand := func(args ...string) string {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-			t.Fatalf("run(%v) = %d; stderr: %s", args, code, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Errorf("run(%v) stderr = %q, want empty", args, stderr.String())
-		}
+		code := runCLI(args, &stdout, &stderr, commandLine)
+		require.Equal(t, 0, code, "run(%v) stderr: %s", args, stderr.String())
+		require.Empty(t, stderr, "run(%v) stderr should be empty", args)
 		return stdout.String()
 	}
 
 	// --id フラグ経路でゾーンを参照する
 	output := runCommand("iaas-api", "zone", "read", "--id", "2")
-	if !strings.Contains(output, `"Name": "test-zone-b"`) {
-		t.Fatalf("read --id output = %q, want test-zone-b", output)
-	}
+	require.Contains(t, output, `"Name": "test-zone-b"`, "read --id output %q", output)
 
 	// --query で必要な項目へ絞り込む。応答は単一オブジェクトのためオブジェクト構築式を使う
 	projected := runCommand("iaas-api", "zone", "read", "--id", "1", "--query", "{ID,Name}")
@@ -144,18 +119,13 @@ func TestIaaSZoneReadWithLocalMock(t *testing.T) {
 		ID   int64
 		Name string
 	}
-	if err := json.Unmarshal([]byte(projected), &item); err != nil {
-		t.Fatalf("decode projected output %q: %v", projected, err)
-	}
-	if item.ID != 1 || item.Name != "test-zone-a" {
-		t.Fatalf("projected read = %#v, want ID 1 and test-zone-a", item)
-	}
+	require.NoError(t, json.Unmarshal([]byte(projected), &item), "decode projected output %q", projected)
+	require.Equal(t, int64(1), item.ID, "projected read ID")
+	require.Equal(t, "test-zone-a", item.Name, "projected read name")
 
 	// --request 経路でも同じ SDK リクエストになる
 	jsonOutput := runCommand("iaas-api", "zone", "read", "--request", `{"ID":2}`)
-	if !strings.Contains(jsonOutput, `"Name": "test-zone-b"`) {
-		t.Fatalf("read --request output = %q, want test-zone-b", jsonOutput)
-	}
+	require.Contains(t, jsonOutput, `"Name": "test-zone-b"`, "read --request output %q", jsonOutput)
 }
 
 func TestIaaSZoneRejectsInvalidReadRequestsBeforeCallingAPI(t *testing.T) {
@@ -176,9 +146,9 @@ func TestIaaSZoneRejectsInvalidReadRequestsBeforeCallingAPI(t *testing.T) {
 		})
 		var stdout, stderr bytes.Buffer
 		code := runCLI(append([]string{"iaas-api", "zone"}, args...), &stdout, &stderr, commandLine)
-		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
-		}
+		require.NotEqual(t, 0, code, "%v should fail with a validation error", args)
+		require.Empty(t, stdout, "%v should not write output", args)
+		require.NotEmpty(t, stderr, "%v should report a validation error", args)
 	}
 }
 
@@ -193,7 +163,7 @@ func TestIaaSZoneReadPropagatesAPIErrors(t *testing.T) {
 	})
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "zone", "read", "--id", "99"}, &stdout, &stderr, commandLine)
-	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "not_found") {
-		t.Fatalf("read error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-	}
+	require.NotEqual(t, 0, code, "read error should fail")
+	require.Empty(t, stdout, "read error should not write output")
+	require.Contains(t, stderr.String(), "not_found", "read error %q", stderr.String())
 }

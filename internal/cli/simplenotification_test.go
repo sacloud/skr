@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/sacloud/skr/internal/apigen"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSimpleNotificationGeneratedCodeMatchesConfig(t *testing.T) {
@@ -38,24 +39,14 @@ func TestSimpleNotificationGeneratedCodeMatchesConfig(t *testing.T) {
 		{"api/commands/simple-notification-history.json", "internal/simplenotificationapi/simple_notification_history_api_generated.go"},
 	} {
 		configData, err := os.ReadFile(repositoryPath(test.config))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		config, err := apigen.DecodeConfig(configData)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		want, err := apigen.Generate(config)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		got, err := os.ReadFile(repositoryPath(test.output))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Fatalf("generated API commands are stale; run make generate-api API_CONFIG=%s API_OUTPUT=%s", test.config, test.output)
-		}
+		require.NoError(t, err)
+		require.Equal(t, want, got, "generated API commands are stale; run make generate-api API_CONFIG=%s API_OUTPUT=%s", test.config, test.output)
 	}
 }
 
@@ -95,15 +86,11 @@ func TestRunSimpleNotificationAPIHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if exitCode := run(test.args, &stdout, &stderr); exitCode != 0 {
-				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, exitCode, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help output does not contain %q", text)
-				}
+				require.Contains(t, help, text, "help output does not contain %q", text)
 			}
 		})
 	}
@@ -129,9 +116,7 @@ func TestSimpleNotificationTraceUsesParsedFlag(t *testing.T) {
 		if trace {
 			args = append([]string{"--trace"}, args...)
 		}
-		if code := run(args, &output, &stderr); code != 0 {
-			t.Fatalf("exit = %d, stderr = %s", code, &stderr)
-		}
+		require.Equal(t, 0, run(args, &output, &stderr), "stderr: %s", stderr.String())
 		if strings.Contains(logs.String(), "[TRACE]") != trace {
 			t.Fatalf("trace output enabled = %v, want %v", strings.Contains(logs.String(), "[TRACE]"), trace)
 		}
@@ -154,23 +139,19 @@ func TestDestinationSDKValidationDoesNotExposeFileValues(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "request.json")
 	for _, operation := range []string{"create", "update"} {
 		data := `{"CommonServiceItem":{"Name":"test","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"` + webhookURL + `","Value":"webhook"}}}`
-		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
-			t.Fatal(err)
-		}
+		err := os.WriteFile(path, []byte(data), 0o600)
+		require.NoError(t, err)
 		args := []string{"simple-notification-api", "destination", operation}
 		if operation == "update" {
 			args = append(args, "123456789012")
 		}
 		args = append(args, "--request", "@"+path)
 		var output, stderr bytes.Buffer
-		if code := run(args, &output, &stderr); code != 1 {
-			t.Fatalf("%s exit = %d, want 1", operation, code)
-		}
+		code := run(args, &output, &stderr)
+		require.EqualValues(t, 1, code, "%s exit = %d, want 1", operation, code)
 		if strings.Contains(stderr.String()+output.String(), webhookURL) || stderr.Len() == 0 {
 			t.Fatalf("%s did not return a nonempty safe error", operation)
 		}
 	}
-	if calls != 0 {
-		t.Fatalf("invalid request reached the server %d times", calls)
-	}
+	require.EqualValues(t, 0, calls, "invalid request reached the server %d times", calls)
 }

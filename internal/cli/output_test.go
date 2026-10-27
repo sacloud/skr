@@ -19,13 +19,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOutputFlagIsRejectedBeforeAPICall(t *testing.T) {
@@ -42,9 +42,10 @@ func TestOutputFlagIsRejectedBeforeAPICall(t *testing.T) {
 					args = append(args, "--query", ".Name")
 				}
 				var stdout, stderr bytes.Buffer
-				if code := runCLI(args, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "--output") {
-					t.Fatalf("removed flag: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-				}
+				code := runCLI(args, &stdout, &stderr, commandLine)
+				require.NotEqual(t, 0, code, "removed flag: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+				require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+				require.Contains(t, stderr.String(), "--output", "missing expected text %q", "--output")
 			})
 		}
 	}
@@ -61,15 +62,12 @@ func TestJSONOutputIgnoresLegacyProfileFormat(t *testing.T) {
 			profileDir := t.TempDir()
 			t.Setenv("SAKURA_PROFILE_DIR", profileDir)
 			profilePath := filepath.Join(profileDir, "example")
-			if err := os.Mkdir(profilePath, 0o700); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(profileDir, "current"), []byte("example\n"), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(profilePath, test.filename), []byte(test.contents), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			err := os.Mkdir(profilePath, 0o700)
+			require.NoError(t, err)
+			err2 := os.WriteFile(filepath.Join(profileDir, "current"), []byte("example\n"), 0o600)
+			require.NoError(t, err2)
+			err3 := os.WriteFile(filepath.Join(profilePath, test.filename), []byte(test.contents), 0o600)
+			require.NoError(t, err3)
 			server := iaasmock.NewTestServer(iaasmock.Config{})
 			t.Cleanup(server.Close)
 			runCommand := func(args ...string) []byte {
@@ -77,23 +75,17 @@ func TestJSONOutputIgnoresLegacyProfileFormat(t *testing.T) {
 				commandLine := newCLI()
 				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return swytch.New(server), nil })
 				var stdout, stderr bytes.Buffer
-				if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
-					t.Fatalf("run(%v): code %d, stderr %s", args, code, stderr.String())
-				}
+				require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
 				return stdout.Bytes()
 			}
 			var created iaas.Switch
-			if err := json.Unmarshal(runCommand("iaas-api", "switch", "create", "--zone", "test-zone", "--name", "output-test"), &created); err != nil {
-				t.Fatal(err)
-			}
-			if created.Name != "output-test" {
-				t.Fatalf("JSON create returned %+v", created)
-			}
+			err4 := json.Unmarshal(runCommand("iaas-api", "switch", "create", "--zone", "test-zone", "--name", "output-test"), &created)
+			require.NoError(t, err4)
+			require.Equal(t, "output-test", created.Name, "JSON create returned %+v", created)
 			output := runCommand("iaas-api", "switch", "find", "--zone", "test-zone", "--query", "map({ID,Name})")
 			var projected []map[string]json.RawMessage
-			if err := json.Unmarshal(output, &projected); err != nil {
-				t.Fatal(err)
-			}
+			err5 := json.Unmarshal(output, &projected)
+			require.NoError(t, err5)
 			if len(projected) != 1 || len(projected[0]) != 2 || string(projected[0]["Name"]) != `"output-test"` {
 				t.Fatalf("projected output = %s", output)
 			}
@@ -110,9 +102,10 @@ func TestQueryErrorsBeforeAPICall(t *testing.T) {
 				return nil, nil
 			})
 			var stdout, stderr bytes.Buffer
-			if code := runCLI([]string{"iaas-api", "switch", "create", "--zone", "test-zone", "--name", "test", "--query", expression}, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "--query expression") {
-				t.Fatalf("invalid query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-			}
+			code := runCLI([]string{"iaas-api", "switch", "create", "--zone", "test-zone", "--name", "test", "--query", expression}, &stdout, &stderr, commandLine)
+			require.NotEqual(t, 0, code, "invalid query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+			require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+			require.Contains(t, stderr.String(), "--query expression", "missing expected text %q", "--query expression")
 		})
 	}
 }
@@ -131,22 +124,18 @@ func TestWriteQueryOutput(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var output bytes.Buffer
-			if err := writeQueryOutput(&output, test.expression, test.value); err != nil {
-				t.Fatal(err)
-			}
-			if got := output.String(); got != test.want {
-				t.Errorf("writeQueryOutput() = %q, want %q", got, test.want)
-			}
+			err := writeQueryOutput(&output, test.expression, test.value)
+			require.NoError(t, err)
+			got := output.String()
+			require.Equal(t, test.want, got, "writeQueryOutput() = %q, want %q", got, test.want)
 		})
 	}
 }
 
 func TestWriteQueryOutputDoesNotWritePartialResultsOnError(t *testing.T) {
 	var output bytes.Buffer
-	if err := writeQueryOutput(&output, `(.Name, error("query failed"))`, map[string]any{"Name": "example"}); err == nil {
-		t.Fatal("writeQueryOutput() succeeded, want evaluation error")
-	}
-	if got := output.String(); got != "" {
-		t.Errorf("writeQueryOutput() wrote partial output %q", got)
-	}
+	err := writeQueryOutput(&output, `(.Name, error("query failed"))`, map[string]any{"Name": "example"})
+	require.Error(t, err, "writeQueryOutput() succeeded, want evaluation error")
+	got := output.String()
+	require.Empty(t, got, "writeQueryOutput() wrote partial output %q", got)
 }

@@ -18,6 +18,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunNetworkingSuiteAPIHelp(t *testing.T) {
@@ -52,13 +54,10 @@ func TestRunNetworkingSuiteAPIHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v) exit code = %d; stderr: %s", test.args, code, stderr.String())
-			}
+			code := run(test.args, &stdout, &stderr)
+			require.Equal(t, 0, code, "run(%v) stderr: %s", test.args, stderr.String())
 			for _, text := range test.want {
-				if !strings.Contains(stdout.String(), text) {
-					t.Errorf("help output does not contain %q", text)
-				}
+				require.Contains(t, stdout.String(), text, "help output for %v", test.args)
 			}
 		})
 	}

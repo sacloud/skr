@@ -38,6 +38,7 @@ import (
 	"github.com/sacloud/skr/internal/iaas/serverapi"
 	"github.com/sacloud/skr/internal/iaas/serverplanapi"
 	"github.com/sacloud/skr/internal/iaas/switchapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
@@ -56,18 +57,12 @@ func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
 	}
 	for _, resource := range resources {
 		data, err := os.ReadFile(repositoryPath("api/commands/" + resource.config + ".json"))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		config, err := apigen.DecodeConfig(data)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		for _, operation := range config.Operations {
 			if resource.name == "archive" && operation.Name == "Find" {
-				if operation.RequestValidator != "ValidateFindRequest" {
-					t.Fatal("Archive Find must retain unknown OSType validation")
-				}
+				require.Equal(t, "ValidateFindRequest", operation.RequestValidator, "Archive Find must retain unknown OSType validation")
 			} else if operation.RequestValidator != "" {
 				t.Fatalf("%s %s still configures a body validator", resource.name, operation.Name)
 			}
@@ -145,22 +140,33 @@ func TestIaaSEmptyUpdatesReachSDK(t *testing.T) {
 					args = append(args, "--zone", "test-zone", "--id", "123")
 				}
 				var stdout, stderr bytes.Buffer
-				if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 || stderr.Len() != 0 {
-					t.Fatalf("code=%d stderr=%q; want request forwarded", code, stderr.String())
-				}
+				code := runCLI(args, &stdout, &stderr, commandLine)
+				require.Equal(t, 0, code, "code=%d stderr=%q; want request forwarded", code, stderr.String())
+				require.EqualValues(t, 0, stderr.Len(), "unexpected value")
 				switch resource {
 				case "server":
-					if req := serverAPI.updateRequest; req == nil || req.ID != 123 || req.Zone != "test-zone" || req.Name != nil || req.Tags != nil || req.CPU != nil {
-						t.Fatalf("unexpected request: %+v", req)
-					}
+					req := serverAPI.updateRequest
+					require.NotNil(t, req, "unexpected request: %+v", req)
+					require.EqualValues(t, 123, req.ID, "unexpected value")
+					require.Equal(t, "test-zone", req.Zone, "unexpected value")
+					require.Nil(t, req.Name, "should be nil")
+					require.Nil(t, req.Tags, "should be nil")
+					require.Nil(t, req.CPU, "should be nil")
 				case "disk":
-					if req := diskAPI.updateRequest; req == nil || req.ID != 123 || req.Zone != "test-zone" || req.Name != nil || req.Tags != nil || req.Connection != nil {
-						t.Fatalf("unexpected request: %+v", req)
-					}
+					req2 := diskAPI.updateRequest
+					require.NotNil(t, req2, "unexpected request: %+v", req2)
+					require.EqualValues(t, 123, req2.ID, "unexpected value")
+					require.Equal(t, "test-zone", req2.Zone, "unexpected value")
+					require.Nil(t, req2.Name, "should be nil")
+					require.Nil(t, req2.Tags, "should be nil")
+					require.Nil(t, req2.Connection, "should be nil")
 				case "packetfilter":
-					if req := filterAPI.request; req == nil || req.ID != 123 || req.Zone != "test-zone" || req.Name != nil || req.Expression != nil {
-						t.Fatalf("unexpected request: %+v", req)
-					}
+					req3 := filterAPI.request
+					require.NotNil(t, req3, "unexpected request: %+v", req3)
+					require.EqualValues(t, 123, req3.ID, "unexpected value")
+					require.Equal(t, "test-zone", req3.Zone, "unexpected value")
+					require.Nil(t, req3.Name, "should be nil")
+					require.Nil(t, req3.Expression, "should be nil")
 				}
 			})
 		}
@@ -180,16 +186,14 @@ func TestArchiveOSTypeCanBeCombinedWithNamesAndTags(t *testing.T) {
 				args = append(args, "--zone", "test-zone", "--os-type", "ubuntu2404", "--tags", "custom")
 			}
 			var stdout, stderr bytes.Buffer
-			if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 || stderr.Len() != 0 {
-				t.Fatalf("code=%d stderr=%q; want combined search forwarded", code, stderr.String())
-			}
-			if len(api.findRequests) != 1 {
-				t.Fatalf("requests: %+v", api.findRequests)
-			}
+			code := runCLI(args, &stdout, &stderr, commandLine)
+			require.Equal(t, 0, code, "code=%d stderr=%q; want combined search forwarded", code, stderr.String())
+			require.EqualValues(t, 0, stderr.Len(), "unexpected value")
+			require.Len(t, api.findRequests, 1, "requests: %+v", api.findRequests)
 			req := api.findRequests[0]
-			if req.OSType != ostype.Ubuntu2404 || len(req.Tags) != 1 || req.Tags[0] != "custom" {
-				t.Fatalf("unexpected request: %+v", req)
-			}
+			require.Equal(t, ostype.Ubuntu2404, req.OSType, "unexpected request: %+v", req)
+			require.Len(t, req.Tags, 1, "unexpected length")
+			require.Equal(t, "custom", req.Tags[0], "unexpected value")
 			if input == "JSON" && (len(req.Names) != 1 || req.Names[0] != "image") {
 				t.Fatalf("names were not preserved: %+v", req)
 			}
@@ -203,9 +207,11 @@ func TestServerBootSDKValidationErrorIsReturned(t *testing.T) {
 	setServerAPIFactory(commandLine, func() (serverapi.API, error) { return server.New(caller), nil })
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "server", "boot", "--zone", "test-zone", "--id", "0"}, &stdout, &stderr, commandLine)
-	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "required") || !strings.Contains(stderr.String(), "ID") || len(caller.calls) != 0 {
-		t.Fatalf("code=%d stdout=%q stderr=%q calls=%+v; want SDK validation error", code, stdout.String(), stderr.String(), caller.calls)
-	}
+	require.EqualValues(t, 1, code, "code=%d stdout=%q stderr=%q calls=%+v; want SDK validation error", code, stdout.String(), stderr.String(), caller.calls)
+	require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+	require.Contains(t, stderr.String(), "required", "missing expected text %q", "required")
+	require.Contains(t, stderr.String(), "ID", "missing expected text %q", "ID")
+	require.Len(t, caller.calls, 0, "unexpected length")
 }
 
 func TestPacketFilterMissingHashIsForwardedAndAPIErrorsAreReturned(t *testing.T) {

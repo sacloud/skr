@@ -26,13 +26,12 @@ import (
 	"github.com/alecthomas/kong"
 	objectstoragemock "github.com/sacloud/sakumock/objectstorage"
 	"github.com/sacloud/skr/internal/objectstorageapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunObjectStorageAPIHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"object-storage-api", "--help"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"object-storage-api", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
 	for _, text := range []string{
 		"object-storage-api site list",
 		"object-storage-api account access-key create",
@@ -41,22 +40,16 @@ func TestRunObjectStorageAPIHelp(t *testing.T) {
 		"オブジェクト本体の転送ではなく",
 		"作成完了後からバケットの基本料金が発生します",
 	} {
-		if !strings.Contains(stdout.String(), text) {
-			t.Errorf("help output does not contain %q", text)
-		}
+		require.Contains(t, stdout.String(), text, "help output does not contain %q", text)
 	}
 }
 
 func TestRunObjectStoragePermissionCreateHelpDocumentsJSONInput(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if exitCode := run([]string{"object-storage-api", "permission", "create", "--help"}, &stdout, &stderr); exitCode != 0 {
-		t.Fatalf("run() exit code = %d, want 0; stderr: %s", exitCode, stderr.String())
-	}
+	require.Equal(t, 0, run([]string{"object-storage-api", "permission", "create", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	for _, text := range []string{"--request", "display_name", "bucket_controls", "@path.json"} {
-		if !strings.Contains(stdout.String(), text) {
-			t.Errorf("help output does not contain %q", text)
-		}
+		require.Contains(t, stdout.String(), text, "help output does not contain %q", text)
 	}
 }
 
@@ -68,9 +61,8 @@ func newObjectStorageMock(t *testing.T, cfg objectstoragemock.Config) *objectsto
 	t.Setenv("SAKURA_TRACE_MODE", "")
 	server := objectstoragemock.NewTestServer(cfg)
 	t.Cleanup(func() {
-		if violations := server.SpecViolations(); len(violations) != 0 {
-			t.Errorf("sakumock returned %d OpenAPI specification violations", len(violations))
-		}
+		violations := server.SpecViolations()
+		require.Len(t, violations, 0, "sakumock returned %d OpenAPI specification violations", len(violations))
 		server.Close()
 	})
 	t.Setenv("SAKURA_ENDPOINTS_OBJECT_STORAGE", server.TestURL())
@@ -80,9 +72,8 @@ func newObjectStorageMock(t *testing.T, cfg objectstoragemock.Config) *objectsto
 func decodeObjectStorageResult[T any](t *testing.T, output []byte) T {
 	t.Helper()
 	var result T
-	if err := json.Unmarshal(output, &result); err != nil {
-		t.Fatalf("decode Object Storage response: %v", err)
-	}
+	err := json.Unmarshal(output, &result)
+	require.NoError(t, err, "decode Object Storage response: %v")
 	return result
 }
 
@@ -92,12 +83,8 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 	runCommand := func(args ...string) []byte {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := run(append([]string{"object-storage-api"}, args...), &stdout, &stderr); code != 0 {
-			t.Fatalf("object-storage-api %v: exit %d: %s", args, code, stderr.String())
-		}
-		if stderr.Len() != 0 {
-			t.Fatalf("object-storage-api %v: unexpected stderr: %s", args, stderr.String())
-		}
+		require.Equal(t, 0, run(append([]string{"object-storage-api"}, args...), &stdout, &stderr), "stderr: %s", stderr.String())
+		require.EqualValues(t, 0, stderr.Len(), "object-storage-api %v: unexpected stderr: %s", args, stderr.String())
 		calls = append(calls, strings.Join(args, " "))
 		return stdout.Bytes()
 	}
@@ -105,37 +92,31 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
 		code := run(append([]string{"object-storage-api"}, args...), &stdout, &stderr)
-		if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "API Error 404:") {
-			t.Fatalf("object-storage-api %v: expected API 404, got exit %d: %s", args, code, stderr.String())
-		}
+		require.NotEqual(t, 0, code, "object-storage-api %v: expected API 404, got exit %d: %s", args, code, stderr.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+		require.Contains(t, stderr.String(), "API Error 404:", "missing expected text %q", "API Error 404:")
 	}
 	type identity struct {
 		ID         string `json:"id"`
 		ResourceID string `json:"resource_id"`
 	}
 	sites := decodeObjectStorageResult[[]identity](t, runCommand("site", "list"))
-	if len(sites) != 3 {
-		t.Fatalf("site count = %d, want 3", len(sites))
-	}
+	require.Len(t, sites, 3, "site count = %d, want 3", len(sites))
 	accounts := map[string]string{}
 	for _, site := range []string{"tky01", "isk01", "arc02"} {
-		if got := decodeObjectStorageResult[identity](t, runCommand("site", "read", site)); got.ID != site {
-			t.Fatalf("site read returned ID %q, want %q", got.ID, site)
-		}
+		got := decodeObjectStorageResult[identity](t, runCommand("site", "read", site))
+		require.Equal(t, site, got.ID, "site read returned ID %q, want %q", got.ID, site)
 		requireAbsent("account", "read", site)
 		created := decodeObjectStorageResult[identity](t, runCommand("account", "create", site))
 		read := decodeObjectStorageResult[identity](t, runCommand("account", "read", site))
-		if created.ResourceID == "" || read.ResourceID != created.ResourceID {
-			t.Fatal("account resource ID was missing or changed")
-		}
+		require.NotEmpty(t, created.ResourceID, "account resource ID was missing or changed")
+		require.Equal(t, created.ResourceID, read.ResourceID, "unexpected value")
 		accounts[site] = created.ResourceID
 		plans := decodeObjectStorageResult[[]struct {
 			ClusterID string `json:"cluster_id"`
 			Path      string `json:"service_class_path"`
 		}](t, runCommand("site", "plans", site))
-		if len(plans) == 0 {
-			t.Fatal("site returned no plans")
-		}
+		require.NotEmpty(t, plans, "site returned no plans")
 		for _, plan := range plans {
 			if plan.ClusterID != site || !strings.HasPrefix(plan.Path, "objectstorage/"+site+"/bucket") {
 				t.Fatal("plan did not belong to the requested site")
@@ -153,25 +134,21 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 			result = append(result, target...)
 			return append(result, id...)
 		}
-		if keys := decodeObjectStorageResult[[]key](t, runCommand(args("list")...)); len(keys) != 0 {
-			t.Fatal("new owner already has access keys")
-		}
-		created := decodeObjectStorageResult[key](t, runCommand(args("create")...))
-		if created.ID == "" || created.Secret == "" {
-			t.Fatal("key creation omitted ID or secret")
-		}
-		read := decodeObjectStorageResult[key](t, runCommand(args("read", created.ID)...))
-		if read.ID != created.ID || read.Secret != "" {
-			t.Fatal("key read changed ID or exposed the secret again")
-		}
 		keys := decodeObjectStorageResult[[]key](t, runCommand(args("list")...))
-		if len(keys) != 1 || keys[0].ID != created.ID || keys[0].Secret != "" {
-			t.Fatal("key list did not match the new key or exposed its secret")
-		}
+		require.Len(t, keys, 0, "new owner already has access keys")
+		created := decodeObjectStorageResult[key](t, runCommand(args("create")...))
+		require.NotEmpty(t, created.ID, "key creation omitted ID or secret")
+		require.NotEmpty(t, created.Secret, "should not be empty")
+		read := decodeObjectStorageResult[key](t, runCommand(args("read", created.ID)...))
+		require.Equal(t, created.ID, read.ID, "key read changed ID or exposed the secret again")
+		require.Empty(t, read.Secret, "should be empty")
+		keys = decodeObjectStorageResult[[]key](t, runCommand(args("list")...))
+		require.Len(t, keys, 1, "key list did not match the new key or exposed its secret")
+		require.Equal(t, created.ID, keys[0].ID, "unexpected value")
+		require.Empty(t, keys[0].Secret, "should be empty")
 		runCommand(args("delete", created.ID)...)
-		if keys := decodeObjectStorageResult[[]key](t, runCommand(args("list")...)); len(keys) != 0 {
-			t.Fatal("key remains after deletion")
-		}
+		keys2 := decodeObjectStorageResult[[]key](t, runCommand(args("list")...))
+		require.Len(t, keys2, 0, "key remains after deletion")
 	}
 	checkKeys([]string{"account", "access-key"}, "tky01")
 
@@ -200,13 +177,14 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 			wantPath, wantType = wantPath+"/"+item.plan, "archive"
 		}
 		created := decodeObjectStorageResult[bucket](t, runCommand(args...))
-		if created.Name != item.name || created.ClusterID != item.site || created.Plan.Path != wantPath || created.Plan.Type != wantType {
-			t.Fatal("created bucket site, name, or plan did not match")
-		}
+		require.Equal(t, item.name, created.Name, "created bucket site, name, or plan did not match")
+		require.Equal(t, item.site, created.ClusterID, "unexpected value")
+		require.Equal(t, wantPath, created.Plan.Path, "unexpected value")
+		require.Equal(t, wantType, created.Plan.Type, "unexpected value")
 		list := decodeObjectStorageResult[[]bucket](t, runCommand("bucket", "list", item.site, "--query", "map({name,resource_id})"))
-		if len(list) != 1 || list[0].Name != item.name || list[0].ResourceID == "" {
-			t.Fatal("bucket list omitted the new bucket identity")
-		}
+		require.Len(t, list, 1, "bucket list omitted the new bucket identity")
+		require.Equal(t, item.name, list[0].Name, "unexpected value")
+		require.NotEmpty(t, list[0].ResourceID, "should not be empty")
 		item.id = list[0].ResourceID
 	}
 
@@ -222,9 +200,8 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 	}
 	request := filepath.Join(t.TempDir(), "permission.json")
 	body := `{"display_name":"skr-test","bucket_controls":[{"bucket_name":"skr-test-source","can_read":true,"can_write":true}]}`
-	if err := os.WriteFile(request, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(request, []byte(body), 0o600)
+	require.NoError(t, err)
 	created := decodeObjectStorageResult[permission](t, runCommand("permission", "create", "tky01", "--request", "@"+request))
 	if created.ID <= 0 || created.DisplayName != "skr-test" || len(created.Controls) != 1 ||
 		created.Controls[0] != (control{BucketName: "skr-test-source", CanRead: true, CanWrite: true}) {
@@ -232,13 +209,11 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 	}
 	permissionID := strconv.FormatInt(created.ID, 10)
 	listed := decodeObjectStorageResult[[]permission](t, runCommand("permission", "list", "tky01"))
-	if len(listed) != 1 || listed[0].ID != created.ID {
-		t.Fatal("permission list omitted the created ID")
-	}
+	require.Len(t, listed, 1, "permission list omitted the created ID")
+	require.Equal(t, created.ID, listed[0].ID, "unexpected value")
 	read := decodeObjectStorageResult[permission](t, runCommand("permission", "read", "tky01", permissionID))
-	if read.ID != created.ID || read.DisplayName != created.DisplayName {
-		t.Fatal("permission read did not preserve identity")
-	}
+	require.Equal(t, created.ID, read.ID, "permission read did not preserve identity")
+	require.Equal(t, created.DisplayName, read.DisplayName, "unexpected value")
 	checkKeys([]string{"permission", "access-key"}, "tky01", permissionID)
 	updatedBody := strings.Replace(body, `"can_write":true`, `"can_write":false`, 1)
 	updated := decodeObjectStorageResult[permission](t, runCommand("permission", "update", "tky01", permissionID, "--request", updatedBody))
@@ -257,24 +232,18 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 		{"bucket", "quota", "tky01", "skr-test-source"},
 	} {
 		result := decodeObjectStorageResult[map[string]json.RawMessage](t, runCommand(args...))
-		if len(result) == 0 {
-			t.Fatalf("%v returned no fields", args)
-		}
+		require.NotEmpty(t, result, "%v returned no fields", args)
 	}
 	metering := decodeObjectStorageResult[[]json.RawMessage](t, runCommand("site", "status", "bucket-metering", "tky01", "skr-test-source",
 		"--from", "2026-09-01T00:00:00Z", "--to", "2026-10-01T00:00:00Z"))
-	if len(metering) != 0 {
-		t.Fatal("sakumock returned unexpected usage history")
-	}
+	require.Len(t, metering, 0, "sakumock returned unexpected usage history")
 
 	const keyID = "12345678-1234-4234-9234-123456789abc"
 	runCommand("bucket", "encryption", "enable", "tky01", "skr-test-source", "--kms-key-id", keyID)
 	encryption := decodeObjectStorageResult[struct {
 		KeyID string `json:"kms_key_id"`
 	}](t, runCommand("bucket", "encryption", "read", "tky01", "skr-test-source"))
-	if encryption.KeyID != keyID {
-		t.Fatal("encryption read did not preserve the selected key ID")
-	}
+	require.Equal(t, keyID, encryption.KeyID, "encryption read did not preserve the selected key ID")
 	runCommand("bucket", "encryption", "disable", "tky01", "skr-test-source")
 	requireAbsent("bucket", "encryption", "read", "tky01", "skr-test-source")
 	type replication struct {
@@ -296,18 +265,15 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 	runCommand("bucket", "replication", "disable", "tky01", "skr-test-source")
 	requireAbsent("bucket", "replication", "read", "tky01", "skr-test-source")
 	runCommand("permission", "delete", "tky01", permissionID)
-	if list := decodeObjectStorageResult[[]permission](t, runCommand("permission", "list", "tky01")); len(list) != 0 {
-		t.Fatal("permission remains after deletion")
-	}
+	list := decodeObjectStorageResult[[]permission](t, runCommand("permission", "list", "tky01"))
+	require.Len(t, list, 0, "permission remains after deletion")
 	for _, item := range buckets {
 		list := decodeObjectStorageResult[[]bucket](t, runCommand("bucket", "list", item.site))
-		if len(list) != 1 || list[0].ResourceID != item.id {
-			t.Fatal("bucket identity changed before deletion")
-		}
+		require.Len(t, list, 1, "bucket identity changed before deletion")
+		require.Equal(t, item.id, list[0].ResourceID, "unexpected value")
 		runCommand("bucket", "delete", item.site, item.name)
-		if list := decodeObjectStorageResult[[]bucket](t, runCommand("bucket", "list", item.site)); len(list) != 0 {
-			t.Fatal("bucket remains after deletion")
-		}
+		list2 := decodeObjectStorageResult[[]bucket](t, runCommand("bucket", "list", item.site))
+		require.Len(t, list2, 0, "bucket remains after deletion")
 		account := decodeObjectStorageResult[identity](t, runCommand("account", "read", item.site))
 		if account.ResourceID != accounts[item.site] {
 			t.Fatal("account identity changed before deletion")
@@ -318,9 +284,7 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 
 	commands := objectstorageapi.NewCommands(objectstorageapi.Runtime{}, nil)
 	parser, err := kong.New(&commands)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var verifyCoverage func(*kong.Node, []string)
 	verifyCoverage = func(node *kong.Node, path []string) {
 		for _, child := range node.Children {
@@ -345,13 +309,10 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 func TestObjectStorageSakumockErrorPropagation(t *testing.T) {
 	newObjectStorageMock(t, objectstoragemock.Config{Fault: []string{"403:1"}})
 	var stdout, stderr bytes.Buffer
-	if code := run([]string{"object-storage-api", "site", "list"}, &stdout, &stderr); code == 0 {
-		t.Fatal("API error returned success")
-	}
+	require.NotEqual(t, 0, run([]string{"object-storage-api", "site", "list"}, &stdout, &stderr), "run should fail")
 
-	if stdout.Len() != 0 || !strings.Contains(stderr.String(), "403") {
-		t.Fatal("API error was hidden or produced success-shaped output")
-	}
+	require.EqualValues(t, 0, stdout.Len(), "API error was hidden or produced success-shaped output")
+	require.Contains(t, stderr.String(), "403", "missing expected text %q", "403")
 }
 
 func TestObjectStorageInvalidQueryBeforeAPIFactory(t *testing.T) {
@@ -415,9 +376,7 @@ func TestObjectStorageInvalidQueryBeforeAPIFactory(t *testing.T) {
 			commands = append(commands, args)
 		}
 	}
-	if len(commands) != 34 {
-		t.Fatalf("query regression coverage = %d, want 34", len(commands))
-	}
+	require.Len(t, commands, 34, "query regression coverage = %d, want 34", len(commands))
 	for _, args := range commands {
 		for _, expression := range []string{"(", "unknown_function"} {
 			t.Run(strings.Join(args, " ")+"/"+expression, func(t *testing.T) {
@@ -431,9 +390,10 @@ func TestObjectStorageInvalidQueryBeforeAPIFactory(t *testing.T) {
 				var stdout, stderr bytes.Buffer
 				input := append([]string{"object-storage-api"}, args...)
 				input = append(input, "--query", expression)
-				if code := runCLI(input, &stdout, &stderr, commandLine); code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "--query expression") {
-					t.Fatalf("invalid query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-				}
+				code := runCLI(input, &stdout, &stderr, commandLine)
+				require.NotEqual(t, 0, code, "invalid query: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+				require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+				require.Contains(t, stderr.String(), "--query expression", "missing expected text %q", "--query expression")
 			})
 		}
 	}
@@ -446,9 +406,7 @@ func TestObjectStorageSakumockRejectsWrongSite(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		code := run(append([]string{"object-storage-api"}, args...), &stdout, &stderr)
 		if wantSuccess {
-			if code != 0 {
-				t.Fatalf("%v: %s", args, stderr.String())
-			}
+			require.Equal(t, 0, code, "%v: %s", args, stderr.String())
 		} else if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "操作を拒否") {
 			t.Fatalf("wrong-site operation %v: exit %d, stderr %s", args, code, stderr.String())
 		}
@@ -479,7 +437,6 @@ func TestObjectStorageSakumockRejectsWrongSite(t *testing.T) {
 	buckets := decodeObjectStorageResult[[]struct {
 		Name string `json:"name"`
 	}](t, call(true, "bucket", "list", "isk01"))
-	if len(buckets) != 1 || buckets[0].Name != "skr-site-source" {
-		t.Fatal("wrong-site operation deleted the source bucket")
-	}
+	require.Len(t, buckets, 1, "wrong-site operation deleted the source bucket")
+	require.Equal(t, "skr-site-source", buckets[0].Name, "unexpected value")
 }

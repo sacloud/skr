@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	apprunmock "github.com/sacloud/sakumock/apprun"
 )
 
@@ -49,14 +51,10 @@ func TestRunAppRunAPIHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v) code = %d; stderr: %s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, expected := range test.want {
-				if !strings.Contains(help, expected) {
-					t.Errorf("help does not contain %q:\n%s", expected, help)
-				}
+				require.Contains(t, help, expected, "help does not contain %q:\n%s", expected, help)
 			}
 		})
 	}
@@ -67,12 +65,9 @@ func TestRunAppRunAPIRejectsInlineSensitiveCreateRequest(t *testing.T) {
 	args := []string{"apprun-api", "application", "create", "--request",
 		`{"components":[{"secret":[{"key":"TOKEN","value":"` + secret + `"}]}]}`}
 	var stdout, stderr bytes.Buffer
-	if code := run(args, &stdout, &stderr); code == 0 {
-		t.Fatal("inline application request succeeded")
-	}
-	if strings.Contains(stderr.String(), secret) || !strings.Contains(stderr.String(), "@path.json") {
-		t.Fatalf("error = %q, want safe file-input guidance without secret", stderr.String())
-	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	require.NotContains(t, stderr.String(), secret, "error = %q, want safe file-input guidance without secret", stderr.String())
+	require.Contains(t, stderr.String(), "@path.json", "missing expected text %q", "@path.json")
 }
 
 func TestRunAppRunAPIRejectsInlineSensitiveUpdateRequest(t *testing.T) {
@@ -80,12 +75,9 @@ func TestRunAppRunAPIRejectsInlineSensitiveUpdateRequest(t *testing.T) {
 	args := []string{"apprun-api", "application", "update", "app-id", "--request",
 		`{"components":[{"secret":[{"key":"TOKEN","value":"` + secret + `"}]}]}`}
 	var stdout, stderr bytes.Buffer
-	if code := run(args, &stdout, &stderr); code == 0 {
-		t.Fatal("inline application update succeeded")
-	}
-	if strings.Contains(stderr.String(), secret) || !strings.Contains(stderr.String(), "@path.json") {
-		t.Fatalf("error = %q, want safe file-input guidance without secret", stderr.String())
-	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	require.NotContains(t, stderr.String(), secret, "error = %q, want safe file-input guidance without secret", stderr.String())
+	require.Contains(t, stderr.String(), "@path.json", "missing expected text %q", "@path.json")
 }
 
 func TestRunAppRunAPIRejectsInvalidSortOrder(t *testing.T) {
@@ -94,12 +86,8 @@ func TestRunAppRunAPIRejectsInvalidSortOrder(t *testing.T) {
 		{"apprun-api", "version", "list", "--application-id", "app-id", "--sort-order", "invalid"},
 	} {
 		var stdout, stderr bytes.Buffer
-		if code := run(args, &stdout, &stderr); code == 0 {
-			t.Errorf("run(%v) succeeded with invalid sort order", args)
-		}
-		if !strings.Contains(stderr.String(), "sort-order must be asc or desc") {
-			t.Errorf("run(%v) error = %q, want sort-order validation", args, stderr.String())
-		}
+		require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+		require.Contains(t, stderr.String(), "sort-order must be asc or desc", "run(%v) error = %q, want sort-order validation", args, stderr.String())
 	}
 }
 
@@ -114,20 +102,15 @@ func TestAppRunAPIWithSakumock(t *testing.T) {
 	runCommand := func(args ...string) []byte {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := run(args, &stdout, &stderr); code != 0 {
-			t.Fatalf("run(%v) code = %d; stderr: %s", args, code, stderr.String())
-		}
-		if stderr.Len() > 0 {
-			t.Errorf("run(%v) stderr = %q", args, stderr.String())
-		}
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		require.Empty(t, stderr.String(), "run(%v) stderr = %q", args, stderr.String())
 		return stdout.Bytes()
 	}
 
 	requestFile := filepath.Join(t.TempDir(), "create.json")
 	request := `{"name":"mock-apprun","timeout_seconds":60,"port":8080,"min_scale":0,"max_scale":1,"scale_target_concurrency":100,"components":[{"name":"web","max_cpu":"0.5","max_memory":"1Gi","deploy_source":{"container_registry":{"image":"ghcr.io/sacloud/apprun-samples/tutorial:latest"}},"secret":[{"key":"TOKEN","value":"test-only-apprun-secret"}]}]}`
-	if err := os.WriteFile(requestFile, []byte(request), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(requestFile, []byte(request), 0o600)
+	require.NoError(t, err)
 	createdData := runCommand("apprun-api", "application", "create", "--request", "@"+requestFile)
 	if bytes.Contains(createdData, []byte("test-only-apprun-secret")) {
 		t.Fatalf("application create output exposed a secret: %s", createdData)
@@ -136,12 +119,10 @@ func TestAppRunAPIWithSakumock(t *testing.T) {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(createdData, &created); err != nil {
-		t.Fatal(err)
-	}
-	if created.ID == "" || created.Name != "mock-apprun" {
-		t.Fatalf("created application = %+v", created)
-	}
+	err2 := json.Unmarshal(createdData, &created)
+	require.NoError(t, err2)
+	require.NotEmpty(t, created.ID, "created application = %+v", created)
+	require.Equal(t, "mock-apprun", created.Name, "unexpected value")
 
 	var listed struct {
 		Data []struct {
@@ -149,25 +130,22 @@ func TestAppRunAPIWithSakumock(t *testing.T) {
 			Name string `json:"name"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(runCommand("apprun-api", "application", "list", "--page-num", "1", "--page-size", "10"), &listed); err != nil {
-		t.Fatal(err)
-	}
-	if len(listed.Data) != 1 || listed.Data[0].ID != created.ID || listed.Data[0].Name != created.Name {
-		t.Fatalf("application list = %+v, want created application", listed)
-	}
+	err3 := json.Unmarshal(runCommand("apprun-api", "application", "list", "--page-num", "1", "--page-size", "10"), &listed)
+	require.NoError(t, err3)
+	require.Len(t, listed.Data, 1, "application list = %+v, want created application", listed)
+	require.Equal(t, created.ID, listed.Data[0].ID, "unexpected value")
+	require.Equal(t, created.Name, listed.Data[0].Name, "unexpected value")
 	runCommand("apprun-api", "application", "read", created.ID)
 	runCommand("apprun-api", "application", "status", created.ID)
 	runCommand("apprun-api", "traffic", "list", created.ID)
 	runCommand("apprun-api", "packet-filter", "read", created.ID)
 
 	updateFile := filepath.Join(t.TempDir(), "update.json")
-	if err := os.WriteFile(updateFile, []byte(`{"max_scale":1}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err4 := os.WriteFile(updateFile, []byte(`{"max_scale":1}`), 0o600)
+	require.NoError(t, err4)
 	runCommand("apprun-api", "application", "update", created.ID, "--request", "@"+updateFile)
-	if err := os.WriteFile(updateFile, []byte(`{"min_scale":0}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	err5 := os.WriteFile(updateFile, []byte(`{"min_scale":0}`), 0o600)
+	require.NoError(t, err5)
 	runCommand("apprun-api", "application", "update", created.ID, "--request", "@"+updateFile)
 
 	var versions struct {
@@ -175,10 +153,8 @@ func TestAppRunAPIWithSakumock(t *testing.T) {
 			ID string `json:"id"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(runCommand("apprun-api", "version", "list", "--application-id", created.ID,
-		"--sort-field", "created_at", "--sort-order", "asc"), &versions); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-api", "version", "list", "--application-id", created.ID,
+		"--sort-field", "created_at", "--sort-order", "asc"), &versions))
 	if len(versions.Data) < 2 || versions.Data[0].ID == "" {
 		t.Fatalf("version list = %+v, want two versions created by application updates", versions)
 	}
@@ -193,11 +169,7 @@ func TestAppRunAPIWithSakumock(t *testing.T) {
 	runCommand("apprun-api", "user", "read")
 	runCommand("apprun-api", "application", "delete", created.ID)
 	var remaining []any
-	if err := json.Unmarshal(runCommand("apprun-api", "application", "list",
-		"--query", ".data | map(select(.id == \""+created.ID+"\"))"), &remaining); err != nil {
-		t.Fatal(err)
-	}
-	if len(remaining) != 0 {
-		t.Fatalf("deleted application remains in list: %+v", remaining)
-	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-api", "application", "list",
+		"--query", ".data | map(select(.id == \""+created.ID+"\"))"), &remaining))
+	require.Len(t, remaining, 0, "deleted application remains in list: %+v", remaining)
 }

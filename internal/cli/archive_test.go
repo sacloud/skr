@@ -29,28 +29,19 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 	"github.com/sacloud/skr/internal/apigen"
 	archiveapi "github.com/sacloud/skr/internal/iaas/archiveapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestArchiveGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-archive.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	config, err := apigen.DecodeConfig(configData)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want, err := apigen.Generate(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/archiveapi/archive_api_generated.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatal("generated Archive commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-archive.json API_OUTPUT=internal/iaas/archiveapi/archive_api_generated.go")
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got, "generated Archive commands are stale; run make generate-iaas-api API_CONFIG=api/commands/iaas-archive.json API_OUTPUT=internal/iaas/archiveapi/archive_api_generated.go")
 }
 
 func TestIaaSArchiveHelp(t *testing.T) {
@@ -66,19 +57,13 @@ func TestIaaSArchiveHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := run(test.args, &stdout, &stderr); code != 0 {
-				t.Fatalf("run(%v) = %d; stderr: %s", test.args, code, stderr.String())
-			}
+			require.Equal(t, 0, run(test.args, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, text := range test.want {
-				if !strings.Contains(help, text) {
-					t.Errorf("help does not contain %q: %s", text, help)
-				}
+				require.Contains(t, help, text, "help does not contain %q: %s", text, help)
 			}
 			for _, text := range test.notWant {
-				if strings.Contains(help, text) {
-					t.Errorf("help contains %q: %s", text, help)
-				}
+				require.NotContains(t, help, text, "help contains %q: %s", text, help)
 			}
 		})
 	}
@@ -98,18 +83,18 @@ func TestIaaSArchiveCommandsUseSDKRequests(t *testing.T) {
 	}
 
 	_, stderr, code := run("find", "--zone", "test-zone", "--os-type", "ubuntu2404", "--count", "5", "--from", "2")
-	if code != 0 || stderr != "" {
-		t.Fatalf("find by OS type: code %d, stderr %q", code, stderr)
-	}
-	if request := api.findRequests[0]; request.Zone != "test-zone" || request.OSType != ostype.Ubuntu2404 || request.Count != 5 || request.From != 2 {
-		t.Fatalf("Find request = %+v, want zone, OS type, count, and offset", request)
-	}
+	require.Equal(t, 0, code, "find by OS type: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	request := api.findRequests[0]
+	require.Equal(t, "test-zone", request.Zone, "Find request = %+v, want zone, OS type, count, and offset", request)
+	require.Equal(t, ostype.Ubuntu2404, request.OSType, "unexpected value")
+	require.EqualValues(t, 5, request.Count, "unexpected value")
+	require.EqualValues(t, 2, request.From, "unexpected value")
 
 	output, stderr, code := run("find", "--zone", "test-zone", "--tags", "cloud-init,public", "--query", "map({ID,Name,Description,DiskPlanID,DiskPlanName,SizeMB,Tags})")
-	if code != 0 || stderr != "" {
-		t.Fatalf("find by tags: code %d, stderr %q", code, stderr)
-	}
-	request := api.findRequests[1]
+	require.Equal(t, 0, code, "find by tags: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	request = api.findRequests[1]
 	if request.Zone != "test-zone" || request.OSType != ostype.Custom ||
 		len(request.Tags) != 2 || request.Tags[0] != "cloud-init" || request.Tags[1] != "public" {
 		t.Fatalf("Find request = %+v, want tags and no OS type", request)
@@ -123,9 +108,8 @@ func TestIaaSArchiveCommandsUseSDKRequests(t *testing.T) {
 		SizeMB       int
 		Tags         []string
 	}
-	if err := json.Unmarshal([]byte(output), &projected); err != nil {
-		t.Fatal(err)
-	}
+	err := json.Unmarshal([]byte(output), &projected)
+	require.NoError(t, err)
 	if len(projected) != 1 || projected[0].ID.String() != "123" ||
 		projected[0].Name != "sample-archive" || projected[0].DiskPlanID.String() != "4" ||
 		projected[0].DiskPlanName != "ssd" || projected[0].SizeMB != 20480 ||
@@ -134,21 +118,21 @@ func TestIaaSArchiveCommandsUseSDKRequests(t *testing.T) {
 	}
 
 	_, stderr, code = run("find", "--request", `{"Zone":"test-zone","Names":["cloud-init"],"Tags":["public"]}`)
-	if code != 0 || stderr != "" {
-		t.Fatalf("find with JSON filters: code %d, stderr %q", code, stderr)
-	}
+	require.Equal(t, 0, code, "find with JSON filters: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
 	request = api.findRequests[2]
-	if len(request.Names) != 1 || request.Names[0] != "cloud-init" || len(request.Tags) != 1 || request.Tags[0] != "public" {
-		t.Fatalf("JSON Find request = %+v, want Names and Tags", request)
-	}
+	require.Len(t, request.Names, 1, "JSON Find request = %+v, want Names and Tags", request)
+	require.Equal(t, "cloud-init", request.Names[0], "unexpected value")
+	require.Len(t, request.Tags, 1, "unexpected length")
+	require.Equal(t, "public", request.Tags[0], "unexpected value")
 
 	output, stderr, code = run("read", "--zone", "test-zone", "--id", "123")
-	if code != 0 || stderr != "" || !strings.Contains(output, `"Name": "sample-archive"`) {
-		t.Fatalf("read: code %d, stderr %q, output %q", code, stderr, output)
-	}
-	if api.readRequest == nil || api.readRequest.Zone != "test-zone" || api.readRequest.ID != types.ID(123) {
-		t.Fatalf("Read request = %+v, want zone and ID", api.readRequest)
-	}
+	require.Equal(t, 0, code, "read: code %d, stderr %q, output %q", code, stderr, output)
+	require.Empty(t, stderr, "should be empty")
+	require.Contains(t, output, `"Name": "sample-archive"`, "missing expected text %q", `"Name": "sample-archive"`)
+	require.NotNil(t, api.readRequest, "Read request = %+v, want zone and ID", api.readRequest)
+	require.Equal(t, "test-zone", api.readRequest.Zone, "unexpected value")
+	require.EqualValues(t, types.ID(123), api.readRequest.ID, "unexpected value")
 }
 
 func TestIaaSArchiveRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
@@ -171,13 +155,12 @@ func TestIaaSArchiveRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		commandLine := newCLI()
 		setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return api, nil })
 		code := runCLI(append([]string{"iaas-api", "archive"}, args...), &stdout, &stderr, commandLine)
-		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
-			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
-		}
+		require.NotEqual(t, 0, code, "%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
+		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
-	if len(api.findRequests) != 0 || api.readRequest != nil {
-		t.Fatalf("invalid request reached API: %+v", api)
-	}
+	require.Len(t, api.findRequests, 0, "invalid request reached API: %+v", api)
+	require.Nil(t, api.readRequest, "should be nil")
 }
 
 func TestIaaSArchiveJSONUnknownFieldsAndTrailingValues(t *testing.T) {
@@ -187,16 +170,18 @@ func TestIaaSArchiveJSONUnknownFieldsAndTrailingValues(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "archive", "find", "--request", `{"Zone":"test-zone","Unknown":"ignored"}`}, &stdout, &stderr, commandLine)
-	if code != 0 || stderr.Len() != 0 || len(api.findRequests) != 1 || api.findRequests[0].Zone != "test-zone" {
-		t.Fatalf("unknown JSON field: code %d, stderr %q, requests %+v", code, stderr.String(), api.findRequests)
-	}
+	require.Equal(t, 0, code, "unknown JSON field: code %d, stderr %q, requests %+v", code, stderr.String(), api.findRequests)
+	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
+	require.Len(t, api.findRequests, 1, "unexpected length")
+	require.Equal(t, "test-zone", api.findRequests[0].Zone, "unexpected value")
 
 	stdout.Reset()
 	stderr.Reset()
 	code = runCLI([]string{"iaas-api", "archive", "find", "--request", `{"Zone":"test-zone"} {}`}, &stdout, &stderr, commandLine)
-	if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 || len(api.findRequests) != 1 {
-		t.Fatalf("trailing JSON value: code %d, stdout %q, stderr %q, requests %+v", code, stdout.String(), stderr.String(), api.findRequests)
-	}
+	require.NotEqual(t, 0, code, "trailing JSON value: code %d, stdout %q, stderr %q, requests %+v", code, stdout.String(), stderr.String(), api.findRequests)
+	require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+	require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
+	require.Len(t, api.findRequests, 1, "unexpected length")
 }
 
 func TestIaaSArchivePropagatesAPIErrors(t *testing.T) {
@@ -205,9 +190,9 @@ func TestIaaSArchivePropagatesAPIErrors(t *testing.T) {
 	setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return api, nil })
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "archive", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
-	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "archive API failure") {
-		t.Fatalf("find error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
-	}
+	require.NotEqual(t, 0, code, "find error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	require.EqualValues(t, 0, stdout.Len(), "unexpected value")
+	require.Contains(t, stderr.String(), "archive API failure", "missing expected text %q", "archive API failure")
 }
 
 type archiveAPITestDouble struct {
