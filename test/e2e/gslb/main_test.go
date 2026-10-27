@@ -29,6 +29,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/test/e2e/internal/evidence"
+	"github.com/sacloud/skr/test/e2e/internal/sshrun"
 )
 
 type fakeGSLBCLI struct {
@@ -187,26 +188,37 @@ func (f *fakeGSLBCLI) lookupDNS(_ context.Context, step, _ string) ([]string, er
 	return []string{testServerIP}, nil
 }
 
-func (f *fakeGSLBCLI) connectSSH(_ context.Context, step, _, _, _ string) error {
-	f.calls = append(f.calls, step)
-	return nil
-}
-
-func (f *fakeGSLBCLI) shutdownSSH(_ context.Context, step, _, _, _ string) error {
-	f.calls = append(f.calls, step)
+func (f *fakeGSLBCLI) sshCommand(_ context.Context, args []string) (string, string, error) {
+	// リモートコマンドが hostname ならログイン確認、それ以外はサーバー停止を表す。
+	if args[len(args)-1] == "hostname" {
+		f.calls = append(f.calls, "server-ssh-ready")
+		return "test-server\n", "", nil
+	}
+	f.calls = append(f.calls, "server-shutdown")
 	if f.server == nil {
-		return errors.New("missing Server")
+		return "", "", errors.New("missing Server")
 	}
 	f.server.InstanceStatus = "down"
-	return nil
+	return "", "", nil
 }
 
-func (f *fakeGSLBCLI) testScenario() scenario {
+func (f *fakeGSLBCLI) testScenario(t *testing.T) scenario {
+	t.Helper()
+	recorder, err := evidence.CreateAt(filepath.Join(t.TempDir(), "tmp", "gslb-api-test"), time.Now(), evidence.Scenario{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	return scenario{
-		call: f.call, lookupDNS: f.lookupDNS, connectSSH: f.connectSSH, shutdownSSH: f.shutdownSSH,
+		call: f.call, lookupDNS: f.lookupDNS,
+		ssh: sshrun.Runner{
+			Recorder: recorder, PrivateKey: "/tmp/ssh-key", KnownHosts: "/tmp/known-hosts",
+			SSH: f.sshCommand,
+		},
 		serverName: namePrefix + "server-test", archiveID: 234, diskPlanID: 4, diskSizeGB: 20,
-		userDataPath: "/tmp/user-data.yaml", privateKey: "/tmp/ssh-key", knownHosts: "/tmp/known-hosts",
-		pollInterval: time.Millisecond, serverTimeout: time.Second, dnsTimeout: time.Second,
+		userDataPath:  "/tmp/user-data.yaml",
+		pollInterval:  time.Millisecond,
+		serverTimeout: time.Second,
+		dnsTimeout:    time.Second,
 	}
 }
 
@@ -221,7 +233,7 @@ func argAfter(args []string, flag string) string {
 
 func TestScenarioCleansUpAfterSuccess(t *testing.T) {
 	fake := &fakeGSLBCLI{}
-	if err := fake.testScenario().run(context.Background(), namePrefix+"test"); err != nil {
+	if err := fake.testScenario(t).run(context.Background(), namePrefix+"test"); err != nil {
 		t.Fatal(err)
 	}
 	if fake.item != nil || fake.server != nil || fake.disk != nil {
@@ -243,7 +255,7 @@ func TestScenarioRefusesExistingGSLB(t *testing.T) {
 	fake := &fakeGSLBCLI{item: &gslbItem{
 		ID: types.ID(321), Name: namePrefix + "occupied", Description: "not owned",
 	}}
-	err := fake.testScenario().run(context.Background(), fake.item.Name)
+	err := fake.testScenario(t).run(context.Background(), fake.item.Name)
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("error = %v, want collision refusal", err)
 	}
@@ -254,7 +266,7 @@ func TestScenarioRefusesExistingGSLB(t *testing.T) {
 
 func TestScenarioCleansUpAfterUpdateFailure(t *testing.T) {
 	fake := &fakeGSLBCLI{failAt: "test-update"}
-	err := fake.testScenario().run(context.Background(), namePrefix+"test")
+	err := fake.testScenario(t).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
 		t.Fatalf("error = %v, want update failure", err)
 	}
@@ -265,7 +277,7 @@ func TestScenarioCleansUpAfterUpdateFailure(t *testing.T) {
 
 func TestScenarioRecoversWhenCreateOutputCannotBeDecoded(t *testing.T) {
 	fake := &fakeGSLBCLI{badCreate: true}
-	err := fake.testScenario().run(context.Background(), namePrefix+"test")
+	err := fake.testScenario(t).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "decode GSLB") {
 		t.Fatalf("error = %v, want decode failure", err)
 	}
@@ -276,7 +288,7 @@ func TestScenarioRecoversWhenCreateOutputCannotBeDecoded(t *testing.T) {
 
 func TestScenarioRefusesCleanupWithChangedIdentity(t *testing.T) {
 	fake := &fakeGSLBCLI{failAt: "test-update", changeOnCleanupRead: true}
-	err := fake.testScenario().run(context.Background(), namePrefix+"test")
+	err := fake.testScenario(t).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "cleanup refused") {
 		t.Fatalf("error = %v, want safe cleanup refusal", err)
 	}
@@ -296,7 +308,7 @@ func containsStep(steps []string, want string) bool {
 
 func TestScenarioRejectsNonCloudInitArchiveBeforeCreatingResources(t *testing.T) {
 	fake := &fakeGSLBCLI{}
-	test := fake.testScenario()
+	test := fake.testScenario(t)
 	test.call = func(ctx context.Context, step string, args []string, request any) ([]byte, error) {
 		if step == "archive-preflight-read" {
 			return []byte(`{"ID":234,"Tags":["os-linux"],"SizeMB":20480}`), nil
@@ -382,7 +394,7 @@ func TestParseDNSAnswers(t *testing.T) {
 
 func TestScenarioRejectsDNSFailureAndCleansUp(t *testing.T) {
 	fake := &fakeGSLBCLI{}
-	test := fake.testScenario()
+	test := fake.testScenario(t)
 	test.lookupDNS = func(ctx context.Context, step, fqdn string) ([]string, error) {
 		if step == "test-dns-unhealthy" {
 			return parseDNSAnswers(";; ->>HEADER<<- opcode: QUERY, status: SERVFAIL, id: 123\n")
@@ -417,7 +429,7 @@ func TestCleanupRefusesUnverifiedDisk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fake := &fakeGSLBCLI{}
-			test := fake.testScenario()
+			test := fake.testScenario(t)
 			test.call = func(ctx context.Context, step string, args []string, request any) ([]byte, error) {
 				if step == "disk-cleanup-find-after" && fake.disk != nil {
 					tt.change(fake.disk)
@@ -437,7 +449,7 @@ func TestCleanupRefusesUnverifiedDisk(t *testing.T) {
 
 func TestCleanupRefusesDiskChangedBeforeDelete(t *testing.T) {
 	fake := &fakeGSLBCLI{}
-	test := fake.testScenario()
+	test := fake.testScenario(t)
 	test.call = func(ctx context.Context, step string, args []string, request any) ([]byte, error) {
 		if step == "disk-cleanup-read" {
 			fake.disk.ServerID = 999
@@ -493,7 +505,7 @@ func TestWaitForDNSRetriesPropagationErrors(t *testing.T) {
 
 func TestScenarioCleansUpBothServersAfterSorryBootFailure(t *testing.T) {
 	fake := &fakeGSLBCLI{sorry: &fakeGSLBCLI{sorryRole: true, failAt: "server-boot"}}
-	err := fake.testScenario().run(context.Background(), namePrefix+"test")
+	err := fake.testScenario(t).run(context.Background(), namePrefix+"test")
 	if err == nil || !strings.Contains(err.Error(), "injected CLI failure") {
 		t.Fatalf("error = %v, want sorry boot failure", err)
 	}
@@ -503,7 +515,7 @@ func TestScenarioCleansUpBothServersAfterSorryBootFailure(t *testing.T) {
 }
 func TestDiskIdentityMustBeCapturedBeforeCleanup(t *testing.T) {
 	fake := &fakeGSLBCLI{}
-	test := fake.testScenario()
+	test := fake.testScenario(t)
 	test.call = func(ctx context.Context, step string, args []string, request any) ([]byte, error) {
 		if step == "disk-created-find" {
 			return nil, errors.New("disk lookup failed")
