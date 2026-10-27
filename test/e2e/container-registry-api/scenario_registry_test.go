@@ -15,8 +15,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -40,7 +38,7 @@ const (
 func TestScenarioRegistry(t *testing.T) {
 	h := helper.New(t, "container-registry-api", "コンテナレジストリとそのユーザーの作成/更新/確認が可能であることを確認する")
 
-	suffix := randomSuffix(t)
+	suffix := helper.RandomSuffix(t)
 	name := registryPrefix + suffix
 	description := descriptionPrefix + suffix
 	updatedDescription := description + "/updated"
@@ -156,22 +154,12 @@ func parseRegistry(t *testing.T, data []byte) iaas.ContainerRegistry {
 	return registry
 }
 
-// randomSuffix はリソース名の衝突回避用サフィックスを生成します。
-func randomSuffix(t *testing.T) string {
-	t.Helper()
-
-	buf := make([]byte, 8)
-	_, err := rand.Read(buf)
-	require.NoError(t, err, "generate random suffix: %v", err)
-	return hex.EncodeToString(buf)
-}
-
 // writePasswordFile は今回の実行専用のパスワードが入った保護されたファイルを作成し、パスを返します。
 func writePasswordFile(t *testing.T) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "registry-password")
-	err := os.WriteFile(path, []byte(randomSuffix(t)), 0o600)
+	err := os.WriteFile(path, []byte(helper.RandomSuffix(t)), 0o600)
 	require.NoError(t, err, "write private E2E password file: %v", err)
 	return path
 }
