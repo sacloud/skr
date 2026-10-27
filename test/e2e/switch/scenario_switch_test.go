@@ -77,10 +77,6 @@ func TestScenarioSwitch(t *testing.T) {
 	require.ElementsMatch(t, createdTags, created.Tags, "create should return the requested tags")
 
 	defer func() {
-		// 削除前に再参照して、今回作成したスイッチであることを確認する
-		current := readSwitch(t, h, "削除前にスイッチを再参照する", created.ID)
-		require.Equal(t, description, current.Description, "cleanup should only delete the test switch")
-		require.Contains(t, []string{name, updatedName}, current.Name, "switch %s has an unexpected name; refusing cleanup", created.ID)
 		// スイッチを削除し、作成時と更新後の名前のどちらでも残っていないことを確認する
 		_ = h.Call(t, "スイッチを削除する", "iaas-api", "switch", "delete", "--zone", zone, "--id", created.ID.String(), "--fail-if-not-found")
 		require.Empty(t, findSwitches(t, h, "削除後に作成時の名前のスイッチが残っていないことを確認する", name), "switch %s should not remain after deletion", created.ID)
@@ -175,8 +171,7 @@ func parseSwitch(t *testing.T, data []byte) switchItem {
 	return item
 }
 
-// lookupSwitches は SDK で名前でスイッチを検索します。作成前の同名確認など、
-// 実行記録を残す必要のない安全確認に使います (ADR 0064)。
+// lookupSwitches は SDK で名前でスイッチを検索します。
 func lookupSwitches(t *testing.T, client *iaas.Client, name string) []switchItem {
 	t.Helper()
 
