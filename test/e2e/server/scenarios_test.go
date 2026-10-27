@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -24,7 +25,7 @@ import (
 )
 
 // TestScenarioCreatesBootsSSHAndCleansServerAndDisk はシナリオが
-// 作成前の同名確認、作成、起動、SSH 接続確認、更新、後片付けの順に実行されることを確認する。
+// 作成前の同名確認、作成、参照、名前検索、起動、SSH 接続確認、更新、後片付けの順に実行されることを確認する。
 func TestScenarioCreatesBootsSSHAndCleansServerAndDisk(t *testing.T) {
 	fake := &fakeServerCommands{}
 	require.NoError(t, runServerScenario(t, fake, noSleep, testServerRun()))
@@ -33,10 +34,12 @@ func TestScenarioCreatesBootsSSHAndCleansServerAndDisk(t *testing.T) {
 	require.False(t, fake.disk, "the Disk should be deleted after the scenario")
 	require.Equal(t, []int64{123}, toInts(fake.deleted), "the Server should be deleted once")
 
-	// 同名確認 → 作成 → 起動 → SSH 接続確認 → 更新 → 後片付けの順に実行される
-	require.Greater(t, callIndex(fake.calls, "findServers"), -1, "the preflight should find existing Servers")
-	require.Greater(t, callIndex(fake.calls, "createServer"), callIndex(fake.calls, "findServers"), "the create should follow the preflight")
-	require.Greater(t, callIndex(fake.calls, "bootServer"), callIndex(fake.calls, "createServer"), "the boot should follow the create")
+	// 同名確認 → 作成 → 参照 → 名前検索 → 起動 → SSH 接続確認 → 更新 → 後片付けの順に実行される
+	require.Greater(t, callIndex(fake.calls, "lookupServers"), -1, "the preflight should find existing Servers")
+	require.Greater(t, callIndex(fake.calls, "createServer"), callIndex(fake.calls, "lookupServers"), "the create should follow the preflight")
+	require.Greater(t, callIndex(fake.calls, "readServer"), callIndex(fake.calls, "createServer"), "the read should follow the create")
+	require.Greater(t, callIndex(fake.calls, "findServers"), callIndex(fake.calls, "readServer"), "the find should follow the read")
+	require.Greater(t, callIndex(fake.calls, "bootServer"), callIndex(fake.calls, "findServers"), "the boot should follow the find")
 	require.Greater(t, callIndex(fake.calls, "connectSSH"), callIndex(fake.calls, "bootServer"), "the SSH login check should follow the boot")
 	require.Greater(t, callIndex(fake.calls, "updateServer"), callIndex(fake.calls, "connectSSH"), "the update should follow the SSH login check")
 	require.Greater(t, callIndex(fake.calls, "deleteServer"), callIndex(fake.calls, "updateServer"), "the cleanup should follow the update")
@@ -51,7 +54,7 @@ func TestScenarioRefusesExistingServer(t *testing.T) {
 	require.ErrorContains(t, err, "already exists", "the name collision should be refused")
 	// 既存リソースは変更せず、作成も削除もしない
 	require.Equal(t, "unrelated Server", fake.server.Description, "the existing Server should not be modified")
-	require.Equal(t, []string{"findServers"}, fake.calls, "only the preflight server find should run")
+	require.Equal(t, []string{"lookupServers"}, fake.calls, "only the preflight server lookup should run")
 	require.Empty(t, fake.deleted, "no Server should be deleted")
 }
 
@@ -78,22 +81,21 @@ func TestScenarioTimesOutWhenSSHLoginFailsAndCleansUp(t *testing.T) {
 	require.Equal(t, []int64{123}, toInts(fake.deleted), "the Server should be deleted after the SSH timeout")
 }
 
-// TestScenarioKeepsServerWhenRestoreFails は復元に失敗した場合に、後片付けが
-// Server を識別できず削除しないことを確認する。
-func TestScenarioKeepsServerWhenRestoreFails(t *testing.T) {
+// TestScenarioCleansUpServerWhenRestoreFails は復元に失敗した場合に、復元の失敗を報告しつつ、
+// 更新フェーズで設定した識別情報と一致する Server を後片付けで削除することを確認する。
+func TestScenarioCleansUpServerWhenRestoreFails(t *testing.T) {
 	fake := &fakeServerCommands{failRestore: true}
 	err := runServerScenario(t, fake, noSleep, testServerRun())
 
 	require.ErrorContains(t, err, "restore Server Name and Description", "the restore failure should be reported")
-	require.ErrorContains(t, err, "cleanup refused", "the cleanup should refuse a Server whose name was not restored")
-	require.NotNil(t, fake.server, "the Server should not be deleted when the restore failed")
-	require.Empty(t, fake.deleted, "no Server should be deleted")
+	require.Nil(t, fake.server, "the Server with the update-phase identity should be cleaned up")
+	require.Equal(t, []int64{123}, toInts(fake.deleted), "the Server should be deleted once")
 }
 
 // TestFindReadsAllPages は一括検索が全ページを取得することを確認する。
 func TestFindReadsAllPages(t *testing.T) {
 	calls := 0
-	items, err := paginateFind(t, "ディスクを検索する", func(from int) ([]diskItem, error) {
+	items, err := paginateFind(t, func(ctx context.Context, from int) ([]diskItem, error) {
 		calls++
 		if from != (calls-1)*findPageSize {
 			return nil, fmt.Errorf("unexpected from %d", from)
@@ -113,22 +115,15 @@ func TestFindReadsAllPages(t *testing.T) {
 // 不在として扱わないことを確認する。
 func TestFindDoesNotTreatPageFailureAsMissing(t *testing.T) {
 	calls := 0
-	_, err := paginateFind(t, "ディスクを検索する", func(int) ([]diskItem, error) {
+	_, err := paginateFind(t, func(context.Context, int) ([]diskItem, error) {
 		calls++
 		if calls == 2 {
-			return nil, errors.New("injected CLI failure")
+			return nil, errors.New("injected failure")
 		}
 		return make([]diskItem, findPageSize), nil
 	})
 
-	require.ErrorContains(t, err, "injected CLI failure", "a page failure should not be treated as no results")
-}
-
-// TestFindPageLabelAddsPageInfo は2ページ目以降の検索にページ位置を示す説明が
-// 追加されることを確認する。
-func TestFindPageLabelAddsPageInfo(t *testing.T) {
-	require.Equal(t, "ディスクを検索する", findPageLabel("ディスクを検索する", 0), "the first page should use the original label")
-	require.Equal(t, "ディスクを検索する（101 件目以降）", findPageLabel("ディスクを検索する", 100), "the second page should note the position")
+	require.ErrorContains(t, err, "injected failure", "a page failure should not be treated as no results")
 }
 
 // toInts は ID の記録を検証しやすい int64 のスライスに変換します。

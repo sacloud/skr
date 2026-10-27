@@ -16,7 +16,6 @@ package main
 
 import (
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -58,9 +57,9 @@ type fakeServerCommands struct {
 	changeIdentityAtCleanup bool
 	// failMethod は指定した操作を失敗させます。
 	failMethod string
-	// failFindDisksCall は N 回目の Disk 検索を失敗させます。事前確認と後片付けの
+	// failLookupDisksCall は N 回目の Disk 検索を失敗させます。事前確認と後片付けの
 	// 検索を区別するために使います。
-	failFindDisksCall int
+	failLookupDisksCall int
 	// sshErr は SSH ログイン確認が毎回返すエラーです。
 	sshErr error
 
@@ -68,10 +67,10 @@ type fakeServerCommands struct {
 	deleted []types.ID
 	// deletedDisks は削除した Disk の ID の記録です。
 	deletedDisks []types.ID
-	// calls は実行した操作の記録です。
+	// calls は実行した操作の記録です。CLI 操作と SDK による確認の両方を記録します。
 	calls []string
-	// findDisksCalls は Disk 検索の呼び出し回数です。
-	findDisksCalls int
+	// lookupDisksCalls は Disk 検索の呼び出し回数です。
+	lookupDisksCalls int
 	// updateCalls は更新 API の呼び出し回数です。更新と復元を区別するために使います。
 	updateCalls int
 }
@@ -80,36 +79,9 @@ type fakeServerCommands struct {
 func (f *fakeServerCommands) record(name string) error {
 	f.calls = append(f.calls, name)
 	if f.failMethod == name {
-		return errors.New("injected CLI failure")
+		return errors.New("injected failure")
 	}
 	return nil
-}
-
-func (f *fakeServerCommands) findServers(t *testing.T, label, name string) ([]serverItem, error) {
-	if err := f.record("findServers"); err != nil {
-		return nil, err
-	}
-	if f.server == nil || f.server.Name != name {
-		return nil, nil
-	}
-	return []serverItem{*f.server}, nil
-}
-
-func (f *fakeServerCommands) findDisks(t *testing.T, label, name string) ([]diskItem, error) {
-	if err := f.record("findDisks"); err != nil {
-		return nil, err
-	}
-	f.findDisksCalls++
-	if f.failFindDisksCall == f.findDisksCalls {
-		return nil, errors.New("injected CLI failure")
-	}
-	if !f.disk {
-		return nil, nil
-	}
-	if f.multipleOrphans {
-		return []diskItem{{ID: 45, Name: name}, {ID: 46, Name: name}}, nil
-	}
-	return []diskItem{{ID: 45, Name: name}}, nil
 }
 
 func (f *fakeServerCommands) createServer(t *testing.T, label, name string, params serverDiskParams) (serverItem, error) {
@@ -126,7 +98,7 @@ func (f *fakeServerCommands) createServer(t *testing.T, label, name string, para
 	f.disk = true
 	if f.failCreateAfterSideEffect {
 		// リソースを作成した後に作成 API が失敗した状態を再現する
-		return serverItem{}, errors.New("injected CLI failure")
+		return serverItem{}, errors.New("injected failure")
 	}
 	return *f.server, nil
 }
@@ -146,34 +118,39 @@ func (f *fakeServerCommands) readServer(t *testing.T, label string, id types.ID)
 	if f.server == nil || f.server.ID != id {
 		return serverItem{}, errors.New("missing Server")
 	}
-	item := *f.server
-	if f.changeIdentityAtCleanup && strings.Contains(label, "削除前に") {
-		// 後片付けの再照合でのみ識別情報が変わった状態を再現する
-		item.Description = "changed identity"
-	}
-	return item, nil
+	return *f.server, nil
 }
 
-func (f *fakeServerCommands) updateServer(t *testing.T, label string, id types.ID, name, desc string) error {
+func (f *fakeServerCommands) findServers(t *testing.T, label, name string) ([]serverItem, error) {
+	if err := f.record("findServers"); err != nil {
+		return nil, err
+	}
+	if f.server == nil || f.server.Name != name {
+		return nil, nil
+	}
+	return []serverItem{*f.server}, nil
+}
+
+func (f *fakeServerCommands) updateServer(t *testing.T, label string, id types.ID, name, desc string) (serverItem, error) {
 	f.calls = append(f.calls, "updateServer")
 	if f.server == nil || f.server.ID != id {
-		return errors.New("missing Server")
+		return serverItem{}, errors.New("missing Server")
 	}
 	if name == "" || desc == "" {
-		return errors.New("missing Name or Description")
+		return serverItem{}, errors.New("missing Name or Description")
 	}
 	f.updateCalls++
 	// 更新と復元を区別するため、呼び出し回数で判定する
 	if (f.failUpdate && f.updateCalls == 1) || (f.failRestore && f.updateCalls == 2) {
-		return errors.New("injected CLI failure")
+		return serverItem{}, errors.New("injected failure")
 	}
 	if (f.ignoreUpdate && f.updateCalls == 1) || (f.ignoreRestore && f.updateCalls == 2) {
-		// 更新を無視して成功を装う。次の参照で反映の有無を検出できる。
-		return nil
+		// 更新を無視して成功を装う。応答が更新前の値のままなので反映の有無を検出できる。
+		return *f.server, nil
 	}
 	f.server.Name = name
 	f.server.Description = desc
-	return nil
+	return *f.server, nil
 }
 
 func (f *fakeServerCommands) deleteServer(t *testing.T, label string, id types.ID) error {
@@ -193,17 +170,6 @@ func (f *fakeServerCommands) deleteServer(t *testing.T, label string, id types.I
 	return nil
 }
 
-func (f *fakeServerCommands) readDisk(t *testing.T, label string, id types.ID) (diskItem, error) {
-	if err := f.record("readDisk"); err != nil {
-		return diskItem{}, err
-	}
-	disk := diskItem{ID: 45, Name: namePrefix + "test", DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 20 * 1024}
-	if f.orphanDisk != nil {
-		disk = *f.orphanDisk
-	}
-	return disk, nil
-}
-
 func (f *fakeServerCommands) deleteDisk(t *testing.T, label string, id types.ID) error {
 	if err := f.record("deleteDisk"); err != nil {
 		return err
@@ -220,8 +186,63 @@ func (f *fakeServerCommands) connectSSH(t *testing.T, label, ip string) error {
 	return f.sshErr
 }
 
+// lookupServers は Server の事前確認と後片付けの検索を再現します。
+func (f *fakeServerCommands) lookupServers(t *testing.T, name string) ([]serverItem, error) {
+	if err := f.record("lookupServers"); err != nil {
+		return nil, err
+	}
+	if f.server == nil || f.server.Name != name {
+		return nil, nil
+	}
+	return []serverItem{*f.server}, nil
+}
+
+// lookupDisks は Disk の事前確認と後片付けの検索を再現します。
+func (f *fakeServerCommands) lookupDisks(t *testing.T, name string) ([]diskItem, error) {
+	if err := f.record("lookupDisks"); err != nil {
+		return nil, err
+	}
+	f.lookupDisksCalls++
+	if f.failLookupDisksCall == f.lookupDisksCalls {
+		return nil, errors.New("injected failure")
+	}
+	if !f.disk {
+		return nil, nil
+	}
+	if f.multipleOrphans {
+		return []diskItem{{ID: 45, Name: name}, {ID: 46, Name: name}}, nil
+	}
+	return []diskItem{{ID: 45, Name: name}}, nil
+}
+
+// fetchServer は後片付けの再照合と起動待ちのポーリングを再現します。
+func (f *fakeServerCommands) fetchServer(t *testing.T, id types.ID) (serverItem, error) {
+	f.calls = append(f.calls, "fetchServer")
+	if f.server == nil || f.server.ID != id {
+		return serverItem{}, errors.New("missing Server")
+	}
+	item := *f.server
+	if f.changeIdentityAtCleanup && f.updateCalls >= 2 {
+		// 更新と復元の後の再照合でのみ識別情報が変わった状態を再現する
+		item.Description = "changed identity"
+	}
+	return item, nil
+}
+
+// fetchDisk は孤立ディスクの参照を再現します。
+func (f *fakeServerCommands) fetchDisk(t *testing.T, id types.ID) (diskItem, error) {
+	if err := f.record("fetchDisk"); err != nil {
+		return diskItem{}, err
+	}
+	disk := diskItem{ID: 45, Name: namePrefix + "test", DiskPlanID: 4, SourceArchiveID: 234, SizeMB: 20 * 1024}
+	if f.orphanDisk != nil {
+		disk = *f.orphanDisk
+	}
+	return disk, nil
+}
+
 // noSleep は単体テストで待機を省略する sleep 関数です。
-func noSleep(*testing.T, string, time.Duration) {}
+func noSleep(time.Duration) {}
 
 // testServerRun は単体テスト用の serverRun を組み立てます。
 func testServerRun() *serverRun {

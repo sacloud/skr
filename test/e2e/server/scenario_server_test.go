@@ -36,7 +36,8 @@ func TestScenarioServer(t *testing.T) {
 
 	// 一時的な SSH 鍵と cloud-init の user-data を作成します。秘密鍵の内容は実行記録に残りません
 	material := helper.WriteSSHMaterial(t, sshUser, false)
-	c := newSKRServerCommands(h, material, sshUser)
+	c, err := newSKRServerCommands(h, material, sshUser)
+	require.NoError(t, err, "build Server E2E commands")
 
 	run := &serverRun{
 		name:       namePrefix + helper.RandomSuffix(t),
@@ -45,16 +46,17 @@ func TestScenarioServer(t *testing.T) {
 		sshTimeout: sshWaitTimeout,
 	}
 
-	err := runServerScenario(t, c, h.Sleep, run)
+	err = runServerScenario(t, c, time.Sleep, run)
 	require.NoError(t, err, "Server E2E scenario failed: %v", err)
 }
 
 // runServerScenario は1回の実行で、作成前の同名確認、Server と cloud-init ディスクの作成、
 // user-data による起動、SSH 接続確認、名前と説明の更新と復元、後片付けまで行います。
-// 途中の失敗でも後片付けは実行され、その失敗はエラーに含まれます。
-func runServerScenario(t *testing.T, c serverCommands, sleep func(*testing.T, string, time.Duration), run *serverRun) (result error) {
-	// 作成前に Server と Disk の両方で同名リソースが存在しないことを確認する。
-	// 後片付けはまだ登録せず、既存リソースを変更しないまま終了する。
+// テスト対象の操作は skr CLI で実行し、事前確認と後片付けの確認と起動待ちのポーリングは
+// SDK で静かに実行します。途中の失敗でも後片付けは実行され、その失敗はエラーに含まれます。
+func runServerScenario(t *testing.T, c serverCommands, sleep func(time.Duration), run *serverRun) (result error) {
+	// 作成前に Server と Disk の両方で同名リソースが存在しないことを SDK で確認する。
+	// 確認の実行は証跡に残らず、後片付けはまだ登録せず、既存リソースを変更しないまま終了する。
 	if err := requireNoServerNameCollision(t, c, run.name); err != nil {
 		return err
 	}
@@ -66,7 +68,7 @@ func runServerScenario(t *testing.T, c serverCommands, sleep func(*testing.T, st
 		}
 	}()
 
-	// テスト用の Server を cloud-init ディスクと共有 NIC 付きで作成する
+	// テスト用の Server を cloud-init ディスクと共有 NIC 付きで作成し、参照と名前検索で確認する
 	if err := createServer(t, c, run); err != nil {
 		return err
 	}
@@ -76,7 +78,7 @@ func runServerScenario(t *testing.T, c serverCommands, sleep func(*testing.T, st
 		return err
 	}
 
-	// SSH ログインできるまで待つ
+	// 起動を確認しながら SSH ログインできるまで待つ
 	if err := waitForServerSSH(t, c, sleep, run); err != nil {
 		return err
 	}
@@ -85,19 +87,19 @@ func runServerScenario(t *testing.T, c serverCommands, sleep func(*testing.T, st
 	return updateAndVerifyServer(t, c, run.serverID, run.name)
 }
 
-// requireNoServerNameCollision は作成前に Server と Disk の両方で同名リソースが存在しないことを確認します。
-// 既存リソースは変更せず、存在する場合はエラーを返します。
+// requireNoServerNameCollision は作成前に Server と Disk の両方で同名リソースが存在しないことを
+// SDK で確認します。確認の実行は証跡に残しません。既存リソースは変更せず、存在する場合はエラーを返します。
 func requireNoServerNameCollision(t *testing.T, c serverCommands, name string) error {
 	t.Helper()
 
-	servers, err := c.findServers(t, "作成前に同名サーバーが存在しないことを確認する", name)
+	servers, err := c.lookupServers(t, name)
 	if err != nil {
 		return fmt.Errorf("find existing servers: %w", err)
 	}
 	if len(servers) != 0 {
 		return fmt.Errorf("test server name %q already exists; refusing to modify it", name)
 	}
-	disks, err := c.findDisks(t, "作成前に同名ディスクが存在しないことを確認する", name)
+	disks, err := c.lookupDisks(t, name)
 	if err != nil {
 		return fmt.Errorf("find existing disks: %w", err)
 	}
@@ -107,11 +109,13 @@ func requireNoServerNameCollision(t *testing.T, c serverCommands, name string) e
 	return nil
 }
 
-// createServer は cloud-init ディスクと共有 NIC を持つテスト用 Server を作成し、識別情報を確認します。
-// 作成に成功した ID を run に記録し、後片付けが確実に回収できるようにします。
+// createServer は cloud-init ディスクと共有 NIC を持つテスト用 Server を skr CLI で作成し、
+// 参照と名前検索で作成結果を確認します。作成に成功した ID を run に記録し、
+// 後片付けが確実に回収できるようにします。
 func createServer(t *testing.T, c serverCommands, run *serverRun) error {
 	t.Helper()
 
+	// 作成応答に作成結果が含まれる
 	item, err := c.createServer(t, "テスト用のサーバーを cloud-init ディスク付きで作成する", run.name, run.params)
 	if err != nil {
 		return err
@@ -123,52 +127,57 @@ func createServer(t *testing.T, c serverCommands, run *serverRun) error {
 		return err
 	}
 	run.serverID = item.ID
+
+	// server read が作成済みの Server を返すことを確認する
+	item, err = c.readServer(t, "作成したサーバーを参照する", run.serverID)
+	if err != nil {
+		return err
+	}
+	if err := checkServer(item, run.serverID, run.name); err != nil {
+		return err
+	}
+
+	// server find --name が作成した Server を見つけられることを確認する
+	matches, err := c.findServers(t, "作成したサーバーを名前で検索する", run.name)
+	if err != nil {
+		return err
+	}
+	if len(matches) != 1 || matches[0].ID != run.serverID {
+		return fmt.Errorf("server find --name should return the created Server %s", run.serverID)
+	}
 	return nil
 }
 
-// waitForServerSSH は共有 NIC の IP アドレスを確認し、SSH ログインが成功するまで期限付きで待ちます。
+// waitForServerSSH は SDK で起動と共有 NIC の IP アドレスを確認し、SSH ログインが
+// 成功するまで期限付きで待ちます。起動待ちのポーリングは証跡に残しません。
 // cloud-init の反映はベストエフォートで待ち、期限を過ぎたらエラーにします。
-// 再試行はすべて実行記録に残り、成功の判断は hostname の取得で行います。
-func waitForServerSSH(t *testing.T, c serverCommands, sleep func(*testing.T, string, time.Duration), run *serverRun) error {
+// SSH の接続試行は実行記録に残り、成功の判断は hostname の取得で行います。
+func waitForServerSSH(t *testing.T, c serverCommands, sleep func(time.Duration), run *serverRun) error {
 	t.Helper()
 
 	deadline := time.Now().Add(run.sshTimeout)
 	for {
-		ip, err := publicIPOfServer(t, c, run)
+		item, err := c.fetchServer(t, run.serverID)
 		if err != nil {
 			return err
 		}
-		if ip != "" {
-			err := c.connectSSH(t, "SSH ログインを確認する", ip)
-			if err == nil {
-				return nil
+		if err := checkServer(item, run.serverID, run.name); err != nil {
+			return err
+		}
+		if item.InstanceStatus.IsUp() {
+			if ip := sharedIPOfServer(item); ip != "" {
+				err := c.connectSSH(t, "SSH ログインを確認する", ip)
+				if err == nil {
+					return nil
+				}
+				t.Logf("SSH login attempt failed, retrying: %v", err)
 			}
-			t.Logf("SSH login attempt failed, retrying: %v", err)
 		}
 		if time.Now().Add(sshPolling).After(deadline) {
 			return fmt.Errorf("SSH login check timed out after %s", run.sshTimeout)
 		}
-		sleep(t, "SSH ログインの再確認まで待つ", sshPolling)
+		sleep(sshPolling)
 	}
-}
-
-// publicIPOfServer は Server を参照し、共有 NIC に割り当てられた IPv4 アドレスを返します。
-// サーバーが起動していない場合や IP が未割り当ての場合は空文字列を返します。
-// 参照結果が今回の実行の Server と一致しない場合はエラーにします。
-func publicIPOfServer(t *testing.T, c serverCommands, run *serverRun) (string, error) {
-	t.Helper()
-
-	item, err := c.readServer(t, "サーバーの起動状態と共有 NIC の IP アドレスを確認する", run.serverID)
-	if err != nil {
-		return "", err
-	}
-	if err := checkServer(item, run.serverID, run.name); err != nil {
-		return "", err
-	}
-	if !item.InstanceStatus.IsUp() {
-		return "", nil
-	}
-	return sharedIPOfServer(item), nil
 }
 
 // sharedIPOfServer は Server の参照結果から共有 NIC の IPv4 アドレスを返します。ない場合は空文字列を返します。

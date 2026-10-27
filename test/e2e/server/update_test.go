@@ -30,41 +30,35 @@ func updatedServerName(name string) string {
 	return name + "-upd"
 }
 
-// updateAndVerifyServer は Server の名前と説明を更新し、参照で反映を確認してから
+// updateAndVerifyServer は Server の名前と説明を skr CLI で更新し、応答で反映を確認してから
 // 元の値に戻し、復元を確認します。復元により後片付けが Server を再び識別できるようになります。
 func updateAndVerifyServer(t *testing.T, c serverCommands, id types.ID, name string) error {
 	t.Helper()
 
-	if err := c.updateServer(t, "サーバーの名前と説明を更新する", id, updatedServerName(name), updatedServerDescription); err != nil {
-		return err
-	}
-	item, err := c.readServer(t, "更新後のサーバーを参照する", id)
+	item, err := c.updateServer(t, "サーバーの名前と説明を更新する", id, updatedServerName(name), updatedServerDescription)
 	if err != nil {
-		return fmt.Errorf("read updated Server: %w", err)
+		return err
 	}
 	if err := checkUpdatedServer(item, id, name); err != nil {
 		return err
 	}
-	if err := c.updateServer(t, "サーバーの名前と説明を元に戻す", id, name, serverDescription); err != nil {
-		return fmt.Errorf("restore Server Name and Description: %w", err)
-	}
-	item, err = c.readServer(t, "元に戻ったサーバーを参照する", id)
+	item, err = c.updateServer(t, "サーバーの名前と説明を元に戻す", id, name, serverDescription)
 	if err != nil {
-		return fmt.Errorf("read restored Server: %w", err)
+		return fmt.Errorf("restore Server Name and Description: %w", err)
 	}
 	return checkServer(item, id, name)
 }
 
-// TestUpdateAndVerifyUpdatesRestoresAndReads は更新と復元が参照を挟んで実行されることを確認する。
-func TestUpdateAndVerifyUpdatesRestoresAndReads(t *testing.T) {
+// TestUpdateAndVerifyUpdatesAndRestores は更新と復元が応答で確認されることを確認する。
+func TestUpdateAndVerifyUpdatesAndRestores(t *testing.T) {
 	fake := &fakeServerCommands{}
 	fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: serverDescription}
 
 	run := testServerRun()
 	require.NoError(t, updateAndVerifyServer(t, fake, 123, run.name))
 
-	// 更新 → 参照 → 復元 → 参照の順に実行される
-	want := []string{"updateServer", "readServer", "updateServer", "readServer"}
+	// 更新 → 復元の順に実行され、参照は挟まない
+	want := []string{"updateServer", "updateServer"}
 	require.Equal(t, want, fake.calls)
 	require.Equal(t, run.name, fake.server.Name, "the Server Name should be restored")
 	require.Equal(t, serverDescription, fake.server.Description, "the Server Description should be restored")
@@ -77,7 +71,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 		fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: serverDescription}
 
 		err := updateAndVerifyServer(t, fake, 123, namePrefix+"test")
-		require.ErrorContains(t, err, "injected CLI failure", "the update API failure should be reported")
+		require.ErrorContains(t, err, "injected failure", "the update API failure should be reported")
 	})
 
 	t.Run("update ignored", func(t *testing.T) {
@@ -85,7 +79,7 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 		fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: serverDescription}
 
 		err := updateAndVerifyServer(t, fake, 123, namePrefix+"test")
-		require.ErrorContains(t, err, "updated Server identity mismatch", "the update reflection should be verified by Read")
+		require.ErrorContains(t, err, "updated Server identity mismatch", "the update reflection should be verified by the response")
 	})
 
 	t.Run("restore api error", func(t *testing.T) {
@@ -101,6 +95,6 @@ func TestUpdateAndVerifyReportsFailures(t *testing.T) {
 		fake.server = &serverItem{ID: 123, Name: namePrefix + "test", Description: serverDescription}
 
 		err := updateAndVerifyServer(t, fake, 123, namePrefix+"test")
-		require.ErrorContains(t, err, "identity mismatch", "the restore reflection should be verified by Read")
+		require.ErrorContains(t, err, "identity mismatch", "the restore reflection should be verified by the response")
 	})
 }

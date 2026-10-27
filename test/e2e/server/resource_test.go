@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
@@ -43,7 +44,7 @@ const (
 	sshWaitTimeout = 20 * time.Minute
 	// sshPolling は SSH ログインの再確認間隔です。
 	sshPolling = 10 * time.Second
-	// findPageSize は Server・Disk の一括検索で使う1ページの件数です。
+	// findPageSize は SDK の一括検索で使う1ページの件数です。
 	findPageSize = 100
 )
 
@@ -143,22 +144,11 @@ func parseServerParams(archiveID, diskPlanID, sizeGB string) (serverDiskParams, 
 }
 
 // findServerArgs は名前で Server を検索する引数を組み立てます。--name は部分一致検索です。
-func findServerArgs(name string, from int) []string {
+func findServerArgs(name string) []string {
 	return []string{
 		"iaas-api", "server", "find",
 		"--zone", zone, "--name", name,
-		"--count", strconv.Itoa(findPageSize), "--from", strconv.Itoa(from),
 		"--query", "map({ID,Name,Description})",
-	}
-}
-
-// findDiskArgs は名前で Disk を検索する引数を組み立てます。--name は部分一致検索です。
-func findDiskArgs(name string, from int) []string {
-	return []string{
-		"iaas-api", "disk", "find",
-		"--zone", zone, "--name", name,
-		"--count", strconv.Itoa(findPageSize), "--from", strconv.Itoa(from),
-		"--query", "map({ID,Name,ServerID,DiskPlanID,SourceArchiveID,SizeMB})",
 	}
 }
 
@@ -194,11 +184,13 @@ func readServerArgs(id types.ID) []string {
 }
 
 // updateServerArgs は Server の名前と説明を更新する引数を組み立てます。
+// 応答は単一オブジェクトのため、--query はオブジェクト構築で確認に必要な項目へ絞り込みます。
 func updateServerArgs(id types.ID, name, desc string) []string {
 	return []string{
 		"iaas-api", "server", "update",
 		"--zone", zone, "--id", id.String(),
 		"--name", name, "--description", desc,
+		"--query", "{ID,Name,Description}",
 	}
 }
 
@@ -209,14 +201,6 @@ func deleteServerArgs(id types.ID) []string {
 		"iaas-api", "server", "delete",
 		"--zone", zone, "--id", id.String(),
 		"--with-disks", "--force", "--fail-if-not-found",
-	}
-}
-
-// readDiskArgs は Disk を参照する引数を組み立てます。
-func readDiskArgs(id types.ID) []string {
-	return []string{
-		"iaas-api", "disk", "read", "--zone", zone, "--id", id.String(),
-		"--query", "{ID,Name,ServerID,DiskPlanID,SourceArchiveID,SizeMB}",
 	}
 }
 
@@ -241,18 +225,6 @@ func decodeServerList(data []byte) ([]serverItem, error) {
 	return items, nil
 }
 
-// decodeDiskList は Disk の一括検索の応答を解析します。
-func decodeDiskList(data []byte) ([]diskItem, error) {
-	var items []diskItem
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, fmt.Errorf("decode Disk list: %w", err)
-	}
-	if items == nil {
-		return nil, errors.New("expected a JSON array of Disks")
-	}
-	return items, nil
-}
-
 // parseServer は Server の参照応答を解析します。ID が空の場合はエラーを返します。
 func parseServer(data []byte) (serverItem, error) {
 	var item serverItem
@@ -265,16 +237,53 @@ func parseServer(data []byte) (serverItem, error) {
 	return item, nil
 }
 
-// parseDisk は Disk の参照応答を解析します。ID が空の場合はエラーを返します。
-func parseDisk(data []byte) (diskItem, error) {
-	var item diskItem
-	if err := json.Unmarshal(data, &item); err != nil {
-		return diskItem{}, fmt.Errorf("decode Disk: %w", err)
+// serverFromSDK は SDK の Server を参照結果の型へ変換します。
+// 接続中 Disk の情報は Server の応答に含まれる項目へ写します。
+func serverFromSDK(s *iaas.Server) serverItem {
+	item := serverItem{
+		ID:             s.ID,
+		Name:           s.Name,
+		Description:    s.Description,
+		InstanceStatus: s.InstanceStatus,
 	}
-	if item.ID.IsEmpty() {
-		return diskItem{}, errors.New("Disk ID is empty")
+	for _, iface := range s.Interfaces {
+		if iface == nil {
+			continue
+		}
+		item.Interfaces = append(item.Interfaces, serverInterface{
+			IPAddress:    iface.IPAddress,
+			UpstreamType: iface.UpstreamType,
+		})
 	}
-	return item, nil
+	for _, disk := range s.Disks {
+		if disk == nil {
+			continue
+		}
+		item.Disks = append(item.Disks, connectedDiskFromSDK(disk))
+	}
+	return item
+}
+
+// connectedDiskFromSDK は SDK の接続中 Disk 情報を Disk の参照結果の型へ変換します。
+func connectedDiskFromSDK(d *iaas.ServerConnectedDisk) diskItem {
+	return diskItem{
+		ID:         d.ID,
+		Name:       d.Name,
+		DiskPlanID: d.DiskPlanID,
+		SizeMB:     int64(d.SizeMB),
+	}
+}
+
+// diskFromSDK は SDK の Disk を Disk の参照結果の型へ変換します。
+func diskFromSDK(d *iaas.Disk) diskItem {
+	return diskItem{
+		ID:              d.ID,
+		Name:            d.Name,
+		ServerID:        d.ServerID,
+		DiskPlanID:      d.DiskPlanID,
+		SourceArchiveID: d.SourceArchiveID,
+		SizeMB:          int64(d.SizeMB),
+	}
 }
 
 // checkServer は参照結果の ID・名前・説明が、今回の実行で作成した内容と一致することを確認します。
@@ -329,21 +338,13 @@ func TestParseServerParams(t *testing.T) {
 	}
 }
 
-// TestFindArgsPaginateByName は名前検索の引数がページングと絞り込みを含むことを確認する。
-func TestFindArgsPaginateByName(t *testing.T) {
+// TestFindServerArgsVerifyByName は名前検索の引数が --name と項目の絞り込みを使うことを確認する。
+func TestFindServerArgsVerifyByName(t *testing.T) {
 	require.Equal(t, []string{
 		"iaas-api", "server", "find",
 		"--zone", "is1b", "--name", "skr-e2e-server-test",
-		"--count", "100", "--from", "0",
 		"--query", "map({ID,Name,Description})",
-	}, findServerArgs("skr-e2e-server-test", 0), "the server find should limit fields with --query")
-
-	require.Equal(t, []string{
-		"iaas-api", "disk", "find",
-		"--zone", "is1b", "--name", "skr-e2e-server-test",
-		"--count", "100", "--from", "100",
-		"--query", "map({ID,Name,ServerID,DiskPlanID,SourceArchiveID,SizeMB})",
-	}, findDiskArgs("skr-e2e-server-test", 100), "the disk find should request the second page")
+	}, findServerArgs("skr-e2e-server-test"), "the server find should limit fields with --query")
 }
 
 // TestCreateServerArgsUseDedicatedOptions は Server 作成の引数が ADR 0041 の
@@ -379,7 +380,8 @@ func TestServerMutationArgsMatchAPIOperations(t *testing.T) {
 		"iaas-api", "server", "update",
 		"--zone", "is1b", "--id", "123",
 		"--name", "skr-e2e-server-test-upd", "--description", "updated description",
-	}, updateServerArgs(123, "skr-e2e-server-test-upd", "updated description"))
+		"--query", "{ID,Name,Description}",
+	}, updateServerArgs(123, "skr-e2e-server-test-upd", "updated description"), "the update response should be limited to the verified fields")
 
 	require.Equal(t, []string{
 		"iaas-api", "server", "delete",
@@ -438,32 +440,65 @@ func TestMatchesCreatedDisk(t *testing.T) {
 	}
 }
 
-// TestDecodeListResponses は一括検索の応答の解析を確認する。
-func TestDecodeListResponses(t *testing.T) {
+// TestDecodeServerList は Server の一括検索の応答の解析を確認する。
+func TestDecodeServerList(t *testing.T) {
 	servers, err := decodeServerList([]byte(`[{"ID":123,"Name":"skr-e2e-server-test","Description":"d"}]`))
 	require.NoError(t, err)
 	require.Equal(t, []serverItem{{ID: 123, Name: "skr-e2e-server-test", Description: "d"}}, servers)
-
-	disks, err := decodeDiskList([]byte(`[{"ID":45,"Name":"skr-e2e-server-test","SizeMB":20480}]`))
-	require.NoError(t, err)
-	require.Equal(t, []diskItem{{ID: 45, Name: "skr-e2e-server-test", SizeMB: 20480}}, disks)
 
 	_, err = decodeServerList([]byte(`null`))
 	require.Error(t, err, "a null response should be refused")
 	_, err = decodeServerList([]byte(`{"ID":123}`))
 	require.Error(t, err, "a non-array response should be refused")
-	_, err = decodeDiskList([]byte(`null`))
-	require.Error(t, err, "a null response should be refused")
 }
 
-// TestParseResponses は参照応答の解析を確認する。
-func TestParseResponses(t *testing.T) {
+// TestParseServerResponse は Server の参照応答の解析を確認する。
+func TestParseServerResponse(t *testing.T) {
 	server, err := parseServer([]byte(`{"ID":123,"Name":"skr-e2e-server-test"}`))
 	require.NoError(t, err)
 	require.Equal(t, types.ID(123), server.ID)
 
 	_, err = parseServer([]byte(`{}`))
 	require.Error(t, err, "an empty Server ID should be refused")
-	_, err = parseDisk([]byte(`{}`))
-	require.Error(t, err, "an empty Disk ID should be refused")
+}
+
+// TestServerFromSDK は SDK の Server から参照結果の型への変換を確認する。
+func TestServerFromSDK(t *testing.T) {
+	sdk := &iaas.Server{
+		ID:             123,
+		Name:           "skr-e2e-server-test",
+		Description:    serverDescription,
+		InstanceStatus: types.ServerInstanceStatuses.Up,
+		Interfaces: []*iaas.InterfaceView{
+			{ID: 200, IPAddress: "192.0.2.10", UpstreamType: types.UpstreamNetworkTypes.Shared},
+			nil,
+		},
+		Disks: []*iaas.ServerConnectedDisk{
+			{ID: 45, Name: "skr-e2e-server-test", DiskPlanID: 4, SizeMB: 20480},
+			nil,
+		},
+	}
+
+	require.Equal(t, serverItem{
+		ID:             123,
+		Name:           "skr-e2e-server-test",
+		Description:    serverDescription,
+		InstanceStatus: types.ServerInstanceStatuses.Up,
+		Interfaces:     []serverInterface{{IPAddress: "192.0.2.10", UpstreamType: types.UpstreamNetworkTypes.Shared}},
+		Disks:          []diskItem{{ID: 45, Name: "skr-e2e-server-test", DiskPlanID: 4, SizeMB: 20480}},
+	}, serverFromSDK(sdk), "the conversion should keep the verified fields and skip nil elements")
+}
+
+// TestDiskFromSDK は SDK の Disk から参照結果の型への変換を確認する。
+func TestDiskFromSDK(t *testing.T) {
+	sdk := &iaas.Disk{ID: 45, Name: "skr-e2e-server-test", ServerID: 123, DiskPlanID: 4, SourceArchiveID: 999, SizeMB: 20480}
+
+	require.Equal(t, diskItem{
+		ID:              45,
+		Name:            "skr-e2e-server-test",
+		ServerID:        123,
+		DiskPlanID:      4,
+		SourceArchiveID: 999,
+		SizeMB:          20480,
+	}, diskFromSDK(sdk))
 }
