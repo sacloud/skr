@@ -28,42 +28,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// serverCommands は Server シナリオが使う Server・Disk の操作と SSH ログイン確認です。
-// ライブ実行では helper 経由の skr CLI と SSH、単体テストでは偽の実装を使います。
-// すべてのメソッドはエラーを返し、後片付けが途中の失敗でも続行できるようにします。
-type serverCommands interface {
-	// 検証対象の CLI 操作です。実行記録に説明付きで残ります。
-
-	// createServer は cloud-init ディスクと共有 NIC を持つ Server を作成します。
-	createServer(t *testing.T, label, name string, params serverDiskParams) (serverItem, error)
-	// bootServer は cloud-init の user-data を指定して Server を起動します。
-	bootServer(t *testing.T, label string, id types.ID, userDataPath string) error
-	// readServer は Server を参照します。
-	readServer(t *testing.T, label string, id types.ID) (serverItem, error)
-	// findServers は名前で Server を検索します。
-	findServers(t *testing.T, label, name string) ([]serverItem, error)
-	// updateServer は Server の名前と説明を更新し、更新結果を返します。
-	updateServer(t *testing.T, label string, id types.ID, name, desc string) (serverItem, error)
-	// deleteServer は Server をディスクとともに削除します。
-	deleteServer(t *testing.T, label string, id types.ID) error
-	// deleteDisk は Disk を削除します。
-	deleteDisk(t *testing.T, label string, id types.ID) error
-	// connectSSH は一時的な鍵でリモートの hostname を取得し、ログインできることを確認します。
-	connectSSH(t *testing.T, label, ip string) error
-
-	// SDK で静かに実行する確認です。事前確認と後片付けの確認で使い、証跡には残しません。
-
-	// lookupServers は名前部分一致で Server を検索し、全ページを返します。
-	lookupServers(t *testing.T, name string) ([]serverItem, error)
-	// lookupDisks は名前部分一致で Disk を検索し、全ページを返します。
-	lookupDisks(t *testing.T, name string) ([]diskItem, error)
-	// fetchServer は Server を参照します。
-	fetchServer(t *testing.T, id types.ID) (serverItem, error)
-	// fetchDisk は Disk を参照します。
-	fetchDisk(t *testing.T, id types.ID) (diskItem, error)
-}
-
-// skrServerCommands は helper 経由で skr CLI と SSH を実行し、確認系は SDK で直接実行する操作です。
+// skrServerCommands は Server シナリオが使う Server・Disk の操作と SSH ログイン確認です。
+// 検証対象の CLI 操作は helper 経由で skr CLI と SSH を実行し、実行記録に説明付きで残ります。
+// 確認系は SDK で静かに実行し、事前確認と後片付けの確認で使い、証跡には残しません。
 type skrServerCommands struct {
 	h        *helper.Helper
 	material helper.SSHMaterial
@@ -76,67 +43,109 @@ type skrServerCommands struct {
 
 // newSKRServerCommands は skr CLI と SDK の両方を使う操作を組み立てます。
 // SDK クライアントは skr CLI と同じ認証設定 (プロファイル) を使います。
-func newSKRServerCommands(h *helper.Helper, material helper.SSHMaterial, user string) (skrServerCommands, error) {
+func newSKRServerCommands(t *testing.T, h *helper.Helper, material helper.SSHMaterial, user string) skrServerCommands {
+	t.Helper()
+
 	client, err := iaasclient.New(false)
-	if err != nil {
-		return skrServerCommands{}, fmt.Errorf("create IaaS API client for verification: %w", err)
-	}
+	require.NoError(t, err, "create IaaS API client for verification")
 	return skrServerCommands{
 		h:        h,
 		material: material,
 		user:     user,
 		servers:  serverSDK.New(client),
 		disks:    diskSDK.New(client),
-	}, nil
+	}
 }
 
+// createServer は cloud-init ディスクと共有 NIC を持つ Server を作成します。
+// ディスクと NIC は ADR 0041 の反復可能オプションで指定します。
 func (c skrServerCommands) createServer(t *testing.T, label, name string, params serverDiskParams) (serverItem, error) {
-	data, _, err := c.h.CallAllowingFailure(t, label, createServerArgs(name, params)...)
+	data, _, err := c.h.CallAllowingFailure(t, label,
+		"iaas-api", "server", "create",
+		"--zone", zone, "--name", name, "--description", serverDescription,
+		"--cpu", "1", "--memory-gb", "1",
+		"--disk", fmt.Sprintf("archive-id=%d,plan-id=%d,size-gb=%d", params.ArchiveID, params.DiskPlanID, params.SizeGB),
+		"--nic", "upstream=shared",
+	)
 	if err != nil {
 		return serverItem{}, err
 	}
 	return parseServer(data)
 }
 
+// bootServer は cloud-init の user-data を指定して Server を起動します。
+// user-data は @path 形式でのみ渡し、内容を引数に含めません。
 func (c skrServerCommands) bootServer(t *testing.T, label string, id types.ID, userDataPath string) error {
-	_, _, err := c.h.CallAllowingFailure(t, label, bootServerArgs(id, userDataPath)...)
+	_, _, err := c.h.CallAllowingFailure(t, label,
+		"iaas-api", "server", "boot",
+		"--zone", zone, "--id", id.String(),
+		"--user-data", "@"+userDataPath,
+	)
 	return err
 }
 
+// readServer は Server を参照します。--query で確認に必要な項目へ絞り込みます。
 func (c skrServerCommands) readServer(t *testing.T, label string, id types.ID) (serverItem, error) {
-	data, _, err := c.h.CallAllowingFailure(t, label, readServerArgs(id)...)
+	data, _, err := c.h.CallAllowingFailure(t, label,
+		"iaas-api", "server", "read", "--zone", zone, "--id", id.String(),
+		"--query", "{ID,Name,Description,InstanceStatus,Interfaces,Disks}",
+	)
 	if err != nil {
 		return serverItem{}, err
 	}
 	return parseServer(data)
 }
 
+// findServers は名前で Server を検索します。--name は部分一致検索です。
 func (c skrServerCommands) findServers(t *testing.T, label, name string) ([]serverItem, error) {
-	data, _, err := c.h.CallAllowingFailure(t, label, findServerArgs(name)...)
+	data, _, err := c.h.CallAllowingFailure(t, label,
+		"iaas-api", "server", "find",
+		"--zone", zone, "--name", name,
+		"--query", "map({ID,Name,Description})",
+	)
 	if err != nil {
 		return nil, err
 	}
 	return decodeServerList(data)
 }
 
+// updateServer は Server の名前と説明を更新し、更新結果を返します。
+// 応答は単一オブジェクトのため、--query はオブジェクト構築で確認に必要な項目へ絞り込みます。
 func (c skrServerCommands) updateServer(t *testing.T, label string, id types.ID, name, desc string) (serverItem, error) {
-	data, _, err := c.h.CallAllowingFailure(t, label, updateServerArgs(id, name, desc)...)
+	data, _, err := c.h.CallAllowingFailure(t, label,
+		"iaas-api", "server", "update",
+		"--zone", zone, "--id", id.String(),
+		"--name", name, "--description", desc,
+		"--query", "{ID,Name,Description}",
+	)
 	if err != nil {
 		return serverItem{}, err
 	}
 	return parseServer(data)
 }
 
+// deleteServer は Server をディスクとともに削除します。
+// --with-disks で接続中の Disk も削除し、--force で電源を止めてから削除します。
 func (c skrServerCommands) deleteServer(t *testing.T, label string, id types.ID) error {
-	_, _, err := c.h.CallAllowingFailure(t, label, deleteServerArgs(id)...)
+	_, _, err := c.h.CallAllowingFailure(t, label,
+		"iaas-api", "server", "delete",
+		"--zone", zone, "--id", id.String(),
+		"--with-disks", "--force", "--fail-if-not-found",
+	)
 	return err
 }
 
+// deleteDisk は孤立した Disk を削除します。
 func (c skrServerCommands) deleteDisk(t *testing.T, label string, id types.ID) error {
-	_, _, err := c.h.CallAllowingFailure(t, label, deleteDiskArgs(id)...)
+	_, _, err := c.h.CallAllowingFailure(t, label,
+		"iaas-api", "disk", "delete",
+		"--zone", zone, "--id", id.String(),
+		"--fail-if-not-found",
+	)
 	return err
 }
 
+// connectSSH は一時的な鍵でリモートの hostname を取得し、ログインできることを確認します。
 func (c skrServerCommands) connectSSH(t *testing.T, label, ip string) error {
 	return c.h.ConnectSSH(t, c.material, c.user, ip, label)
 }

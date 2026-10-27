@@ -29,6 +29,8 @@ import (
 // TestScenarioServer は Server E2E です。cloud-init ディスク付きの Server を is1b に作成し、
 // user-data で起動して SSH 接続を確認し、名前と説明の更新・復元と後片付けまで行います。
 // ライブ実行には is1b で利用可能な cloud-init アーカイブとディスクプランの環境変数が必要です。
+// テスト対象の操作は skr CLI で実行し、事前確認と後片付けの確認と起動待ちのポーリングは
+// SDK で静かに実行します。途中の失敗でも後片付けは実行され、その失敗はテストの結果に含まれます。
 func TestScenarioServer(t *testing.T) {
 	h := helper.New(t, "server-api", "IaaS サーバーを cloud-init ディスク付きで作成・起動し、SSH 接続・更新・削除と後片付けが正しく動作することを確認する")
 
@@ -37,147 +39,96 @@ func TestScenarioServer(t *testing.T) {
 
 	// 一時的な SSH 鍵と cloud-init の user-data を作成します。秘密鍵の内容は実行記録に残りません
 	material := helper.WriteSSHMaterial(t, sshUser, false)
-	c, err := newSKRServerCommands(h, material, sshUser)
-	require.NoError(t, err, "build Server E2E commands")
+	c := newSKRServerCommands(t, h, material, sshUser)
+	run := &serverRun{name: namePrefix + helper.RandomSuffix(t), params: params}
 
-	run := &serverRun{
-		name:       namePrefix + helper.RandomSuffix(t),
-		params:     params,
-		material:   material,
-		sshTimeout: sshWaitTimeout,
-	}
-
-	err = runServerScenario(t, c, time.Sleep, run)
-	require.NoError(t, err, "Server E2E scenario failed: %v", err)
-}
-
-// runServerScenario は1回の実行で、作成前の同名確認、Server と cloud-init ディスクの作成、
-// user-data による起動、SSH 接続確認、名前と説明の更新と復元、後片付けまで行います。
-// テスト対象の操作は skr CLI で実行し、事前確認と後片付けの確認と起動待ちのポーリングは
-// SDK で静かに実行します。途中の失敗でも後片付けは実行され、その失敗はエラーに含まれます。
-func runServerScenario(t *testing.T, c serverCommands, sleep func(time.Duration), run *serverRun) (result error) {
 	// 作成前に Server と Disk の両方で同名リソースが存在しないことを SDK で確認する。
 	// 確認の実行は証跡に残らず、後片付けはまだ登録せず、既存リソースを変更しないまま終了する。
-	if err := requireNoServerNameCollision(t, c, run.name); err != nil {
-		return err
-	}
+	requireNoServerNameCollision(t, c, run.name)
 
 	// 後片付け: Server を識別情報の再照合つきで削除し、孤立ディスクの回収と不在確認まで行う
 	defer func() {
 		if err := cleanupServerResources(t, c, run); err != nil {
-			result = errors.Join(result, fmt.Errorf("cleanup failed: %w", err))
+			t.Errorf("cleanup failed: %v", err)
 		}
 	}()
 
 	// テスト用の Server を cloud-init ディスクと共有 NIC 付きで作成し、参照と名前検索で確認する
-	if err := createServer(t, c, run); err != nil {
-		return err
-	}
+	createServer(t, c, run)
 
 	// cloud-init の user-data を指定して起動する
-	if err := c.bootServer(t, "cloud-init の user-data を指定してサーバーを起動する", run.serverID, run.material.UserDataPath); err != nil {
-		return err
-	}
+	err := c.bootServer(t, "cloud-init の user-data を指定してサーバーを起動する", run.serverID, material.UserDataPath)
+	require.NoError(t, err)
 
 	// 起動を確認しながら SSH ログインできるまで待つ
-	if err := waitForServerSSH(t, c, sleep, run); err != nil {
-		return err
-	}
+	waitForServerSSH(t, c, run)
 
 	// サーバーの名前と説明を更新して元に戻す
-	return updateAndVerifyServer(t, c, run.serverID, run.name)
+	updateAndVerifyServer(t, c, run.serverID, run.name)
 }
 
 // requireNoServerNameCollision は作成前に Server と Disk の両方で同名リソースが存在しないことを
-// SDK で確認します。確認の実行は証跡に残しません。既存リソースは変更せず、存在する場合はエラーを返します。
-func requireNoServerNameCollision(t *testing.T, c serverCommands, name string) error {
+// SDK で確認します。確認の実行は証跡に残しません。既存リソースは変更しません。
+func requireNoServerNameCollision(t *testing.T, c skrServerCommands, name string) {
 	t.Helper()
 
 	servers, err := c.lookupServers(t, name)
-	if err != nil {
-		return fmt.Errorf("find existing servers: %w", err)
-	}
-	if len(servers) != 0 {
-		return fmt.Errorf("test server name %q already exists; refusing to modify it", name)
-	}
+	require.NoError(t, err, "find existing servers")
+	require.Empty(t, servers, "test server name %q already exists; refusing to modify it", name)
 	disks, err := c.lookupDisks(t, name)
-	if err != nil {
-		return fmt.Errorf("find existing disks: %w", err)
-	}
-	if len(disks) != 0 {
-		return fmt.Errorf("test disk name %q already exists; refusing to modify it", name)
-	}
-	return nil
+	require.NoError(t, err, "find existing disks")
+	require.Empty(t, disks, "test disk name %q already exists; refusing to modify it", name)
 }
 
 // createServer は cloud-init ディスクと共有 NIC を持つテスト用 Server を skr CLI で作成し、
 // 参照と名前検索で作成結果を確認します。作成に成功した ID を run に記録し、
 // 後片付けが確実に回収できるようにします。
-func createServer(t *testing.T, c serverCommands, run *serverRun) error {
+func createServer(t *testing.T, c skrServerCommands, run *serverRun) {
 	t.Helper()
 
 	// 作成応答に作成結果が含まれる
 	item, err := c.createServer(t, "テスト用のサーバーを cloud-init ディスク付きで作成する", run.name, run.params)
-	if err != nil {
-		return err
-	}
-	if item.ID.IsEmpty() {
-		return errors.New("created Server ID is empty")
-	}
-	if err := checkServer(item, item.ID, run.name); err != nil {
-		return err
-	}
+	require.NoError(t, err, "create Server with cloud-init disk")
+	require.NoError(t, checkServer(item, item.ID, run.name), "the create response should contain the created Server")
 	run.serverID = item.ID
 
 	// server read が作成済みの Server を返すことを確認する
 	item, err = c.readServer(t, "作成したサーバーを参照する", run.serverID)
-	if err != nil {
-		return err
-	}
-	if err := checkServer(item, run.serverID, run.name); err != nil {
-		return err
-	}
+	require.NoError(t, err, "read the created Server")
+	require.NoError(t, checkServer(item, run.serverID, run.name), "server read should return the created Server")
 
 	// server find --name が作成した Server を見つけられることを確認する
 	matches, err := c.findServers(t, "作成したサーバーを名前で検索する", run.name)
-	if err != nil {
-		return err
-	}
-	if len(matches) != 1 || matches[0].ID != run.serverID {
-		return fmt.Errorf("server find --name should return the created Server %s", run.serverID)
-	}
-	return nil
+	require.NoError(t, err, "find the created Server by name")
+	require.Len(t, matches, 1, "server find --name should return only the created Server")
+	require.Equal(t, run.serverID, matches[0].ID, "server find --name should return the created Server")
 }
 
 // waitForServerSSH は SDK で起動と共有 NIC の IP アドレスを確認し、SSH ログインが
-// 成功するまで期限付きで待ちます。起動待ちのポーリングは証跡に残しません。
-// cloud-init の反映はベストエフォートで待ち、期限を過ぎたらエラーにします。
+// 成功するまで期限付きで待ちます。起動待ちのポーリングは証跡に残りません。
+// cloud-init の反映はベストエフォートで待ち、期限を過ぎたらテストを失敗させます。
 // SSH の接続試行は実行記録に残り、成功の判断は hostname の取得で行います。
-func waitForServerSSH(t *testing.T, c serverCommands, sleep func(time.Duration), run *serverRun) error {
+func waitForServerSSH(t *testing.T, c skrServerCommands, run *serverRun) {
 	t.Helper()
 
-	deadline := time.Now().Add(run.sshTimeout)
+	deadline := time.Now().Add(sshWaitTimeout)
 	for {
 		item, err := c.fetchServer(t, run.serverID)
-		if err != nil {
-			return err
-		}
-		if err := checkServer(item, run.serverID, run.name); err != nil {
-			return err
-		}
+		require.NoError(t, err, "read Server while waiting for SSH login")
+		require.NoError(t, checkServer(item, run.serverID, run.name), "the Server should keep its identity while booting")
 		if item.InstanceStatus.IsUp() {
 			if ip := sharedIPOfServer(item); ip != "" {
-				err := c.connectSSH(t, "SSH ログインを確認する", ip)
-				if err == nil {
-					return nil
+				if err := c.connectSSH(t, "SSH ログインを確認する", ip); err == nil {
+					return
+				} else {
+					t.Logf("SSH login attempt failed, retrying: %v", err)
 				}
-				t.Logf("SSH login attempt failed, retrying: %v", err)
 			}
 		}
 		if time.Now().Add(sshPolling).After(deadline) {
-			return fmt.Errorf("SSH login check timed out after %s", run.sshTimeout)
+			t.Fatalf("SSH login check timed out after %s", sshWaitTimeout)
 		}
-		sleep(sshPolling)
+		time.Sleep(sshPolling)
 	}
 }
 
@@ -202,27 +153,21 @@ func updatedServerName(name string) string {
 
 // updateAndVerifyServer は Server の名前と説明を skr CLI で更新し、応答で反映を確認してから
 // 元の値に戻し、復元を確認します。復元により後片付けが Server を再び識別できるようになります。
-func updateAndVerifyServer(t *testing.T, c serverCommands, id types.ID, name string) error {
+func updateAndVerifyServer(t *testing.T, c skrServerCommands, id types.ID, name string) {
 	t.Helper()
 
 	item, err := c.updateServer(t, "サーバーの名前と説明を更新する", id, updatedServerName(name), updatedServerDescription)
-	if err != nil {
-		return err
-	}
-	if err := checkUpdatedServer(item, id, name); err != nil {
-		return err
-	}
+	require.NoError(t, err, "update Server Name and Description")
+	require.NoError(t, checkUpdatedServer(item, id, name), "the update should be reflected in the response")
 	item, err = c.updateServer(t, "サーバーの名前と説明を元に戻す", id, name, serverDescription)
-	if err != nil {
-		return fmt.Errorf("restore Server Name and Description: %w", err)
-	}
-	return checkServer(item, id, name)
+	require.NoError(t, err, "restore Server Name and Description")
+	require.NoError(t, checkServer(item, id, name), "the restore should be reflected in the response")
 }
 
 // cleanupServerResources は後片付けです。作成に成功した Server の ID を優先して SDK で再照合し、
 // ID がない場合は名前検索で回収を試みます。識別できない場合は削除しません。
 // 削除は skr CLI で行い、削除後は SDK で同名リソースの不在を確認し、孤立した Disk の回収まで行います。
-func cleanupServerResources(t *testing.T, c serverCommands, run *serverRun) error {
+func cleanupServerResources(t *testing.T, c skrServerCommands, run *serverRun) error {
 	t.Helper()
 
 	id := run.serverID
@@ -261,7 +206,7 @@ func cleanupServerResources(t *testing.T, c serverCommands, run *serverRun) erro
 
 // requireServerAbsent は Server が元の名前と更新フェーズの名前のどちらでも残っていないことを
 // SDK で確認します。更新フェーズで復元が完了していない場合も、更新後の名前での不在を確認します。
-func requireServerAbsent(t *testing.T, c serverCommands, run *serverRun) error {
+func requireServerAbsent(t *testing.T, c skrServerCommands, run *serverRun) error {
 	t.Helper()
 
 	for _, name := range []string{run.name, updatedServerName(run.name)} {
@@ -279,7 +224,7 @@ func requireServerAbsent(t *testing.T, c serverCommands, run *serverRun) error {
 // cleanupOrphanDisks は Server 削除後に残った同名 Disk を回収します。
 // SDK で検索と参照を行い、既知の Disk と一致する場合のみ skr CLI で削除し、
 // 削除後は SDK で不在を確認します。識別できない Disk は変更せず、手動での回収が必要なことを報告します。
-func cleanupOrphanDisks(t *testing.T, c serverCommands, run *serverRun, knownDisks []diskItem) error {
+func cleanupOrphanDisks(t *testing.T, c skrServerCommands, run *serverRun, knownDisks []diskItem) error {
 	t.Helper()
 
 	matches, err := c.lookupDisks(t, run.name)

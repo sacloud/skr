@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -141,76 +140,6 @@ func parseServerParams(archiveID, diskPlanID, sizeGB string) (serverDiskParams, 
 		}
 	}
 	return serverDiskParams{ArchiveID: archive, DiskPlanID: plan, SizeGB: size}, nil
-}
-
-// findServerArgs は名前で Server を検索する引数を組み立てます。--name は部分一致検索です。
-func findServerArgs(name string) []string {
-	return []string{
-		"iaas-api", "server", "find",
-		"--zone", zone, "--name", name,
-		"--query", "map({ID,Name,Description})",
-	}
-}
-
-// createServerArgs は cloud-init ディスクと共有 NIC を持つ Server 作成の引数を組み立てます。
-// ディスクと NIC は ADR 0041 の反復可能オプションで指定します。
-// user-data は起動時に渡すため、作成引数には含めません。
-func createServerArgs(name string, params serverDiskParams) []string {
-	return []string{
-		"iaas-api", "server", "create",
-		"--zone", zone, "--name", name, "--description", serverDescription,
-		"--cpu", "1", "--memory-gb", "1",
-		"--disk", fmt.Sprintf("archive-id=%d,plan-id=%d,size-gb=%d", params.ArchiveID, params.DiskPlanID, params.SizeGB),
-		"--nic", "upstream=shared",
-	}
-}
-
-// bootServerArgs は cloud-init の user-data を指定して Server を起動する引数を組み立てます。
-// user-data は @path 形式でのみ渡し、内容を引数に含めません。
-func bootServerArgs(id types.ID, userDataPath string) []string {
-	return []string{
-		"iaas-api", "server", "boot",
-		"--zone", zone, "--id", id.String(),
-		"--user-data", "@" + userDataPath,
-	}
-}
-
-// readServerArgs は Server を参照する引数を組み立てます。
-func readServerArgs(id types.ID) []string {
-	return []string{
-		"iaas-api", "server", "read", "--zone", zone, "--id", id.String(),
-		"--query", "{ID,Name,Description,InstanceStatus,Interfaces,Disks}",
-	}
-}
-
-// updateServerArgs は Server の名前と説明を更新する引数を組み立てます。
-// 応答は単一オブジェクトのため、--query はオブジェクト構築で確認に必要な項目へ絞り込みます。
-func updateServerArgs(id types.ID, name, desc string) []string {
-	return []string{
-		"iaas-api", "server", "update",
-		"--zone", zone, "--id", id.String(),
-		"--name", name, "--description", desc,
-		"--query", "{ID,Name,Description}",
-	}
-}
-
-// deleteServerArgs は Server をディスクとともに削除する引数を組み立てます。
-// --with-disks で接続中の Disk も削除し、--force で電源を止めてから削除します。
-func deleteServerArgs(id types.ID) []string {
-	return []string{
-		"iaas-api", "server", "delete",
-		"--zone", zone, "--id", id.String(),
-		"--with-disks", "--force", "--fail-if-not-found",
-	}
-}
-
-// deleteDiskArgs は孤立した Disk を削除する引数を組み立てます。
-func deleteDiskArgs(id types.ID) []string {
-	return []string{
-		"iaas-api", "disk", "delete",
-		"--zone", zone, "--id", id.String(),
-		"--fail-if-not-found",
-	}
 }
 
 // decodeServerList は Server の一括検索の応答を解析します。
@@ -336,64 +265,6 @@ func TestParseServerParams(t *testing.T) {
 			require.Error(t, err, "invalid parameters should be rejected")
 		})
 	}
-}
-
-// TestFindServerArgsVerifyByName は名前検索の引数が --name と項目の絞り込みを使うことを確認する。
-func TestFindServerArgsVerifyByName(t *testing.T) {
-	require.Equal(t, []string{
-		"iaas-api", "server", "find",
-		"--zone", "is1b", "--name", "skr-e2e-server-test",
-		"--query", "map({ID,Name,Description})",
-	}, findServerArgs("skr-e2e-server-test"), "the server find should limit fields with --query")
-}
-
-// TestCreateServerArgsUseDedicatedOptions は Server 作成の引数が ADR 0041 の
-// 反復可能オプションと共有 NIC を使うことを確認する。
-func TestCreateServerArgsUseDedicatedOptions(t *testing.T) {
-	args := createServerArgs("skr-e2e-server-test", serverDiskParams{ArchiveID: 123, DiskPlanID: 4, SizeGB: 20})
-
-	require.Equal(t, []string{
-		"iaas-api", "server", "create",
-		"--zone", "is1b", "--name", "skr-e2e-server-test", "--description", serverDescription,
-		"--cpu", "1", "--memory-gb", "1",
-		"--disk", "archive-id=123,plan-id=4,size-gb=20",
-		"--nic", "upstream=shared",
-	}, args)
-}
-
-// TestBootServerArgsOnlyReferenceUserDataPath は起動の引数が user-data を
-// @path 形式でのみ参照し、内容を含まないことを確認する。
-func TestBootServerArgsOnlyReferenceUserDataPath(t *testing.T) {
-	args := bootServerArgs(123, "/tmp/user-data.yaml")
-
-	require.Equal(t, []string{
-		"iaas-api", "server", "boot",
-		"--zone", "is1b", "--id", "123",
-		"--user-data", "@/tmp/user-data.yaml",
-	}, args)
-	require.NotContains(t, strings.Join(args, " "), "ssh_authorized_keys", "the boot args should not contain the user-data content")
-}
-
-// TestServerMutationArgsMatchAPIOperations は更新と削除の引数を確認する。
-func TestServerMutationArgsMatchAPIOperations(t *testing.T) {
-	require.Equal(t, []string{
-		"iaas-api", "server", "update",
-		"--zone", "is1b", "--id", "123",
-		"--name", "skr-e2e-server-test-upd", "--description", "updated description",
-		"--query", "{ID,Name,Description}",
-	}, updateServerArgs(123, "skr-e2e-server-test-upd", "updated description"), "the update response should be limited to the verified fields")
-
-	require.Equal(t, []string{
-		"iaas-api", "server", "delete",
-		"--zone", "is1b", "--id", "123",
-		"--with-disks", "--force", "--fail-if-not-found",
-	}, deleteServerArgs(123), "the server delete should also delete connected Disks")
-
-	require.Equal(t, []string{
-		"iaas-api", "disk", "delete",
-		"--zone", "is1b", "--id", "45",
-		"--fail-if-not-found",
-	}, deleteDiskArgs(45))
 }
 
 // TestCheckServerIdentity は参照結果の識別確認を確認する。
