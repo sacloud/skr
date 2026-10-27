@@ -16,9 +16,10 @@ package iaas
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	sdk "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
@@ -39,11 +40,10 @@ func TestIconSearchAndPaging(t *testing.T) {
 		{"test beta", []string{"test", "second"}},
 		{"other", []string{"other"}},
 	} {
-		if _, err := service.Create(&iconSDK.CreateRequest{
+		_, err := service.Create(&iconSDK.CreateRequest{
 			Name: item.name, Image: "aW1hZ2U=", Tags: item.tags,
-		}); err != nil {
-			t.Fatal(err)
-		}
+		})
+		require.NoError(t, err, "create icon %q", item.name)
 	}
 	for _, test := range []struct {
 		name    string
@@ -63,20 +63,15 @@ func TestIconSearchAndPaging(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			condition, err := test.request.ToRequestParameter()
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err, "convert FindRequest: %v", err)
 			result, err := sdk.NewIconOp(server).Find(ctx, condition)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if result.Total != test.total || result.Count != len(test.names) || len(result.Icons) != len(test.names) || result.From != test.request.From {
-				t.Fatalf("result = %+v; want total=%d count=%d from=%d", result, test.total, len(test.names), test.request.From)
-			}
+			require.NoError(t, err, "find icons: %v", err)
+			require.Equal(t, test.total, result.Total, "result total")
+			require.Equal(t, len(test.names), result.Count, "result count")
+			require.Len(t, result.Icons, len(test.names), "result icons")
+			require.Equal(t, test.request.From, result.From, "result from")
 			for i, name := range test.names {
-				if result.Icons[i].Name != name {
-					t.Fatalf("result[%d] = %q, want %q", i, result.Icons[i].Name, name)
-				}
+				require.Equal(t, name, result.Icons[i].Name, "result[%d]", i)
 			}
 		})
 	}
@@ -89,9 +84,8 @@ func TestIconMissingResourceReturnsNotFound(t *testing.T) {
 		t.Run(method, func(t *testing.T) {
 			_, err := server.Do(context.Background(), method, "https://example.invalid/icon/9999", nil)
 			var apiErr sdk.APIError
-			if !errors.As(err, &apiErr) || apiErr.ResponseCode() != http.StatusNotFound {
-				t.Fatalf("error = %v, want API 404", err)
-			}
+			require.ErrorAs(t, err, &apiErr, "error = %v, want API error", err)
+			require.Equal(t, http.StatusNotFound, apiErr.ResponseCode(), "error response code")
 		})
 	}
 }
@@ -102,13 +96,12 @@ func TestZoneFindReturnsConfiguredZonesWithIDs(t *testing.T) {
 	ctx := context.Background()
 
 	result, err := sdk.NewZoneOp(server).Find(ctx, &sdk.FindCondition{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result.Zones) != 2 || result.Zones[0].ID != types.ID(1) || result.Zones[0].Name != "test-zone-a" ||
-		result.Zones[1].ID != types.ID(2) || result.Zones[1].Name != "test-zone-b" {
-		t.Fatalf("zone find = %#v, want configured zones with IDs 1 and 2", result.Zones)
-	}
+	require.NoError(t, err, "find zones: %v", err)
+	require.Len(t, result.Zones, 2, "zone list")
+	require.Equal(t, types.ID(1), result.Zones[0].ID, "zone 0 ID")
+	require.Equal(t, "test-zone-a", result.Zones[0].Name, "zone 0 name")
+	require.Equal(t, types.ID(2), result.Zones[1].ID, "zone 1 ID")
+	require.Equal(t, "test-zone-b", result.Zones[1].Name, "zone 1 name")
 }
 
 func TestZoneReadReturnsConfiguredZone(t *testing.T) {
@@ -116,12 +109,9 @@ func TestZoneReadReturnsConfiguredZone(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	found, err := sdk.NewZoneOp(server).Read(context.Background(), types.ID(2))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if found.ID != types.ID(2) || found.Name != "test-zone-b" {
-		t.Fatalf("zone read = %#v, want ID 2 and name test-zone-b", found)
-	}
+	require.NoError(t, err, "read zone 2: %v", err)
+	require.Equal(t, types.ID(2), found.ID, "read zone ID")
+	require.Equal(t, "test-zone-b", found.Name, "read zone name")
 }
 
 func TestZoneMissingResourceReturnsNotFound(t *testing.T) {
@@ -129,7 +119,6 @@ func TestZoneMissingResourceReturnsNotFound(t *testing.T) {
 	t.Cleanup(server.Close)
 	_, err := sdk.NewZoneOp(server).Read(context.Background(), types.ID(99))
 	var apiErr sdk.APIError
-	if !errors.As(err, &apiErr) || apiErr.ResponseCode() != http.StatusNotFound {
-		t.Fatalf("error = %v, want API 404", err)
-	}
+	require.ErrorAs(t, err, &apiErr, "error = %v, want API error", err)
+	require.Equal(t, http.StatusNotFound, apiErr.ResponseCode(), "error response code")
 }

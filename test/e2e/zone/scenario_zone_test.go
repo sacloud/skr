@@ -15,13 +15,21 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"reflect"
+	"encoding/json"
+	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 )
+
+// zoneItem はゾーンの一覧と参照で確認する項目です。
+type zoneItem struct {
+	ID          int64
+	Name        string
+	Description string
+}
 
 // TestScenarioZone は zone コマンドのライブ E2E です。
 // ゾーン一覧の取得、jq 式での名前抽出、ID での参照を確認します。
@@ -30,57 +38,59 @@ func TestScenarioZone(t *testing.T) {
 	h := helper.New(t, "zone-api",
 		"IaaS API の zone コマンドでゾーン一覧の取得、名前の抽出、ID での参照が正しく動作することを確認する")
 
-	if err := runZoneScenario(t, skrZoneCommands{h: h}); err != nil {
-		t.Fatalf("%v", err)
-	}
-}
-
-// runZoneScenario はゾーンの一覧・名前抽出・参照を確認します。
-// 失敗はエラーで返し、ライブ実行ではテストを失敗させます。
-func runZoneScenario(t *testing.T, commands zoneCommands) error {
-	t.Helper()
-
 	// ゾーン一覧を取得して ID と名前を確認する
-	zones, err := commands.findZones(t, "ゾーン一覧を取得する")
-	if err != nil {
-		return fmt.Errorf("find zones: %w", err)
-	}
-	if len(zones) == 0 {
-		return errors.New("zone list is empty")
-	}
+	zones := findZones(t, h, "ゾーン一覧を取得する")
+	require.NotEmpty(t, zones, "zone list is empty")
 	for i, z := range zones {
-		if z.ID == 0 {
-			return fmt.Errorf("zone %d has no ID", i)
-		}
-		if z.Name == "" {
-			return fmt.Errorf("zone %d has an empty name", i)
-		}
+		require.NotZero(t, z.ID, "zone %d has no ID", i)
+		require.NotEmpty(t, z.Name, "zone %d has an empty name", i)
 	}
 
 	// jq 式でゾーン名を抽出して一覧と一致させる
-	names, err := commands.findZoneNames(t, "jq 式でゾーン名を抽出する")
-	if err != nil {
-		return fmt.Errorf("find zone names: %w", err)
-	}
 	expected := make([]string, 0, len(zones))
 	for _, z := range zones {
 		expected = append(expected, z.Name)
 	}
-	if !reflect.DeepEqual(expected, names) {
-		return fmt.Errorf("zone names from --query output mismatch: want %#v, got %#v", expected, names)
-	}
+	require.Equal(t, expected, findZoneNames(t, h, "jq 式でゾーン名を抽出する"),
+		"zone names from --query output should match the zone list")
 
 	// 一覧の先頭ゾーンを ID で参照して一覧と一致させる
 	first := zones[0]
-	read, err := commands.readZone(t, "ゾーンを ID で参照する", first.ID)
-	if err != nil {
-		return fmt.Errorf("read zone %d: %w", first.ID, err)
-	}
-	if read.ID != first.ID {
-		return fmt.Errorf("read zone ID mismatch: want %d, got %d", first.ID, read.ID)
-	}
-	if read.Name != first.Name {
-		return fmt.Errorf("read zone name mismatch: want %q, got %q", first.Name, read.Name)
-	}
-	return nil
+	read := readZone(t, h, "ゾーンを ID で参照する", first.ID)
+	require.Equal(t, first.ID, read.ID, "read zone ID should match the zone list")
+	require.Equal(t, first.Name, read.Name, "read zone name should match the zone list")
+}
+
+// findZones はゾーン一覧を取得して ID と名前を検証します。
+func findZones(t *testing.T, h *helper.Helper, description string) []zoneItem {
+	t.Helper()
+
+	data, _, err := h.CallAllowingFailure(t, description, "iaas-api", "zone", "find")
+	require.NoError(t, err, "%s: zone find: %v", description, err)
+	var zones []zoneItem
+	require.NoError(t, json.Unmarshal(data, &zones), "%s: decode zone list: %v", description, err)
+	return zones
+}
+
+// findZoneNames は jq 式でゾーン名の配列を取得して検証します。
+func findZoneNames(t *testing.T, h *helper.Helper, description string) []string {
+	t.Helper()
+
+	data, _, err := h.CallAllowingFailure(t, description, "iaas-api", "zone", "find", "--query", "map(.Name)")
+	require.NoError(t, err, "%s: zone find --query: %v", description, err)
+	var names []string
+	require.NoError(t, json.Unmarshal(data, &names), "%s: decode zone names: %v", description, err)
+	return names
+}
+
+// readZone は指定した ID のゾーンを参照して応答を検証します。
+func readZone(t *testing.T, h *helper.Helper, description string, id int64) zoneItem {
+	t.Helper()
+
+	data, _, err := h.CallAllowingFailure(t, description, "iaas-api", "zone", "read",
+		"--id", strconv.FormatInt(id, 10), "--query", "{ID,Name,Description}")
+	require.NoError(t, err, "%s: zone read %d: %v", description, id, err)
+	var item zoneItem
+	require.NoError(t, json.Unmarshal(data, &item), "%s: decode zone: %v", description, err)
+	return item
 }
