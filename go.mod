@@ -9,6 +9,7 @@ require (
 	github.com/itchyny/gojq v0.12.19
 	github.com/sacloud/sacloud-sdk-go v0.3.1
 	github.com/sacloud/sakumock v0.13.0
+	github.com/stretchr/testify v1.12.1
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/term v0.47.0
 )
@@ -62,6 +63,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go.uber.org/zap v1.28.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/net v0.59.0 // indirect

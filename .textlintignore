@@ -3,3 +3,8 @@ dist/
 
 CHANGELOG.md
 AGENTS.md
+
+tmp/**
+**/e2e-output/**
+
+docs/adr/*.md

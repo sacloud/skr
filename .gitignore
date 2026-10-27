@@ -12,3 +12,5 @@ skr
 /tmp/http-api/
 ./tmp/
 /tmp/
+e2e-output
+/.idea/
