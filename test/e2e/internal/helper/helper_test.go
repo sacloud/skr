@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -186,6 +187,74 @@ func TestWriteRequestJSONFile(t *testing.T) {
 	require.Equal(t, os.FileMode(0600), info.Mode().Perm())
 }
 
+// TestCallAllowingFailure は失敗するコマンドでもテストを停止せず、stdout・stderr・エラーを返すことを確認する。
+func TestCallAllowingFailure(t *testing.T) {
+	base := t.TempDir()
+	// stdout・stderr を出力して失敗するダミーコマンドを配置する
+	writeExecutableWithScript(t, filepath.Join(base, "skr"), "#!/bin/sh\necho ok\necho err >&2\nexit 3\n")
+	enterScenarioDir(t, base)
+
+	h := &Helper{name: "test", description: "test", binary: filepath.Join(base, "skr"), defaultTimeout: 10 * time.Second}
+	stdout, stderr, err := h.CallAllowingFailure(t, "失敗するコマンドを実行する")
+	require.Error(t, err, "the dummy command should fail")
+	require.Equal(t, "ok\n", string(stdout))
+	require.Equal(t, "err\n", stderr)
+	require.Len(t, h.results, 1, "the failed call should be recorded as well")
+}
+
+// TestCallAllowingFailureSucceeds は成功するコマンドで CallAllowingFailure がエラーを返さないことを確認する。
+func TestCallAllowingFailureSucceeds(t *testing.T) {
+	base := t.TempDir()
+	writeExecutableWithScript(t, filepath.Join(base, "skr"), "#!/bin/sh\necho ok\n")
+	enterScenarioDir(t, base)
+
+	h := &Helper{name: "test", description: "test", binary: filepath.Join(base, "skr"), defaultTimeout: 10 * time.Second}
+	stdout, stderr, err := h.CallAllowingFailure(t, "成功するコマンドを実行する")
+	require.NoError(t, err, "the dummy command should succeed")
+	require.Equal(t, "ok\n", string(stdout))
+	require.Empty(t, stderr)
+}
+
+// TestSleep は Sleep が待機した時間を実行記録に保存することを確認する。
+func TestSleep(t *testing.T) {
+	h := &Helper{name: "test", description: "test"}
+
+	start := time.Now()
+	h.Sleep(t, "反映待ちとして待機する", 20*time.Millisecond)
+	elapsed := time.Since(start)
+
+	// 待機した時間を実行記録に保存する
+	require.Len(t, h.results, 1, "the sleep should be recorded")
+	res := h.results[0]
+	require.Equal(t, "反映待ちとして待機する", res.Description())
+	require.Contains(t, res.Render(), "20ms", "the report should show the sleep duration")
+	require.GreaterOrEqual(t, elapsed, 20*time.Millisecond, "Sleep should wait for the requested duration")
+}
+
+// TestReportIncludesTotalDuration はレポートの先頭にシナリオ全体の所要時間が記録されることを確認する。
+func TestReportIncludesTotalDuration(t *testing.T) {
+	base := t.TempDir()
+	// 所要時間が秒単位で記録されるよう、1.2s かかるダミーコマンドを配置する
+	writeExecutableWithScript(t, filepath.Join(base, "skr"), "#!/bin/sh\nsleep 1.2\necho ok\n")
+	enterScenarioDir(t, base)
+
+	// レポートはサブテストの t.Cleanup で出力される。完了後に内容を確認する
+	t.Run("new", func(t *testing.T) {
+		// newHelper は上のディレクトリからダミーの skr を見つける
+		h := newHelper(t, "test", "test")
+		h.Call(t, "ダミーコマンドを実行する")
+	})
+
+	files, err := filepath.Glob("e2e-output/test-*.md")
+	require.NoError(t, err)
+	require.Len(t, files, 1, "the report file should be written by t.Cleanup")
+	data, err := os.ReadFile(files[0]) //nolint:gosec // テスト専用ディレクトリ内のレポートを読み込む。
+	require.NoError(t, err, "read report file")
+
+	// 所要時間は説明の後、最初のステップより前に秒単位で、生成日時とともに記録される
+	require.Regexp(t, `^# test\ntest\n\n\*\*total duration\*\*:\n[1-9]\d*s\n\n\*\*generated at\*\*:\n\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\n\n## `, string(data))
+}
+
 // createProfile は指定されたプロファイルディレクトリに空のプロファイルを作成する。
 func createProfile(t *testing.T, dir, name string) {
 	t.Helper()
@@ -227,10 +296,15 @@ func enterScenarioDir(t *testing.T, base string) {
 
 // writeExecutable は指定されたパスに実行可能なダミーファイルを作成する。
 func writeExecutable(t *testing.T, path string) {
+	writeExecutableWithScript(t, path, "#!/bin/sh\n")
+}
+
+// writeExecutableWithScript は指定されたスクリプトの実行可能ファイルを作成する。
+func writeExecutableWithScript(t *testing.T, path, script string) {
 	t.Helper()
 
 	//nolint:gosec // 探索対象の実行可能ファイルとして Stat できることを確認するだけのダミーを、テスト専用ディレクトリ内に作成する。
-	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"), 0700))
+	require.NoError(t, os.WriteFile(path, []byte(script), 0700))
 }
 
 // writeGoMod は指定されたディレクトリに探索の打ち切り位置を決めるための go.mod を作成する。

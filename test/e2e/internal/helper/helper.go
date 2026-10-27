@@ -26,6 +26,7 @@ type Helper struct {
 	description    string
 	binary         string
 	defaultTimeout time.Duration
+	startedAt      time.Time
 	results        []Result
 	mu             sync.Mutex
 }
@@ -111,6 +112,7 @@ func newHelper(t *testing.T, name, description string) *Helper {
 		description:    description,
 		binary:         binary,
 		defaultTimeout: 10 * time.Minute,
+		startedAt:      time.Now(),
 	}
 
 	t.Cleanup(func() {
@@ -133,6 +135,10 @@ func newHelper(t *testing.T, name, description string) *Helper {
 
 		var buf bytes.Buffer
 		buf.WriteString(fmt.Sprintf("# %s\n%s\n", h.name, h.description))
+		// レポートの先頭にシナリオ全体の所要時間と生成日時を記録する。
+		// 所要時間は1分以上「1m47s」のように分と秒で表示する。
+		buf.WriteString(fmt.Sprintf("\n**total duration**:\n%v\n\n", time.Since(h.startedAt).Round(time.Second)))
+		buf.WriteString(fmt.Sprintf("**generated at**:\n%s\n\n", time.Now().Format(time.RFC3339)))
 		for _, res := range h.results {
 			buf.WriteString(fmt.Sprintf("## %s\n\n", res.Description()))
 			buf.WriteString(res.Render())
@@ -173,6 +179,25 @@ func (h *Helper) Call(t *testing.T, description string, args ...string) []byte {
 func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, description string, args ...string) []byte {
 	t.Helper()
 
+	stdout, stderr, err := h.run(t, timeout, description, args...)
+	require.NoError(t, err, stderr.String())
+	return stdout.Bytes()
+}
+
+// CallAllowingFailure は指定されたコマンドを実行し、stdout・stderr・エラーを返す。
+// コマンドの失敗はテストを停止しない。実行結果は Call と同様に実行記録へ保存する。
+// 失敗が想定内かどうかの判断は呼び出し元が行う。
+func (h *Helper) CallAllowingFailure(t *testing.T, description string, args ...string) ([]byte, string, error) {
+	t.Helper()
+
+	stdout, stderr, err := h.run(t, h.defaultTimeout, description, args...)
+	return stdout.Bytes(), stderr.String(), err
+}
+
+// run は指定されたコマンドを実行し、stdout・stderr・エラーを返す。実行結果は実行記録へ保存する。
+func (h *Helper) run(t *testing.T, timeout time.Duration, description string, args ...string) (bytes.Buffer, bytes.Buffer, error) {
+	t.Helper()
+
 	ctx, cancel := context.WithTimeout(t.Context(), timeout)
 	defer cancel()
 
@@ -195,8 +220,24 @@ func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, descriptio
 	})
 	h.mu.Unlock()
 
-	require.NoError(t, runErr, stderr.String())
-	return stdout.Bytes()
+	return stdout, stderr, runErr
+}
+
+// Sleep は指定された時間だけ待機し、待機した時間を実行記録へ保存する。
+// 反映待ちなどで待機した時間もレポートに残す。実行記録は待機の開始前に追加する。
+func (h *Helper) Sleep(t *testing.T, description string, d time.Duration) {
+	t.Helper()
+
+	t.Logf("%s: %s", description, d)
+
+	h.mu.Lock()
+	h.results = append(h.results, &sleepResult{
+		description: description,
+		duration:    d,
+	})
+	h.mu.Unlock()
+
+	time.Sleep(d)
 }
 
 // WriteRequestJSONFile は --request @path で CLI に渡すリクエストファイルを作成し、パスを返します。
