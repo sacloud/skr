@@ -25,7 +25,6 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -89,10 +88,6 @@ type serverRun struct {
 	name string
 	// params は cloud-init アーカイブとディスクプランの設定です。
 	params serverDiskParams
-	// material は SSH 接続確認に使う一時的な鍵と cloud-init の user-data です。
-	material helper.SSHMaterial
-	// sshTimeout は SSH ログイン確認の期限です。ライブ実行では sshWaitTimeout を使います。
-	sshTimeout time.Duration
 	// serverID は作成に成功した Server の ID です。作成前は空です。
 	serverID types.ID
 }
