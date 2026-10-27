@@ -179,7 +179,17 @@ func (h *Helper) Call(t *testing.T, description string, args ...string) []byte {
 func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, description string, args ...string) []byte {
 	t.Helper()
 
-	stdout, stderr, err := h.run(t, timeout, description, args...)
+	stdout, stderr, err := h.run(t, timeout, false, description, args...)
+	require.NoError(t, err, stderr.String())
+	return stdout.Bytes()
+}
+
+// CallHidingStdout は stdout に秘密情報が含まれるコマンドを実行し、
+// stdout を実行記録に残さずに返します。コマンドの実行自体と stderr は実行記録に残ります。
+func (h *Helper) CallHidingStdout(t *testing.T, description string, args ...string) []byte {
+	t.Helper()
+
+	stdout, stderr, err := h.run(t, h.defaultTimeout, true, description, args...)
 	require.NoError(t, err, stderr.String())
 	return stdout.Bytes()
 }
@@ -190,12 +200,13 @@ func (h *Helper) CallWithTimeout(t *testing.T, timeout time.Duration, descriptio
 func (h *Helper) CallAllowingFailure(t *testing.T, description string, args ...string) ([]byte, string, error) {
 	t.Helper()
 
-	stdout, stderr, err := h.run(t, h.defaultTimeout, description, args...)
+	stdout, stderr, err := h.run(t, h.defaultTimeout, false, description, args...)
 	return stdout.Bytes(), stderr.String(), err
 }
 
 // run は指定されたコマンドを実行し、stdout・stderr・エラーを返す。実行結果は実行記録へ保存する。
-func (h *Helper) run(t *testing.T, timeout time.Duration, description string, args ...string) (bytes.Buffer, bytes.Buffer, error) {
+// hideStdout を設定すると、秘密情報を含む stdout を実行記録に残さない。
+func (h *Helper) run(t *testing.T, timeout time.Duration, hideStdout bool, description string, args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(t.Context(), timeout)
@@ -217,6 +228,7 @@ func (h *Helper) run(t *testing.T, timeout time.Duration, description string, ar
 		stdout:      stdout.String(),
 		stderr:      stderr.String(),
 		duration:    time.Since(start),
+		hideStdout:  hideStdout,
 	})
 	h.mu.Unlock()
 

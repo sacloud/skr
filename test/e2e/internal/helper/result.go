@@ -18,6 +18,8 @@ type commandResult struct {
 	stdout      string
 	stderr      string
 	duration    time.Duration
+	// hideStdout は stdout に秘密情報が含まれる場合に、実行記録へ stdout を残さないためのフラグです。
+	hideStdout bool
 }
 
 func (c *commandResult) Description() string { return c.description }
@@ -28,9 +30,15 @@ func (c *commandResult) Render() string {
 	buf.WriteString("\n```\n\n")
 	buf.WriteString("**duration**:\n")
 	buf.WriteString(fmt.Sprintf("%v\n\n", c.duration))
-	buf.WriteString("**stdout**:\n```\n")
-	buf.WriteString(c.stdout)
-	buf.WriteString("\n```\n\n")
+	buf.WriteString("**stdout**:\n")
+	if c.hideStdout {
+		// 秘密情報を含む stdout は実行記録に残さず、省略したことを記録する。
+		buf.WriteString("秘密情報が含まれるため省略します。\n\n")
+	} else {
+		buf.WriteString("```\n")
+		buf.WriteString(c.stdout)
+		buf.WriteString("\n```\n\n")
+	}
 	buf.WriteString("**stderr**:\n```\n")
 	buf.WriteString(c.stderr)
 	buf.WriteString("\n```\n\n")

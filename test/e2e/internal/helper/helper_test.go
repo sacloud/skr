@@ -215,6 +215,26 @@ func TestCallAllowingFailureSucceeds(t *testing.T) {
 	require.Empty(t, stderr)
 }
 
+// TestCallHidingStdout は stdout に秘密情報が含まれるコマンドで、実行記録に stdout を残さないことを確認する。
+func TestCallHidingStdout(t *testing.T) {
+	base := t.TempDir()
+	// stdout に秘密情報を出力するダミーコマンドを配置する
+	writeExecutableWithScript(t, filepath.Join(base, "skr"), "#!/bin/sh\nprintf '%s' '{\"APIKey\":\"test-only-api-key\"}'\n")
+	enterScenarioDir(t, base)
+
+	h := &Helper{name: "test", description: "test", binary: filepath.Join(base, "skr"), defaultTimeout: 10 * time.Second}
+	stdout := h.CallHidingStdout(t, "API キーを発行する")
+
+	// 呼び出し元には生の stdout を返す
+	require.Contains(t, string(stdout), "test-only-api-key", "the caller should receive the raw stdout")
+
+	// 実行記録には秘密情報を残さず、省略したことを記録する
+	require.Len(t, h.results, 1, "the call should be recorded")
+	rendered := h.results[0].Render()
+	require.NotContains(t, rendered, "test-only-api-key", "the report should not contain the secret")
+	require.Contains(t, rendered, "省略します", "the report should note the hidden stdout")
+}
+
 // TestSleep は Sleep が待機した時間を実行記録に保存することを確認する。
 func TestSleep(t *testing.T) {
 	h := &Helper{name: "test", description: "test"}
@@ -248,7 +268,7 @@ func TestReportIncludesTotalDuration(t *testing.T) {
 	files, err := filepath.Glob("e2e-output/test-*.md")
 	require.NoError(t, err)
 	require.Len(t, files, 1, "the report file should be written by t.Cleanup")
-	data, err := os.ReadFile(files[0]) //nolint:gosec // テスト専用ディレクトリ内のレポートを読み込む。
+	data, err := os.ReadFile(files[0])
 	require.NoError(t, err, "read report file")
 
 	// 所要時間は説明の後、最初のステップより前に秒単位で、生成日時とともに記録される
