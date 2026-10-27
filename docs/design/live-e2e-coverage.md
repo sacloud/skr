@@ -22,7 +22,7 @@
 | `test/e2e/region` | find / read(2) | 全コマンド実装済み |
 | `test/e2e/serverplan` | find / read(2) | 全コマンド実装済み |
 | `test/e2e/serviceclass` | find(1) | 全コマンド実装済み |
-| `test/e2e/zone` | find(1) | 全コマンド実装済み |
+| `test/e2e/zone` | find / find --query / read(3) | 全コマンド実装済み。ライブで正常応答を確認済み |
 | `test/e2e/version` | version(1) | 全コマンド実装済み。ライブで正常応答を確認済み |
 | `test/e2e/iaas-lookup` | archive find / read、product disk find / read(4) | 全コマンド実装済み |
 | `test/e2e/iaas-product-plans` | product internet find / read、product license find、product privatehost find / read(5) | 全コマンド実装済み |

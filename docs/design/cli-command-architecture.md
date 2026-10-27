@@ -96,7 +96,7 @@ Disk API のライブ操作は `test/e2e/disk` で検証します。対象は `i
 
 Switch runner は `--confirm-is1b-live` でも実行できます。`--confirm-tk1v` との併用は拒否します。この経路では `is1b` にランダム名のスイッチを作成し、既存リソースの事前削除は行いません。検索、参照、更新、投影 JSON の確認後に今回作成した ID と名前・説明を照合して削除し、不在を検証します。
 
-Zone API の読み取り専用ライブ E2E は `test/e2e/zone` にあります。対象プロファイルと IaaS API の読み取り権限を確認してから `make build`、`./skr config current`、`go run ./test/e2e/zone --skr ./skr --confirm-zone-live` を実行します。runner は選択中プロファイルを確認してから `zone find --query 'map(.Name)'` を実行し、ゾーン名の JSON 配列を検証します。クラウドリソースの作成・変更・削除は行いません。入力・出力・エラーは共通の private evidence 機構で `tmp/zone-api/<YYYYMMDDHHmm>/` に保存します。
+Zone API の読み取り専用ライブ E2E は `test/e2e/zone` の `scenario_zone_test.go` で検証します。`SKR_E2E` を設定して `go test` を実行すると `skr-e2e` プロファイルでライブ実行し、通常の `go test` では実行環境を変更しません。シナリオはゾーン一覧の取得、`--query 'map(.Name)'` での名前抽出、一覧の先頭ゾーンの ID での参照を確認します。クラウドリソースの作成・変更・削除は行いません。実行記録は helper が Git 管理外の `e2e-output/` 配下の Markdown に保存します。
 
 実行する開発者は対象プロファイルとプロジェクトを確認します。`tk1v` の既存テスト用スイッチの事前削除を含む変更の承認を得てください。その後、リポジトリのルートで `make build`、`./skr config current`、`go run ./test/e2e/switch --skr ./skr --confirm-tk1v` を実行します。スクリプトは選択中のプロファイルを要求します。同じ分に複数回実行した場合は `-02` 以降を付けて既存の証跡を上書きしません。各 JSON の先頭にある連番と `ORDER.txt` で実行順を確認し、`RESULT.txt` で最終結果を確認します。証跡のディレクトリは `0700`、入力と出力を含む JSON ファイルは `0600` です。実際の ID やアカウント情報を含むため Git に追加・共有しません。削除に失敗した場合はエラーと証跡から対象を確認します。
 

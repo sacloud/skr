@@ -50,21 +50,23 @@ func TestZoneGeneratedCodeMatchesConfig(t *testing.T) {
 	}
 }
 
-func TestIaaSZoneFindHelp(t *testing.T) {
+func TestIaaSZoneHelp(t *testing.T) {
 	for _, test := range []struct {
 		args []string
 		want []string
 	}{
-		{args: []string{"iaas-api", "zone", "--help"}, want: []string{"find", "--query", "map(.Name)"}},
+		{args: []string{"iaas-api", "zone", "--help"}, want: []string{"find", "read"}},
 		{args: []string{"iaas-api", "zone", "find", "--help"}, want: []string{"--query", "map(.Name)", "--request", "FindRequest"}},
+		{args: []string{"iaas-api", "zone", "read", "--help"}, want: []string{"--id", "--request", "@path.json", "ZONE-ID", "併用できません"}},
 	} {
 		var stdout, stderr bytes.Buffer
 		if code := run(test.args, &stdout, &stderr); code != 0 {
 			t.Fatalf("run(%v) = %d; stderr: %s", test.args, code, stderr.String())
 		}
+		help := strings.Join(strings.Fields(stdout.String()), " ")
 		for _, text := range test.want {
-			if !strings.Contains(stdout.String(), text) {
-				t.Errorf("run(%v) help does not contain %q: %s", test.args, text, stdout.String())
+			if !strings.Contains(help, text) {
+				t.Errorf("help for %v does not contain %q: %s", test.args, text, help)
 			}
 		}
 	}
@@ -106,5 +108,92 @@ func TestIaaSZoneFindWithLocalMockAndQuery(t *testing.T) {
 	}
 	if len(names) != 2 || names[0] != "test-zone-a" || names[1] != "test-zone-b" {
 		t.Errorf("query output = %#v, want configured zone names", names)
+	}
+}
+
+func TestIaaSZoneReadWithLocalMock(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	server := iaasmock.NewTestServer(iaasmock.Config{Zones: []string{"test-zone-a", "test-zone-b"}})
+	t.Cleanup(server.Close)
+
+	commandLine := newCLI()
+	setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
+		return zone.New(server), nil
+	})
+	runCommand := func(args ...string) string {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		if code := runCLI(args, &stdout, &stderr, commandLine); code != 0 {
+			t.Fatalf("run(%v) = %d; stderr: %s", args, code, stderr.String())
+		}
+		if stderr.Len() != 0 {
+			t.Errorf("run(%v) stderr = %q, want empty", args, stderr.String())
+		}
+		return stdout.String()
+	}
+
+	// --id フラグ経路でゾーンを参照する
+	output := runCommand("iaas-api", "zone", "read", "--id", "2")
+	if !strings.Contains(output, `"Name": "test-zone-b"`) {
+		t.Fatalf("read --id output = %q, want test-zone-b", output)
+	}
+
+	// --query で必要な項目へ絞り込む。応答は単一オブジェクトのためオブジェクト構築式を使う
+	projected := runCommand("iaas-api", "zone", "read", "--id", "1", "--query", "{ID,Name}")
+	var item struct {
+		ID   int64
+		Name string
+	}
+	if err := json.Unmarshal([]byte(projected), &item); err != nil {
+		t.Fatalf("decode projected output %q: %v", projected, err)
+	}
+	if item.ID != 1 || item.Name != "test-zone-a" {
+		t.Fatalf("projected read = %#v, want ID 1 and test-zone-a", item)
+	}
+
+	// --request 経路でも同じ SDK リクエストになる
+	jsonOutput := runCommand("iaas-api", "zone", "read", "--request", `{"ID":2}`)
+	if !strings.Contains(jsonOutput, `"Name": "test-zone-b"`) {
+		t.Fatalf("read --request output = %q, want test-zone-b", jsonOutput)
+	}
+}
+
+func TestIaaSZoneRejectsInvalidReadRequestsBeforeCallingAPI(t *testing.T) {
+	server := iaasmock.NewTestServer(iaasmock.Config{Zones: []string{"test-zone-a"}})
+	t.Cleanup(server.Close)
+	for _, args := range [][]string{
+		{"read"},
+		{"read", "--id", "invalid"},
+		{"read", "--id", "1", "--request", `{"ID":1}`},
+		{"read", "--request", `{"ID":"invalid"}`},
+		{"read", "--request", `{"ID":1} {}`},
+		{"read", "--request", `{"Unknown":1}`},
+		{"read", "--request", `not-json`},
+	} {
+		commandLine := newCLI()
+		setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
+			return zone.New(server), nil
+		})
+		var stdout, stderr bytes.Buffer
+		code := runCLI(append([]string{"iaas-api", "zone"}, args...), &stdout, &stderr, commandLine)
+		if code == 0 || stdout.Len() != 0 || stderr.Len() == 0 {
+			t.Errorf("%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
+		}
+	}
+}
+
+func TestIaaSZoneReadPropagatesAPIErrors(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	server := iaasmock.NewTestServer(iaasmock.Config{Zones: []string{"test-zone-a"}})
+	t.Cleanup(server.Close)
+
+	commandLine := newCLI()
+	setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
+		return zone.New(server), nil
+	})
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"iaas-api", "zone", "read", "--id", "99"}, &stdout, &stderr, commandLine)
+	if code == 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "not_found") {
+		t.Fatalf("read error: code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
 	}
 }

@@ -1,6 +1,6 @@
-# IaaS Zone API: ゾーン一覧を jq で加工する
+# IaaS Zone API: ゾーン一覧とゾーン情報を参照する
 
-`skr iaas-api zone find` は IaaS API からゾーン一覧を取得します。このチュートリアルでは、JSON の一覧を確認し、`--query` でゾーン名だけを取り出します。
+`skr iaas-api zone` は IaaS API からゾーン一覧とゾーン情報を取得します。このチュートリアルでは、JSON の一覧を確認し、`--query` でゾーン名だけを取り出し、指定した ID のゾーン情報を参照します。
 
 ## 前提条件
 
@@ -19,6 +19,7 @@ $ skr config current
 $ skr iaas-api --help
 $ skr iaas-api zone --help
 $ skr iaas-api zone find --help
+$ skr iaas-api zone read --help
 ```
 
 ### 2. ゾーン一覧を JSON で確認する
@@ -46,9 +47,29 @@ $ skr iaas-api zone find --query 'map(.Name)'
 
 jq 式は skr に組み込まれた gojq で評価するため、外部の jq コマンドは不要です。
 
+### 4. ID でゾーン情報を参照する
+
+`zone read` に `--id` でゾーン ID を指定すると、そのゾーンの情報を取得します。表示されるゾーン ID は環境によって異なるため、`zone find` の結果から選んだ値を使います。
+
+```console
+$ skr iaas-api zone read --id 21001
+```
+
+応答には ID、表示順、名前、説明のほか、VNC プロキシや FTP サーバなどの接続情報が含まれます。必要な項目だけを確認するには、`--query` でオブジェクトを構築します。`read` の応答は配列ではなく単一オブジェクトのため、`map()` ではなく `{ID,Name}` の形式を使います。
+
+```console
+$ skr iaas-api zone read --id 21001 --query '{ID,Name,Region}'
+```
+
+`--id` と `--request` は併用できません。`ReadRequest` JSON を直接指定する場合は次のようにします。
+
+```console
+$ skr iaas-api zone read --request '{"ID":21001}'
+```
+
 ## クリーンアップ
 
-この手順は読み取り専用の一覧取得です。削除するリソースはありません。
+この手順は読み取り専用の参照です。削除するリソースはありません。
 
 ## 参考資料
 

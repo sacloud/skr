@@ -95,3 +95,41 @@ func TestIconMissingResourceReturnsNotFound(t *testing.T) {
 		})
 	}
 }
+
+func TestZoneFindReturnsConfiguredZonesWithIDs(t *testing.T) {
+	server := NewTestServer(Config{Zones: []string{"test-zone-a", "test-zone-b"}})
+	t.Cleanup(server.Close)
+	ctx := context.Background()
+
+	result, err := sdk.NewZoneOp(server).Find(ctx, &sdk.FindCondition{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Zones) != 2 || result.Zones[0].ID != types.ID(1) || result.Zones[0].Name != "test-zone-a" ||
+		result.Zones[1].ID != types.ID(2) || result.Zones[1].Name != "test-zone-b" {
+		t.Fatalf("zone find = %#v, want configured zones with IDs 1 and 2", result.Zones)
+	}
+}
+
+func TestZoneReadReturnsConfiguredZone(t *testing.T) {
+	server := NewTestServer(Config{Zones: []string{"test-zone-a", "test-zone-b"}})
+	t.Cleanup(server.Close)
+
+	found, err := sdk.NewZoneOp(server).Read(context.Background(), types.ID(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.ID != types.ID(2) || found.Name != "test-zone-b" {
+		t.Fatalf("zone read = %#v, want ID 2 and name test-zone-b", found)
+	}
+}
+
+func TestZoneMissingResourceReturnsNotFound(t *testing.T) {
+	server := NewTestServer(Config{Zones: []string{"test-zone-a"}})
+	t.Cleanup(server.Close)
+	_, err := sdk.NewZoneOp(server).Read(context.Background(), types.ID(99))
+	var apiErr sdk.APIError
+	if !errors.As(err, &apiErr) || apiErr.ResponseCode() != http.StatusNotFound {
+		t.Fatalf("error = %v, want API 404", err)
+	}
+}
