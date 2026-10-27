@@ -14,7 +14,7 @@
 | `test/e2e/c0nfig` | config の current / list / show / create / edit / use(6) | 全コマンド実装済み |
 | `test/e2e/http` | http(1) | 全コマンド実装済み |
 | `test/e2e/simplemq` | queue 8操作、message 4操作(12) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
-| `test/e2e/simple-notification` | destination 6、group 6、history 2、routing 7(21) | 全コマンド実装済み |
+| `test/e2e/simple-notification` | destination 6、group 6、history 2、routing 7(21) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/container-registry-api` | registry 5操作、user 4操作(9) | 全コマンド実装済み |
 | `test/e2e/networking-suite` | subnet-group 5、subnet 5、interface-connection 2、address 2(14) | 全コマンド実装済み |
 | `test/e2e/gslb` | find / read / create / update / delete(5) | 全コマンド実装済み |
@@ -97,9 +97,10 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 - タスク3の iam-api runner は `test/e2e/iam-api/` 配下に次のシナリオと、対応する `_test.go` を追加しました。証跡ステップは `account-read-password-policy`、`account-update-service-policy`、`u2fa-read-missing-security-key` などの kebab-case です。
     - `scenario_read_only.go`、`scenario_policy.go`、`scenario_hierarchy.go`、`scenario_serviceprincipal.go`、`scenario_projectapikey.go`。
     - `scenario_scim.go`、`scenario_sso.go`、`scenario_account.go`、`scenario_user2fa.go`。
-- 任意の改善候補として、`test/e2e/simple-notification/crud.go` を `scenario_crud_only.go` に改名できます。対応する `crud_test.go` も合わせます。`test/e2e/gslb/server.go` は役割を表す名前のため変更不要です。
+- 任意の改善候補として、`test/e2e/simple-notification/crud.go` を `scenario_crud_only.go` に改名できます。対応する `crud_test.go` も合わせます。`test/e2e/gslb/server.go` は役割を表す名前のため変更不要です。2026-10-27 の simple-notification の移行で `crud.go` は削除済みです。
 - switch の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/switch/scenario_switch_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。旧 runner の固定名での事前後片付けはランダムな接尾辞付きの名前に置き換え、作成前の同名確認は [ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従い実行記録を残さない SDK で直接実行し、後片付けの削除前再参照と削除後の不在確認はシナリオ内で行います。検証ゾーンは旧 runner の is1b モードに合わせて is1b の単一シナリオに絞り、旧 runner の Sandbox (tk1v) モードは削除しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 - simplemq の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/simplemq/scenario_simplemq_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。旧 runner の `evidence` 機構による実行記録は共有 helper の実行記録に置き換わり、API キーの発行は stdout を実行記録に残さない `CallHidingStdout` で行います。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
+- simple-notification の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`scenario_notification_test.go`、`scenario_crud_only_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`、`crud.go`、`crud_test.go`) は `test/e2e/simple-notification/` から削除しました。既存通知先の ID は `SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID` 環境変数で渡し、未設定の場合はテストをスキップします。一時リソースの作成・更新・並べ替えの反映待ちは `helper.Sleep` で実行記録に残します。後片付けの削除と不在確認は `helper.Call` / `CallAllowingFailure` で行い、移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 
 ## 参照
 
