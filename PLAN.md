@@ -62,7 +62,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `autoscale`
 - [x] `containerregistry` — `container-registry-api` でレジストリと認証ユーザーを管理します。ライブ E2E テストと[チュートリアル](docs/manual/tutorials/container-registry-api.md)を追加済み
 - [ ] `dns`
-- [x] `gslb` — `gslb-api` で Find / Read / Create / Update / Delete を実装済みです。単純値、ヘルスチェックのフラットなフラグ、反復可能な `--destination-server` と JSON 入力に対応します。[is1b ライブ E2E runner](test/e2e/gslb/) で実サーバーとソーリーサーバーを各1台作成し、ping 監視による停止・復帰時の応答先切り替えを `NOERROR` と期待 IP の完全一致で確認済みです。GSLB の CRUD、両サーバーの削除、ディスクの個別削除と各リソースの不在も確認済みです。以前の単一宛先・空応答による停止確認は不十分なため、この構成で置き換えました。[チュートリアル](docs/manual/tutorials/gslb-api.md)では両サーバーの準備、ソーリーサーバーへの切り替えと復帰、更新、ディスクの個別削除を説明します
+- [x] `gslb` — `gslb-api` で Find / Read / Create / Update / Delete を実装済みです。単純値、ヘルスチェックのフラットなフラグ、反復可能な `--destination-server` と JSON 入力に対応します。[testing.T ベースのライブ E2E](test/e2e/gslb/) で実サーバーとソーリーサーバーを各1台作成し、ping 監視による停止・復帰時の応答先切り替えを `NOERROR` と期待 IP の完全一致で確認済みです。GSLB の CRUD、両サーバーのディスク込み削除、各リソースの不在も確認済みです。以前の単一宛先・空応答による停止確認は不十分なため、この構成で置き換えました。[チュートリアル](docs/manual/tutorials/gslb-api.md)では両サーバーの準備、ソーリーサーバーへの切り替えと復帰、更新、ディスクの個別削除を説明します
 - [ ] `localrouter`
 - [ ] `proxylb`
 - [ ] `simplemonitor`
