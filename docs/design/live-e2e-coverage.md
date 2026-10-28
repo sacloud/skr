@@ -29,7 +29,7 @@
 | `test/e2e/version` | version(1) | 全コマンド実装済み。ライブで正常応答を確認済み |
 | `test/e2e/iaas-lookup` | archive find / read、product disk find / read(4) | 全コマンド実装済み |
 | `test/e2e/iaas-product-plans` | product internet find / read、product license find、product privatehost find / read(5) | 全コマンド実装済み |
-| `test/e2e/object-storage-api` | 6シナリオで34コマンド | runner 実装済み。ライブは29コマンドの正常応答を確認済みで、`bucket penalty` と `site status bucket-metering` は API エラー、暗号化3操作は KMS キー作成未実装のため延期。状況は `PLAN.md` を参照 |
+| `test/e2e/object-storage-api` | 6シナリオで34コマンド | testing.T ベースのシナリオに移行済み。ライブは29コマンドの正常応答を確認済みで、`bucket penalty` と `site status bucket-metering` は API エラー、暗号化3操作は KMS キー作成未実装のため延期。状況は `PLAN.md` を参照 |
 | `test/e2e/iam-api` | 8シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | runner 実装済み。ライブは57コマンドの正常実行を確認済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
 
 `config` は CLI のメタコマンドとして上表に含めます。`version` は `test/e2e/version` の testing.T ベースのシナリオテストで検証します。
