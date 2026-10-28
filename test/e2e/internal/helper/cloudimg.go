@@ -99,9 +99,10 @@ func AvailableDiskPlan(plans []*iaas.DiskPlan, sizeGB int64) *iaas.DiskPlan {
 
 // diskPlanHasSize はディスクプランが指定サイズ (GB) を利用可能なサイズとして持つかどうかを返します。
 func diskPlanHasSize(plan *iaas.DiskPlan, sizeGB int64) bool {
-	sizeMB := int(sizeGB) * 1024
+	// GB を MB に換算して照合します。int64 のまま扱い、解析済みの値を狭める変換を行いません
+	sizeMB := sizeGB * 1024
 	for _, size := range plan.Size {
-		if size.SizeMB == sizeMB && size.Availability == types.Availabilities.Available {
+		if int64(size.SizeMB) == sizeMB && size.Availability == types.Availabilities.Available {
 			return true
 		}
 	}
