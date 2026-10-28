@@ -12,179 +12,196 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// このファイルは iam-api E2E の read-only シナリオです。
+// この実行でリソースを作成せず、読み取りコマンドを確認します。
 package main
 
 import (
-	"context"
-	"slices"
-	"strings"
+	"encoding/json"
 	"testing"
+
+	"github.com/sacloud/skr/test/e2e/internal/helper"
+	"github.com/stretchr/testify/require"
 )
 
-func TestReadOnlyScenarioCoversCatalogAndPolicies(t *testing.T) {
-	fake := newFakeCLI()
-	s := testScenario(t, fake)
-	if err := s.readOnlyScenario(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{
-		"iam-role-list",
-		"iam-role-read",
-		"id-role-list",
-		"id-role-read",
-		"id-policy-read-organization",
-		"read-auth-context",
-		"read-auth-conditions",
-		"read-password-policy",
-		"policy-read-organization",
-		"organization-read",
-		"service-policy-is-enabled",
-		"read-service-policy",
-		"list-rule-templates",
-	} {
-		if !slices.Contains(fake.calls, want) {
-			t.Errorf("read-only scenario did not call %s: %v", want, fake.calls)
-		}
-	}
-	if got := fake.argsByStep["iam-role-read"]; !slices.Equal(got, []string{"iam-api", "iam-role", "read", "addon-admin"}) {
-		t.Errorf("iam-role-read args = %v", got)
-	}
-	if got := fake.argsByStep["id-role-read"]; !slices.Equal(got, []string{"iam-api", "id-role", "read", "identity-admin"}) {
-		t.Errorf("id-role-read args = %v", got)
-	}
-	if got := fake.argsByStep["id-policy-read-organization"]; !slices.Equal(got, []string{"iam-api", "id-policy", "read-organization"}) {
-		t.Errorf("id-policy-read-organization args = %v", got)
-	}
+type roleSummary struct {
+	ID                      string `json:"id"`
+	Name                    string `json:"name"`
+	Description             string `json:"description"`
+	Category                string `json:"category"`
+	LowestGrantableResource string `json:"lowest_grantable_resource"`
 }
 
-func TestReadOnlyScenarioDoesNotCreateResources(t *testing.T) {
-	fake := newFakeCLI()
-	s := testScenario(t, fake)
-	if err := s.readOnlyScenario(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if len(fake.users) != 0 || len(fake.groups) != 0 || len(fake.folders) != 0 || len(fake.projects) != 0 || len(fake.servicePrincipals) != 0 {
-		t.Fatalf("read-only scenario created resources: users=%+v folders=%+v", fake.users, fake.folders)
-	}
+type roleList struct {
+	Items []roleSummary `json:"items"`
 }
 
-func TestReadResourcePoliciesUsesRunResources(t *testing.T) {
-	fake := newFakeCLI()
-	s := testScenario(t, fake)
-	if err := s.createFolder(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.createProject(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.readResourcePolicies(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if got := fake.argsByStep["policy-read-folder"]; !slices.Equal(got, []string{"iam-api", "policy", "read-folder", "3001"}) {
-		t.Errorf("policy-read-folder args = %v, want the folder created by this run", got)
-	}
-	if got := fake.argsByStep["policy-read-project"]; !slices.Equal(got, []string{"iam-api", "policy", "read-project", "4001"}) {
-		t.Errorf("policy-read-project args = %v, want the project created by this run", got)
-	}
-	if err := s.cleanup(); err != nil {
-		t.Fatal(err)
-	}
+type policyRole struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
 }
 
-func TestReadOnlyScenarioReportsFailures(t *testing.T) {
-	tests := []struct {
-		name     string
-		fake     func(f *fakeCLI)
-		fails    string
-		contains bool
-	}{
-		{
-			name:  "empty role catalog",
-			fake:  func(f *fakeCLI) { f.emptyRoleCatalog = true },
-			fails: "iam-role-list: the role catalog is empty",
-		},
-		{
-			name:  "iam-role read mismatch",
-			fake:  func(f *fakeCLI) { f.iamRoleReadID = "other-role" },
-			fails: "iam-role read mismatch: got \"other-role\"/\"Add-on service\", want \"addon-admin\"/\"Add-on service\"",
-		},
-		{
-			name:  "id-role read mismatch",
-			fake:  func(f *fakeCLI) { f.idRoleReadID = "other-role" },
-			fails: "id-role read mismatch: got \"other-role\"/\"ID administrator\", want \"identity-admin\"/\"ID administrator\"",
-		},
-		{
-			name:  "auth context without resource ID",
-			fake:  func(f *fakeCLI) { f.authResourceID = -1 },
-			fails: "read-auth-context: resource_id = -1, want a positive value",
-		},
-		{
-			name:  "password policy without min length",
-			fake:  func(f *fakeCLI) { f.passwordMinLength = -1 },
-			fails: "read-password-policy: min_length = -1, want a positive value",
-		},
-		{
-			name:  "organization without ID",
-			fake:  func(f *fakeCLI) { f.organizationID = -1 },
-			fails: "organization-read: id = -1, want a positive value",
-		},
-		{
-			name:     "broken policy bindings JSON",
-			fake:     func(f *fakeCLI) { f.brokenPolicyJSON = true },
-			fails:    "id-policy-read-organization: decode policy bindings",
-			contains: true,
-		},
-		{
-			name:  "empty rule template catalog",
-			fake:  func(f *fakeCLI) { f.emptyRuleTemplates = true },
-			fails: "list-rule-templates: the rule template catalog is empty",
-		},
-		{
-			name:  "injected CLI failure",
-			fake:  func(f *fakeCLI) { f.failAt = "read-auth-context" },
-			fails: "injected CLI failure at read-auth-context",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fake := newFakeCLI()
-			tt.fake(fake)
-			s := testScenario(t, fake)
-			err := s.readOnlyScenario(context.Background())
-			if err == nil {
-				t.Fatalf("read-only scenario succeeded, want %q", tt.fails)
-			}
-			if tt.contains {
-				if !strings.Contains(err.Error(), tt.fails) {
-					t.Errorf("error = %q, want to contain %q", err.Error(), tt.fails)
-				}
-				return
-			}
-			if err.Error() != tt.fails {
-				t.Errorf("error = %q, want %q", err.Error(), tt.fails)
-			}
-		})
-	}
+type policyPrincipal struct {
+	Type string `json:"type"`
+	ID   int64  `json:"id"`
 }
 
-func TestReadResourcePoliciesReportsFailures(t *testing.T) {
-	fake := newFakeCLI()
-	fake.brokenPolicyJSON = true
-	s := testScenario(t, fake)
-	if err := s.createFolder(context.Background()); err != nil {
-		t.Fatal(err)
+type policyBinding struct {
+	Role       policyRole        `json:"role"`
+	Principals []policyPrincipal `json:"principals"`
+}
+
+type authContext struct {
+	ResourceID         int64  `json:"resource_id"`
+	AuthType           string `json:"auth_type"`
+	LimitedToProjectID *int64 `json:"limited_to_project_id"`
+	MemberCode         string `json:"member_code"`
+}
+
+type ipRestriction struct {
+	Mode string `json:"mode"`
+}
+
+type twoFactorAuth struct {
+	Enabled bool `json:"enabled"`
+}
+
+type authConditions struct {
+	IPRestriction        ipRestriction `json:"ip_restriction"`
+	RequireTwoFactorAuth twoFactorAuth `json:"require_two_factor_auth"`
+}
+
+type passwordPolicy struct {
+	MinLength        int  `json:"min_length"`
+	RequireUppercase bool `json:"require_uppercase"`
+	RequireLowercase bool `json:"require_lowercase"`
+	RequireSymbols   bool `json:"require_symbols"`
+}
+
+type organizationInfo struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+type ruleTemplateSummary struct {
+	Code           string `json:"code"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	Type           string `json:"type"`
+	SupportsDryRun bool   `json:"supports_dry_run"`
+}
+
+type ruleTemplateList struct {
+	Items []ruleTemplateSummary `json:"items"`
+}
+
+// TestScenarioIAMReadOnly は、この実行でリソースを作成せず、
+// IAM API の read-only コマンドを確認します。
+// すべてのコマンドはデータの読み込みのみを行うため、
+// organization 全体の設定は変更されません。
+func TestScenarioIAMReadOnly(t *testing.T) {
+	h := helper.New(t, "iam-api-read-only",
+		"IAM API の読み取りコマンドが正しいデータを返すことを確認する")
+
+	// iam-role と id-role のロールカタログを確認する
+	checkRoleCatalog(t, h, "iam-role")
+	checkRoleCatalog(t, h, "id-role")
+	// organization の ID ポリシー binding を読み込む
+	readPolicyBindings(t, h, "organizationのIDポリシーbindingを読み込む", "id-policy", "read-organization", "")
+	// 認証コンテキストを読み込む
+	checkAuthContext(t, h)
+	// 認証条件とパスワードポリシーを読み込む
+	checkAuthConditions(t, h)
+	checkPasswordPolicy(t, h)
+	// organization の IAM ポリシー binding を読み込む
+	readPolicyBindings(t, h, "organizationのIAMポリシーbindingを読み込む", "policy", "read-organization", "")
+	// organization とサービスポリシーを確認する
+	checkOrganization(t, h)
+	checkServicePolicy(t, h)
+}
+
+// checkRoleCatalog は利用可能なロールを一覧表示し、最初の1つを読み込みます。
+// kind は iam-role または id-role です。
+func checkRoleCatalog(t *testing.T, h *helper.Helper, kind string) {
+	t.Helper()
+	data := h.Call(t, kind+"のロール一覧を取得する", "iam-api", kind, "list")
+	var list roleList
+	require.NoError(t, json.Unmarshal(data, &list), "%s-list: ロール一覧のデコードに失敗しました", kind)
+	require.NotEmpty(t, list.Items, "%s-list: ロールカタログが空です", kind)
+	first := list.Items[0]
+	require.NotEmpty(t, first.ID, "%s-list: 最初のロールにIDが存在すること", kind)
+	require.NotEmpty(t, first.Name, "%s-list: 最初のロールに名前が存在すること", kind)
+
+	readData := h.Call(t, kind+"のロールを読み込む", "iam-api", kind, "read", first.ID)
+	var read roleSummary
+	require.NoError(t, json.Unmarshal(readData, &read), "%s-read: ロールのデコードに失敗しました", kind)
+	require.Equal(t, first.ID, read.ID, "%s-read: 読み込んだロールのIDが一覧と一致すること", kind)
+	require.Equal(t, first.Name, read.Name, "%s-read: 読み込んだロールの名前が一覧と一致すること", kind)
+}
+
+// readPolicyBindings は organization、folder、project の IAM ポリシー binding を読み込みます。
+// organization の場合 resourceID は空です。
+func readPolicyBindings(t *testing.T, h *helper.Helper, description, kind, subcommand, resourceID string) []policyBinding {
+	t.Helper()
+	args := []string{"iam-api", kind, subcommand}
+	if resourceID != "" {
+		args = append(args, resourceID)
 	}
-	if err := s.createProject(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	err := s.readResourcePolicies(context.Background())
-	if err == nil {
-		t.Fatal("readResourcePolicies succeeded, want decode failure")
-	}
-	if !strings.HasPrefix(err.Error(), "policy-read-folder: decode policy bindings") {
-		t.Errorf("error = %q", err.Error())
-	}
-	if err := s.cleanup(); err != nil {
-		t.Fatal(err)
-	}
+	data := h.Call(t, description, args...)
+	var bindings []policyBinding
+	require.NoError(t, json.Unmarshal(data, &bindings), "%s: ポリシーbindingのデコードに失敗しました", description)
+	return bindings
+}
+
+// checkAuthContext は認証コンテキストを読み込み、
+// principal の ID と認証方式が存在することを確認します。
+// principal が特定の project に限定されている場合、その project ID を返します。
+func checkAuthContext(t *testing.T, h *helper.Helper) authContext {
+	t.Helper()
+	data := h.Call(t, "認証コンテキストを読み込む", "iam-api", "auth", "read-auth-context")
+	var context authContext
+	require.NoError(t, json.Unmarshal(data, &context), "read-auth-context: 認証コンテキストのデコードに失敗しました")
+	require.Positive(t, context.ResourceID, "read-auth-context: resource_idが正の値であること")
+	require.NotEmpty(t, context.AuthType, "read-auth-context: auth_typeが存在すること")
+	return context
+}
+
+func checkAuthConditions(t *testing.T, h *helper.Helper) {
+	t.Helper()
+	data := h.Call(t, "認証条件を読み込む", "iam-api", "auth", "read-auth-conditions")
+	var conditions authConditions
+	require.NoError(t, json.Unmarshal(data, &conditions), "read-auth-conditions: 認証条件のデコードに失敗しました")
+	require.NotEmpty(t, conditions.IPRestriction.Mode, "read-auth-conditions: ip_restriction.modeが存在すること")
+}
+
+func checkPasswordPolicy(t *testing.T, h *helper.Helper) {
+	t.Helper()
+	data := h.Call(t, "パスワードポリシーを読み込む", "iam-api", "auth", "read-password-policy")
+	var policy passwordPolicy
+	require.NoError(t, json.Unmarshal(data, &policy), "read-password-policy: パスワードポリシーのデコードに失敗しました")
+	require.Positive(t, policy.MinLength, "read-password-policy: min_lengthが正の値であること")
+}
+
+func checkOrganization(t *testing.T, h *helper.Helper) {
+	t.Helper()
+	data := h.Call(t, "organizationを読み込む", "iam-api", "organization", "read")
+	var organization organizationInfo
+	require.NoError(t, json.Unmarshal(data, &organization), "organization-read: organizationのデコードに失敗しました")
+	require.Positive(t, organization.ID, "organization-read: idが正の値であること")
+}
+
+func checkServicePolicy(t *testing.T, h *helper.Helper) {
+	t.Helper()
+	data := h.Call(t, "サービスポリシーの有効状態を確認する", "iam-api", "service-policy", "is-enabled")
+	var enabled bool
+	require.NoError(t, json.Unmarshal(data, &enabled), "service-policy-is-enabled: 真偽値のデコードに失敗しました")
+
+	data = h.Call(t, "organizationのサービスポリシーのルールを読み込む", "iam-api", "organization", "read-service-policy")
+	var rules []json.RawMessage
+	require.NoError(t, json.Unmarshal(data, &rules), "read-service-policy: ルールのデコードに失敗しました")
+
+	data = h.Call(t, "サービスポリシーのルールテンプレート一覧を取得する", "iam-api", "service-policy", "list-rule-templates")
+	var templates ruleTemplateList
+	require.NoError(t, json.Unmarshal(data, &templates), "list-rule-templates: ルールテンプレートのデコードに失敗しました")
+	require.NotEmpty(t, templates.Items, "list-rule-templates: ルールテンプレートのカタログが空です")
 }

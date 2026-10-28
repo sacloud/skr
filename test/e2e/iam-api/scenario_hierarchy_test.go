@@ -12,72 +12,106 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// このファイルは iam-api E2E のフォルダ階層シナリオです。
+// child folder と project の移動と、親の確認を確認します。
 package main
 
 import (
-	"context"
-	"slices"
-	"strings"
+	"encoding/json"
+	"strconv"
 	"testing"
+
+	"github.com/sacloud/skr/test/e2e/internal/helper"
+	"github.com/stretchr/testify/require"
 )
 
-func newHierarchyScenario(t *testing.T, fake *fakeCLI) *scenario {
-	t.Helper()
-	s := testScenario(t, fake)
-	if err := s.createFolder(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.createProject(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	return s
+type hierarchyFolder struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	ParentID *int64 `json:"parent_id"`
 }
 
-func TestHierarchyScenarioMovesChildFolderAndProject(t *testing.T) {
-	fake := newFakeCLI()
-	s := newHierarchyScenario(t, fake)
-	if err := s.hierarchyScenario(context.Background()); err != nil {
-		t.Fatal(err)
+type hierarchyProject struct {
+	ID             int64  `json:"id"`
+	Name           string `json:"name"`
+	ParentFolderID *int64 `json:"parent_folder_id"`
+}
+
+// TestScenarioIAMHierarchy はテスト用の folder と project で、
+// 子 folder の移動と project の親 folder 移動を確認します。
+func TestScenarioIAMHierarchy(t *testing.T) {
+	h := helper.New(t, "iam-api-hierarchy",
+		"テスト用のフォルダとプロジェクトで階層移動が正しく動作することを確認する")
+
+	suffix := helper.RandomSuffix(t)
+	name := resourceNamePrefix + suffix
+	desc := resourceDescription + suffix
+	run := &iamRun{
+		folder:      iamResource{kind: "folder", name: name, description: desc},
+		childFolder: iamResource{kind: "folder", name: name + "-child", description: desc},
+		project:     iamResource{kind: "project", name: name, code: "e2e" + suffix, description: desc},
 	}
-	for _, want := range []string{
-		"create-child-folder",
-		"move-child-folder",
-		"read-child-folder",
-		"move-project",
-		"read-project-moved",
-	} {
-		if !slices.Contains(fake.calls, want) {
-			t.Errorf("hierarchy scenario did not call %s: %v", want, fake.calls)
+
+	// 作成前に同名のリソースが存在しないことを確認する
+	requireNoNameCollision(t, h, run)
+
+	// 後片付け: project と folder を再照合つき削除して残っていないことを確認する
+	defer func() {
+		if err := cleanupIAMResources(t, h, run); err != nil {
+			t.Errorf("cleanup failed: %v", err)
 		}
-	}
-	if got := fake.argsByStep["move-child-folder"]; !slices.Equal(got, []string{
-		"iam-api", "folder", "move", "--ids", "3002", "--parent-id", "3001",
-	}) {
-		t.Errorf("move-child-folder args = %v", got)
-	}
-	if got := fake.argsByStep["move-project"]; !slices.Equal(got, []string{
-		"iam-api", "project", "move", "--ids", "4001", "--parent-folder-id", "3002",
-	}) {
-		t.Errorf("move-project args = %v", got)
-	}
+	}()
+
+	// テスト用の folder と project を作成する
+	createFolderAndProject(t, h, run)
+	// 子 folder を作成して階層を移動する
+	runHierarchyScenario(t, h, run)
 }
 
-func TestHierarchyScenarioDetectsUnexpectedChildFolderParent(t *testing.T) {
-	fake := newFakeCLI()
-	fake.childFolderParentID = 9999
-	s := newHierarchyScenario(t, fake)
-	if err := s.hierarchyScenario(context.Background()); err == nil {
-		t.Fatal("hierarchy scenario accepted a child folder with an unexpected parent")
-	} else if !strings.Contains(err.Error(), "parent_id") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+// runHierarchyScenario は child folder を main folder に移動し、
+// project を child folder に移動します。両方の移動は API から親を読み込んで確認します。
+func runHierarchyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
+	t.Helper()
+	run.childFolder.attempted = true
+	data := h.Call(t, "テスト用の子folderを作成する", "iam-api", "folder", "create",
+		"--name", run.childFolder.name, "--description", run.childFolder.description)
+	created := requireItem(t, data, "create-child-folder")
+	requireIdentity(t, created, run.childFolder)
+	run.childFolder.id = created.id()
+
+	h.Call(t, "子folderをmain folderに移動する", "iam-api", "folder", "move",
+		"--ids", run.childFolder.id, "--parent-id", run.folder.id)
+	checkChildFolderParent(t, h, run)
+
+	h.Call(t, "projectを子folderに移動する", "iam-api", "project", "move",
+		"--ids", run.project.id, "--parent-folder-id", run.childFolder.id)
+	checkProjectParent(t, h, run)
 }
 
-func TestHierarchyScenarioFailsWhenMoveIsRejected(t *testing.T) {
-	fake := newFakeCLI()
-	s := newHierarchyScenario(t, fake)
-	fake.failAt = "move-child-folder"
-	if err := s.hierarchyScenario(context.Background()); err == nil {
-		t.Fatal("hierarchy scenario succeeded although the move was rejected")
-	}
+// checkChildFolderParent は child folder を読み込み、
+// その親がこの実行の main folder であることを確認します。
+func checkChildFolderParent(t *testing.T, h *helper.Helper, run *iamRun) {
+	t.Helper()
+	data := h.Call(t, "移動後の子folderの親を確認する", "iam-api", "folder", "read", run.childFolder.id,
+		"--query", "{id: .id, name: .name, parent_id: .parent_id}")
+	var folder hierarchyFolder
+	require.NoError(t, json.Unmarshal(data, &folder), "read-child-folder: folderのデコードに失敗しました")
+	folderID, err := strconv.ParseInt(run.folder.id, 10, 64)
+	require.NoError(t, err, "read-child-folder: folder ID %qを解析できること", run.folder.id)
+	require.NotNil(t, folder.ParentID, "read-child-folder: 親folderが設定されていること")
+	require.Equal(t, folderID, *folder.ParentID, "read-child-folder: 親がmain folder %sであること", run.folder.id)
+}
+
+// checkProjectParent は project を読み込み、
+// その親 folder がこの実行の child folder であることを確認します。
+func checkProjectParent(t *testing.T, h *helper.Helper, run *iamRun) {
+	t.Helper()
+	data := h.Call(t, "移動後のprojectの親を確認する", "iam-api", "project", "read", run.project.id,
+		"--query", "{id: .id, name: .name, parent_folder_id: .parent_folder_id}")
+	var project hierarchyProject
+	require.NoError(t, json.Unmarshal(data, &project), "read-project-moved: projectのデコードに失敗しました")
+	childID, err := strconv.ParseInt(run.childFolder.id, 10, 64)
+	require.NoError(t, err, "read-project-moved: folder ID %qを解析できること", run.childFolder.id)
+	require.NotNil(t, project.ParentFolderID, "read-project-moved: 親folderが設定されていること")
+	require.Equal(t, childID, *project.ParentFolderID, "read-project-moved: 親folderが子folder %sであること", run.childFolder.id)
 }
