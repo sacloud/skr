@@ -1,0 +1,316 @@
+# 末端サブコマンドごとの E2E 状況。1行1コマンドで、<path> <status> の順に書きます。
+# 延期の場合は status の後に追跡 Issue の参照 (#144 など) と説明を書き、必要に応じて補足を書きます。
+# status は live(ライブ検証済み) / implemented(実装済み・ライブ未実施) / deferred(延期) / todo(未整備) のいずれか。
+# 詳細は docs/design/live-e2e-coverage.md を参照。
+apprun-api application create live
+apprun-api application delete live
+apprun-api application list live
+apprun-api application read live
+apprun-api application status live
+apprun-api application update live
+apprun-api packet-filter read live
+apprun-api packet-filter update live
+apprun-api traffic list live
+apprun-api traffic update live
+apprun-api user create live
+apprun-api user read live
+apprun-api version delete live
+apprun-api version list live
+apprun-api version read live
+apprun-api version status live
+apprun-dedicated-api application containers deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api application create deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api application delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api application list deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api application read deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api application update deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api auto-scaling-group create deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api auto-scaling-group delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api auto-scaling-group list deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api auto-scaling-group read deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api certificate create deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api certificate delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api certificate list deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api certificate read deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api certificate update deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api cluster create deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api cluster delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api cluster list deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api cluster read deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api cluster update deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api load-balancer create deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api load-balancer delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api load-balancer list deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api load-balancer node list deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api load-balancer node read deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api load-balancer read deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api service-class list-lb deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api service-class list-worker deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api version create deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api version delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api version list deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api version read deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api worker-node list deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api worker-node read deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api worker-node update deferred #59 クラスタ作成を前提とし実行コストが大きいため
+config create live
+config current live
+config edit live
+config list live
+config show live
+config use live
+container-registry-api registry create live
+container-registry-api registry delete live
+container-registry-api registry list live
+container-registry-api registry read live
+container-registry-api registry update live
+container-registry-api registry user add live
+container-registry-api registry user delete live
+container-registry-api registry user list live
+container-registry-api registry user update live
+eventbus-api process-configuration create live
+eventbus-api process-configuration delete live
+eventbus-api process-configuration list live
+eventbus-api process-configuration read live
+eventbus-api process-configuration update live
+eventbus-api process-configuration update-secret live
+eventbus-api schedule create live
+eventbus-api schedule delete live
+eventbus-api schedule list live
+eventbus-api schedule read live
+eventbus-api schedule update live
+eventbus-api trigger create live
+eventbus-api trigger delete live
+eventbus-api trigger list live
+eventbus-api trigger read live
+eventbus-api trigger update live
+gslb-api create live
+gslb-api delete live
+gslb-api find live
+gslb-api read live
+gslb-api update live
+http live
+iaas-api archive find live
+iaas-api archive read live
+iaas-api disk create live
+iaas-api disk delete live
+iaas-api disk find live
+iaas-api disk read live
+iaas-api disk update live
+iaas-api icon create live
+iaas-api icon delete live
+iaas-api icon find live
+iaas-api icon read live
+iaas-api icon update live
+iaas-api internet add-subnet live
+iaas-api internet create live
+iaas-api internet delete live
+iaas-api internet delete-subnet live
+iaas-api internet disable-ipv6 live
+iaas-api internet enable-ipv6 live
+iaas-api internet find live
+iaas-api internet list-subnet live
+iaas-api internet monitor-router live
+iaas-api internet read live
+iaas-api internet read-ipv6 live
+iaas-api internet update live
+iaas-api internet update-subnet live
+iaas-api packetfilter create live
+iaas-api packetfilter delete live
+iaas-api packetfilter find live
+iaas-api packetfilter read live
+iaas-api packetfilter update live
+iaas-api product disk find live
+iaas-api product disk read live
+iaas-api product internet find live
+iaas-api product internet read live
+iaas-api product license find live
+iaas-api product privatehost find live
+iaas-api product privatehost read live
+iaas-api product server find live
+iaas-api product server read live
+iaas-api region find live
+iaas-api region read live
+iaas-api server boot live
+iaas-api server create live
+iaas-api server delete live
+iaas-api server find live
+iaas-api server read live
+iaas-api server update live
+iaas-api service-class find live
+iaas-api switch create live
+iaas-api switch delete live
+iaas-api switch find live
+iaas-api switch read live
+iaas-api switch update live
+iaas-api zone find live
+iaas-api zone read live
+iam-api auth read-auth-conditions live
+iam-api auth read-auth-context live
+iam-api auth read-password-policy live
+iam-api auth update-auth-conditions live
+iam-api auth update-password-policy live
+iam-api folder create live
+iam-api folder delete live
+iam-api folder list live
+iam-api folder move live
+iam-api folder read live
+iam-api folder update live
+iam-api group create live
+iam-api group delete live
+iam-api group list live
+iam-api group read live
+iam-api group read-memberships live
+iam-api group update todo 旧 runner が未整備。ADR 0062 への移行時に対応
+iam-api group update-memberships live
+iam-api iam-role list live
+iam-api iam-role read live
+iam-api id-policy read-organization live
+iam-api id-policy update-organization live
+iam-api id-role list live
+iam-api id-role read live
+iam-api organization read live
+iam-api organization read-service-policy live
+iam-api organization update live
+iam-api organization update-service-policy live
+iam-api policy read-folder live
+iam-api policy read-organization live
+iam-api policy read-project live
+iam-api policy update-folder live
+iam-api policy update-organization live
+iam-api policy update-project live
+iam-api project create live
+iam-api project delete live
+iam-api project list live
+iam-api project move live
+iam-api project read live
+iam-api project update live
+iam-api project-api-key create live
+iam-api project-api-key delete live
+iam-api project-api-key list live
+iam-api project-api-key read live
+iam-api project-api-key update live
+iam-api scim create live
+iam-api scim delete live
+iam-api scim list live
+iam-api scim read live
+iam-api scim regenerate-token live
+iam-api scim update live
+iam-api service-policy disable live
+iam-api service-policy enable live
+iam-api service-policy is-enabled live
+iam-api service-policy list-rule-templates live
+iam-api service-principal create live
+iam-api service-principal delete live
+iam-api service-principal delete-key live
+iam-api service-principal disable-key live
+iam-api service-principal enable-key live
+iam-api service-principal issue-token live
+iam-api service-principal list live
+iam-api service-principal list-keys live
+iam-api service-principal read live
+iam-api service-principal update live
+iam-api service-principal upload-key live
+iam-api sso create live
+iam-api sso delete live
+iam-api sso link deferred #144 全組織ユーザーのログイン方法に影響するため
+iam-api sso list live
+iam-api sso read live
+iam-api sso unlink deferred #144 全組織ユーザーのログイン方法に影響するため
+iam-api sso update live
+iam-api user create live
+iam-api user delete live
+iam-api user list live
+iam-api user read live
+iam-api user register-email live
+iam-api user unregister-email live
+iam-api user update live
+iam-api user-2fa clear-trusted-devices live
+iam-api user-2fa deactivate-otp live
+iam-api user-2fa delete-security-key live
+iam-api user-2fa delete-trusted-device live
+iam-api user-2fa list-security-keys live
+iam-api user-2fa list-trusted-devices live
+iam-api user-2fa read-security-key live
+networking-suite-api address list live
+networking-suite-api address read live
+networking-suite-api interface-connection create live
+networking-suite-api interface-connection delete live
+networking-suite-api subnet create live
+networking-suite-api subnet delete live
+networking-suite-api subnet list live
+networking-suite-api subnet read live
+networking-suite-api subnet update live
+networking-suite-api subnet-group create live
+networking-suite-api subnet-group delete live
+networking-suite-api subnet-group list live
+networking-suite-api subnet-group read live
+networking-suite-api subnet-group update live
+object-storage-api account access-key create live
+object-storage-api account access-key delete live
+object-storage-api account access-key list live
+object-storage-api account access-key read live
+object-storage-api account create live
+object-storage-api account delete live
+object-storage-api account read live
+object-storage-api bucket create live
+object-storage-api bucket delete live
+object-storage-api bucket encryption disable deferred #141 KMS キー作成が未実装のため
+object-storage-api bucket encryption enable deferred #141 KMS キー作成が未実装のため
+object-storage-api bucket encryption read deferred #141 KMS キー作成が未実装のため
+object-storage-api bucket list live
+object-storage-api bucket penalty deferred #142 API がエラーを返すため
+object-storage-api bucket quota live
+object-storage-api bucket replication disable live
+object-storage-api bucket replication enable live
+object-storage-api bucket replication read live
+object-storage-api bucket usage live
+object-storage-api permission access-key create live
+object-storage-api permission access-key delete live
+object-storage-api permission access-key list live
+object-storage-api permission access-key read live
+object-storage-api permission create live
+object-storage-api permission delete live
+object-storage-api permission list live
+object-storage-api permission read live
+object-storage-api permission update live
+object-storage-api site list live
+object-storage-api site plans live
+object-storage-api site read live
+object-storage-api site status bucket-metering deferred #142 API がエラーを返すため
+object-storage-api site status quota live
+object-storage-api site status read live
+simple-notification-api destination create live
+simple-notification-api destination delete live
+simple-notification-api destination list live
+simple-notification-api destination read live
+simple-notification-api destination read-status live
+simple-notification-api destination update live
+simple-notification-api group create live
+simple-notification-api group delete live
+simple-notification-api group list live
+simple-notification-api group read live
+simple-notification-api group send-message live
+simple-notification-api group update live
+simple-notification-api history list live
+simple-notification-api history read live
+simple-notification-api routing create live
+simple-notification-api routing delete live
+simple-notification-api routing list live
+simple-notification-api routing list-source live
+simple-notification-api routing read live
+simple-notification-api routing reorder live
+simple-notification-api routing update live
+simplemq-api message delete live
+simplemq-api message extend-timeout live
+simplemq-api message receive live
+simplemq-api message send live
+simplemq-api queue clear-messages live
+simplemq-api queue config live
+simplemq-api queue count-messages live
+simplemq-api queue create live
+simplemq-api queue delete live
+simplemq-api queue list live
+simplemq-api queue read live
+simplemq-api queue rotate-api-key live
+version live

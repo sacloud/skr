@@ -118,7 +118,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 - [ ] `monitoring-suite`
 - [x] `networking-suite` — `networking-suite-api` でサブネットグループ、サブネット、インターフェースコネクション、アドレスの SDK 公開14操作を実装済みです。別サブネット間の TCP 疎通を確認する is1b [ライブ E2E runner](test/e2e/networking-suite/) と[チュートリアル](docs/manual/tutorials/networking-suite-api.md)があります。cloudimg Archive の Server A から Server B へ TCP 接続し、`PONG networking-suite` を受信するライブ検証を完了し、一時リソースを削除しました。共有 NIC と Networking Suite NIC を併用する Server A では、ゲスト OS 側で NWS NIC の DHCP と経路を設定する必要があるため、runner とチュートリアルで MAC アドレスに一致する netplan を設定します。Server A は利用者の状態確認用に起動したまま保持しています
 - [ ] `nosql`
-- [x] `object-storage` — `object-storage-api` で SDK v0.3.1 の `SiteAPI`、`AccountAPI`、`BucketAPI`、`BucketExtraAPI`、`PermissionsAPI`、`SiteStatusAPI` が公開する全34管理操作を実装済みです。サイト・サイトアカウント・バケット・パーミッション、アクセスキー、暗号化、レプリケーション、状態・クォータ・利用量を操作できます。パーミッションの作成・更新は構造化された JSON を `--request` で受け付けます。バケット作成は `isk01`、`tky01`、`arc02` に対応し、`arc02` では `--plan` を必須にしています。S3 互換 API によるオブジェクト本体の操作は対象外です。[ライブ E2E runner](test/e2e/object-storage-api/) の6シナリオで全34コマンドを対象にし、[チュートリアル](docs/manual/tutorials/object-storage-api.md)の手順も含めています。ライブでは29コマンドの正常応答を確認しました。通常・アーカイブバケット、サイトアカウント、パーミッション更新、両種類のキー、サイト間レプリケーションと後片付けが成功しました。状態・クォータ・利用量は東京第1サイトで成功しましたが、`bucket penalty` は404、`site status bucket-metering` は400のため成功未確認です（[#142](https://github.com/sacloud/skr/issues/142)）。暗号化3操作は KMS キー作成が未実装のため、合意により延期しています（[#141](https://github.com/sacloud/skr/issues/141)）。sakumock v0.13.0 の `objectstorage` サーバーに対し、実際の CLI と SDK を経由して全34コマンドの正常系を確認し、403と削除後の404も検証しています。ドメインの単体テストには SDK interface の差し替えも使います。対応表と実行条件は[設計文書](docs/design/object-storage-api.md)に記載しています
+- [x] `object-storage` — `object-storage-api` で SDK v0.3.1 の `SiteAPI`、`AccountAPI`、`BucketAPI`、`BucketExtraAPI`、`PermissionsAPI`、`SiteStatusAPI` が公開する全34管理操作を実装済みです。サイト・サイトアカウント・バケット・パーミッション、アクセスキー、暗号化、レプリケーション、状態・クォータ・利用量を操作できます。パーミッションの作成・更新は構造化された JSON を `--request` で受け付けます。バケット作成は `isk01`、`tky01`、`arc02` に対応し、`arc02` では `--plan` を必須にしています。S3 互換 API によるオブジェクト本体の操作は対象外です。testing.T ベースの[ライブ E2E シナリオ](test/e2e/object-storage-api/)の6シナリオで全34コマンドを対象にし、[チュートリアル](docs/manual/tutorials/object-storage-api.md)の手順も含めています。ライブでは29コマンドの正常応答を確認しました。通常・アーカイブバケット、サイトアカウント、パーミッション更新、両種類のキー、サイト間レプリケーションと後片付けが成功しました。状態・クォータ・利用量は東京第1サイトで成功しましたが、`bucket penalty` は404、`site status bucket-metering` は400のため成功未確認です（[#142](https://github.com/sacloud/skr/issues/142)）。暗号化3操作は KMS キー作成が未実装のため、合意により延期しています（[#141](https://github.com/sacloud/skr/issues/141)）。sakumock v0.13.0 の `objectstorage` サーバーに対し、実際の CLI と SDK を経由して全34コマンドの正常系を確認し、403と削除後の404も検証しています。ドメインの単体テストには SDK interface の差し替えも使います。対応表と実行条件は[設計文書](docs/design/object-storage-api.md)に記載しています
 - [ ] `secretmanager`
 - [ ] `security-control`
 - [ ] `service-endpoint-gateway`
@@ -150,7 +150,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 2026-10-26 にタスク3として iam-api の59コマンドのうち57コマンドをライブ検証しました。読み取り15操作、リソーススコープの書き込み27操作、アカウント全体やログインユーザーへ影響する書き込み15操作です。sso link/unlink は全組織ユーザーのログイン方法に影響するため、[#144](https://github.com/sacloud/skr/issues/144) で影響範囲の確認と設計を進めます。期待どおりの失敗を確認するステップは、証跡に `expected-error` として記録されます。
 
-網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。
+網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。末端コマンドごとの状況は [ADR 0065](docs/adr/0065-e2e-command-coverage-baseline.md) に従い [`test/e2e/command-coverage/baseline.txt`](test/e2e/command-coverage/baseline.txt) に記録し、`make e2e-coverage` で検証します。2026-10-28 の baseline 作成時に、iam-api の旧 runner が `iam-api group update` を実行していない網羅漏れを検出し、未整備として記録しました。
 
 ## 進め方
 

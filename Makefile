@@ -37,6 +37,11 @@ lint-adr:
 
 lint-text: lint-adr
 
+.PHONY: e2e-coverage
+e2e-coverage:
+	@echo "reporting E2E command coverage..."
+	@$(GO) test ./test/e2e/command-coverage/ -v -run 'TestBaselineCoversAllLeafCommands|TestReportEvidenceCoverage'
+
 .PHONY: generate-api
 generate-api:
 	@test -n "$(API_CONFIG)" || (echo "API_CONFIG is required" >&2; exit 2)
