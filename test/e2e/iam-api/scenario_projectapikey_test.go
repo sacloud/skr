@@ -12,96 +12,129 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// このファイルは iam-api E2E の project API key シナリオです。
+// テスト用の project 内でキーのライフサイクルを確認します。
 package main
 
 import (
-	"context"
-	"slices"
-	"strings"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func newProjectAPIKeyScenario(t *testing.T, fake *fakeCLI) *scenario {
+const projectAPIKeyRole = "resource-creator"
+
+// projectAPIKeyScenario は、この実行の project 内で API key を作成、読み込み、一覧表示、更新、削除します。
+// create と read の応答には access token が含まれるため、
+// すべての出力は --query で投影され、
+// 実行記録にはトークン自体が保存されることはありません。
+// 後片付けは前のステップが失敗した場合のみ削除します。
+func (s *iamRun) projectAPIKeyScenario(t *testing.T) {
 	t.Helper()
-	s := testScenario(t, fake)
-	// runner と同じ方法で、限定された project を含む認証コンテキストを取得する。
-	// 限定された project も含める。
-	if err := s.checkAuthContext(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.createProject(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	return s
+	s.projectAPIKey.attempted = true
+	s.projectAPIKey.currentName = s.projectAPIKey.name
+	// リクエストは秘密情報を含まないため、テスト専用ディレクトリに書き込みます。
+	createFile := s.writeProjectAPIKeyRequest(t, "pak-create", s.projectAPIKey.name, true)
+	data := s.call(t, "テスト用のproject API keyを作成する", "iam-api", "project-api-key", "create",
+		"--request", "@"+createFile, "--query", "{id: .id, name: .name, iam_roles: .iam_roles}")
+	id, name, roles, err := decodeAPIKeyProjection("create-project-api-key", data)
+	require.NoError(t, err, "create-project-api-key: 応答のデコードに失敗しました")
+	require.Equal(t, s.projectAPIKey.name, name, "create-project-api-key: 作成後の名前がリクエストと一致すること")
+	require.NoError(t, checkAPIKeyRoles(roles), "create-project-api-key: ロールが期待値と一致すること")
+	s.projectAPIKey.id = id
+
+	data = s.call(t, "project API keyを読み込む", "iam-api", "project-api-key", "read", s.projectAPIKey.id,
+		"--query", "{id: .id, name: .name, iam_roles: .iam_roles}")
+	id, name, roles, err = decodeAPIKeyProjection("read-project-api-key", data)
+	require.NoError(t, err, "read-project-api-key: 応答のデコードに失敗しました")
+	require.Equal(t, s.projectAPIKey.id, id, "read-project-api-key: 読み込んだキーのIDが一致すること")
+	require.Equal(t, s.projectAPIKey.currentName, name, "read-project-api-key: 読み込んだキーの名前が一致すること")
+	require.NoError(t, checkAPIKeyRoles(roles), "read-project-api-key: ロールが期待値と一致すること")
+
+	data = s.call(t, "project API keyの一覧を確認する", "iam-api", "project-api-key", "list", "--query", managedListQuery)
+	found, err := checkManagedListed("list-project-api-keys", data, s.projectAPIKey.id, s.projectAPIKey.currentName)
+	require.NoError(t, err, "list-project-api-keys: 一覧のデコードに失敗しました")
+	require.True(t, found, "list-project-api-keys: キー %sが一覧に存在すること", s.projectAPIKey.id)
+
+	renamed := s.projectAPIKey.name + "-renamed"
+	updateFile := s.writeProjectAPIKeyRequest(t, "pak-update", renamed, false)
+	data = s.call(t, "project API keyの名前を更新する", "iam-api", "project-api-key", "update", s.projectAPIKey.id,
+		"--request", "@"+updateFile, "--query", "{id: .id, name: .name}")
+	_, name, _, err = decodeAPIKeyProjection("update-project-api-key", data)
+	require.NoError(t, err, "update-project-api-key: 応答のデコードに失敗しました")
+	require.Equal(t, renamed, name, "update-project-api-key: 更新後の名前がリクエストと一致すること")
+	s.projectAPIKey.currentName = renamed
+
+	s.call(t, "project API keyを削除する", "iam-api", "project-api-key", "delete", s.projectAPIKey.id)
+	s.projectAPIKey.id = ""
 }
 
-func TestProjectAPIKeyScenarioCoversLifecycle(t *testing.T) {
-	fake := newFakeCLI()
-	s := newProjectAPIKeyScenario(t, fake)
-	if err := s.projectAPIKeyScenario(context.Background()); err != nil {
-		t.Fatal(err)
+// writeProjectAPIKeyRequest は作成または更新のリクエスト JSON を書き込みます。
+// create リクエストは key をこの実行の project に固定しますが、
+// principal が特定の project に限定されている場合は
+// 認証コンテキストの project に固定します。
+func (s *iamRun) writeProjectAPIKeyRequest(t *testing.T, purpose, name string, create bool) string {
+	t.Helper()
+	request := map[string]any{
+		"name":        name,
+		"description": s.projectAPIKey.name,
+		"iam_roles":   []string{projectAPIKeyRole},
 	}
-	for _, want := range []string{
-		"create-project-api-key",
-		"read-project-api-key",
-		"list-project-api-keys",
-		"update-project-api-key",
-		"delete-project-api-key",
-	} {
-		if !slices.Contains(fake.calls, want) {
-			t.Errorf("project API key scenario did not call %s: %v", want, fake.calls)
-		}
+	if create {
+		pinned := s.projectAPIKeyProjectID()
+		projectID, err := strconv.ParseInt(pinned, 10, 64)
+		require.NoError(t, err, "project ID %qを解析できること", pinned)
+		request["project_id"] = projectID
 	}
-	// create と read の応答には access token が含まれるため、
-	// リクエストはインライン値ではなくプライベートなファイルから読み込む必要がある。
-	if got := fake.argsByStep["create-project-api-key"]; !requestFromFile(got) {
-		t.Errorf("create-project-api-key args = %v, want --request @path", got)
-	}
-	// fake の認証コンテキストでは principal が project に限定されているため、
-	// key はこの実行の project ではなくその project に固定する必要がある。
-	if pinned, ok := fake.lastPakRequest["project_id"].(float64); !ok || int(pinned) != fakeLimitedProjectID {
-		t.Errorf("create-project-api-key pinned project = %v, want %d", fake.lastPakRequest["project_id"], fakeLimitedProjectID)
-	}
-	if !fake.pakDeleted {
-		t.Error("project API key scenario left the key undeleted")
-	}
-	if err := s.cleanupManaged(context.Background(), &s.projectAPIKey); err != nil {
-		t.Fatalf("cleanupManaged after a completed scenario: %v", err)
-	}
+	encoded, err := json.Marshal(request)
+	require.NoError(t, err, "project API keyの%sリクエストをエンコードできること", purpose)
+	path := filepath.Join(t.TempDir(), "skr-e2e-iam-"+purpose+"-"+s.suffix+".json")
+	require.NoError(t, os.WriteFile(path, encoded, 0o600), "project API keyの%sリクエストファイルの書き込みに失敗しました", purpose)
+	return path
 }
 
-func TestProjectAPIKeyScenarioCleansUpWhenListFails(t *testing.T) {
-	fake := newFakeCLI()
-	s := newProjectAPIKeyScenario(t, fake)
-	fake.failAt = "list-project-api-keys"
-	if err := s.projectAPIKeyScenario(context.Background()); err == nil {
-		t.Fatal("project API key scenario succeeded although the list failed")
+// projectAPIKeyProjectID は新しい API key を固定する project を返します。
+// 特定の project に限定された principal はそこにしか key を作成できないため、
+// 認証コンテキストの project がこの実行の project より優先されます。
+func (s *iamRun) projectAPIKeyProjectID() string {
+	if s.limitedProjectID > 0 {
+		return strconv.FormatInt(s.limitedProjectID, 10)
 	}
-	if fake.pakDeleted {
-		t.Fatal("the key was deleted before the cleanup ran")
-	}
-	if err := s.cleanupManaged(context.Background(), &s.projectAPIKey); err != nil {
-		t.Fatalf("cleanupManaged: %v", err)
-	}
-	if !fake.pakDeleted {
-		t.Error("cleanupManaged did not delete the left-behind key")
-	}
+	return s.project.id
 }
 
-func TestProjectAPIKeyScenarioCleanupRefusesIdentityMismatch(t *testing.T) {
-	fake := newFakeCLI()
-	s := newProjectAPIKeyScenario(t, fake)
-	fake.failAt = "list-project-api-keys"
-	if err := s.projectAPIKeyScenario(context.Background()); err == nil {
-		t.Fatal("project API key scenario succeeded although the list failed")
+// decodeAPIKeyProjection は投影された {id, name, iam_roles} の出力をデコードします。
+func decodeAPIKeyProjection(step string, data []byte) (id string, name string, roles []string, err error) {
+	var result struct {
+		ID       any      `json:"id"`
+		Name     string   `json:"name"`
+		IAMRoles []string `json:"iam_roles"`
 	}
-	fake.pakName = "someone-elses-key"
-	if err := s.cleanupManaged(context.Background(), &s.projectAPIKey); err == nil {
-		t.Fatal("cleanupManaged deleted a key with a different name")
-	} else if !strings.Contains(err.Error(), "cleanup refused") {
-		t.Fatalf("unexpected error: %v", err)
+	if err := json.Unmarshal(data, &result); err != nil {
+		return "", "", nil, fmt.Errorf("%s: decode key: %w", step, err)
 	}
-	if fake.pakDeleted {
-		t.Error("cleanupManaged deleted the mismatching key")
+	switch value := result.ID.(type) {
+	case string:
+		id = value
+	case float64:
+		id = strconv.FormatInt(int64(value), 10)
+	default:
+		return "", "", nil, fmt.Errorf("%s: key ID is missing", step)
 	}
+	if id == "" {
+		return "", "", nil, fmt.Errorf("%s: key ID is missing", step)
+	}
+	return id, result.Name, result.IAMRoles, nil
+}
+
+func checkAPIKeyRoles(roles []string) error {
+	if len(roles) != 1 || roles[0] != projectAPIKeyRole {
+		return fmt.Errorf("iam_roles = %q, want [%q]", roles, projectAPIKeyRole)
+	}
+	return nil
 }

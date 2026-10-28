@@ -103,7 +103,7 @@ SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のよう
 
 SDK の `api` 直下には、IaaS 以外に次の API ドメインがあります。CLI コマンドの実装、ライブ E2E、チュートリアルの対応状況は分けて記載します。コマンドの入口があることは、そのドメインの SDK 操作すべてへの対応を意味しません。
 
-- [x] `iam` — `iam-api` コマンドと[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。[ライブ E2E runner](test/e2e/iam-api/)は59の末端コマンドのうち57コマンドを2026-10-26 にライブ検証済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で対応します。残りの状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)で管理します。
+- [x] `iam` — `iam-api` コマンドと[チュートリアル](docs/manual/tutorials/iam-api.md)を実装済みです。[ライブ E2E](test/e2e/iam-api/)（testing.T ベースのシナリオ）は59の末端コマンドのうち58コマンドをライブ検証済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で対応します。2026-10-26 に57コマンドをライブ検証し、2026-10-29 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行しました。移行時に未検証だった `group update` のカバレッジを追加しました。残りの状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)で管理します。
 - [x] `eventbus` — `eventbus-api`。Provider 補完・リクエスト検証・シークレット入力とエラー伝播のドメイン単体テストを実装済みです。[ライブ E2E](test/e2e/eventbus-api/)は process-configuration と trigger の作成・参照・削除、update-secret、schedule のライフサイクル、SimpleMQ 連携を検証済みです。2026-10-27 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行し、全工程を再実行しました。
 - [x] `simplemq` — `simplemq-api`。キュー／メッセージコマンドは `apigen-api` を使います。12の末端コマンドを1シナリオで実行する[ライブ E2E](test/e2e/simplemq/)（testing.T ベースのシナリオ）と[チュートリアル](docs/manual/tutorials/simplemq-api.md)があります。2026-10-27 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行し、同じ日に移行後のシナリオをライブ再実行して作成・参照・射影・設定更新・API キー発行・メッセージ操作・削除を確認済みです。
 - [x] `simple-notification` — `simple-notification-api`。通知先、グループ、ルーティング、履歴の SDK 公開操作を実装済みです。送信は `--message` と JSON 入力に対応します。[ライブ E2E](test/e2e/simple-notification/)（testing.T ベースのシナリオ）と[チュートリアル](docs/manual/tutorials/simple-notification-api.md)があります。2026-10-27 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行しました。既存通知先へのテスト送信シナリオと、通知を送信しない CRUD シナリオがあります。ライブではメール通知の処理完了、利用者による実受信、履歴の個別取得、一時通知先・グループ・ルーティングの作成／参照／更新／削除、設定省略時の保持と設定変更、一時ルーティングだけの並べ替え、既存設定の保持、削除後の不在を確認済みです。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。
@@ -148,9 +148,9 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 既存 runner へのシナリオ追加とそのライブ実行を完了しています。
 
-2026-10-26 にタスク3として iam-api の59コマンドのうち57コマンドをライブ検証しました。読み取り15操作、リソーススコープの書き込み27操作、アカウント全体やログインユーザーへ影響する書き込み15操作です。sso link/unlink は全組織ユーザーのログイン方法に影響するため、[#144](https://github.com/sacloud/skr/issues/144) で影響範囲の確認と設計を進めます。期待どおりの失敗を確認するステップは、証跡に `expected-error` として記録されます。
+2026-10-26 にタスク3として iam-api の59コマンドのうち57コマンドをライブ検証しました。読み取り15操作、リソーススコープの書き込み27操作、アカウント全体やログインユーザーへ影響する書き込み15操作です。sso link/unlink は全組織ユーザーのログイン方法に影響するため、[#144](https://github.com/sacloud/skr/issues/144) で影響範囲の確認と設計を進めます。期待どおりの失敗を確認するステップは、証跡に `expected-error` として記録されます。2026-10-29 に iam-api の E2E を testing.T ベースのシナリオテストへ移行し、移行時に未検証だった `group update` のカバレッジを追加しました。移行後のシナリオのライブ再実行は未実施です。
 
-網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。末端コマンドごとの状況は [ADR 0065](docs/adr/0065-e2e-command-coverage-baseline.md) に従い [`test/e2e/command-coverage/baseline.txt`](test/e2e/command-coverage/baseline.txt) に記録し、`make e2e-coverage` で検証します。2026-10-28 の baseline 作成時に、iam-api の旧 runner が `iam-api group update` を実行していない網羅漏れを検出し、未整備として記録しました。
+網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。末端コマンドごとの状況は [ADR 0065](docs/adr/0065-e2e-command-coverage-baseline.md) に従い [`test/e2e/command-coverage/baseline.txt`](test/e2e/command-coverage/baseline.txt) に記録し、`make e2e-coverage` で検証します。2026-10-28 の baseline 作成時に、iam-api の旧 runner が `iam-api group update` を実行していない網羅漏れを検出し、未整備として記録しました。2026-10-29 の移行時に `group update` のカバレッジを追加し、baseline を live に更新しました。
 
 ## 進め方
 

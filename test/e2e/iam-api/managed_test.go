@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// このファイルは iam-api E2E の managed resource ヘルパーです。
+// SCIM、SSO、project API key の識別と後片付けを担当します。
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"testing"
 )
 
 // managedListQuery は一覧応答をリソース ID と name に投影します。
@@ -60,15 +62,15 @@ func decodeNamedResource(step string, data []byte) (id string, name string, err 
 }
 
 // findManaged はリソース種別を一覧表示し、指定した name の項目を返します。
-// name を指定する。
-func (s *scenario) findManaged(ctx context.Context, step, kind, name string) (nameID, bool, error) {
-	data, err := s.call(ctx, step, "iam-api", kind, "list", "--query", managedListQuery)
+func (s *iamRun) findManaged(t *testing.T, description, kind, name string) (nameID, bool, error) {
+	t.Helper()
+	data, _, err := s.callWithErr(t, description, "iam-api", kind, "list", "--query", managedListQuery)
 	if err != nil {
-		return nameID{}, false, err
+		return nameID{}, false, fmt.Errorf("%s: %w", description, err)
 	}
 	var list nameIDList
 	if err := json.Unmarshal(data, &list); err != nil {
-		return nameID{}, false, fmt.Errorf("%s: decode list: %w", step, err)
+		return nameID{}, false, fmt.Errorf("%s: decode list: %w", description, err)
 	}
 	for _, candidate := range list.Items {
 		if candidate.Name == name {
@@ -79,7 +81,6 @@ func (s *scenario) findManaged(ctx context.Context, step, kind, name string) (na
 }
 
 // checkManagedListed は一覧に指定した ID と name のリソースが含まれているかどうかを報告します。
-// 指定した ID と name であること。
 func checkManagedListed(step string, data []byte, id, name string) (bool, error) {
 	var list nameIDList
 	if err := json.Unmarshal(data, &list); err != nil {
@@ -99,13 +100,14 @@ func checkManagedListed(step string, data []byte, id, name string) (bool, error)
 // cleanupManaged は、managed シナリオが削除前に失敗して作成されたリソースを削除します。
 // リソースの identity は削除前に読み込んで確認し、
 // 削除は一覧チェックで確認します。
-func (s *scenario) cleanupManaged(ctx context.Context, target *managedResource) error {
+func (s *iamRun) cleanupManaged(t *testing.T, target *managedResource) error {
+	t.Helper()
 	if !target.attempted {
 		return nil
 	}
 	id := target.id
 	if id == "" {
-		found, ok, err := s.findManaged(ctx, "cleanup-find-"+target.kind, target.kind, target.currentName)
+		found, ok, err := s.findManaged(t, "後片付けとして作成を試みた"+target.kind+"を検索する", target.kind, target.currentName)
 		if err != nil {
 			return err
 		}
@@ -114,8 +116,8 @@ func (s *scenario) cleanupManaged(ctx context.Context, target *managedResource) 
 		}
 		id = found.ID
 	}
-	data, err := s.call(ctx, "cleanup-read-"+target.kind, "iam-api", target.kind, "read", id,
-		"--query", "{id: (.id | tostring), name: .name}")
+	data, _, err := s.callWithErr(t, "後片付けの前に"+target.kind+"の識別情報を確認する",
+		"iam-api", target.kind, "read", id, "--query", "{id: (.id | tostring), name: .name}")
 	if err != nil {
 		return fmt.Errorf("cannot verify %s before cleanup: %w", target.kind, err)
 	}
@@ -126,10 +128,11 @@ func (s *scenario) cleanupManaged(ctx context.Context, target *managedResource) 
 	if currentID != id || currentName != target.currentName {
 		return fmt.Errorf("cleanup refused: %s %s does not match %q", target.kind, currentID, target.currentName)
 	}
-	if _, err := s.call(ctx, "cleanup-delete-"+target.kind, "iam-api", target.kind, "delete", id); err != nil {
+	if _, _, err := s.callWithErr(t, "後片付けとして"+target.kind+"を削除する", "iam-api", target.kind, "delete", id); err != nil {
 		return fmt.Errorf("delete E2E %s: %w", target.kind, err)
 	}
-	data, err = s.call(ctx, "cleanup-verify-"+target.kind, "iam-api", target.kind, "list", "--query", managedListQuery)
+	data, _, err = s.callWithErr(t, "後片付けの後に"+target.kind+"が残っていないことを確認する",
+		"iam-api", target.kind, "list", "--query", managedListQuery)
 	if err != nil {
 		return fmt.Errorf("verify E2E %s deletion: %w", target.kind, err)
 	}

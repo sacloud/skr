@@ -161,7 +161,7 @@ iam-api group delete live
 iam-api group list live
 iam-api group read live
 iam-api group read-memberships live
-iam-api group update todo 旧 runner が未整備。ADR 0062 への移行時に対応
+iam-api group update live
 iam-api group update-memberships live
 iam-api iam-role list live
 iam-api iam-role read live
