@@ -34,26 +34,7 @@ const (
 	// iconPrefix はテスト用アイコンの名前の接頭辞です。ランダムな接尾辞とともに使い、
 	// 過去の実行のリソースと衝突しないようにします。
 	iconPrefix = "skr-e2e-icon-"
-	// createdTags はテスト用アイコンに付ける作成時のタグです。後片付けの識別にも使います。
-	createdTags = "skr-e2e,temporary"
-	// updatedTags は更新確認中に使用する一時的なタグです。後片付けはこのタグも許容します。
-	updatedTags = "skr-e2e,updated"
 )
-
-// createdTagList は作成時に指定するタグの期待値です。
-func createdTagList() []string {
-	return []string{"skr-e2e", "temporary"}
-}
-
-// updatedTagList は更新時に指定するタグの期待値です。
-func updatedTagList() []string {
-	return []string{"skr-e2e", "updated"}
-}
-
-// updatedIconName は更新確認中に使用する一時的な名前です。
-func updatedIconName(name string) string {
-	return name + "-updated"
-}
 
 // iconItem は Icon の参照結果のうち、確認に使う項目です。
 type iconItem struct {

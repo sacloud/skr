@@ -43,21 +43,22 @@ func TestScenarioIcon(t *testing.T) {
 	imagePath := createIconImage(t)
 
 	name := iconPrefix + helper.RandomSuffix(t)
+	updatedName := name + "-updated"
 
 	// 作成前に同名の Icon が存在しないことを SDK で確認する。
 	// 確認の実行は証跡に残らず、後片付けはまだ登録せず、既存リソースを変更しないまま終了する。
 	requireNoIconNameCollision(t, icons, name)
-	requireNoIconNameCollision(t, icons, updatedIconName(name))
+	requireNoIconNameCollision(t, icons, updatedName)
 
 	// アイコンを作成する
 	data := h.Call(t, "テスト用のアイコンを作成する",
 		"iaas-api", "icon", "create",
 		"--name", name, "--image-file", imagePath,
-		"--tags", createdTags,
+		"--tags", "skr-e2e,temporary",
 	)
 	created, err := parseIcon(data)
 	require.NoError(t, err)
-	require.NoError(t, checkIconIdentity(created, created.ID, name, createdTagList()),
+	require.NoError(t, checkIconIdentity(created, created.ID, name, []string{"skr-e2e", "temporary"}),
 		"the create response should contain the created Icon")
 
 	// 後片付け: アイコンを識別情報の再照合つきで削除する。
@@ -72,29 +73,29 @@ func TestScenarioIcon(t *testing.T) {
 
 	// 作成したアイコンを参照する
 	read := readIcon(t, h, "作成したアイコンを参照する", created.ID)
-	require.NoError(t, checkIconIdentity(read, created.ID, name, createdTagList()),
+	require.NoError(t, checkIconIdentity(read, created.ID, name, []string{"skr-e2e", "temporary"}),
 		"icon read should return the created Icon")
 
 	// 名前とタグを更新する
 	data = h.Call(t, "アイコンの名前とタグを更新する",
 		"iaas-api", "icon", "update",
 		"--id", created.ID.String(),
-		"--name", updatedIconName(name), "--tags", updatedTags,
+		"--name", updatedName, "--tags", "skr-e2e,updated",
 	)
 	updated, err := parseIcon(data)
 	require.NoError(t, err)
-	require.NoError(t, checkIconIdentity(updated, created.ID, updatedIconName(name), updatedTagList()),
+	require.NoError(t, checkIconIdentity(updated, created.ID, updatedName, []string{"skr-e2e", "updated"}),
 		"the update should be reflected in the response")
 
 	// 更新後のアイコンを参照する
 	read = readIcon(t, h, "更新後のアイコンを参照する", created.ID)
-	require.NoError(t, checkIconIdentity(read, created.ID, updatedIconName(name), updatedTagList()),
+	require.NoError(t, checkIconIdentity(read, created.ID, updatedName, []string{"skr-e2e", "updated"}),
 		"icon read should return the updated Icon")
 
 	// 更新後の名前で検索する。Names はフラグで指定できないため --request で JSON を渡す
-	found := findIcons(t, h, "更新後の名前でアイコンを検索する", updatedIconName(name))
+	found := findIcons(t, h, "更新後の名前でアイコンを検索する", updatedName)
 	require.Len(t, found, 1, "icon find should return exactly the updated Icon")
-	require.NoError(t, checkIconIdentity(found[0], created.ID, updatedIconName(name), updatedTagList()),
+	require.NoError(t, checkIconIdentity(found[0], created.ID, updatedName, []string{"skr-e2e", "updated"}),
 		"icon find should return the updated Icon")
 }
 
@@ -137,6 +138,8 @@ func readIcon(t *testing.T, h *helper.Helper, description string, id types.ID) i
 func cleanupIcon(t *testing.T, h *helper.Helper, icons *iconSDK.Service, name string, knownID types.ID) error {
 	t.Helper()
 
+	updatedName := name + "-updated"
+
 	id := knownID
 	if id.IsEmpty() {
 		matches, err := lookupIcons(t, icons, name)
@@ -147,7 +150,7 @@ func cleanupIcon(t *testing.T, h *helper.Helper, icons *iconSDK.Service, name st
 			return nil
 		}
 		if len(matches) != 1 || matches[0].ID.IsEmpty() ||
-			(matches[0].Name != name && matches[0].Name != updatedIconName(name)) {
+			(matches[0].Name != name && matches[0].Name != updatedName) {
 			return errors.New("cannot safely identify created Icon; manual cleanup required")
 		}
 		id = matches[0].ID
@@ -158,7 +161,7 @@ func cleanupIcon(t *testing.T, h *helper.Helper, icons *iconSDK.Service, name st
 	if err != nil {
 		return fmt.Errorf("cannot verify Icon before cleanup: %w", err)
 	}
-	if current.ID != id || (current.Name != name && current.Name != updatedIconName(name)) {
+	if current.ID != id || (current.Name != name && current.Name != updatedName) {
 		return errors.New("cleanup refused: Icon identity changed; manual cleanup required")
 	}
 	if _, _, err := h.CallAllowingFailure(t, "テスト用のアイコンを削除する",
@@ -166,7 +169,7 @@ func cleanupIcon(t *testing.T, h *helper.Helper, icons *iconSDK.Service, name st
 	); err != nil {
 		return fmt.Errorf("delete test Icon %s: %w", id, err)
 	}
-	for _, candidate := range []string{name, updatedIconName(name)} {
+	for _, candidate := range []string{name, updatedName} {
 		matches, err := lookupIcons(t, icons, candidate)
 		if err != nil {
 			return fmt.Errorf("verify Icon absence after cleanup: %w", err)
