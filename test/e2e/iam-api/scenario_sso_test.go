@@ -46,6 +46,22 @@ type ssoProfileResponse struct {
 	Description string `json:"description"`
 }
 
+// TestScenarioIAMSSO は生成された IdP 証明書を持つ SSO profile を作成、読み込み、一覧表示、更新、削除します。
+// link と unlink は organization 内のすべてのクラウドユーザーのログイン方法を変更するため、
+// このシナリオではなく専用の追跡 Issue で対象となります。
+func TestScenarioIAMSSO(t *testing.T) {
+	h := helper.New(t, "iam-api-sso",
+		"テスト用の SSO profile のライフサイクルが正しく動作することを確認する")
+
+	name := resourceNamePrefix + helper.RandomSuffix(t)
+	run := &iamRun{
+		ssoProfile: iamResource{kind: "sso", name: name + "-sso"},
+	}
+
+	// SSO profile のライフサイクルを確認する
+	runSSOScenario(t, h, run)
+}
+
 // runSSOScenario は生成された IdP 証明書を持つ SSO profile を作成、読み込み、一覧表示、更新、削除します。
 // profile は organization 全体のものであるため、
 // シナリオ内で削除されます。

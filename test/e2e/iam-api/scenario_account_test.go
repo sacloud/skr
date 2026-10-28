@@ -18,7 +18,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/sacloud/skr/test/e2e/internal/helper"
@@ -27,15 +26,46 @@ import (
 
 const missingTwoFactorResourceID = "999999999999"
 
+// TestScenarioIAMAccount は organization スコープの書き込みコマンドを現在値の往復で確認し、
+// テスト用の user に対して user 2FA コマンドを確認します。
+func TestScenarioIAMAccount(t *testing.T) {
+	h := helper.New(t, "iam-api-account",
+		"organization スコープの更新コマンドが現在値を維持することと user 2FA コマンドの分類を確認する")
+
+	suffix := helper.RandomSuffix(t)
+	name := resourceNamePrefix + suffix
+	run := &iamRun{
+		password: randomPassword(t),
+		user:     iamResource{kind: "user", name: name, code: "e2e_" + suffix, description: resourceDescription + suffix},
+	}
+
+	// 作成前に同名の user が存在しないことを確認する
+	requireNoNameCollision(t, h, run)
+
+	// 後片付け: テスト用の user を再照合つき削除して残っていないことを確認する
+	defer func() {
+		if err := cleanupIAMResources(t, h, run); err != nil {
+			t.Errorf("cleanup failed: %v", err)
+		}
+	}()
+
+	// テスト用の user を作成する
+	createUser(t, h, run)
+	// organization スコープの更新コマンドを現在値の往復で確認する
+	runAccountScenario(t, h)
+	// user 2FA コマンドを確認する
+	runUser2FAScenario(t, h, run)
+}
+
 // runAccountScenario は organization スコープの書き込みコマンドを実行します。
 // すべての更新は事前に読み込んだ値を送信するため、
 // 書き込み経路を網羅しつつ organization 全体の設定は変更されません。
-func runAccountScenario(t *testing.T, h *helper.Helper, run *iamRun) {
+func runAccountScenario(t *testing.T, h *helper.Helper) {
 	t.Helper()
 	updatePasswordPolicy(t, h)
 	updateAuthConditions(t, h)
-	updateIDPolicy(t, h, run)
-	updateOrganizationPolicyBindings(t, h, run)
+	updateIDPolicy(t, h)
+	updateOrganizationPolicyBindings(t, h)
 	updateOrganizationName(t, h)
 	servicePolicyFlip(t, h)
 }
@@ -77,7 +107,7 @@ func updateAuthConditions(t *testing.T, h *helper.Helper) {
 
 // updateIDPolicy は organization の ID ポリシー binding を、事前に読み込んだ binding で置き換えます。
 // これにより割り当ては変更されません。
-func updateIDPolicy(t *testing.T, h *helper.Helper, run *iamRun) {
+func updateIDPolicy(t *testing.T, h *helper.Helper) {
 	t.Helper()
 	original := readPolicyBindings(t, h, "organizationのIDポリシーbindingを読み込む", "id-policy", "read-organization", "")
 	updatePolicyBindings(t, h, "読み込んだ値でIDポリシーbindingを更新する",
@@ -88,7 +118,7 @@ func updateIDPolicy(t *testing.T, h *helper.Helper, run *iamRun) {
 
 // updateOrganizationPolicyBindings は organization の IAM ポリシー binding を、
 // 事前に読み込んだ binding で置き換えます。
-func updateOrganizationPolicyBindings(t *testing.T, h *helper.Helper, run *iamRun) {
+func updateOrganizationPolicyBindings(t *testing.T, h *helper.Helper) {
 	t.Helper()
 	original := readPolicyBindings(t, h, "organizationのIAMポリシーbindingを読み込む", "policy", "read-organization", "")
 	updatePolicyBindings(t, h, "読み込んだ値でIAMポリシーbindingを更新する",
@@ -206,14 +236,4 @@ type twoFactorPage struct {
 	Items    []json.RawMessage `json:"items"`
 	Next     *string           `json:"next"`
 	Previous *string           `json:"previous"`
-}
-
-// mustSettingsJSON は値を JSON 文字列に変換します。
-// エラーはあり得ないため、フォールバックとして %#v を返します。
-func mustSettingsJSON(value any) string {
-	data, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Sprintf("%#v", value)
-	}
-	return string(data)
 }

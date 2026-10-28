@@ -17,7 +17,6 @@
 package main
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/sacloud/skr/test/e2e/internal/helper"
@@ -30,13 +29,37 @@ const (
 	policyPrincipalTyp = "service-principal"
 )
 
-// runPolicyBindingScenario は、この実行で作成した folder と project の IAM ポリシー binding を更新し、
-// 元の binding に戻します。
-// 更新は binding リスト全体を置き換えるため、
-// 更新前に元の binding を取得し、後で復元します。
-func runPolicyBindingScenario(t *testing.T, h *helper.Helper, run *iamRun) {
-	t.Helper()
+// TestScenarioIAMPolicy は、テスト用の folder と project にこの実行の principal への
+// IAM ポリシー binding を追加し、元の binding に戻します。
+func TestScenarioIAMPolicy(t *testing.T) {
+	h := helper.New(t, "iam-api-policy",
+		"テスト用のフォルダとプロジェクトに IAM ポリシー binding を設定し、元の binding に戻すことを確認する")
+
+	suffix := helper.RandomSuffix(t)
+	name := resourceNamePrefix + suffix
+	desc := resourceDescription + suffix
+	run := &iamRun{
+		folder:  iamResource{kind: "folder", name: name, description: desc},
+		project: iamResource{kind: "project", name: name, code: "e2e" + suffix, description: desc},
+	}
+
+	// 作成前に同名のリソースが存在しないことを確認する
+	requireNoNameCollision(t, h, run)
+
+	// 後片付け: project と folder を再照合つき削除して残っていないことを確認する
+	defer func() {
+		if err := cleanupIAMResources(t, h, run); err != nil {
+			t.Errorf("cleanup failed: %v", err)
+		}
+	}()
+
+	// 認証コンテキストから principal の ID を読み込む
+	run.principalID = checkAuthContext(t, h).ResourceID
+	// テスト用の folder と project を作成する
+	createFolderAndProject(t, h, run)
+	// folder のポリシー binding を更新して元に戻す
 	updateFolderPolicy(t, h, run)
+	// project のポリシー binding を更新して元に戻す
 	updateProjectPolicy(t, h, run)
 }
 
@@ -94,15 +117,4 @@ func checkPolicyBindings(t *testing.T, h *helper.Helper, description, kind, subc
 	t.Helper()
 	actual := readPolicyBindings(t, h, description, kind, subcommand, resourceID)
 	require.Equal(t, expected, actual, "%s: bindingが期待値と一致すること", description)
-}
-
-// TestPolicyRequestJSON は binding の JSON が元の値と一致することを確認します。
-func TestPolicyRequestJSON(t *testing.T) {
-	bound := []policyBinding{{
-		Role:       policyRole{Type: "preset", ID: folderPolicyRole},
-		Principals: []policyPrincipal{{Type: policyPrincipalTyp, ID: 113702071936}},
-	}}
-	var decoded []policyBinding
-	require.NoError(t, json.Unmarshal([]byte(mustSettingsJSON(bound)), &decoded), "bindingのJSONをデコードできること")
-	require.Equal(t, bound, decoded, "bindingのJSONが元の値と一致すること")
 }

@@ -307,9 +307,13 @@ func requireIdentity(t *testing.T, candidate iamItem, target iamResource) {
 
 // requireNoNameCollision は作成前に同名リソースが存在しないことを確認します。
 // 同名リソースが存在する場合はテストを失敗させ、既存リソースを変更しません。
+// シナリオが初期化したリソース (kind が設定されているもの) だけを対象にします。
 func requireNoNameCollision(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
 	for _, target := range []iamResource{run.user, run.group, run.folder, run.childFolder, run.project, run.servicePrincipal} {
+		if target.kind == "" {
+			continue
+		}
 		items := listIAMItems(t, h, "作成前に同名の"+target.kind+"が存在しないことを確認する", target.kind, target.name)
 		for _, candidate := range items {
 			require.NotEqual(t, target.name, candidate.Name,
@@ -634,4 +638,14 @@ func randomPassword(t *testing.T) string {
 		value[index] = passwordChars[position.Int64()]
 	}
 	return prefix + string(value)
+}
+
+// mustSettingsJSON は値を JSON 文字列に変換します。
+// エラーはあり得ないため、フォールバックとして %#v を返します。
+func mustSettingsJSON(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprintf("%#v", value)
+	}
+	return string(data)
 }

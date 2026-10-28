@@ -35,6 +35,21 @@ type secretTokenLength struct {
 	TokenLength int `json:"token_length"`
 }
 
+// TestScenarioIAMScim は user provisioning configuration を作成、読み込み、更新、一覧表示、
+// 秘密トークンの再生成、削除します。
+func TestScenarioIAMScim(t *testing.T) {
+	h := helper.New(t, "iam-api-scim",
+		"テスト用の SCIM 設定のライフサイクルが正しく動作することを確認する")
+
+	name := resourceNamePrefix + helper.RandomSuffix(t)
+	run := &iamRun{
+		scim: iamResource{kind: "scim", name: name + "-scim"},
+	}
+
+	// SCIM 設定のライフサイクルを確認する
+	runScimScenario(t, h, run)
+}
+
 // runScimScenario は user provisioning configuration を作成、読み込み、更新、一覧表示、
 // 秘密トークンの再生成、削除を行います。
 // configuration は organization 全体のものであるため、シナリオ内で削除されます。

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // このファイルは iam-api E2E の read-only シナリオです。
-// この実行で作成したリソースに依存しない読み取りコマンドを確認します。
+// この実行でリソースを作成せず、読み取りコマンドを確認します。
 package main
 
 import (
@@ -95,29 +95,29 @@ type ruleTemplateList struct {
 	Items []ruleTemplateSummary `json:"items"`
 }
 
-// runReadOnlyScenario は、この実行で作成したリソースに依存しない read-only な iam-api コマンドを実行します。
+// TestScenarioIAMReadOnly は、この実行でリソースを作成せず、
+// IAM API の read-only コマンドを確認します。
 // すべてのコマンドはデータの読み込みのみを行うため、
 // organization 全体の設定は変更されません。
-func runReadOnlyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
-	t.Helper()
+func TestScenarioIAMReadOnly(t *testing.T) {
+	h := helper.New(t, "iam-api-read-only",
+		"IAM API の読み取りコマンドが正しいデータを返すことを確認する")
+
+	// iam-role と id-role のロールカタログを確認する
 	checkRoleCatalog(t, h, "iam-role")
 	checkRoleCatalog(t, h, "id-role")
+	// organization の ID ポリシー binding を読み込む
 	readPolicyBindings(t, h, "organizationのIDポリシーbindingを読み込む", "id-policy", "read-organization", "")
-	checkAuthContext(t, h, run)
+	// 認証コンテキストを読み込む
+	checkAuthContext(t, h)
+	// 認証条件とパスワードポリシーを読み込む
 	checkAuthConditions(t, h)
 	checkPasswordPolicy(t, h)
+	// organization の IAM ポリシー binding を読み込む
 	readPolicyBindings(t, h, "organizationのIAMポリシーbindingを読み込む", "policy", "read-organization", "")
+	// organization とサービスポリシーを確認する
 	checkOrganization(t, h)
 	checkServicePolicy(t, h)
-}
-
-// readResourcePolicies は、この実行で作成した folder と project のポリシー binding を読み込みます。
-// この実行は一時的なリソースにロールを付与しないため、
-// binding は空の場合があります。
-func readResourcePolicies(t *testing.T, h *helper.Helper, run *iamRun) {
-	t.Helper()
-	readPolicyBindings(t, h, "作成したfolderのポリシーbindingを読み込む", "policy", "read-folder", run.folder.id)
-	readPolicyBindings(t, h, "作成したprojectのポリシーbindingを読み込む", "policy", "read-project", run.project.id)
 }
 
 // checkRoleCatalog は利用可能なロールを一覧表示し、最初の1つを読み込みます。
@@ -153,17 +153,17 @@ func readPolicyBindings(t *testing.T, h *helper.Helper, description, kind, subco
 	return bindings
 }
 
-func checkAuthContext(t *testing.T, h *helper.Helper, run *iamRun) {
+// checkAuthContext は認証コンテキストを読み込み、
+// principal の ID と認証方式が存在することを確認します。
+// principal が特定の project に限定されている場合、その project ID を返します。
+func checkAuthContext(t *testing.T, h *helper.Helper) authContext {
 	t.Helper()
 	data := h.Call(t, "認証コンテキストを読み込む", "iam-api", "auth", "read-auth-context")
 	var context authContext
 	require.NoError(t, json.Unmarshal(data, &context), "read-auth-context: 認証コンテキストのデコードに失敗しました")
 	require.Positive(t, context.ResourceID, "read-auth-context: resource_idが正の値であること")
 	require.NotEmpty(t, context.AuthType, "read-auth-context: auth_typeが存在すること")
-	run.principalID = context.ResourceID
-	if context.LimitedToProjectID != nil {
-		run.limitedProjectID = *context.LimitedToProjectID
-	}
+	return context
 }
 
 func checkAuthConditions(t *testing.T, h *helper.Helper) {

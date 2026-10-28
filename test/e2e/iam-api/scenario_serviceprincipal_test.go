@@ -53,14 +53,40 @@ type accessTokenSummary struct {
 	ExpiresIn int64  `json:"expires_in"`
 }
 
-// runServicePrincipalScenario は、この実行の service principal を更新・復元し、
-// 生成された RSA キーペアをアップロードしてキーのライフサイクルを確認し、
-// 秘密鍵で署名した JWT assertion から access token を発行します。
+// TestScenarioIAMServicePrincipal はテスト用の service principal を作成し、
+// 名前の更新、キーのライフサイクル、JWT assertion からの access token 発行を確認します。
 // 秘密鍵はこのプロセスから出ません。
 // 公開鍵と署名済み assertion のみがプライベートなファイルに書き込まれます。
-func runServicePrincipalScenario(t *testing.T, h *helper.Helper, run *iamRun) {
-	t.Helper()
+func TestScenarioIAMServicePrincipal(t *testing.T) {
+	h := helper.New(t, "iam-api-service-principal",
+		"テスト用のサービスプリンシパルのキーと access token 発行が正しく動作することを確認する")
+
+	suffix := helper.RandomSuffix(t)
+	name := resourceNamePrefix + suffix
+	desc := resourceDescription + suffix
+	run := &iamRun{
+		folder:           iamResource{kind: "folder", name: name, description: desc},
+		project:          iamResource{kind: "project", name: name, code: "e2e" + suffix, description: desc},
+		servicePrincipal: iamResource{kind: "service-principal", name: name, description: desc},
+	}
+
+	// 作成前に同名のリソースが存在しないことを確認する
+	requireNoNameCollision(t, h, run)
+
+	// 後片付け: service principal、project、folder を再照合つき削除して残っていないことを確認する
+	defer func() {
+		if err := cleanupIAMResources(t, h, run); err != nil {
+			t.Errorf("cleanup failed: %v", err)
+		}
+	}()
+
+	// テスト用の folder と project を作成する
+	createFolderAndProject(t, h, run)
+	// テスト用の service principal を作成する
+	createServicePrincipal(t, h, run)
+	// service principal の名前を更新して元に戻す
 	updateServicePrincipal(t, h, run)
+	// service principal のキーと access token を確認する
 	runServicePrincipalKeysScenario(t, h, run)
 }
 

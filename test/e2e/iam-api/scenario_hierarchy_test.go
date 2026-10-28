@@ -37,9 +37,39 @@ type hierarchyProject struct {
 	ParentFolderID *int64 `json:"parent_folder_id"`
 }
 
+// TestScenarioIAMHierarchy はテスト用の folder と project で、
+// 子 folder の移動と project の親 folder 移動を確認します。
+func TestScenarioIAMHierarchy(t *testing.T) {
+	h := helper.New(t, "iam-api-hierarchy",
+		"テスト用のフォルダとプロジェクトで階層移動が正しく動作することを確認する")
+
+	suffix := helper.RandomSuffix(t)
+	name := resourceNamePrefix + suffix
+	desc := resourceDescription + suffix
+	run := &iamRun{
+		folder:      iamResource{kind: "folder", name: name, description: desc},
+		childFolder: iamResource{kind: "folder", name: name + "-child", description: desc},
+		project:     iamResource{kind: "project", name: name, code: "e2e" + suffix, description: desc},
+	}
+
+	// 作成前に同名のリソースが存在しないことを確認する
+	requireNoNameCollision(t, h, run)
+
+	// 後片付け: project と folder を再照合つき削除して残っていないことを確認する
+	defer func() {
+		if err := cleanupIAMResources(t, h, run); err != nil {
+			t.Errorf("cleanup failed: %v", err)
+		}
+	}()
+
+	// テスト用の folder と project を作成する
+	createFolderAndProject(t, h, run)
+	// 子 folder を作成して階層を移動する
+	runHierarchyScenario(t, h, run)
+}
+
 // runHierarchyScenario は child folder を main folder に移動し、
-// project を child folder に移動します。両方の移動は API から親を読み込んで確認し、
-// cleanup は main folder の前に child folder を削除します。
+// project を child folder に移動します。両方の移動は API から親を読み込んで確認します。
 func runHierarchyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
 	run.childFolder.attempted = true

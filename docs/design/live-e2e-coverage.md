@@ -30,7 +30,7 @@
 | `test/e2e/iaas-lookup` | archive find / read、product disk find / read(4) | 全コマンド実装済み |
 | `test/e2e/iaas-product-plans` | product internet find / read、product license find、product privatehost find / read(5) | 全コマンド実装済み |
 | `test/e2e/object-storage-api` | 6シナリオで34コマンド | testing.T ベースのシナリオに移行済み。ライブは29コマンドの正常応答を確認済みで、`bucket penalty` と `site status bucket-metering` は API エラー、暗号化3操作は KMS キー作成未実装のため延期。状況は `PLAN.md` を参照 |
-| `test/e2e/iam-api` | 8シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | runner 実装済み。ライブは57コマンドの正常実行を確認済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
+| `test/e2e/iam-api` | 9シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | testing.T ベースのシナリオに移行済み。ライブは57コマンドの正常実行を確認済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
 
 `config` は CLI のメタコマンドとして上表に含めます。`version` は `test/e2e/version` の testing.T ベースのシナリオテストで検証します。
 
@@ -99,7 +99,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 - タスク2の apprun は 2026-10-27 に testing.T ベースのシナリオテストへ移行しました。旧 runner の証跡ステップは `update-application`、`list-versions`、`read-version`、`list-traffic`、`update-traffic`、`read-packet-filter` などの kebab-case です。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 - server の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/server/scenario_server_test.go` ほか) へ移行しました。旧 runner (`main.go`、`scenario_update.go`) は削除し、SSH 鍵の生成と SSH 接続の確認は `test/e2e/internal/helper` に移しました ([ADR 0063](../adr/0063-reusable-ssh-and-local-command-recording.md))。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。同日に作成前の同名確認、後片付けの再照合と不在確認、起動待ちのポーリングを SDK で直接実行するよう変更しました ([ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md))。実行記録にはテスト対象の CLI 操作だけが残ります。同日に偽の操作 (`fakeServerCommands`) によるシナリオ経路の単体テストを廃止し、実ロジックの単体テストだけを残しました。テストファイルはシナリオ・SDK の確認操作・共有ロジックの3つに整理し、CLI の引数はシナリオの呼び出し箇所に直接書きました。引数を組み立てるだけの関数、インターフェース、操作を束ねる構造体も削除しました。
 - iam-api の E2E は 2026-10-29 に testing.T ベースのシナリオテスト (`test/e2e/iam-api/scenario_iam_test.go` ほか) へ移行しました。旧 runner (`main.go`、`main_test.go`、`managed.go`、`scenario_*.go`) は削除しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
-- 移行後のシナリオは、`resource_test.go` (共有ヘルパーとコアシナリオ)、`managed_test.go` (managed リソース)、`scenario_read_only_test.go` (読み取り専用)、`scenario_iam_test.go` (エントリ) に整理しました。ポリシー、階層、サービスプリンシパル、project API key、SCIM、SSO、アカウント (organization スコープと user-2fa) は、それぞれ `scenario_*.go` に対応する `_test.go` として配置しました。
+- 移行後のシナリオは、各 `scenario_*_test.go` が1つのテスト関数と1つの `helper.New` を持ち、それぞれが独立したシナリオとして実行できる9ファイルに整理しました。コアリソース (`scenario_iam_test.go`)、読み取り専用、ポリシー、階層、サービスプリンシパル、project API key、SCIM、SSO、アカウント (organization スコープと user-2fa) です。共有ヘルパーは `resource_test.go` と `managed_test.go` に配置し、各シナリオは自分が必要なリソースを作成して後片付けします。
 - 秘密情報はコマンド引数に含めず、パスワードと公開鍵、assertion、SSO 証明書は `@path` または専用ファイルから読み込み、access token を含む応答は `--query` で投影します。
 - 任意の改善候補として、`test/e2e/simple-notification/crud.go` を `scenario_crud_only.go` に改名できます。対応する `crud_test.go` も合わせます。`test/e2e/gslb/server.go` は役割を表す名前のため変更不要です。2026-10-27 の simple-notification の移行で `crud.go` は削除済みです。
 - switch の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/switch/scenario_switch_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。旧 runner の固定名での事前後片付けはランダムな接尾辞付きの名前に置き換え、作成前の同名確認は [ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従い実行記録を残さない SDK で直接実行し、後片付けの削除前再参照と削除後の不在確認はシナリオ内で行います。検証ゾーンは旧 runner の is1b モードに合わせて is1b の単一シナリオに絞り、旧 runner の Sandbox (tk1v) モードは削除しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。

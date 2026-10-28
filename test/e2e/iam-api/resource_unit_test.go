@@ -17,6 +17,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -175,6 +176,17 @@ func TestRandomPassword(t *testing.T) {
 	for _, r := range value {
 		require.True(t, strings.ContainsRune(passwordChars, r), "パスワードは許可された文字だけで構成されること")
 	}
+}
+
+// TestPolicyRequestJSON は binding の JSON が元の値と一致することを確認します。
+func TestPolicyRequestJSON(t *testing.T) {
+	bound := []policyBinding{{
+		Role:       policyRole{Type: "preset", ID: folderPolicyRole},
+		Principals: []policyPrincipal{{Type: policyPrincipalTyp, ID: 113702071936}},
+	}}
+	var decoded []policyBinding
+	require.NoError(t, json.Unmarshal([]byte(mustSettingsJSON(bound)), &decoded), "bindingのJSONをデコードできること")
+	require.Equal(t, bound, decoded, "bindingのJSONが元の値と一致すること")
 }
 
 func TestRandomPasswordUnique(t *testing.T) {

@@ -30,10 +30,45 @@ import (
 
 const projectAPIKeyRole = "resource-creator"
 
-// runProjectAPIKeyScenario は、この実行の project 内で API key を作成、読み込み、一覧表示、更新、削除します。
+// TestScenarioIAMProjectAPIKey はテスト用の project 内で API key を作成、読み込み、一覧表示、更新、削除します。
 // create と read の応答には access token が含まれるため、
 // すべての出力は --query で投影され、
 // 実行記録にはトークン自体が保存されることはありません。
+func TestScenarioIAMProjectAPIKey(t *testing.T) {
+	h := helper.New(t, "iam-api-project-api-key",
+		"テスト用のプロジェクト内で API キーのライフサイクルが正しく動作することを確認する")
+
+	suffix := helper.RandomSuffix(t)
+	name := resourceNamePrefix + suffix
+	desc := resourceDescription + suffix
+	run := &iamRun{
+		folder:        iamResource{kind: "folder", name: name, description: desc},
+		project:       iamResource{kind: "project", name: name, code: "e2e" + suffix, description: desc},
+		projectAPIKey: iamResource{kind: "project-api-key", name: name + "-pak"},
+	}
+
+	// 作成前に同名のリソースが存在しないことを確認する
+	requireNoNameCollision(t, h, run)
+
+	// 後片付け: project と folder を再照合つき削除して残っていないことを確認する
+	defer func() {
+		if err := cleanupIAMResources(t, h, run); err != nil {
+			t.Errorf("cleanup failed: %v", err)
+		}
+	}()
+
+	// 認証コンテキストから principal の project 制限を読み込む
+	context := checkAuthContext(t, h)
+	if context.LimitedToProjectID != nil {
+		run.limitedProjectID = *context.LimitedToProjectID
+	}
+	// テスト用の folder と project を作成する
+	createFolderAndProject(t, h, run)
+	// project API key のライフサイクルを確認する
+	runProjectAPIKeyScenario(t, h, run)
+}
+
+// runProjectAPIKeyScenario は、この実行の project 内で API key を作成、読み込み、一覧表示、更新、削除します。
 // 後片付けは前のステップが失敗した場合のみ削除します。
 func runProjectAPIKeyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
