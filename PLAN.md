@@ -92,7 +92,7 @@ SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のよう
 - [x] `internetplan` — `iaas-api product internet` の Find / Read を実装済みです。ゾーン別プランの帯域幅と利用可否を確認できます。
 - [x] `licenseinfo` — `iaas-api product license` の Find を実装済みです。API に Read 操作はありません。
 - [x] `privatehostplan` — `iaas-api product privatehost` の Find / Read を実装済みです。CPU、CPU モデル、メモリ、利用可否を確認できます。
-- 3 リソースの読み取り専用 [ライブ E2E runner](test/e2e/iaas-product-plans/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet-plan.md)、[チュートリアル](docs/manual/tutorials/iaas-api/license-info.md)、[チュートリアル](docs/manual/tutorials/iaas-api/private-host-plan.md)があります。is1b のライブ E2E で InternetPlan / PrivateHostPlan の Find と Read の一致を確認し、LicenseInfo の Find 応答を検証済みです。クラウドリソースの変更はありません。
+- 3 リソースの読み取り専用ライブ E2E (`scenario_iaas_product_plans_test.go`) と[チュートリアル](docs/manual/tutorials/iaas-api/internet-plan.md)、[チュートリアル](docs/manual/tutorials/iaas-api/license-info.md)、[チュートリアル](docs/manual/tutorials/iaas-api/private-host-plan.md)があります。is1b のライブ E2E で InternetPlan / PrivateHostPlan の Find と Read の一致を確認し、LicenseInfo の Find 応答を検証済みです。クラウドリソースの変更はありません。
 - コマンド範囲と読み取り専用 E2E の判断は [ADR 0055](docs/adr/0055-iaas-product-plan-api-commands.md) に記録しています。
 
 ## IaaS SDK に同居する System API 候補
