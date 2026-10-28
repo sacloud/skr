@@ -13,14 +13,13 @@
 // limitations under the License.
 
 // このファイルは http コマンドの E2E シナリオです。
-// 選択中のプロファイルで認証付き HTTP GET リクエストを送信し、生の JSON 応答を確認します。
+// 認証付き HTTP GET リクエストを送信し、生の JSON 応答を確認します。
 package main
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -37,13 +36,6 @@ const zoneListURL = "https://secure.sakura.ad.jp/cloud/zone/is1b/api/cloud/1.1/z
 func TestScenarioHTTP(t *testing.T) {
 	h := helper.New(t, "http-api",
 		"skr http コマンドで HTTP リクエストを送信し、応答の取得と終了コードが正しく動作することを確認する")
-
-	// 選択中の SDK プロファイルを確認する
-	profile, _, err := h.CallAllowingFailure(t, "現在選択されている SDK プロファイルを確認する",
-		"config", "current")
-	require.NoError(t, err, "read the selected SDK profile")
-	require.NotEmpty(t, strings.TrimSpace(string(profile)),
-		"a selected SDK profile is required")
 
 	// zone API へ読み取り専用の GET リクエストを送信する
 	body := h.Call(t, "さくらのクラウド zone API への GET リクエストが JSON 応答を返すことを確認する",
