@@ -7,6 +7,8 @@
 
 [ADR 0058](../adr/0058-live-e2e-command-coverage.md) で公開するすべての末端サブコマンドにライブ E2E が必須とされたため、`skr --help` から抽出した末端コマンド一覧と `test/e2e/` 配下の runner 実装を突合しました。runner が実行する CLI 引数を精査し、末端コマンドごとに runner の対象範囲を判定しています。ライブ実行の成否は `PLAN.md` と各設計文書の記録に従い、この文書では runner が対象とするコマンドの範囲を基準にします。全末端コマンドは311個で、タスク1の完了後は未検証が118個です。
 
+末端コマンドごとの状況は、[ADR 0065](../adr/0065-e2e-command-coverage-baseline.md) に従い [`test/e2e/command-coverage/baseline.txt`](../../test/e2e/command-coverage/baseline.txt) に記録しています。`make e2e-coverage` が末端コマンドが baseline に登録されていることを検証し、実行記録から抽出したコマンドと baseline の状況を報告します。この文書の対応表は runner 単位の概況であり、コマンド単位の状況は baseline を基準にします。
+
 ## 網羅済みの runner
 
 | runner | 対象末端コマンド | 状況 |
@@ -82,8 +84,9 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 
 ### 横断タスク
 
-- コマンドツリーとシナリオの対応を検査する網羅テストを追加し、runner 追加時の網羅漏れを検出します。要求は [ADR 0058](../adr/0058-live-e2e-command-coverage.md) に記載しています。
-- 各タスク完了後に、この文書の網羅表と未検証コマンド、`PLAN.md` の対応状況を更新します。
+- コマンドツリーとシナリオの対応を検査する網羅テストは完了です。[ADR 0065](../adr/0065-e2e-command-coverage-baseline.md) に従い、`internal/cli` の `LeafCommandPaths` が末端コマンドを列挙し、`test/e2e/command-coverage/baseline.txt` への登録を網羅テストが強制します。実行記録から抽出したコマンドが baseline の状況と一致しない場合も網羅テストが失敗します。要求は [ADR 0058](../adr/0058-live-e2e-command-coverage.md) に記載しています。
+- baseline では `iam-api group update` が未整備 (`todo`) として記録されています。旧 runner がこのコマンドを実行していないためで、[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) への移行時に整備します。
+- 各タスク完了後に、この文書の網羅表と未検証コマンド、`PLAN.md` の対応状況、baseline を更新します。
 
 ## 命名ルールの適用状況
 
