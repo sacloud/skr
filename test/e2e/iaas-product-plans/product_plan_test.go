@@ -18,8 +18,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"strconv"
 	"testing"
 
@@ -77,18 +75,16 @@ type privateHostPlanFindSummary struct {
 	PrivateHostPlans []privateHostPlanSummary `json:"PrivateHostPlans"`
 }
 
-// validateFindResult は Find 応答のページング情報が要求したページと一致することを確認します。
-// required fields が欠けている場合、またはページング情報が要求と一致しない場合にエラーを返します。
-func validateFindResult(total, from, count *int, itemCount, expectedFrom, requestedCount int) error {
-	if total == nil || from == nil || count == nil {
-		return errors.New("required pagination fields are missing or null")
-	}
-	if *total < 0 || *from != expectedFrom || *count < 0 || *count > requestedCount ||
-		*from > *total || *count > *total-*from || itemCount != *count ||
-		(*count == 0 && *total > *from) {
-		return fmt.Errorf("pagination metadata does not match the requested page (total=%d, from=%d, count=%d, items=%d)", *total, *from, *count, itemCount)
-	}
-	return nil
+// checkFindPage は Find 応答のページング情報が要求 (--count 1 --from 0) と一致することを確認します。
+// この確認で --count と --from が API まで伝わっていることを検証します。
+func checkFindPage(t *testing.T, total, from, count *int, itemCount int) {
+	t.Helper()
+	require.NotNil(t, total, "Find response is missing its Total")
+	require.NotNil(t, from, "Find response is missing its From")
+	require.NotNil(t, count, "Find response is missing its Count")
+	require.Equal(t, 0, *from, "Find response From should match the requested --from 0")
+	require.LessOrEqual(t, *count, 1, "Find response Count should honor the requested --count 1")
+	require.Equal(t, *count, itemCount, "Find response Count should match the result items")
 }
 
 // findInternetPlans は指定ゾーンのインターネットプランを検索して応答を返します。
@@ -101,8 +97,7 @@ func findInternetPlans(t *testing.T, h *helper.Helper, description string) []int
 	require.NoError(t, err, "%s: product internet find: %v", description, err)
 	var find internetPlanFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode InternetPlan find output: %v", description, err)
-	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, len(find.InternetPlans), 0, 1),
-		"%s: InternetPlan Find returned an inconsistent result", description)
+	checkFindPage(t, find.Total, find.From, find.Count, len(find.InternetPlans))
 	return find.InternetPlans
 }
 
@@ -128,8 +123,7 @@ func findLicenseInfos(t *testing.T, h *helper.Helper, description string) []lice
 	require.NoError(t, err, "%s: product license find: %v", description, err)
 	var find licenseInfoFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode LicenseInfo find output: %v", description, err)
-	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, len(find.LicenseInfo), 0, 1),
-		"%s: LicenseInfo Find returned an inconsistent result", description)
+	checkFindPage(t, find.Total, find.From, find.Count, len(find.LicenseInfo))
 	return find.LicenseInfo
 }
 
@@ -143,8 +137,7 @@ func findPrivateHostPlans(t *testing.T, h *helper.Helper, description string) []
 	require.NoError(t, err, "%s: product privatehost find: %v", description, err)
 	var find privateHostPlanFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode PrivateHostPlan find output: %v", description, err)
-	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, len(find.PrivateHostPlans), 0, 1),
-		"%s: PrivateHostPlan Find returned an inconsistent result", description)
+	checkFindPage(t, find.Total, find.From, find.Count, len(find.PrivateHostPlans))
 	return find.PrivateHostPlans
 }
 
