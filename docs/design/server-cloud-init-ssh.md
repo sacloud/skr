@@ -26,7 +26,7 @@ cloud-init が動作しない場合の確認手順と検証用 Server でのロ�
 
 ライブ E2E は testing.T ベースのシナリオテスト (`test/e2e/server/scenario_server_test.go`) として実装します。配置と実行方法は [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従います。
 
-シナリオはランダムな Server 名と固定の E2E 説明を使用します。テスト対象の操作は skr CLI で実行し、実行記録に説明付きで残します。安全確認と起動待ち ([ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md)) は sacloud SDK で静かに実行し、証跡は残しません。
+シナリオはランダムな Server 名と固定の E2E 説明を使用します。cloud-init アーカイブとディスクプランはテストの事前確認として sacloud SDK で自動選択します ([ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md))。アーカイブは Ubuntu Server 24.04 LTS の `(cloudimg)` に限定し、ディスクプランは指定サイズが利用可能なプランのうち ID が最小のものを選びます。テスト対象の操作は skr CLI で実行し、実行記録に説明付きで残します。安全確認と起動待ちは sacloud SDK で静かに実行し、証跡は残しません。
 
 シナリオは次の CLI コマンドを、説明付きで実行記録に残します。
 
@@ -48,13 +48,11 @@ Server 削除前に接続ディスクの ID を取得します。削除後に同
 
 ## 実行
 
-`./skr` をビルドし、プロファイルディレクトリに `skr-e2e` プロファイルを用意してから、リポジトリのルートでテストを実行します。is1b で利用可能な cloud-init アーカイブとディスクプランの ID を環境変数で指定します。ディスクサイズは `SKR_E2E_DISK_SIZE_GB` (既定 20) で指定できます。アーカイブかディスクプランが未設定の場合はテストをスキップします。2026-10-27 に安全確認と起動待ちを SDK で実行するシナリオをライブ実行し、cloud-init 起動・SSH 接続・更新・復元・削除と後片付けを確認しました。
+`./skr` をビルドし、プロファイルディレクトリに `skr-e2e` プロファイルを用意してから、リポジトリのルートでテストを実行します。cloud-init アーカイブとディスクプランは SDK で自動選択します。ディスクサイズは `SKR_E2E_DISK_SIZE_GB` (既定 20) で指定できます。2026-10-28 に自動選択を含むシナリオをライブ実行し、cloud-init 起動・SSH 接続・更新・復元・削除と後片付けを確認しました。
 
 ```console
 $ make build
 $ SKR_E2E=1 \
-    SKR_E2E_CLOUDIMG_ARCHIVE_ID=ARCHIVE_ID \
-    SKR_E2E_DISK_PLAN_ID=DISK_PLAN_ID \
     go test ./test/e2e/server/ -run TestScenarioServer -v -timeout 40m
 ```
 
@@ -62,7 +60,7 @@ $ SKR_E2E=1 \
 
 ## SSH 接続確認の再利用
 
-SSH 鍵の生成、cloud-init の user-data の作成、SSH ログインの確認は、`test/e2e/internal/helper` パッケージに実装し、Server 以外のリソースを扱う E2E でも再利用します ([ADR 0063](../adr/0063-reusable-ssh-and-local-command-recording.md))。
+SSH 鍵の生成、cloud-init の user-data の作成、SSH ログインの確認、cloudimg アーカイブとディスクプランの自動選択は、`test/e2e/internal/helper` パッケージに実装しています。Server 以外のリソースを扱う E2E でも再利用します ([ADR 0063](../adr/0063-reusable-ssh-and-local-command-recording.md))。
 
 - `helper.WriteSSHMaterial` は ssh-keygen で一時的な鍵ペアを生成し、指定したユーザーでログインするための cloud-init user-data を作成します。公開鍵だけを user-data に記載し、秘密鍵の内容は含めません。sudo を設定すると NOPASSWD の sudo 権限を user-data に含めます。
 - `helper.ConnectSSH` は一時的な鍵でリモートの `hostname` を取得し、ログインできることを確認します。`helper.RunSSHCommand` はリモートコマンドを1回実行し、stdout を返します。
