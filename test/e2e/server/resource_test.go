@@ -26,6 +26,8 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/sacloud/skr/test/e2e/internal/helper"
 )
 
 const (
@@ -74,9 +76,9 @@ type diskItem struct {
 
 // serverDiskParams は cloud-init ディスクの作成に使うアーカイブとディスクプランの設定です。
 type serverDiskParams struct {
-	// ArchiveID は is1b で利用可能な cloud-init アーカイブの ID です。
+	// ArchiveID は自動選択した Ubuntu Server 24.04 LTS (cloudimg) アーカイブの ID です。
 	ArchiveID int64
-	// DiskPlanID は is1b で利用可能なディスクプランの ID です。
+	// DiskPlanID は自動選択したディスクプランの ID です。
 	DiskPlanID int64
 	// SizeGB はクラウドディスクのサイズ (GB) です。
 	SizeGB int64
@@ -92,49 +94,34 @@ type serverRun struct {
 	serverID types.ID
 }
 
-// requireServerParams はライブ実行に必要な cloud-init アーカイブとディスクプランの設定を読み取ります。
-// 環境変数は SKR_E2E_CLOUDIMG_ARCHIVE_ID と SKR_E2E_DISK_PLAN_ID、SKR_E2E_DISK_SIZE_GB (既定 20) です。
-// アーカイブかプランが未設定の場合はテストをスキップします。
-func requireServerParams(t *testing.T) serverDiskParams {
+// requireServerParams はディスクサイズの環境変数を読み取り、
+// cloud-init アーカイブとディスクプランを SDK で自動選択します。
+// 環境変数は SKR_E2E_DISK_SIZE_GB (既定 20) です。
+// アーカイブとディスクプランの選択は E2E の事前確認のため SDK で静かに実行します。
+func requireServerParams(t *testing.T, caller iaas.APICaller) serverDiskParams {
 	t.Helper()
 
-	params, err := parseServerParams(
-		os.Getenv("SKR_E2E_CLOUDIMG_ARCHIVE_ID"),
-		os.Getenv("SKR_E2E_DISK_PLAN_ID"),
-		os.Getenv("SKR_E2E_DISK_SIZE_GB"),
-	)
-	if errors.Is(err, errMissingServerParams) {
-		t.Skipf("%v, skipping E2E test", err)
+	sizeGB, err := parseDiskSizeGB(os.Getenv("SKR_E2E_DISK_SIZE_GB"))
+	require.NoError(t, err, "parse SKR_E2E_DISK_SIZE_GB")
+	archive := helper.FindCloudimgArchive(t, caller, zone)
+	plan := helper.FindDiskPlan(t, caller, zone, sizeGB)
+	return serverDiskParams{
+		ArchiveID:  int64(archive.ID),
+		DiskPlanID: int64(plan.ID),
+		SizeGB:     sizeGB,
 	}
-	require.NoError(t, err, "parse Server E2E parameters")
-	return params
 }
 
-// errMissingServerParams は cloud-init アーカイブかディスクプランの環境変数が未設定であることを示します。
-var errMissingServerParams = errors.New("SKR_E2E_CLOUDIMG_ARCHIVE_ID and SKR_E2E_DISK_PLAN_ID are required")
-
-// parseServerParams は cloud-init アーカイブとディスクプランの設定値を解析します。
-// アーカイブとプランは正の整数、ディスクサイズは正の整数 (既定 20) です。
-func parseServerParams(archiveID, diskPlanID, sizeGB string) (serverDiskParams, error) {
-	if archiveID == "" || diskPlanID == "" {
-		return serverDiskParams{}, errMissingServerParams
+// parseDiskSizeGB はディスクサイズ (GB) の環境変数の値を解析します。未設定なら既定の 20 を返します。
+func parseDiskSizeGB(sizeGB string) (int64, error) {
+	if sizeGB == "" {
+		return 20, nil
 	}
-	archive, err := strconv.ParseInt(archiveID, 10, 64)
-	if err != nil || archive <= 0 {
-		return serverDiskParams{}, errors.New("SKR_E2E_CLOUDIMG_ARCHIVE_ID must be a positive integer")
+	size, err := strconv.ParseInt(sizeGB, 10, 64)
+	if err != nil || size <= 0 {
+		return 0, errors.New("SKR_E2E_DISK_SIZE_GB must be a positive integer")
 	}
-	plan, err := strconv.ParseInt(diskPlanID, 10, 64)
-	if err != nil || plan <= 0 {
-		return serverDiskParams{}, errors.New("SKR_E2E_DISK_PLAN_ID must be a positive integer")
-	}
-	size := int64(20)
-	if sizeGB != "" {
-		size, err = strconv.ParseInt(sizeGB, 10, 64)
-		if err != nil || size <= 0 {
-			return serverDiskParams{}, errors.New("SKR_E2E_DISK_SIZE_GB must be a positive integer")
-		}
-	}
-	return serverDiskParams{ArchiveID: archive, DiskPlanID: plan, SizeGB: size}, nil
+	return size, nil
 }
 
 // decodeServerList は Server の一括検索の応答を解析します。
@@ -227,30 +214,24 @@ func matchesCreatedDisk(disk diskItem, id types.ID, name string, params serverDi
 		params.SizeGB > 0 && disk.SizeMB/1024 == params.SizeGB && disk.SizeMB%1024 == 0
 }
 
-// TestParseServerParams は cloud-init アーカイブとディスクプランの設定値の解析を確認する。
-func TestParseServerParams(t *testing.T) {
-	params, err := parseServerParams("123", "4", "")
+// TestParseDiskSizeGB はディスクサイズの環境変数の値の解析を確認する。
+func TestParseDiskSizeGB(t *testing.T) {
+	size, err := parseDiskSizeGB("")
 	require.NoError(t, err)
-	require.Equal(t, serverDiskParams{ArchiveID: 123, DiskPlanID: 4, SizeGB: 20}, params, "the disk size should default to 20GB")
+	require.EqualValues(t, 20, size, "the disk size should default to 20GB")
 
-	params, err = parseServerParams("123", "4", "40")
+	size, err = parseDiskSizeGB("40")
 	require.NoError(t, err)
-	require.Equal(t, serverDiskParams{ArchiveID: 123, DiskPlanID: 4, SizeGB: 40}, params)
+	require.EqualValues(t, 40, size)
 
-	for name, tc := range map[string]struct {
-		archiveID, diskPlanID, sizeGB string
-	}{
-		"missing archive":   {archiveID: "", diskPlanID: "4"},
-		"missing disk plan": {archiveID: "123", diskPlanID: ""},
-		"invalid archive":   {archiveID: "abc", diskPlanID: "4"},
-		"negative archive":  {archiveID: "-1", diskPlanID: "4"},
-		"invalid disk plan": {archiveID: "123", diskPlanID: "abc"},
-		"invalid disk size": {archiveID: "123", diskPlanID: "4", sizeGB: "abc"},
-		"zero disk size":    {archiveID: "123", diskPlanID: "4", sizeGB: "0"},
+	for name, tc := range map[string]string{
+		"not an integer": "abc",
+		"zero":           "0",
+		"negative":       "-20",
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := parseServerParams(tc.archiveID, tc.diskPlanID, tc.sizeGB)
-			require.Error(t, err, "invalid parameters should be rejected")
+			_, err := parseDiskSizeGB(tc)
+			require.Error(t, err, "invalid disk size should be rejected")
 		})
 	}
 }

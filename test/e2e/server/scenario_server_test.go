@@ -31,22 +31,23 @@ import (
 
 // TestScenarioServer は Server E2E です。cloud-init ディスク付きの Server を is1b に作成し、
 // user-data で起動して SSH 接続を確認し、名前と説明の更新・復元と後片付けまで行います。
-// ライブ実行には is1b で利用可能な cloud-init アーカイブとディスクプランの環境変数が必要です。
+// cloud-init アーカイブとディスクプランは SDK で自動選択します。
 // テスト対象の操作は skr CLI で実行し、事前確認と後片付けの確認と起動待ちのポーリングは
 // SDK で静かに実行します。途中の失敗でも後片付けは実行され、その失敗はテストの結果に含まれます。
 func TestScenarioServer(t *testing.T) {
 	h := helper.New(t, "server-api", "IaaS サーバーを cloud-init ディスク付きで作成・起動し、SSH 接続・更新・削除と後片付けが正しく動作することを確認する")
 
-	// ライブ実行には is1b で利用可能な cloud-init アーカイブとディスクプランの設定が必要です
-	params := requireServerParams(t)
-
-	// 一時的な SSH 鍵と cloud-init の user-data を作成します。秘密鍵の内容は実行記録に残りません
-	material := helper.WriteSSHMaterial(t, sshUser, false)
-
 	// 事前確認と後片付けの確認は SDK で静かに実行します。skr CLI と同じ認証設定 (プロファイル) を使います
 	client, err := iaasclient.New(false)
 	require.NoError(t, err, "create IaaS API client for verification")
 	servers, disks := serverSDK.New(client), diskSDK.New(client)
+
+	// cloud-init アーカイブとディスクプランを SDK で自動選択します。
+	// アーカイブは Ubuntu Server 24.04 LTS (cloudimg) に限定して選択します
+	params := requireServerParams(t, client)
+
+	// 一時的な SSH 鍵と cloud-init の user-data を作成します。秘密鍵の内容は実行記録に残りません
+	material := helper.WriteSSHMaterial(t, sshUser, false)
 
 	run := &serverRun{name: namePrefix + helper.RandomSuffix(t), params: params}
 
