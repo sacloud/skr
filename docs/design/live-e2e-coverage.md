@@ -22,7 +22,7 @@
 | `test/e2e/gslb` | find / read / create / update / delete(5) | 全コマンド実装済み |
 | `test/e2e/icon`、`test/e2e/packetfilter` | 各 CRUD(5) | 全コマンド実装済み |
 | `test/e2e/disk`、`test/e2e/switch` | 各 CRUD(5) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
-| `test/e2e/region` | find / read(2) | 全コマンド実装済み |
+| `test/e2e/region` | find / read(2) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/serverplan` | find / read(2) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/serviceclass` | find(1) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/zone` | find / find --query / read(3) | 全コマンド実装済み。ライブで正常応答を確認済み |
@@ -106,6 +106,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 - simple-notification の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`scenario_notification_test.go`、`scenario_crud_only_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`、`crud.go`、`crud_test.go`) は `test/e2e/simple-notification/` から削除しました。既存通知先の ID は `SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID` 環境変数で渡し、未設定の場合はテストをスキップします。一時リソースの作成・更新・並べ替えの反映待ちは `helper.Sleep` で実行記録に残します。後片付けの削除と不在確認は `helper.Call` / `CallAllowingFailure` で行い、移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 - serviceclass の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/serviceclass/scenario_serviceclass_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。旧 runner の `--confirm-read-only-live` フラグによる実行確認は共有 helper の `SKR_E2E` ゲートに置き換わり、旧 runner の `evidence` 機構による実行記録は共有 helper の実行記録に置き換わります。シナリオは読み取り専用で、選択中のプロファイルの確認と `is1b` のサービスクラス検索を検証します。
 - serverplan の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/serverplan/scenario_serverplan_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。旧 runner の `--confirm-read-only-live` フラグによる実行確認は共有 helper の `SKR_E2E` ゲートに置き換わり、旧 runner の `evidence` 機構による実行記録は共有 helper の実行記録に置き換わります。シナリオは読み取り専用で、選択中のプロファイルの確認と `is1b` のサーバープランの検索・参照、Find の結果と Read の一致を検証します。
+- region の E2E は 2026-10-28 に testing.T ベースのシナリオテスト (`test/e2e/region/scenario_region_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。旧 runner の `--confirm-read-only-live` フラグによる実行確認は共有 helper の `SKR_E2E` ゲートに置き換わり、旧 runner の `evidence` 機構による実行記録は共有 helper の実行記録に置き換わります。シナリオは読み取り専用で、選択中のプロファイルの確認とリージョンの検索・参照、Find の結果と Read の一致を検証します。同日に移行後のシナリオをライブ再実行しました。
 
 ## 参照
 
