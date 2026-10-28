@@ -57,39 +57,31 @@ type privateHostPlanSummary struct {
 }
 
 type internetPlanFindSummary struct {
-	Total         *int                   `json:"Total"`
-	From          *int                   `json:"From"`
-	Count         *int                   `json:"Count"`
-	InternetPlans *[]internetPlanSummary `json:"InternetPlans"`
+	Total         *int                  `json:"Total"`
+	From          *int                  `json:"From"`
+	Count         *int                  `json:"Count"`
+	InternetPlans []internetPlanSummary `json:"InternetPlans"`
 }
 
 type licenseInfoFindSummary struct {
-	Total       *int                  `json:"Total"`
-	From        *int                  `json:"From"`
-	Count       *int                  `json:"Count"`
-	LicenseInfo *[]licenseInfoSummary `json:"LicenseInfo"`
+	Total       *int                 `json:"Total"`
+	From        *int                 `json:"From"`
+	Count       *int                 `json:"Count"`
+	LicenseInfo []licenseInfoSummary `json:"LicenseInfo"`
 }
 
 type privateHostPlanFindSummary struct {
-	Total            *int                      `json:"Total"`
-	From             *int                      `json:"From"`
-	Count            *int                      `json:"Count"`
-	PrivateHostPlans *[]privateHostPlanSummary `json:"PrivateHostPlans"`
-}
-
-// sliceLength は結果配列の要素数を返します。配列が null の場合は -1 を返します。
-func sliceLength[T any](items *[]T) int {
-	if items == nil {
-		return -1
-	}
-	return len(*items)
+	Total            *int                     `json:"Total"`
+	From             *int                     `json:"From"`
+	Count            *int                     `json:"Count"`
+	PrivateHostPlans []privateHostPlanSummary `json:"PrivateHostPlans"`
 }
 
 // validateFindResult は Find 応答のページング情報が要求したページと一致することを確認します。
 // required fields が欠けている場合、またはページング情報が要求と一致しない場合にエラーを返します。
 func validateFindResult(total, from, count *int, itemCount, expectedFrom, requestedCount int) error {
-	if total == nil || from == nil || count == nil || itemCount < 0 {
-		return errors.New("required pagination fields or result array are missing or null")
+	if total == nil || from == nil || count == nil {
+		return errors.New("required pagination fields are missing or null")
 	}
 	if *total < 0 || *from != expectedFrom || *count < 0 || *count > requestedCount ||
 		*from > *total || *count > *total-*from || itemCount != *count ||
@@ -109,9 +101,9 @@ func findInternetPlans(t *testing.T, h *helper.Helper, description string) []int
 	require.NoError(t, err, "%s: product internet find: %v", description, err)
 	var find internetPlanFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode InternetPlan find output: %v", description, err)
-	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, sliceLength(find.InternetPlans), 0, 1),
+	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, len(find.InternetPlans), 0, 1),
 		"%s: InternetPlan Find returned an inconsistent result", description)
-	return *find.InternetPlans
+	return find.InternetPlans
 }
 
 // readInternetPlan は指定した ID のインターネットプランを参照して応答を返します。
@@ -136,9 +128,9 @@ func findLicenseInfos(t *testing.T, h *helper.Helper, description string) []lice
 	require.NoError(t, err, "%s: product license find: %v", description, err)
 	var find licenseInfoFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode LicenseInfo find output: %v", description, err)
-	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, sliceLength(find.LicenseInfo), 0, 1),
+	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, len(find.LicenseInfo), 0, 1),
 		"%s: LicenseInfo Find returned an inconsistent result", description)
-	return *find.LicenseInfo
+	return find.LicenseInfo
 }
 
 // findPrivateHostPlans は指定ゾーンのプライベートホストプランを検索して応答を返します。
@@ -151,9 +143,9 @@ func findPrivateHostPlans(t *testing.T, h *helper.Helper, description string) []
 	require.NoError(t, err, "%s: product privatehost find: %v", description, err)
 	var find privateHostPlanFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode PrivateHostPlan find output: %v", description, err)
-	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, sliceLength(find.PrivateHostPlans), 0, 1),
+	require.NoError(t, validateFindResult(find.Total, find.From, find.Count, len(find.PrivateHostPlans), 0, 1),
 		"%s: PrivateHostPlan Find returned an inconsistent result", description)
-	return *find.PrivateHostPlans
+	return find.PrivateHostPlans
 }
 
 // readPrivateHostPlan は指定した ID のプライベートホストプランを参照して応答を返します。

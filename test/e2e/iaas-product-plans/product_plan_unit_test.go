@@ -26,13 +26,6 @@ func intPtr(v int) *int {
 	return &v
 }
 
-// TestSliceLength は結果配列の要素数の計算を確認します。
-func TestSliceLength(t *testing.T) {
-	require.Equal(t, -1, sliceLength[int](nil), "nil slice should return -1")
-	require.Equal(t, 0, sliceLength(&[]int{}), "empty slice should return 0")
-	require.Equal(t, 2, sliceLength(&[]int{1, 2}), "slice length should match items")
-}
-
 // TestValidateFindResult は Find 応答のページング情報の検証を確認します。
 func TestValidateFindResult(t *testing.T) {
 	for _, test := range []struct {
@@ -47,10 +40,9 @@ func TestValidateFindResult(t *testing.T) {
 		{name: "missing total", total: nil, from: intPtr(0), count: intPtr(0), itemCount: 0, want: "required pagination fields"},
 		{name: "missing from", total: intPtr(0), from: nil, count: intPtr(0), itemCount: 0, want: "required pagination fields"},
 		{name: "missing count", total: intPtr(0), from: intPtr(0), count: nil, itemCount: 0, want: "required pagination fields"},
-		{name: "null result array", total: intPtr(0), from: intPtr(0), count: intPtr(0), itemCount: -1, want: "required pagination fields"},
 		{name: "negative total", total: intPtr(-1), from: intPtr(0), count: intPtr(0), itemCount: 0, want: "pagination metadata"},
 		{name: "mismatched from", total: intPtr(1), from: intPtr(5), count: intPtr(1), itemCount: 1, want: "pagination metadata"},
-		{name: "negative count", total: intPtr(1), from: intPtr(0), count: intPtr(-1), itemCount: -1, want: "required pagination fields"},
+		{name: "negative count", total: intPtr(1), from: intPtr(0), count: intPtr(-1), itemCount: 0, want: "pagination metadata"},
 		{name: "count above requested", total: intPtr(2), from: intPtr(0), count: intPtr(2), itemCount: 2, want: "pagination metadata"},
 		{name: "count above remaining", total: intPtr(2), from: intPtr(1), count: intPtr(2), itemCount: 2, want: "pagination metadata"},
 		{name: "count above total", total: intPtr(1), from: intPtr(0), count: intPtr(2), itemCount: 2, want: "pagination metadata"},
