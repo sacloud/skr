@@ -14,7 +14,7 @@
 | runner | 対象末端コマンド | 状況 |
 | --- | --- | --- |
 | `test/e2e/c0nfig` | config の current / list / show / create / edit / use(6) | 全コマンド実装済み |
-| `test/e2e/http` | http(1) | 全コマンド実装済み |
+| `test/e2e/http` | http(1) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/simplemq` | queue 8操作、message 4操作(12) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/simple-notification` | destination 6、group 6、history 2、routing 7(21) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/container-registry-api` | registry 5操作、user 4操作(9) | 全コマンド実装済み |

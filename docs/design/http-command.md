@@ -32,12 +32,11 @@ HTTP コマンドのテストでは、偽の request doer によるメソッド�
 
 `test/e2e/http` は、設備関連 API の `GET /zone` を `skr http` 経由で1回呼び出し、終了コードと JSON 本文を確認します。ライブ E2E の対象ゾーンに合わせ、URL は `https://secure.sakura.ad.jp/cloud/zone/is1b/api/cloud/1.1/zone` とします。API のリクエスト／レスポンス形状を独自に再実装せず、生のレスポンスが空でなく有効な JSON であることだけを検証します。
 
-実行には選択中の SDK プロファイルと `--confirm-http-live` が必要です。テストはリソースを作成・変更・削除しませんが、選択中のプロファイルの認証情報を `secure.sakura.ad.jp` へ送信します。`test/e2e/internal/evidence` がコマンド、出力、エラーを `tmp/http-api/` 以下へ mode `0700` のディレクトリと mode `0600` のファイルで保存します。証跡は Git 管理外のままにし、共有しないでください。
+シナリオは `test/e2e/http/scenario_http_test.go` にあり、testing.T ベースのテストとして `SKR_E2E` 環境変数が設定された場合にだけ実行します ([ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md))。ライブ実行の認証はプロファイルディレクトリの `skr-e2e` プロファイルを使い、認証情報を表示しません。テストはリソースを作成・変更・削除しませんが、プロファイルの認証情報を `secure.sakura.ad.jp` へ送信します。実行記録は helper が Git 対象外の `test/e2e/http/e2e-output/` 配下に保存します ([ADR 0063](../adr/0063-reusable-ssh-and-local-command-recording.md))。2026-10-28 にシナリオをライブ実行し、zone API の GET リクエストが有効な JSON 応答を返すことを確認しました。
 
 ```console
 $ make build
-$ skr config current
-$ go run ./test/e2e/http --skr ./skr --confirm-http-live
+$ SKR_E2E=1 go test ./test/e2e/http/ -run TestScenarioHTTP -v
 ```
 
-ユニットテストでは live API に接続せず、コマンド引数、認証プロファイル確認、JSON 応答検証、証跡のアクセス権を確認します。
+ユニットテストでは live API に接続せず、応答の JSON 検証を確認します。コマンド引数の追跡は、シナリオのコードと helper のテストで行います。
