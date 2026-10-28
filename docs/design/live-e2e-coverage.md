@@ -20,7 +20,7 @@
 | `test/e2e/container-registry-api` | registry 5操作、user 4操作(9) | 全コマンド実装済み |
 | `test/e2e/networking-suite` | subnet-group 5、subnet 5、interface-connection 2、address 2(14) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/gslb` | find / read / create / update / delete(5) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答と ping 監視による切り替え・復帰を確認済み |
-| `test/e2e/icon`、`test/e2e/packetfilter` | 各 CRUD(5) | 全コマンド実装済み。2026-10-28 に packetfilter を testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
+| `test/e2e/icon`、`test/e2e/packetfilter` | 各 CRUD(5) | 全コマンド実装済み。2026-10-28 に packetfilter と icon を testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/disk`、`test/e2e/switch` | 各 CRUD(5) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/region` | find / read(2) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/serverplan` | find / read(2) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
