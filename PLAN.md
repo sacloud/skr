@@ -148,7 +148,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 既存 runner へのシナリオ追加とそのライブ実行を完了しています。
 
-2026-10-26 にタスク3として iam-api の59コマンドのうち57コマンドをライブ検証しました。読み取り15操作、リソーススコープの書き込み27操作、アカウント全体やログインユーザーへ影響する書き込み15操作です。sso link/unlink は全組織ユーザーのログイン方法に影響するため、[#144](https://github.com/sacloud/skr/issues/144) で影響範囲の確認と設計を進めます。期待どおりの失敗を確認するステップは、証跡に `expected-error` として記録されます。2026-10-29 に iam-api の E2E を testing.T ベースのシナリオテストへ移行し、移行時に未検証だった `group update` のカバレッジを追加しました。移行後のシナリオのライブ再実行は未実施です。
+2026-10-26 にタスク3として iam-api の59コマンドのうち57コマンドをライブ検証しました。読み取り15操作、リソーススコープの書き込み27操作、アカウント全体やログインユーザーへ影響する書き込み15操作です。sso link/unlink は全組織ユーザーのログイン方法に影響するため、[#144](https://github.com/sacloud/skr/issues/144) で影響範囲の確認と設計を進めます。期待どおりの失敗を確認するステップは、証跡に `expected-error` として記録されます。2026-10-29 に iam-api の E2E を testing.T ベースのシナリオテストへ移行し、移行時に未検証だった `group update` のカバレッジを追加しました。同日に移行後のシナリオをライブ再実行し、125ステップを成功させました。
 
 網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。末端コマンドごとの状況は [ADR 0065](docs/adr/0065-e2e-command-coverage-baseline.md) に従い [`test/e2e/command-coverage/baseline.txt`](test/e2e/command-coverage/baseline.txt) に記録し、`make e2e-coverage` で検証します。2026-10-28 の baseline 作成時に、iam-api の旧 runner が `iam-api group update` を実行していない網羅漏れを検出し、未整備として記録しました。2026-10-29 の移行時に `group update` のカバレッジを追加し、baseline を live に更新しました。
 

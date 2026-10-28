@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// このファイルは iam-api E2E の managed resource ヘルパーです。
-// SCIM、SSO、project API key の識別と後片付けを担当します。
+// このファイルは iam-api E2E の organization 全体の設定 (managed resource) の
+// 識別と後片付けヘルパーです。SCIM、SSO、project API key を担当します。
 package main
 
 import (
@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+
+	"github.com/sacloud/skr/test/e2e/internal/helper"
 )
 
 // managedListQuery は一覧応答をリソース ID と name に投影します。
@@ -62,9 +64,9 @@ func decodeNamedResource(step string, data []byte) (id string, name string, err 
 }
 
 // findManaged はリソース種別を一覧表示し、指定した name の項目を返します。
-func (s *iamRun) findManaged(t *testing.T, description, kind, name string) (nameID, bool, error) {
+func findManaged(t *testing.T, h *helper.Helper, description, kind, name string) (nameID, bool, error) {
 	t.Helper()
-	data, _, err := s.callWithErr(t, description, "iam-api", kind, "list", "--query", managedListQuery)
+	data, _, err := h.CallAllowingFailure(t, description, "iam-api", kind, "list", "--query", managedListQuery)
 	if err != nil {
 		return nameID{}, false, fmt.Errorf("%s: %w", description, err)
 	}
@@ -97,17 +99,17 @@ func checkManagedListed(step string, data []byte, id, name string) (bool, error)
 	return false, nil
 }
 
-// cleanupManaged は、managed シナリオが削除前に失敗して作成されたリソースを削除します。
-// リソースの identity は削除前に読み込んで確認し、
-// 削除は一覧チェックで確認します。
-func (s *iamRun) cleanupManaged(t *testing.T, target *managedResource) error {
+// cleanupManagedResource は、organization 全体の設定がシナリオ内で削除できなかった場合に
+// 識別情報を再確認してから削除します。削除後は一覧に残っていないことを確認します。
+// 失敗は呼び出し元に返されます。
+func cleanupManagedResource(t *testing.T, h *helper.Helper, target *iamResource) error {
 	t.Helper()
-	if !target.attempted {
+	if !target.attempted || target.deleted {
 		return nil
 	}
 	id := target.id
 	if id == "" {
-		found, ok, err := s.findManaged(t, "後片付けとして作成を試みた"+target.kind+"を検索する", target.kind, target.currentName)
+		found, ok, err := findManaged(t, h, "後片付けとして作成を試みた"+target.kind+"を検索する", target.kind, target.name)
 		if err != nil {
 			return err
 		}
@@ -116,7 +118,7 @@ func (s *iamRun) cleanupManaged(t *testing.T, target *managedResource) error {
 		}
 		id = found.ID
 	}
-	data, _, err := s.callWithErr(t, "後片付けの前に"+target.kind+"の識別情報を確認する",
+	data, _, err := h.CallAllowingFailure(t, "後片付けの前に"+target.kind+"の識別情報を確認する",
 		"iam-api", target.kind, "read", id, "--query", "{id: (.id | tostring), name: .name}")
 	if err != nil {
 		return fmt.Errorf("cannot verify %s before cleanup: %w", target.kind, err)
@@ -125,18 +127,20 @@ func (s *iamRun) cleanupManaged(t *testing.T, target *managedResource) error {
 	if err != nil {
 		return err
 	}
-	if currentID != id || currentName != target.currentName {
-		return fmt.Errorf("cleanup refused: %s %s does not match %q", target.kind, currentID, target.currentName)
+	// 名前変更ステップが失敗して改名だけが反映された可能性もあるため、
+	// renamedTo に含まれる名前も許容します。
+	if currentID != id || (currentName != target.name && currentName != target.renamedTo) {
+		return fmt.Errorf("cleanup refused: %s %s does not match %q", target.kind, currentID, target.name)
 	}
-	if _, _, err := s.callWithErr(t, "後片付けとして"+target.kind+"を削除する", "iam-api", target.kind, "delete", id); err != nil {
+	if _, _, err := h.CallAllowingFailure(t, "後片付けとして"+target.kind+"を削除する", "iam-api", target.kind, "delete", id); err != nil {
 		return fmt.Errorf("delete E2E %s: %w", target.kind, err)
 	}
-	data, _, err = s.callWithErr(t, "後片付けの後に"+target.kind+"が残っていないことを確認する",
+	data, _, err = h.CallAllowingFailure(t, "後片付けの後に"+target.kind+"が残っていないことを確認する",
 		"iam-api", target.kind, "list", "--query", managedListQuery)
 	if err != nil {
 		return fmt.Errorf("verify E2E %s deletion: %w", target.kind, err)
 	}
-	remaining, err := checkManagedListed("cleanup-verify-"+target.kind, data, id, target.currentName)
+	remaining, err := checkManagedListed("cleanup-verify-"+target.kind, data, id, target.name)
 	if err != nil {
 		return err
 	}

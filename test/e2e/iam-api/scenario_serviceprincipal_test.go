@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,51 +53,51 @@ type accessTokenSummary struct {
 	ExpiresIn int64  `json:"expires_in"`
 }
 
-// servicePrincipalScenario は、この実行の service principal を更新・復元し、
+// runServicePrincipalScenario は、この実行の service principal を更新・復元し、
 // 生成された RSA キーペアをアップロードしてキーのライフサイクルを確認し、
 // 秘密鍵で署名した JWT assertion から access token を発行します。
 // 秘密鍵はこのプロセスから出ません。
 // 公開鍵と署名済み assertion のみがプライベートなファイルに書き込まれます。
-func (s *iamRun) servicePrincipalScenario(t *testing.T) {
+func runServicePrincipalScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.updateServicePrincipal(t)
-	s.servicePrincipalKeysScenario(t)
+	updateServicePrincipal(t, h, run)
+	runServicePrincipalKeysScenario(t, h, run)
 }
 
 // updateServicePrincipal は service principal の名前を変更し、元の名前に戻します。
 // description は実行の description のままなので、
 // cleanup の identity チェックが機能し続けます。
-func (s *iamRun) updateServicePrincipal(t *testing.T) {
+func updateServicePrincipal(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	renamed := s.servicePrincipal.name + "-renamed"
-	s.updateServicePrincipalName(t, "service principalの名前を更新する", renamed)
-	s.updateServicePrincipalName(t, "service principalの名前を元に戻す", s.servicePrincipal.name)
+	renamed := run.servicePrincipal.name + "-renamed"
+	updateServicePrincipalName(t, h, run, "service principalの名前を更新する", renamed)
+	updateServicePrincipalName(t, h, run, "service principalの名前を元に戻す", run.servicePrincipal.name)
 }
 
-func (s *iamRun) updateServicePrincipalName(t *testing.T, description, name string) {
+func updateServicePrincipalName(t *testing.T, h *helper.Helper, run *iamRun, description, name string) {
 	t.Helper()
 	request := mustSettingsJSON(map[string]string{
 		"name":        name,
-		"description": s.servicePrincipal.description,
+		"description": run.servicePrincipal.description,
 	})
-	data := s.call(t, description, "iam-api", "service-principal", "update", s.servicePrincipal.id,
+	data := h.Call(t, description, "iam-api", "service-principal", "update", run.servicePrincipal.id,
 		"--request", request, "--query", "{id: .id, name: .name}")
 	_, updatedName, err := decodeNamedResource("update-service-principal", data)
 	require.NoError(t, err, "%s: 応答のデコードに失敗しました", description)
 	require.Equal(t, name, updatedName, "%s: 更新後の名前がリクエストと一致すること", description)
 }
 
-// servicePrincipalKeysScenario は生成された公開鍵をアップロードし、
+// runServicePrincipalKeysScenario は生成された公開鍵をアップロードし、
 // キーのライフサイクルを確認して、
 // 対応する秘密鍵で署名した JWT assertion から access token を発行します。
-func (s *iamRun) servicePrincipalKeysScenario(t *testing.T) {
+func runServicePrincipalKeysScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
 	keyPair, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err, "サービスプリンシパルのキーペアを生成できること")
-	publicKeyFile := writePublicKeyFile(t, keyPair, s.suffix)
+	publicKeyFile := writePublicKeyFile(t, keyPair)
 
-	data := s.call(t, "生成した公開鍵をservice principalに登録する", "iam-api", "service-principal", "upload-key",
-		"--public-key-file", publicKeyFile, s.servicePrincipal.id,
+	data := h.Call(t, "生成した公開鍵をservice principalに登録する", "iam-api", "service-principal", "upload-key",
+		"--public-key-file", publicKeyFile, run.servicePrincipal.id,
 		"--query", "{id: .id, kid: .kid, status: .status}")
 	key, err := decodeServicePrincipalKey("upload-key", data)
 	require.NoError(t, err, "upload-key: 応答のデコードに失敗しました")
@@ -104,7 +105,7 @@ func (s *iamRun) servicePrincipalKeysScenario(t *testing.T) {
 	require.NotEmpty(t, key.Kid, "upload-key: kidが存在すること")
 	require.NotEmpty(t, key.ID, "upload-key: IDが存在すること")
 
-	data = s.call(t, "service principalのキー一覧を確認する", "iam-api", "service-principal", "list-keys", s.servicePrincipal.id,
+	data = h.Call(t, "service principalのキー一覧を確認する", "iam-api", "service-principal", "list-keys", run.servicePrincipal.id,
 		"--query", "{items: [.items[] | {id: .id, kid: .kid, status: .status}]}")
 	found, err := checkServicePrincipalKey("list-keys", data, key)
 	require.NoError(t, err, "list-keys: キー一覧のデコードに失敗しました")
@@ -118,19 +119,19 @@ func (s *iamRun) servicePrincipalKeysScenario(t *testing.T) {
 		{description: "キーを無効化する", method: "disable-key", status: "disabled"},
 		{description: "キーを有効化する", method: "enable-key", status: "enabled"},
 	} {
-		data = s.call(t, transition.description, "iam-api", "service-principal", transition.method,
-			s.servicePrincipal.id, key.ID, "--query", "{id: .id, status: .status}")
+		data = h.Call(t, transition.description, "iam-api", "service-principal", transition.method,
+			run.servicePrincipal.id, key.ID, "--query", "{id: .id, status: .status}")
 		updated, err := decodeServicePrincipalKey(transition.method, data)
 		require.NoError(t, err, "%s: 応答のデコードに失敗しました", transition.method)
 		require.Equal(t, key.ID, updated.ID, "%s: キーIDが一致すること", transition.method)
 		require.Equal(t, transition.status, updated.Status, "%s: キーの状態が遷移すること", transition.method)
 	}
 
-	s.issueServicePrincipalToken(t, keyPair, key.Kid)
+	issueServicePrincipalToken(t, h, run, keyPair, key.Kid)
 
-	s.call(t, "キーを削除する", "iam-api", "service-principal", "delete-key",
-		s.servicePrincipal.id, key.ID)
-	data = s.call(t, "削除後のキー一覧を確認する", "iam-api", "service-principal", "list-keys", s.servicePrincipal.id,
+	h.Call(t, "キーを削除する", "iam-api", "service-principal", "delete-key",
+		run.servicePrincipal.id, key.ID)
+	data = h.Call(t, "削除後のキー一覧を確認する", "iam-api", "service-principal", "list-keys", run.servicePrincipal.id,
 		"--query", "{items: [.items[] | {id: .id, kid: .kid, status: .status}]}")
 	found, err = checkServicePrincipalKey("list-keys-after-delete", data, key)
 	require.NoError(t, err, "list-keys-after-delete: キー一覧のデコードに失敗しました")
@@ -140,7 +141,7 @@ func (s *iamRun) servicePrincipalKeysScenario(t *testing.T) {
 // issueServicePrincipalToken は、アップロードされた公開鍵の秘密鍵で JWT bearer assertion に署名し、
 // access token を発行します。応答にはトークンが含まれるため、
 // query はトークンタイプと有効期間のみを投影します。
-func (s *iamRun) issueServicePrincipalToken(t *testing.T, privateKey *rsa.PrivateKey, kid string) {
+func issueServicePrincipalToken(t *testing.T, h *helper.Helper, run *iamRun, privateKey *rsa.PrivateKey, kid string) {
 	t.Helper()
 	now := time.Now()
 	audience := servicePrincipalOAuth2Endpoint
@@ -148,8 +149,8 @@ func (s *iamRun) issueServicePrincipalToken(t *testing.T, privateKey *rsa.Privat
 		audience = override
 	}
 	claims := jwt.MapClaims{
-		"iss": s.servicePrincipal.id,
-		"sub": s.servicePrincipal.id,
+		"iss": run.servicePrincipal.id,
+		"sub": run.servicePrincipal.id,
 		"aud": audience,
 		"iat": now.Unix(),
 		"exp": now.Add(3500 * time.Second).Unix(),
@@ -162,7 +163,7 @@ func (s *iamRun) issueServicePrincipalToken(t *testing.T, privateKey *rsa.Privat
 	assertionFile := filepath.Join(t.TempDir(), "assertion")
 	require.NoError(t, os.WriteFile(assertionFile, []byte(assertion), 0o600), "assertionファイルの書き込みに失敗しました")
 
-	data := s.call(t, "JWT assertionからaccess tokenを発行する", "iam-api", "service-principal", "issue-token",
+	data := h.Call(t, "JWT assertionからaccess tokenを発行する", "iam-api", "service-principal", "issue-token",
 		"--assertion-file", assertionFile, "--query", "{token_type: .token_type, expires_in: .expires_in}")
 	var summary accessTokenSummary
 	require.NoError(t, json.Unmarshal(data, &summary), "issue-token: トークンサマリーのデコードに失敗しました")
@@ -170,13 +171,13 @@ func (s *iamRun) issueServicePrincipalToken(t *testing.T, privateKey *rsa.Privat
 	require.Positive(t, summary.ExpiresIn, "issue-token: 有効期間が正の値であること")
 }
 
-func writePublicKeyFile(t *testing.T, key *rsa.PrivateKey, suffix string) string {
+func writePublicKeyFile(t *testing.T, key *rsa.PrivateKey) string {
 	t.Helper()
 	der, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
 	require.NoError(t, err, "サービスプリンシパルの公開鍵をエンコードできること")
 	encoded := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})
-	// 公開鍵は秘密情報ではないため、ファイル名に実行固有のサフィックスを含めます。
-	path := filepath.Join(t.TempDir(), "skr-e2e-iam-sp-public-key-"+suffix+".pem")
+	// 公開鍵は秘密情報ではないため、テスト専用ディレクトリの保護したファイルに書き込みます。
+	path := filepath.Join(t.TempDir(), "skr-e2e-iam-sp-public-key.pem")
 	require.NoError(t, os.WriteFile(path, encoded, 0o600), "公開鍵ファイルの書き込みに失敗しました")
 	return path
 }

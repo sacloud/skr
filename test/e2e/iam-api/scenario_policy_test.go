@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,26 +30,26 @@ const (
 	policyPrincipalTyp = "service-principal"
 )
 
-// policyScenario は、この実行で作成した folder と project の IAM ポリシー binding を更新し、
+// runPolicyBindingScenario は、この実行で作成した folder と project の IAM ポリシー binding を更新し、
 // 元の binding に戻します。
 // 更新は binding リスト全体を置き換えるため、
 // 更新前に元の binding を取得し、後で復元します。
-func (s *iamRun) policyScenario(t *testing.T) {
+func runPolicyBindingScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.updateFolderPolicy(t)
-	s.updateProjectPolicy(t)
+	updateFolderPolicy(t, h, run)
+	updateProjectPolicy(t, h, run)
 }
 
 // updateFolderPolicy はこの実行の principal に folder ロールを付与し、
 // binding を確認してから元の binding に戻します。
-func (s *iamRun) updateFolderPolicy(t *testing.T) {
+func updateFolderPolicy(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	original := s.readPolicyBindings(t, "folderのロール付与前のbindingを読み込む", "policy", "read-folder", s.folder.id)
-	updated := append(append([]policyBinding{}, original...), s.policyBinding(folderPolicyRole))
-	s.updatePolicyBindings(t, "folderのbindingを更新してロールを付与する", "policy", "update-folder", s.folder.id, updated)
-	s.checkPolicyBindings(t, "更新後のfolderのbindingを確認する", "policy", "read-folder", s.folder.id, updated)
-	s.updatePolicyBindings(t, "folderのbindingを元に戻す", "policy", "update-folder", s.folder.id, original)
-	s.checkPolicyBindings(t, "復元後のfolderのbindingを確認する", "policy", "read-folder", s.folder.id, original)
+	original := readPolicyBindings(t, h, "folderのロール付与前のbindingを読み込む", "policy", "read-folder", run.folder.id)
+	updated := append(append([]policyBinding{}, original...), newPolicyBinding(run, folderPolicyRole))
+	updatePolicyBindings(t, h, "folderのbindingを更新してロールを付与する", "policy", "update-folder", run.folder.id, updated)
+	checkPolicyBindings(t, h, "更新後のfolderのbindingを確認する", "policy", "read-folder", run.folder.id, updated)
+	updatePolicyBindings(t, h, "folderのbindingを元に戻す", "policy", "update-folder", run.folder.id, original)
+	checkPolicyBindings(t, h, "復元後のfolderのbindingを確認する", "policy", "read-folder", run.folder.id, original)
 }
 
 // updateProjectPolicy は元の binding に加えて、この実行の principal に project ロールを付与し、
@@ -56,20 +57,20 @@ func (s *iamRun) updateFolderPolicy(t *testing.T) {
 // 新しく作成された project は作成した principal への owner binding から始まるため、
 // 取得した binding のみを復元すれば、
 // この実行自身のアクセスは維持されます。
-func (s *iamRun) updateProjectPolicy(t *testing.T) {
+func updateProjectPolicy(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	original := s.readPolicyBindings(t, "projectのロール付与前のbindingを読み込む", "policy", "read-project", s.project.id)
-	updated := append(append([]policyBinding{}, original...), s.policyBinding(projectPolicyRole))
-	s.updatePolicyBindings(t, "projectのbindingを更新してロールを付与する", "policy", "update-project", s.project.id, updated)
-	s.checkPolicyBindings(t, "更新後のprojectのbindingを確認する", "policy", "read-project", s.project.id, updated)
-	s.updatePolicyBindings(t, "projectのbindingを元に戻す", "policy", "update-project", s.project.id, original)
-	s.checkPolicyBindings(t, "復元後のprojectのbindingを確認する", "policy", "read-project", s.project.id, original)
+	original := readPolicyBindings(t, h, "projectのロール付与前のbindingを読み込む", "policy", "read-project", run.project.id)
+	updated := append(append([]policyBinding{}, original...), newPolicyBinding(run, projectPolicyRole))
+	updatePolicyBindings(t, h, "projectのbindingを更新してロールを付与する", "policy", "update-project", run.project.id, updated)
+	checkPolicyBindings(t, h, "更新後のprojectのbindingを確認する", "policy", "read-project", run.project.id, updated)
+	updatePolicyBindings(t, h, "projectのbindingを元に戻す", "policy", "update-project", run.project.id, original)
+	checkPolicyBindings(t, h, "復元後のprojectのbindingを確認する", "policy", "read-project", run.project.id, original)
 }
 
-func (s *iamRun) policyBinding(roleID string) policyBinding {
+func newPolicyBinding(run *iamRun, roleID string) policyBinding {
 	return policyBinding{
 		Role:       policyRole{Type: "preset", ID: roleID},
-		Principals: []policyPrincipal{{Type: policyPrincipalTyp, ID: s.principalID}},
+		Principals: []policyPrincipal{{Type: policyPrincipalTyp, ID: run.principalID}},
 	}
 }
 
@@ -77,21 +78,21 @@ func (s *iamRun) policyBinding(roleID string) policyBinding {
 // 指定した JSON 配列のリクエストで置き換えます。
 // organization レベルの操作では resourceID を指定せず、
 // コマンド引数に空の位置引数を渡しません。
-func (s *iamRun) updatePolicyBindings(t *testing.T, description, kind, subcommand, resourceID string, bindings []policyBinding) {
+func updatePolicyBindings(t *testing.T, h *helper.Helper, description, kind, subcommand, resourceID string, bindings []policyBinding) {
 	t.Helper()
 	request := mustSettingsJSON(bindings)
 	args := []string{"iam-api", kind, subcommand}
 	if resourceID != "" {
 		args = append(args, resourceID)
 	}
-	s.call(t, description, append(args, "--request", request)...)
+	h.Call(t, description, append(args, "--request", request)...)
 }
 
 // checkPolicyBindings は binding を読み込み、
 // 期待されるリストと比較します。
-func (s *iamRun) checkPolicyBindings(t *testing.T, description, kind, subcommand, resourceID string, expected []policyBinding) {
+func checkPolicyBindings(t *testing.T, h *helper.Helper, description, kind, subcommand, resourceID string, expected []policyBinding) {
 	t.Helper()
-	actual := s.readPolicyBindings(t, description, kind, subcommand, resourceID)
+	actual := readPolicyBindings(t, h, description, kind, subcommand, resourceID)
 	require.Equal(t, expected, actual, "%s: bindingが期待値と一致すること", description)
 }
 

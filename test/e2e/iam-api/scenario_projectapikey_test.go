@@ -24,76 +24,78 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
 
 const projectAPIKeyRole = "resource-creator"
 
-// projectAPIKeyScenario は、この実行の project 内で API key を作成、読み込み、一覧表示、更新、削除します。
+// runProjectAPIKeyScenario は、この実行の project 内で API key を作成、読み込み、一覧表示、更新、削除します。
 // create と read の応答には access token が含まれるため、
 // すべての出力は --query で投影され、
 // 実行記録にはトークン自体が保存されることはありません。
 // 後片付けは前のステップが失敗した場合のみ削除します。
-func (s *iamRun) projectAPIKeyScenario(t *testing.T) {
+func runProjectAPIKeyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.projectAPIKey.attempted = true
-	s.projectAPIKey.currentName = s.projectAPIKey.name
+	run.projectAPIKey.attempted = true
 	// リクエストは秘密情報を含まないため、テスト専用ディレクトリに書き込みます。
-	createFile := s.writeProjectAPIKeyRequest(t, "pak-create", s.projectAPIKey.name, true)
-	data := s.call(t, "テスト用のproject API keyを作成する", "iam-api", "project-api-key", "create",
+	createFile := writeProjectAPIKeyRequest(t, run, "pak-create", run.projectAPIKey.name, true)
+	data := h.Call(t, "テスト用のproject API keyを作成する", "iam-api", "project-api-key", "create",
 		"--request", "@"+createFile, "--query", "{id: .id, name: .name, iam_roles: .iam_roles}")
 	id, name, roles, err := decodeAPIKeyProjection("create-project-api-key", data)
 	require.NoError(t, err, "create-project-api-key: 応答のデコードに失敗しました")
-	require.Equal(t, s.projectAPIKey.name, name, "create-project-api-key: 作成後の名前がリクエストと一致すること")
+	require.Equal(t, run.projectAPIKey.name, name, "create-project-api-key: 作成後の名前がリクエストと一致すること")
 	require.NoError(t, checkAPIKeyRoles(roles), "create-project-api-key: ロールが期待値と一致すること")
-	s.projectAPIKey.id = id
+	run.projectAPIKey.id = id
 
-	data = s.call(t, "project API keyを読み込む", "iam-api", "project-api-key", "read", s.projectAPIKey.id,
+	data = h.Call(t, "project API keyを読み込む", "iam-api", "project-api-key", "read", run.projectAPIKey.id,
 		"--query", "{id: .id, name: .name, iam_roles: .iam_roles}")
 	id, name, roles, err = decodeAPIKeyProjection("read-project-api-key", data)
 	require.NoError(t, err, "read-project-api-key: 応答のデコードに失敗しました")
-	require.Equal(t, s.projectAPIKey.id, id, "read-project-api-key: 読み込んだキーのIDが一致すること")
-	require.Equal(t, s.projectAPIKey.currentName, name, "read-project-api-key: 読み込んだキーの名前が一致すること")
+	require.Equal(t, run.projectAPIKey.id, id, "read-project-api-key: 読み込んだキーのIDが一致すること")
+	require.Equal(t, run.projectAPIKey.name, name, "read-project-api-key: 読み込んだキーの名前が一致すること")
 	require.NoError(t, checkAPIKeyRoles(roles), "read-project-api-key: ロールが期待値と一致すること")
 
-	data = s.call(t, "project API keyの一覧を確認する", "iam-api", "project-api-key", "list", "--query", managedListQuery)
-	found, err := checkManagedListed("list-project-api-keys", data, s.projectAPIKey.id, s.projectAPIKey.currentName)
+	data = h.Call(t, "project API keyの一覧を確認する", "iam-api", "project-api-key", "list", "--query", managedListQuery)
+	found, err := checkManagedListed("list-project-api-keys", data, run.projectAPIKey.id, run.projectAPIKey.name)
 	require.NoError(t, err, "list-project-api-keys: 一覧のデコードに失敗しました")
-	require.True(t, found, "list-project-api-keys: キー %sが一覧に存在すること", s.projectAPIKey.id)
+	require.True(t, found, "list-project-api-keys: キー %sが一覧に存在すること", run.projectAPIKey.id)
 
-	renamed := s.projectAPIKey.name + "-renamed"
-	updateFile := s.writeProjectAPIKeyRequest(t, "pak-update", renamed, false)
-	data = s.call(t, "project API keyの名前を更新する", "iam-api", "project-api-key", "update", s.projectAPIKey.id,
+	renamed := run.projectAPIKey.name + "-renamed"
+	run.projectAPIKey.renamedTo = renamed
+	updateFile := writeProjectAPIKeyRequest(t, run, "pak-update", renamed, false)
+	data = h.Call(t, "project API keyの名前を更新する", "iam-api", "project-api-key", "update", run.projectAPIKey.id,
 		"--request", "@"+updateFile, "--query", "{id: .id, name: .name}")
 	_, name, _, err = decodeAPIKeyProjection("update-project-api-key", data)
 	require.NoError(t, err, "update-project-api-key: 応答のデコードに失敗しました")
 	require.Equal(t, renamed, name, "update-project-api-key: 更新後の名前がリクエストと一致すること")
-	s.projectAPIKey.currentName = renamed
+	run.projectAPIKey.name = renamed
+	run.projectAPIKey.renamedTo = ""
 
-	s.call(t, "project API keyを削除する", "iam-api", "project-api-key", "delete", s.projectAPIKey.id)
-	s.projectAPIKey.id = ""
+	h.Call(t, "project API keyを削除する", "iam-api", "project-api-key", "delete", run.projectAPIKey.id)
+	run.projectAPIKey.deleted = true
 }
 
 // writeProjectAPIKeyRequest は作成または更新のリクエスト JSON を書き込みます。
 // create リクエストは key をこの実行の project に固定しますが、
 // principal が特定の project に限定されている場合は
 // 認証コンテキストの project に固定します。
-func (s *iamRun) writeProjectAPIKeyRequest(t *testing.T, purpose, name string, create bool) string {
+func writeProjectAPIKeyRequest(t *testing.T, run *iamRun, purpose, name string, create bool) string {
 	t.Helper()
 	request := map[string]any{
 		"name":        name,
-		"description": s.projectAPIKey.name,
+		"description": run.projectAPIKey.name,
 		"iam_roles":   []string{projectAPIKeyRole},
 	}
 	if create {
-		pinned := s.projectAPIKeyProjectID()
+		pinned := projectAPIKeyProjectID(run)
 		projectID, err := strconv.ParseInt(pinned, 10, 64)
 		require.NoError(t, err, "project ID %qを解析できること", pinned)
 		request["project_id"] = projectID
 	}
 	encoded, err := json.Marshal(request)
 	require.NoError(t, err, "project API keyの%sリクエストをエンコードできること", purpose)
-	path := filepath.Join(t.TempDir(), "skr-e2e-iam-"+purpose+"-"+s.suffix+".json")
+	path := filepath.Join(t.TempDir(), "skr-e2e-iam-"+purpose+".json")
 	require.NoError(t, os.WriteFile(path, encoded, 0o600), "project API keyの%sリクエストファイルの書き込みに失敗しました", purpose)
 	return path
 }
@@ -101,11 +103,11 @@ func (s *iamRun) writeProjectAPIKeyRequest(t *testing.T, purpose, name string, c
 // projectAPIKeyProjectID は新しい API key を固定する project を返します。
 // 特定の project に限定された principal はそこにしか key を作成できないため、
 // 認証コンテキストの project がこの実行の project より優先されます。
-func (s *iamRun) projectAPIKeyProjectID() string {
-	if s.limitedProjectID > 0 {
-		return strconv.FormatInt(s.limitedProjectID, 10)
+func projectAPIKeyProjectID(run *iamRun) string {
+	if run.limitedProjectID > 0 {
+		return strconv.FormatInt(run.limitedProjectID, 10)
 	}
-	return s.project.id
+	return run.project.id
 }
 
 // decodeAPIKeyProjection は投影された {id, name, iam_roles} の出力をデコードします。

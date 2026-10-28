@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// このファイルは iam-api E2E の共有ヘルパーとシナリオ本体です。
-// リソースの作成・照合・更新・後片付けを helper でビルド済みの skr で実行します。
+// このファイルは iam-api E2E の共有ヘルパーと、user・group・folder・project の
+// 作成・更新シナリオです。リソースの作成・照合・更新・後片付けを
+// helper でビルド済みの skr で実行します。
 package main
 
 import (
@@ -41,8 +42,8 @@ const (
 	userGroupPageSize = 1000
 )
 
-// item は IAM リソースの一覧と読み取りの応答から参照する項目です。
-type item struct {
+// iamItem は IAM リソースの一覧と読み取りの応答から参照する項目です。
+type iamItem struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Code        string `json:"code"`
@@ -51,80 +52,82 @@ type item struct {
 	ProjectID   int    `json:"project_id"`
 }
 
-func (i item) id() string {
+func (i iamItem) id() string {
 	return strconv.Itoa(i.ID)
-}
-
-// markedForThisRun はリソースがこの E2E 実行によって作成されたものかどうかを報告します。
-// Description には実行固有のサフィックスが含まれて変更されないため、
-// 名前が変更されても有効なままです。
-func (i item) markedForThisRun(suffix string) bool {
-	return i.Description == resourceDescription+suffix
 }
 
 // projectedPage は一覧の投影結果の1ページです。
 type projectedPage struct {
-	Items     []item `json:"items"`
-	PageCount int    `json:"page_count"`
-	HasNext   *bool  `json:"has_next,omitempty"`
+	Items     []iamItem `json:"items"`
+	PageCount int       `json:"page_count"`
+	HasNext   *bool     `json:"has_next,omitempty"`
 }
 
-// resource はシナリオが作成・照合する IAM リソースです。
-// id は作成応答から設定され、pendingName は名前変更後の名前を追跡します。
-type resource struct {
-	kind        string
-	name        string
-	code        string
+// iamResource はシナリオが作成・追跡する一時リソースの識別情報です。
+// user、group、folder、project、service principal と、organization 全体の
+// SCIM 設定、SSO profile、project API key を同じ型で追跡します。
+type iamResource struct {
+	// kind は CLI のリソース名です。
+	kind string
+	// name はリソースの現在の名前です。名前変更ステップで更新されます。
+	name string
+	// code は user と project のコードです。
+	code string
+	// description はリソースの説明です。
 	description string
-	projectID   int
-	id          string
-	attempted   bool
-	pendingName string
+	// projectID は service principal が属する project の ID です。
+	projectID int
+	// id は作成応答から保存したリソースの ID です。
+	id string
+	// attempted は作成 API を呼び出したかどうかです。呼び出しが失敗しても後片付けの対象にします。
+	attempted bool
+	// deleted はシナリオ内で削除済みかどうかです。削除済みのリソースは後片付けで変更しません。
+	deleted bool
+	// renamedTo は名前変更ステップの実行中にリソースが改名する可能性のある名前です。
+	// ステップが失敗した場合、後片付けはこの名前も残っていないことを確認します。
+	renamedTo string
 }
 
-// managedResource はシナリオ自身が削除する一時リソースを追跡します。
-// 現在の名前は名前変更ステップに追従し、失敗で残されたリソースを後片付けが識別できるようにします。
-type managedResource struct {
-	kind        string
-	name        string
-	currentName string
-	id          string
-	attempted   bool
-}
-
-// iamRun はシナリオ全体の状態と実行対象のリソースを保持します。
+// iamRun は1回の IAM API E2E 実行の状態と設定です。
 type iamRun struct {
-	h                *helper.Helper
-	password         string
-	suffix           string
-	user             resource
-	group            resource
-	folder           resource
-	childFolder      resource
-	project          resource
-	servicePrincipal resource
-	scim             managedResource
-	ssoProfile       managedResource
-	projectAPIKey    managedResource
-	email            string
-	renamed          string
-	principalID      int64
+	// password は user の作成に使う一時的なパスワードです。
+	password string
+
+	// email は user に一時的に登録するメールアドレスです。
+	email string
+
+	// user はテスト用の user です。
+	user iamResource
+
+	// group はテスト用の group です。
+	group iamResource
+
+	// folder はテスト用の folder です。project の親になります。
+	folder iamResource
+
+	// childFolder は階層移動の確認に使う子 folder です。
+	childFolder iamResource
+
+	// project はテスト用の project です。service principal と project API key の所属先になります。
+	project iamResource
+
+	// servicePrincipal はテスト用の service principal です。
+	servicePrincipal iamResource
+
+	// scim は organization 全体の SCIM 設定です。シナリオ内で削除します。
+	scim iamResource
+
+	// ssoProfile は organization 全体の SSO profile です。シナリオ内で削除します。
+	ssoProfile iamResource
+
+	// projectAPIKey はテスト用の project 内で作成する API key です。シナリオ内で削除します。
+	projectAPIKey iamResource
+
+	// principalID は認証コンテキストから読み込んだ principal の ID です。
+	principalID int64
+
+	// limitedProjectID は principal が特定の project に限定されている場合の project ID です。
 	limitedProjectID int64
-}
-
-// callWithErr はビルド済みの skr を実行し、stdout・stderr・エラーを返します。
-// 後片付けのように、コマンドの失敗を蓄積して処理を続ける経路で使います。
-func (s *iamRun) callWithErr(t *testing.T, description string, args ...string) ([]byte, string, error) {
-	t.Helper()
-	return s.h.CallAllowingFailure(t, description, args...)
-}
-
-// call はビルド済みの skr を実行します。コマンドが失敗した場合はテストを停止します。
-func (s *iamRun) call(t *testing.T, description string, args ...string) []byte {
-	t.Helper()
-	data, _, err := s.callWithErr(t, description, args...)
-	require.NoError(t, err, "%s: コマンドが失敗しました", description)
-	return data
 }
 
 // decodePage は一覧の投影結果をデコードします。
@@ -144,13 +147,13 @@ func decodePage(data []byte, label string) (projectedPage, error) {
 }
 
 // decodeItem はリソースの応答をデコードします。ID が存在することを確認します。
-func decodeItem(data []byte, label string) (item, error) {
-	var result item
+func decodeItem(data []byte, label string) (iamItem, error) {
+	var result iamItem
 	if err := json.Unmarshal(data, &result); err != nil {
-		return item{}, fmt.Errorf("%s: decode resource: %w", label, err)
+		return iamItem{}, fmt.Errorf("%s: decode resource: %w", label, err)
 	}
 	if result.ID == 0 {
-		return item{}, fmt.Errorf("%s: resource ID is missing", label)
+		return iamItem{}, fmt.Errorf("%s: resource ID is missing", label)
 	}
 	return result, nil
 }
@@ -194,9 +197,9 @@ func listQuery(kind string, targetNames ...string) string {
 	return "{items: (" + pageItems + "), page_count: " + pageCount + hasNext + "}"
 }
 
-// listWithErr は指定した種別の一覧を全ページ読み込みます。
+// lookupIAMItems は指定した種別の一覧を全ページ読み込みます。
 // targetNames は最大1要素で、名前が一致する項目だけを投影します。
-func (s *iamRun) listWithErr(t *testing.T, description, kind string, targetNames ...string) ([]item, error) {
+func lookupIAMItems(t *testing.T, h *helper.Helper, description, kind string, targetNames ...string) ([]iamItem, error) {
 	t.Helper()
 	switch kind {
 	case "user", "group", "folder", "project", "service-principal":
@@ -207,13 +210,13 @@ func (s *iamRun) listWithErr(t *testing.T, description, kind string, targetNames
 		return nil, fmt.Errorf("%s: at most one resource name can be matched", description)
 	}
 	query := listQuery(kind, targetNames...)
-	var all []item
+	var all []iamItem
 	for pageNumber := 1; ; pageNumber++ {
 		args := []string{"iam-api", kind, "list", "--page", strconv.Itoa(pageNumber), "--query", query}
 		if kind == "user" || kind == "group" {
 			args = append(args, "--per-page", strconv.Itoa(userGroupPageSize))
 		}
-		data, _, err := s.callWithErr(t, fmt.Sprintf("%s (%d ページ目)", description, pageNumber), args...)
+		data, _, err := h.CallAllowingFailure(t, fmt.Sprintf("%s (%d ページ目)", description, pageNumber), args...)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", description, err)
 		}
@@ -228,61 +231,52 @@ func (s *iamRun) listWithErr(t *testing.T, description, kind string, targetNames
 	}
 }
 
-// list は指定した種別の一覧を全ページ読み込みます。読み込みに失敗した場合はテストを停止します。
-func (s *iamRun) list(t *testing.T, description, kind string, targetNames ...string) []item {
+// listIAMItems は指定した種別の一覧を全ページ読み込みます。読み込みに失敗した場合はテストを停止します。
+func listIAMItems(t *testing.T, h *helper.Helper, description, kind string, targetNames ...string) []iamItem {
 	t.Helper()
-	items, err := s.listWithErr(t, description, kind, targetNames...)
+	items, err := lookupIAMItems(t, h, description, kind, targetNames...)
 	require.NoError(t, err, "%s: 一覧の読み込みに失敗しました", description)
 	return items
 }
 
-// findByNameWithErr は指定したリソースを名前で検索します。
+// findIAMItemByName は指定したリソースを名前で検索します。
 // 見つからない場合は false を返し、複数見つかった場合や
 // この E2E 実行で作成されたものでない場合はエラーを返します。
-func (s *iamRun) findByNameWithErr(t *testing.T, description string, target resource) (item, bool, error) {
+func findIAMItemByName(t *testing.T, h *helper.Helper, description string, target iamResource) (iamItem, bool, error) {
 	t.Helper()
-	items, err := s.listWithErr(t, description, target.kind, target.name)
+	items, err := lookupIAMItems(t, h, description, target.kind, target.name)
 	if err != nil {
-		return item{}, false, err
+		return iamItem{}, false, err
 	}
-	var matches []item
+	var matches []iamItem
 	for _, candidate := range items {
 		if candidate.Name == target.name {
 			matches = append(matches, candidate)
 		}
 	}
 	if len(matches) == 0 {
-		return item{}, false, nil
+		return iamItem{}, false, nil
 	}
-	if len(matches) != 1 || !matches[0].markedForThisRun(s.suffix) {
-		return item{}, false, fmt.Errorf("%s: refusing to use %q: resource identity is not unique and marked for this E2E", description, target.name)
+	if len(matches) != 1 || matches[0].Description != target.description {
+		return iamItem{}, false, fmt.Errorf("%s: refusing to use %q: resource identity is not unique and marked for this E2E", description, target.name)
 	}
 	if target.code != "" && matches[0].Code != target.code {
-		return item{}, false, fmt.Errorf("%s: refusing to use %q: resource code does not match this E2E", description, target.name)
+		return iamItem{}, false, fmt.Errorf("%s: refusing to use %q: resource code does not match this E2E", description, target.name)
 	}
 	if target.projectID != 0 && matches[0].ProjectID != target.projectID {
-		return item{}, false, fmt.Errorf("%s: refusing to use %q: project ID does not match this E2E", description, target.name)
+		return iamItem{}, false, fmt.Errorf("%s: refusing to use %q: project ID does not match this E2E", description, target.name)
 	}
 	return matches[0], true, nil
 }
 
 // checkIdentity はリソースの識別情報が期待値と一致することを確認します。
-// allowedNames は名前変更後の移行期間に許容する名前です。
-func checkIdentity(candidate item, target resource, allowedNames ...string) error {
+// 名前は名前変更ステップの実行中に改名される可能性のある renamedTo も許容します。
+func checkIdentity(candidate iamItem, target iamResource) error {
 	if target.id != "" && candidate.id() != target.id {
 		return fmt.Errorf("%s ID mismatch: got %s, want %s", target.kind, candidate.id(), target.id)
 	}
-	if candidate.Name != target.name {
-		allowed := false
-		for _, name := range allowedNames {
-			if name != "" && candidate.Name == name {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return fmt.Errorf("%s name mismatch: got %q, want %q", target.kind, candidate.Name, target.name)
-		}
+	if candidate.Name != target.name && candidate.Name != target.renamedTo {
+		return fmt.Errorf("%s name mismatch: got %q, want %q", target.kind, candidate.Name, target.name)
 	}
 	if candidate.Description != target.description || !strings.HasPrefix(candidate.Description, resourceDescription) {
 		return fmt.Errorf("%s description mismatch for %q", target.kind, target.name)
@@ -297,7 +291,7 @@ func checkIdentity(candidate item, target resource, allowedNames ...string) erro
 }
 
 // requireItem はリソースの応答をデコードします。デコードに失敗した場合はテストを停止します。
-func requireItem(t *testing.T, data []byte, label string) item {
+func requireItem(t *testing.T, data []byte, label string) iamItem {
 	t.Helper()
 	created, err := decodeItem(data, label)
 	require.NoError(t, err, "%s: 応答のデコードに失敗しました", label)
@@ -306,17 +300,17 @@ func requireItem(t *testing.T, data []byte, label string) item {
 
 // requireIdentity はリソースの識別情報が期待値と一致することを確認します。
 // 一致しない場合はテストを停止します。
-func requireIdentity(t *testing.T, candidate item, target resource, allowedNames ...string) {
+func requireIdentity(t *testing.T, candidate iamItem, target iamResource) {
 	t.Helper()
-	require.NoError(t, checkIdentity(candidate, target, allowedNames...), "%s: 識別情報が一致しません", target.kind)
+	require.NoError(t, checkIdentity(candidate, target), "%s: 識別情報が一致しません", target.kind)
 }
 
-// preflight は作成前に同名リソースが存在しないことを確認します。
+// requireNoNameCollision は作成前に同名リソースが存在しないことを確認します。
 // 同名リソースが存在する場合はテストを失敗させ、既存リソースを変更しません。
-func (s *iamRun) preflight(t *testing.T) {
+func requireNoNameCollision(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	for _, target := range []resource{s.user, s.group, s.folder, s.childFolder, s.project, s.servicePrincipal} {
-		items := s.list(t, "作成前に同名の"+target.kind+"が存在しないことを確認する", target.kind, target.name)
+	for _, target := range []iamResource{run.user, run.group, run.folder, run.childFolder, run.project, run.servicePrincipal} {
+		items := listIAMItems(t, h, "作成前に同名の"+target.kind+"が存在しないことを確認する", target.kind, target.name)
 		for _, candidate := range items {
 			require.NotEqual(t, target.name, candidate.Name,
 				"%s name %q already exists; refusing to modify it", target.kind, target.name)
@@ -324,195 +318,190 @@ func (s *iamRun) preflight(t *testing.T) {
 	}
 }
 
-// readWithErr はリソースを読み込みます。後片付けのように失敗を蓄積する経路で使います。
-func (s *iamRun) readWithErr(t *testing.T, description string, target resource) (item, error) {
+// lookupIAMItem はリソースを読み込みます。後片付けのように失敗を蓄積する経路で使います。
+func lookupIAMItem(t *testing.T, h *helper.Helper, description string, target iamResource) (iamItem, error) {
 	t.Helper()
-	data, _, err := s.callWithErr(t, description, "iam-api", target.kind, "read", target.id)
+	data, _, err := h.CallAllowingFailure(t, description, "iam-api", target.kind, "read", target.id)
 	if err != nil {
-		return item{}, fmt.Errorf("%s: %w", description, err)
+		return iamItem{}, fmt.Errorf("%s: %w", description, err)
 	}
 	result, err := decodeItem(data, description)
 	if err != nil {
-		return item{}, fmt.Errorf("%s: %w", description, err)
+		return iamItem{}, fmt.Errorf("%s: %w", description, err)
 	}
 	return result, nil
 }
 
-// read はリソースを読み込みます。読み込みに失敗した場合はテストを停止します。
-func (s *iamRun) read(t *testing.T, description string, target resource) item {
+// readIAMItem はリソースを読み込みます。読み込みに失敗した場合はテストを停止します。
+func readIAMItem(t *testing.T, h *helper.Helper, description string, target iamResource) iamItem {
 	t.Helper()
-	result, err := s.readWithErr(t, description, target)
+	result, err := lookupIAMItem(t, h, description, target)
 	require.NoError(t, err, "%s: リソースの読み込みに失敗しました", description)
 	return result
 }
 
-func (s *iamRun) createFolder(t *testing.T) {
+func createFolder(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.folder.attempted = true
-	data := s.call(t, "テスト用のfolderを作成する",
-		"iam-api", "folder", "create", "--name", s.folder.name, "--description", s.folder.description)
+	run.folder.attempted = true
+	data := h.Call(t, "テスト用のfolderを作成する",
+		"iam-api", "folder", "create", "--name", run.folder.name, "--description", run.folder.description)
 	created := requireItem(t, data, "create-folder")
-	requireIdentity(t, created, s.folder)
-	s.folder.id = created.id()
+	requireIdentity(t, created, run.folder)
+	run.folder.id = created.id()
 }
 
-func (s *iamRun) createProject(t *testing.T) {
+func createProject(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.project.attempted = true
-	data := s.call(t, "テスト用のprojectを作成する",
+	run.project.attempted = true
+	data := h.Call(t, "テスト用のprojectを作成する",
 		"iam-api", "project", "create",
-		"--code", s.project.code, "--name", s.project.name, "--description", s.project.description,
-		"--parent-folder-id", s.folder.id)
+		"--code", run.project.code, "--name", run.project.name, "--description", run.project.description,
+		"--parent-folder-id", run.folder.id)
 	created := requireItem(t, data, "create-project")
-	requireIdentity(t, created, s.project)
-	s.project.id = created.id()
-	s.servicePrincipal.projectID = created.ID
+	requireIdentity(t, created, run.project)
+	run.project.id = created.id()
+	run.servicePrincipal.projectID = created.ID
 }
 
-func (s *iamRun) createUser(t *testing.T) {
+func createUser(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.user.attempted = true
+	run.user.attempted = true
 	// パスワードはコマンド引数に含めず、テスト専用ディレクトリの保護したファイルから読み込ませます。
 	passwordFile := filepath.Join(t.TempDir(), "password")
-	require.NoError(t, os.WriteFile(passwordFile, []byte(s.password), 0o600), "パスワードファイルの書き込みに失敗しました")
-	data := s.call(t, "テスト用のuserを作成する",
+	require.NoError(t, os.WriteFile(passwordFile, []byte(run.password), 0o600), "パスワードファイルの書き込みに失敗しました")
+	data := h.Call(t, "テスト用のuserを作成する",
 		"iam-api", "user", "create",
-		"--name", s.user.name, "--code", s.user.code, "--description", s.user.description,
+		"--name", run.user.name, "--code", run.user.code, "--description", run.user.description,
 		"--password-file", passwordFile)
 	created := requireItem(t, data, "create-user")
-	requireIdentity(t, created, s.user)
-	s.user.id = created.id()
+	requireIdentity(t, created, run.user)
+	run.user.id = created.id()
 }
 
-func (s *iamRun) createServicePrincipal(t *testing.T) {
+func createServicePrincipal(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.servicePrincipal.attempted = true
-	data := s.call(t, "テスト用のservice principalを作成する",
+	run.servicePrincipal.attempted = true
+	data := h.Call(t, "テスト用のservice principalを作成する",
 		"iam-api", "service-principal", "create",
-		"--project-id", s.project.id, "--name", s.servicePrincipal.name,
-		"--description", s.servicePrincipal.description)
+		"--project-id", run.project.id, "--name", run.servicePrincipal.name,
+		"--description", run.servicePrincipal.description)
 	created := requireItem(t, data, "create-service-principal")
-	requireIdentity(t, created, s.servicePrincipal)
-	require.Equal(t, s.project.id, strconv.Itoa(created.ProjectID),
+	requireIdentity(t, created, run.servicePrincipal)
+	require.Equal(t, run.project.id, strconv.Itoa(created.ProjectID),
 		"作成したservice principalがテスト用のprojectに属すること")
-	s.servicePrincipal.id = created.id()
+	run.servicePrincipal.id = created.id()
 }
 
-func (s *iamRun) verifyUser(t *testing.T) {
+func verifyUser(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	items := s.list(t, "作成したuserが一覧に含まれることを確認する", "user", s.user.name)
+	items := listIAMItems(t, h, "作成したuserが一覧に含まれることを確認する", "user", run.user.name)
 	found := false
 	for _, candidate := range items {
-		if candidate.id() == s.user.id {
+		if candidate.id() == run.user.id {
 			found = true
 			break
 		}
 	}
-	require.True(t, found, "作成したuser %sが一覧に存在すること", s.user.id)
+	require.True(t, found, "作成したuser %sが一覧に存在すること", run.user.id)
 }
 
-func (s *iamRun) updateUser(t *testing.T) {
+func updateUser(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.user.pendingName = s.renamed
-	data := s.call(t, "userの名前を更新する",
-		"iam-api", "user", "update", s.user.id, "--name", s.renamed, "--description", s.user.description)
+	renamed := run.user.name + "-renamed"
+	run.user.renamedTo = renamed
+	data := h.Call(t, "userの名前を更新する",
+		"iam-api", "user", "update", run.user.id, "--name", renamed, "--description", run.user.description)
 	updated := requireItem(t, data, "update-user")
-	require.Equal(t, s.renamed, updated.Name, "更新後のuserの名前がリクエストと一致すること")
-	expected := s.user
-	expected.name = s.renamed
-	requireIdentity(t, updated, expected)
+	require.Equal(t, renamed, updated.Name, "更新後のuserの名前がリクエストと一致すること")
+	requireIdentity(t, updated, run.user)
 	// 名前変更された user は code と description を保持するため、実行の identity は有効なままです。
-	s.user.name = s.renamed
-	s.user.pendingName = ""
+	run.user.name = renamed
+	run.user.renamedTo = ""
 }
 
-func (s *iamRun) updateFolder(t *testing.T) {
+func updateFolder(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	renamed := s.folder.name + "-renamed"
-	s.folder.pendingName = renamed
-	data := s.call(t, "folderの名前を更新する",
-		"iam-api", "folder", "update", s.folder.id, "--name", renamed, "--description", s.folder.description)
+	renamed := run.folder.name + "-renamed"
+	run.folder.renamedTo = renamed
+	data := h.Call(t, "folderの名前を更新する",
+		"iam-api", "folder", "update", run.folder.id, "--name", renamed, "--description", run.folder.description)
 	updated := requireItem(t, data, "update-folder")
 	require.Equal(t, renamed, updated.Name, "更新後のfolderの名前がリクエストと一致すること")
-	expected := s.folder
-	expected.name = renamed
-	requireIdentity(t, updated, expected)
-	s.folder.name = renamed
-	s.folder.pendingName = ""
+	requireIdentity(t, updated, run.folder)
+	run.folder.name = renamed
+	run.folder.renamedTo = ""
 }
 
-func (s *iamRun) updateProject(t *testing.T) {
+func updateProject(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	renamed := s.project.name + "-renamed"
-	s.project.pendingName = renamed
-	data := s.call(t, "projectの名前を更新する",
-		"iam-api", "project", "update", s.project.id, "--name", renamed, "--description", s.project.description)
+	renamed := run.project.name + "-renamed"
+	run.project.renamedTo = renamed
+	data := h.Call(t, "projectの名前を更新する",
+		"iam-api", "project", "update", run.project.id, "--name", renamed, "--description", run.project.description)
 	updated := requireItem(t, data, "update-project")
 	require.Equal(t, renamed, updated.Name, "更新後のprojectの名前がリクエストと一致すること")
-	expected := s.project
-	expected.name = renamed
-	requireIdentity(t, updated, expected)
-	s.project.name = renamed
-	s.project.pendingName = ""
+	requireIdentity(t, updated, run.project)
+	run.project.name = renamed
+	run.project.renamedTo = ""
 }
 
-func (s *iamRun) registerEmail(t *testing.T) {
+func registerEmail(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.call(t, "userにメールアドレスを一時的に登録する", "iam-api", "user", "register-email", s.user.id, "--email", s.email)
-	read := s.read(t, "登録したメールアドレスを確認する", s.user)
-	requireIdentity(t, read, s.user)
-	require.Equal(t, s.email, read.Email, "登録したメールアドレスがリクエストと一致すること")
+	h.Call(t, "userにメールアドレスを一時的に登録する", "iam-api", "user", "register-email", run.user.id, "--email", run.email)
+	read := readIAMItem(t, h, "登録したメールアドレスを確認する", run.user)
+	requireIdentity(t, read, run.user)
+	require.Equal(t, run.email, read.Email, "登録したメールアドレスがリクエストと一致すること")
 }
 
-func (s *iamRun) unregisterEmail(t *testing.T) {
+func unregisterEmail(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.call(t, "userのメールアドレスを解除する", "iam-api", "user", "unregister-email", s.user.id)
-	read := s.read(t, "メールアドレスが解除されたことを確認する", s.user)
-	requireIdentity(t, read, s.user)
+	h.Call(t, "userのメールアドレスを解除する", "iam-api", "user", "unregister-email", run.user.id)
+	read := readIAMItem(t, h, "メールアドレスが解除されたことを確認する", run.user)
+	requireIdentity(t, read, run.user)
 	require.Empty(t, read.Email, "メールアドレスが解除されていること")
 }
 
-func (s *iamRun) createGroup(t *testing.T) {
+func createGroup(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.group.attempted = true
-	data := s.call(t, "テスト用のgroupを作成する",
-		"iam-api", "group", "create", "--name", s.group.name, "--description", s.group.description)
+	run.group.attempted = true
+	data := h.Call(t, "テスト用のgroupを作成する",
+		"iam-api", "group", "create", "--name", run.group.name, "--description", run.group.description)
 	created := requireItem(t, data, "create-group")
-	requireIdentity(t, created, s.group)
-	s.group.id = created.id()
+	requireIdentity(t, created, run.group)
+	run.group.id = created.id()
 }
 
 // updateGroup は group の名前と説明を更新し、元の名前に戻します。
 // group update は指定しない項目を空で上書きするため、
 // 説明も毎回指定して元の値を保持します。
-func (s *iamRun) updateGroup(t *testing.T) {
+func updateGroup(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	s.updateGroupName(t, "groupの名前と説明を更新する", s.group.name+"-renamed")
-	s.updateGroupName(t, "groupの名前と説明を元に戻す", s.group.name)
+	updateGroupName(t, h, run, "groupの名前と説明を更新する", run.group.name+"-renamed")
+	updateGroupName(t, h, run, "groupの名前と説明を元に戻す", run.group.name)
 }
 
-func (s *iamRun) updateGroupName(t *testing.T, description, name string) {
+func updateGroupName(t *testing.T, h *helper.Helper, run *iamRun, description, name string) {
 	t.Helper()
-	data := s.call(t, description, "iam-api", "group", "update", s.group.id,
-		"--name", name, "--description", s.group.description)
+	data := h.Call(t, description, "iam-api", "group", "update", run.group.id,
+		"--name", name, "--description", run.group.description)
 	updated := requireItem(t, data, "update-group")
 	require.Equal(t, name, updated.Name, "更新後のgroupの名前がリクエストと一致すること")
-	expected := s.group
+	expected := run.group
 	expected.name = name
 	requireIdentity(t, updated, expected)
 }
 
-func (s *iamRun) updateMemberships(t *testing.T) {
+func updateMemberships(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	data := s.call(t, "groupの所属をuserだけに更新する",
-		"iam-api", "group", "update-memberships", s.group.id, "--request", "["+s.user.id+"]")
-	requireMemberships(t, data, "update-memberships", s.user.id)
+	data := h.Call(t, "groupの所属をuserだけに更新する",
+		"iam-api", "group", "update-memberships", run.group.id, "--request", "["+run.user.id+"]")
+	requireMemberships(t, data, "update-memberships", run.user.id)
 }
 
-func (s *iamRun) readMemberships(t *testing.T) {
+func readMemberships(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	data := s.call(t, "groupの所属を確認する", "iam-api", "group", "read-memberships", s.group.id)
-	requireMemberships(t, data, "read-memberships", s.user.id)
+	data := h.Call(t, "groupの所属を確認する", "iam-api", "group", "read-memberships", run.group.id)
+	requireMemberships(t, data, "read-memberships", run.user.id)
 }
 
 // requireMemberships は group の所属が指定した user だけであることを確認します。
@@ -526,16 +515,58 @@ func requireMemberships(t *testing.T, data []byte, label, userID string) {
 	require.Equal(t, userID, strconv.Itoa(memberships[0].ID), "%s: 所属がテスト用のuser %sであること", label, userID)
 }
 
-// cleanupResource は、後片付けとしてリソースの識別情報を再確認してから削除します。
-// 削除後は名前が残っていないことを確認します。失敗は呼び出し元に返されます。
-func (s *iamRun) cleanupResource(t *testing.T, target *resource) error {
+// createFolderAndProject はテスト用の folder と project を作成します。
+func createFolderAndProject(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	if !target.attempted {
+	createFolder(t, h, run)
+	createProject(t, h, run)
+}
+
+// createUserAndServicePrincipal はテスト用の user と service principal を作成します。
+func createUserAndServicePrincipal(t *testing.T, h *helper.Helper, run *iamRun) {
+	t.Helper()
+	createUser(t, h, run)
+	createServicePrincipal(t, h, run)
+}
+
+// runUserLifecycleScenario は作成した user を確認し、名前とメールアドレスを更新します。
+func runUserLifecycleScenario(t *testing.T, h *helper.Helper, run *iamRun) {
+	t.Helper()
+	verifyUser(t, h, run)
+	readIAMItem(t, h, "作成したuserを読み込む", run.user)
+	updateUser(t, h, run)
+	registerEmail(t, h, run)
+	unregisterEmail(t, h, run)
+}
+
+// renameFolderAndProject は folder と project の名前を更新します。
+// 更新後の名前は後片付けの照合に使われます。
+func renameFolderAndProject(t *testing.T, h *helper.Helper, run *iamRun) {
+	t.Helper()
+	updateFolder(t, h, run)
+	updateProject(t, h, run)
+}
+
+// runGroupScenario は group を作成し、所属を user だけに更新して確認します。
+// group update は名前と説明の更新と元に戻しも確認します。
+func runGroupScenario(t *testing.T, h *helper.Helper, run *iamRun) {
+	t.Helper()
+	createGroup(t, h, run)
+	updateMemberships(t, h, run)
+	readMemberships(t, h, run)
+	updateGroup(t, h, run)
+}
+
+// cleanupIAMResource は、後片付けとしてリソースの識別情報を再確認してから削除します。
+// 削除後は名前が残っていないことを確認します。失敗は呼び出し元に返されます。
+func cleanupIAMResource(t *testing.T, h *helper.Helper, target *iamResource) error {
+	t.Helper()
+	if !target.attempted || target.deleted {
 		return nil
 	}
 	id := target.id
 	if id == "" {
-		found, ok, err := s.findByNameWithErr(t, "後片付けとして作成を試みた"+target.kind+"を検索する", *target)
+		found, ok, err := findIAMItemByName(t, h, "後片付けとして作成を試みた"+target.kind+"を検索する", *target)
 		if err != nil {
 			return err
 		}
@@ -546,24 +577,24 @@ func (s *iamRun) cleanupResource(t *testing.T, target *resource) error {
 	}
 	verified := *target
 	verified.id = id
-	current, err := s.readWithErr(t, "後片付けの前に"+target.kind+"の識別情報を確認する", verified)
+	current, err := lookupIAMItem(t, h, "後片付けの前に"+target.kind+"の識別情報を確認する", verified)
 	if err != nil {
 		return fmt.Errorf("cannot verify %s before cleanup: %w", target.kind, err)
 	}
-	if err := checkIdentity(current, verified, target.pendingName); err != nil {
+	if err := checkIdentity(current, verified); err != nil {
 		return fmt.Errorf("cleanup refused: %w", err)
 	}
-	if _, _, err := s.callWithErr(t, "後片付けとして"+target.kind+"を削除する", "iam-api", target.kind, "delete", id); err != nil {
+	if _, _, err := h.CallAllowingFailure(t, "後片付けとして"+target.kind+"を削除する", "iam-api", target.kind, "delete", id); err != nil {
 		return fmt.Errorf("delete E2E %s: %w", target.kind, err)
 	}
 	names := []string{target.name}
-	if target.pendingName != "" && target.pendingName != target.name {
-		names = append(names, target.pendingName)
+	if target.renamedTo != "" && target.renamedTo != target.name {
+		names = append(names, target.renamedTo)
 	}
 	for _, name := range names {
 		verifyTarget := *target
 		verifyTarget.name = name
-		found, ok, err := s.findByNameWithErr(t, "後片付けの後に"+target.kind+"が残っていないことを確認する", verifyTarget)
+		found, ok, err := findIAMItemByName(t, h, "後片付けの後に"+target.kind+"が残っていないことを確認する", verifyTarget)
 		if err != nil {
 			return fmt.Errorf("verify E2E %s deletion: %w", target.kind, err)
 		}
@@ -574,53 +605,19 @@ func (s *iamRun) cleanupResource(t *testing.T, target *resource) error {
 	return nil
 }
 
-// cleanup はシナリオが作成した一時リソースを削除します。
-// managed resource は project や folder 自体より先に削除されます。
+// cleanupIAMResources はシナリオが作成した一時リソースを削除します。
+// organization 全体の設定は project や folder 自体より先に削除されます。
 // 途中の失敗でも残りの後片付けを試み、その失敗を結果に含めます。
-func (s *iamRun) cleanup(t *testing.T) error {
+func cleanupIAMResources(t *testing.T, h *helper.Helper, run *iamRun) error {
 	t.Helper()
 	var result error
-	for _, target := range []*managedResource{&s.scim, &s.ssoProfile, &s.projectAPIKey} {
-		result = errors.Join(result, s.cleanupManaged(t, target))
+	for _, target := range []*iamResource{&run.scim, &run.ssoProfile, &run.projectAPIKey} {
+		result = errors.Join(result, cleanupManagedResource(t, h, target))
 	}
-	for _, target := range []*resource{&s.servicePrincipal, &s.group, &s.user, &s.project, &s.childFolder, &s.folder} {
-		result = errors.Join(result, s.cleanupResource(t, target))
+	for _, target := range []*iamResource{&run.servicePrincipal, &run.group, &run.user, &run.project, &run.childFolder, &run.folder} {
+		result = errors.Join(result, cleanupIAMResource(t, h, target))
 	}
 	return result
-}
-
-// run はシナリオ全体を実行します。作成した一時リソースは失敗時にも後片付けで削除します。
-func (s *iamRun) run(t *testing.T) {
-	t.Helper()
-	s.preflight(t)
-	defer func() {
-		require.NoError(t, s.cleanup(t), "後片付けに失敗しました")
-	}()
-	s.readOnlyScenario(t)
-	s.createFolder(t)
-	s.createProject(t)
-	s.readResourcePolicies(t)
-	s.policyScenario(t)
-	s.hierarchyScenario(t)
-	s.createUser(t)
-	s.createServicePrincipal(t)
-	s.servicePrincipalScenario(t)
-	s.projectAPIKeyScenario(t)
-	s.scimScenario(t)
-	s.ssoScenario(t)
-	s.verifyUser(t)
-	s.read(t, "作成したuserを読み込む", s.user)
-	s.updateUser(t)
-	s.registerEmail(t)
-	s.unregisterEmail(t)
-	s.updateFolder(t)
-	s.updateProject(t)
-	s.createGroup(t)
-	s.updateMemberships(t)
-	s.readMemberships(t)
-	s.updateGroup(t)
-	s.user2faScenario(t)
-	s.accountScenario(t)
 }
 
 const passwordChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-."
