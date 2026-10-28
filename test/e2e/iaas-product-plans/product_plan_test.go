@@ -30,18 +30,6 @@ import (
 // productPlanZone はゾーン指定が必要な製品プランを検索するゾーンです。
 const productPlanZone = "is1b"
 
-// internetPlanQuery は検索結果に含める項目を選択する jq 式です。
-// InternetPlans が配列でない場合は応答の生成時にエラーになります。
-const internetPlanQuery = "{Total,From,Count,InternetPlans:(if (.InternetPlans | type) == \"array\" then (.InternetPlans | map({ID,Name,BandWidthMbps,Availability})) else error(\"InternetPlans must be an array\") end)}"
-
-// licenseInfoQuery は検索結果に含める項目を選択する jq 式です。
-// LicenseInfo が配列でない場合は応答の生成時にエラーになります。
-const licenseInfoQuery = "{Total,From,Count,LicenseInfo:(if (.LicenseInfo | type) == \"array\" then (.LicenseInfo | map({ID,Name})) else error(\"LicenseInfo must be an array\") end)}"
-
-// privateHostPlanQuery は検索結果に含める項目を選択する jq 式です。
-// PrivateHostPlans が配列でない場合は応答の生成時にエラーになります。
-const privateHostPlanQuery = "{Total,From,Count,PrivateHostPlans:(if (.PrivateHostPlans | type) == \"array\" then (.PrivateHostPlans | map({ID,Name,Class,CPU,CPUModel,Dedicated,MemoryMB,Availability})) else error(\"PrivateHostPlans must be an array\") end)}"
-
 // internetPlanSummary はインターネットプランの検索・参照で確認する項目です。
 type internetPlanSummary struct {
 	ID            int64
@@ -116,7 +104,8 @@ func findInternetPlans(t *testing.T, h *helper.Helper, description string) []int
 	t.Helper()
 
 	data, _, err := h.CallAllowingFailure(t, description, "iaas-api", "product", "internet", "find",
-		"--zone", productPlanZone, "--count", "1", "--from", "0", "--query", internetPlanQuery)
+		"--zone", productPlanZone, "--count", "1", "--from", "0",
+		"--query", `{Total,From,Count,InternetPlans:(if (.InternetPlans | type) == "array" then (.InternetPlans | map({ID,Name,BandWidthMbps,Availability})) else error("InternetPlans must be an array") end)}`)
 	require.NoError(t, err, "%s: product internet find: %v", description, err)
 	var find internetPlanFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode InternetPlan find output: %v", description, err)
@@ -142,7 +131,8 @@ func findLicenseInfos(t *testing.T, h *helper.Helper, description string) []lice
 	t.Helper()
 
 	data, _, err := h.CallAllowingFailure(t, description, "iaas-api", "product", "license", "find",
-		"--count", "1", "--from", "0", "--query", licenseInfoQuery)
+		"--count", "1", "--from", "0",
+		"--query", `{Total,From,Count,LicenseInfo:(if (.LicenseInfo | type) == "array" then (.LicenseInfo | map({ID,Name})) else error("LicenseInfo must be an array") end)}`)
 	require.NoError(t, err, "%s: product license find: %v", description, err)
 	var find licenseInfoFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode LicenseInfo find output: %v", description, err)
@@ -156,7 +146,8 @@ func findPrivateHostPlans(t *testing.T, h *helper.Helper, description string) []
 	t.Helper()
 
 	data, _, err := h.CallAllowingFailure(t, description, "iaas-api", "product", "privatehost", "find",
-		"--zone", productPlanZone, "--count", "1", "--from", "0", "--query", privateHostPlanQuery)
+		"--zone", productPlanZone, "--count", "1", "--from", "0",
+		"--query", `{Total,From,Count,PrivateHostPlans:(if (.PrivateHostPlans | type) == "array" then (.PrivateHostPlans | map({ID,Name,Class,CPU,CPUModel,Dedicated,MemoryMB,Availability})) else error("PrivateHostPlans must be an array") end)}`)
 	require.NoError(t, err, "%s: product privatehost find: %v", description, err)
 	var find privateHostPlanFindSummary
 	require.NoError(t, json.Unmarshal(data, &find), "%s: decode PrivateHostPlan find output: %v", description, err)

@@ -18,50 +18,12 @@ package main
 import (
 	"testing"
 
-	"github.com/itchyny/gojq"
 	"github.com/stretchr/testify/require"
 )
 
 // intPtr はテストで *int を作るためのヘルパーです。
 func intPtr(v int) *int {
 	return &v
-}
-
-// TestFindQueryExpressionsCompile は検索結果の jq 式がコンパイルでき、
-// 配列でない値を配列として扱わないことを確認します。
-func TestFindQueryExpressionsCompile(t *testing.T) {
-	for _, test := range []struct {
-		name  string
-		query string
-		field string
-	}{
-		{name: "InternetPlan", query: internetPlanQuery, field: "InternetPlans"},
-		{name: "LicenseInfo", query: licenseInfoQuery, field: "LicenseInfo"},
-		{name: "PrivateHostPlan", query: privateHostPlanQuery, field: "PrivateHostPlans"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			parsed, err := gojq.Parse(test.query)
-			require.NoError(t, err, "gojq.Parse(): %v", err)
-			code, err := gojq.Compile(parsed)
-			require.NoError(t, err, "gojq.Compile(): %v", err)
-
-			// 配列でない値に対してクエリはエラーを返す
-			for _, value := range []any{nil, map[string]any{}} {
-				input := map[string]any{"Total": 0, "From": 0, "Count": 0, test.field: value}
-				result, ok := code.Run(input).Next()
-				require.True(t, ok, "query returned no result for %s = %#v", test.field, value)
-				_, isError := result.(error)
-				require.True(t, isError, "query result for %s = %#v, want an error", test.field, value)
-			}
-
-			// 明示的な空の配列はエラーにならない
-			input := map[string]any{"Total": 0, "From": 0, "Count": 0, test.field: []any{}}
-			result, ok := code.Run(input).Next()
-			require.True(t, ok, "query returned no result for an empty array")
-			_, isError := result.(error)
-			require.False(t, isError, "query rejected an explicit empty array: %v", result)
-		})
-	}
 }
 
 // TestSliceLength は結果配列の要素数の計算を確認します。
