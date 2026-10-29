@@ -54,7 +54,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 ### タスク1: 追加リソースなし・費用なしの拡張(完了)
 
 - `server update`(1コマンド): 完了。`test/e2e/server/` の E2E に作成済みサーバーの名前と説明を更新して応答で反映を確認し、元に戻すフローとして組み込みました。restore に失敗した場合、削除フローは名前の不一致を検出して削除を拒否します。2026-10-23 にライブで正常実行を確認し、2026-10-27 に [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテストへ移行しました。
-- `internet update` と `internet monitor-router`(2コマンド): 完了。作成済みルータ＋スイッチの名前・説明の更新と復元を Read で確認し、直近 10 分間の `monitor-router` を `--request` で実行します。トラフィックのない新規ルータに対する空配列は整形式の応答として扱います。2026-10-23 にライブで正常実行を確認しました。
+- `internet update` と `internet monitor-router`(2コマンド): 完了。作成済みルータ＋スイッチの名前・説明の更新と復元を Read で確認し、直近 10 分間の `monitor-router` を `--zone`、`--id`、`--start`、`--end` で実行します。トラフィックのない新規ルータに対する空配列は整形式の応答として扱います。2026-10-23 にライブで正常実行を確認しました。2026-10-29 に `monitor-router` の入力を `--request` から個別フラグへ変更しました。
 - `version`(1コマンド): 完了。`skr version` が `v<semver> <os>/<arch>, build <revision>` 形式で出力して正常終了することを確認します。2026-10-23 にライブで正常実行を確認しました。2026-10-27 に [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテスト (`test/e2e/version/scenario_version_test.go`) へ移行し、同日に移行後のシナリオをライブ再実行しました。
 
 ### タスク2: 同一実行リソース上の拡張(完了)

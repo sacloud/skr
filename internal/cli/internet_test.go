@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
@@ -171,13 +172,14 @@ func TestInternetDeleteFlags(t *testing.T) {
 
 type internetAPITestDouble struct {
 	internetapi.API
-	findRequest         *internet.FindRequest
-	createRequest       *internet.CreateRequest
-	updateRequest       *internet.UpdateRequest
-	deleteRequest       *internet.DeleteRequest
-	addSubnetRequest    *internet.AddSubnetRequest
-	deleteSubnetRequest *internet.DeleteSubnetRequest
-	createErr           error
+	findRequest          *internet.FindRequest
+	createRequest        *internet.CreateRequest
+	updateRequest        *internet.UpdateRequest
+	deleteRequest        *internet.DeleteRequest
+	addSubnetRequest     *internet.AddSubnetRequest
+	deleteSubnetRequest  *internet.DeleteSubnetRequest
+	monitorRouterRequest *internet.MonitorRouterRequest
+	createErr            error
 }
 
 func (api *internetAPITestDouble) FindWithContext(_ context.Context, request *internet.FindRequest) ([]*iaas.Internet, error) {
@@ -220,6 +222,11 @@ func (api *internetAPITestDouble) DeleteSubnetWithContext(_ context.Context, req
 	return nil
 }
 
+func (api *internetAPITestDouble) MonitorRouterWithContext(_ context.Context, request *internet.MonitorRouterRequest) ([]*iaas.MonitorRouterValue, error) {
+	api.monitorRouterRequest = request
+	return []*iaas.MonitorRouterValue{}, nil
+}
+
 func TestInternetGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-internet.json"))
 	require.NoError(t, err)
@@ -244,7 +251,7 @@ func TestIaaSInternetHelp(t *testing.T) {
 		{args: []string{"iaas-api", "internet", "find", "--help"}, want: []string{"--name", "部分一致", "Names", "併用不可"}},
 		{args: []string{"iaas-api", "internet", "delete", "--help"}, want: []string{"--force", "--fail-if-not-found", "NextHop", "サブネット", "IPv6", "--request"}},
 		{args: []string{"iaas-api", "internet", "add-subnet", "--help"}, want: []string{"--network-mask-len", "--next-hop", "ネクストホップ", "@path.json"}},
-		{args: []string{"iaas-api", "internet", "monitor-router", "--help"}, want: []string{"JSON 入力専用", "Start", "End", "RFC3339"}},
+		{args: []string{"iaas-api", "internet", "monitor-router", "--help"}, want: []string{"--zone", "--id", "--start", "--end", "RFC3339", "1時間前", "併用不可", "--request"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
@@ -334,6 +341,24 @@ func TestIaaSInternetCommandsBuildSDKRequests(t *testing.T) {
 	require.True(t, request.Force, "Delete request = %+v, want explicit Force and FailIfNotFound", request)
 	require.True(t, request.FailIfNotFound, "unexpected value")
 
+	_, stderr, code = run("monitor-router", "--zone", "test-zone", "--id", "123",
+		"--start", "2026-10-14T00:00:00Z", "--end", "2026-10-15T00:00:00Z")
+	require.Equal(t, 0, code, "monitor-router flags: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	flagMonitorRequest := *api.monitorRouterRequest
+	require.Equal(t, "test-zone", flagMonitorRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, flagMonitorRequest.ID, "unexpected value")
+	require.Equal(t, time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC), flagMonitorRequest.Start, "unexpected value")
+	require.Equal(t, time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC), flagMonitorRequest.End, "unexpected value")
+
+	_, stderr, code = run("monitor-router", "--request", `{"Zone":"test-zone","ID":123}`)
+	require.Equal(t, 0, code, "monitor-router JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Equal(t, "test-zone", api.monitorRouterRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, api.monitorRouterRequest.ID, "unexpected value")
+	require.True(t, api.monitorRouterRequest.Start.IsZero(), "omitted Start should stay zero for the SDK default")
+	require.True(t, api.monitorRouterRequest.End.IsZero(), "omitted End should stay zero for the SDK default")
+
 	_, stderr, code = run("delete-subnet", "--request", `{"Zone":"test-zone","ID":123,"SubnetID":456}`)
 	require.Equal(t, 0, code, "delete-subnet JSON: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
@@ -353,6 +378,9 @@ func TestIaaSInternetRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		{"create", "--zone", "test-zone", "--name", "router", "--network-mask-len", "28"},
 		{"create", "--zone", "test-zone", "--name", "router", "--band-width-mbps", "100"},
 		{"monitor-router"},
+		{"monitor-router", "--zone", "test-zone"},
+		{"monitor-router", "--zone", "test-zone", "--id", "123", "--start", "invalid"},
+		{"monitor-router", "--zone", "test-zone", "--request", `{"Zone":"test-zone"}`},
 		{"add-subnet", "--zone", "test-zone", "--id", "123", "--network-mask-len", "28"},
 	} {
 		commandLine := newCLI()
@@ -364,7 +392,8 @@ func TestIaaSInternetRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
 	if api.findRequest != nil || api.createRequest != nil || api.updateRequest != nil ||
-		api.deleteRequest != nil || api.addSubnetRequest != nil || api.deleteSubnetRequest != nil {
+		api.deleteRequest != nil || api.addSubnetRequest != nil || api.deleteSubnetRequest != nil ||
+		api.monitorRouterRequest != nil {
 		t.Fatalf("invalid request reached API: %+v", api)
 	}
 }

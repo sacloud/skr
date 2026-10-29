@@ -8,7 +8,7 @@
 
 ## CLI の入力経路
 
-Server Create は `--disk 'archive-id=...,plan-id=...,size-gb=...'` と `--nic 'upstream=SWITCH_ID'` を使います。Internet、Server、Disk の名前検索は `--name` で API 側の部分一致条件を指定し、削除時の Internet は `--force --fail-if-not-found` を使います。`monitor-router` は JSON 入力専用のため、期間と ID を `--request` で指定します。設計判断は [ADR 0049](../adr/0049-internet-workflow-options.md) に記録しています。
+Server Create は `--disk 'archive-id=...,plan-id=...,size-gb=...'` と `--nic 'upstream=SWITCH_ID'` を使います。Internet、Server、Disk の名前検索は `--name` で API 側の部分一致条件を指定し、削除時の Internet は `--force --fail-if-not-found` を使います。`monitor-router` はゾーンと ID、期間を `--zone`、`--id`、`--start`、`--end` (RFC3339 形式) で指定します。設計判断は [ADR 0049](../adr/0049-internet-workflow-options.md) と [ADR 0066](../adr/0066-internet-monitor-router-flags.md) に記録しています。
 
 ## IPv4 アドレスと OS 設定
 

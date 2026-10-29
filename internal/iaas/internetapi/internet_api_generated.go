@@ -6,6 +6,7 @@ package internetapi
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
@@ -27,7 +28,7 @@ type Commands struct {
 	ReadIpv6      ReadIPv6Command      "cmd:\"\" name:\"read-ipv6\" help:\"ルータ＋スイッチに割り当てられた IPv6 ネットワークを読み取ります。\""
 	EnableIpv6    EnableIPv6Command    "cmd:\"\" name:\"enable-ipv6\" help:\"ルータ＋スイッチの IPv6 アドレス割り当てを有効にして、割り当て結果を出力します。\""
 	DisableIpv6   DisableIPv6Command   "cmd:\"\" name:\"disable-ipv6\" help:\"ルータ＋スイッチの IPv6 アドレス割り当てを無効にします。\""
-	MonitorRouter MonitorRouterCommand "cmd:\"\" name:\"monitor-router\" help:\"ルータ＋スイッチのトラフィックを指定期間で取得して出力します。\""
+	MonitorRouter MonitorRouterCommand "cmd:\"\" name:\"monitor-router\" help:\"ルータ＋スイッチのトラフィックを指定期間で取得して出力します。例: skr iaas-api internet monitor-router --zone is1b --id 123456789012 --start 2026-10-14T00:00:00Z --end 2026-10-15T00:00:00Z\""
 }
 
 type API interface {
@@ -969,13 +970,21 @@ func (c *DisableIPv6Command) Run(ctx *kong.Context) error {
 }
 
 type MonitorRouterCommand struct {
-	Request *string "help:\"この操作は JSON 入力専用です。--request に JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、ID (ルータ＋スイッチ ID)、Start、End (RFC3339 形式の日時)。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012,\\\"Start\\\":\\\"2026-10-14T00:00:00Z\\\",\\\"End\\\":\\\"2026-10-15T00:00:00Z\\\"}'。ゾーン、ID、日時は実際の値に置き換えます。\""
+	Request *string    "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、ID (ルータ＋スイッチ ID)。任意: Start、End (RFC3339 形式の日時)。省略時は終了が現在時刻、開始がその1時間前。フラグ例: skr iaas-api internet monitor-router --zone is1b --id 123456789012 --start 2026-10-14T00:00:00Z --end 2026-10-15T00:00:00Z。ゾーン、ID、日時は実際の値に置き換えます。\""
+	Zone    *string    "name:\"zone\" help:\"必須: 対象ゾーン名。\""
+	ID      *int64     "name:\"id\" help:\"必須: 対象のルータ＋スイッチ ID (数値)。\""
+	Start   *time.Time "name:\"start\" help:\"任意: 取得期間の開始日時 (RFC3339 形式)。省略時は終了日時の1時間前。\""
+	End     *time.Time "name:\"end\" help:\"任意: 取得期間の終了日時 (RFC3339 形式)。省略時は現在時刻。\""
 	factory APIFactory
 	runtime Runtime
 }
 
 func (c *MonitorRouterCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
+	flagsSet = flagsSet || c.Zone != nil
+	flagsSet = flagsSet || c.ID != nil
+	flagsSet = flagsSet || c.Start != nil
+	flagsSet = flagsSet || c.End != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -988,7 +997,28 @@ func (c *MonitorRouterCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
-		return fmt.Errorf("--request が必要です")
+		if !flagsSet {
+			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.Zone == nil {
+			return fmt.Errorf("--zone が必要です")
+		}
+		if c.Zone != nil {
+			request.Zone = *c.Zone
+		}
+		if c.ID == nil {
+			return fmt.Errorf("--id が必要です")
+		}
+		if c.ID != nil {
+			value := types.ID(*c.ID)
+			request.ID = value
+		}
+		if c.Start != nil {
+			request.Start = *c.Start
+		}
+		if c.End != nil {
+			request.End = *c.End
+		}
 	}
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err

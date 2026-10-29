@@ -36,15 +36,11 @@ func monitorRouter(t *testing.T, h *helper.Helper, id types.ID) {
 	t.Helper()
 
 	end := time.Now().UTC()
-	request, err := json.Marshal(map[string]any{
-		"Zone":  internetZone,
-		"ID":    int64(id),
-		"Start": end.Add(-monitorWindow).Format(time.RFC3339),
-		"End":   end.Format(time.RFC3339),
-	})
-	require.NoError(t, err, "encode Router monitor request")
 	output := h.Call(t, "ルータ＋スイッチのモニタリングを取得する",
-		"iaas-api", "internet", "monitor-router", "--request", string(request))
+		"iaas-api", "internet", "monitor-router",
+		"--zone", internetZone, "--id", id.String(),
+		"--start", end.Add(-monitorWindow).Format(time.RFC3339),
+		"--end", end.Format(time.RFC3339))
 	require.NoError(t, checkMonitorValues(output), "monitor-router should return well-formed monitor values")
 }
 
@@ -85,23 +81,4 @@ func TestCheckMonitorValues(t *testing.T) {
 		"a non-array response should be refused")
 	require.Error(t, checkMonitorValues([]byte("{")),
 		"invalid JSON should be refused")
-}
-
-// TestMonitorRouterRequestJSON はモニタリングのリクエスト JSON の内容を確認します。
-func TestMonitorRouterRequestJSON(t *testing.T) {
-	end := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	request, err := json.Marshal(map[string]any{
-		"Zone":  internetZone,
-		"ID":    int64(12),
-		"Start": end.Add(-monitorWindow).Format(time.RFC3339),
-		"End":   end.Format(time.RFC3339),
-	})
-	require.NoError(t, err)
-
-	var decoded map[string]any
-	require.NoError(t, json.Unmarshal(request, &decoded))
-	require.Equal(t, internetZone, decoded["Zone"])
-	require.Equal(t, float64(12), decoded["ID"])
-	require.Equal(t, "2026-01-02T02:54:05Z", decoded["Start"])
-	require.Equal(t, "2026-01-02T03:04:05Z", decoded["End"])
 }
