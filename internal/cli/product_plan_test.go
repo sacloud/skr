@@ -47,9 +47,9 @@ func TestIaaSProductPlanGeneratedCodeMatchesConfig(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			configData, err := os.ReadFile(repositoryPath("api/commands/" + test.config + ".json"))
 			require.NoError(t, err)
-			config, err := apigen.DecodeConfig(configData)
+			config, err := apigen.DecodeConfig(configData, apigen.ModeIaaS)
 			require.NoError(t, err)
-			want, err := apigen.Generate(config)
+			want, err := apigen.Generate(config, apigen.ModeIaaS)
 			require.NoError(t, err)
 			got, err := os.ReadFile(repositoryPath(test.output))
 			require.NoError(t, err)

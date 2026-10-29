@@ -1,10 +1,6 @@
 {
   "package": "packetfilterapi",
   "resource": "IaaS PacketFilter",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types",
@@ -13,7 +9,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "パケットフィルタを指定したゾーンで検索して出力します。例: skr iaas-api packetfilter find --zone is1b",
       "method": "FindWithContext",
       "request_type": "packetfilter.FindRequest",
@@ -44,7 +39,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "パケットフィルタを読み取って出力します。例: skr iaas-api packetfilter read --zone ZONE --id 123456789012",
       "method": "ReadWithContext",
       "request_type": "packetfilter.ReadRequest",
@@ -71,7 +65,6 @@
     },
     {
       "name": "Create",
-      "command_type": "CreateCommand",
       "help": "パケットフィルタを作成して出力します。基本項目はフラグ、ルールは --expressions JSON で指定できます。例: skr iaas-api packetfilter create --zone is1b --name example --expressions '[{\"Protocol\":\"tcp\",\"DestinationPort\":\"443\",\"Action\":\"allow\"}]'",
       "method": "CreateWithContext",
       "request_type": "packetfilter.CreateRequest",
@@ -111,7 +104,6 @@
     },
     {
       "name": "Update",
-      "command_type": "UpdateCommand",
       "help": "パケットフィルタの指定項目を更新して出力します。ルール配列は --expressions JSON で指定できます。",
       "method": "UpdateWithContext",
       "request_type": "packetfilter.UpdateRequest",
@@ -166,7 +158,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "DeleteCommand",
       "help": "パケットフィルタを削除します。成功時は出力しません。例: skr iaas-api packetfilter delete --zone ZONE --id 123456789012",
       "method": "DeleteWithContext",
       "request_type": "packetfilter.DeleteRequest",

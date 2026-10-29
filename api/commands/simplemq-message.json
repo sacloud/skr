@@ -1,10 +1,7 @@
 {
   "package": "simplemqapi",
   "resource": "SimpleMQ message",
-  "command_type": "MessageCommands",
-  "api_type": "MessageAPI",
-  "factory_type": "MessageAPIFactory",
-  "runtime_type": "MessageRuntime",
+  "command_prefix": "Message",
   "factory_arguments": [
     {
       "name": "queue-name",
@@ -27,7 +24,6 @@
   "operations": [
     {
       "name": "Send",
-      "command_type": "MessageSendCommand",
       "help": "キューへメッセージを送信します。",
       "method": "Send",
       "response_type": "*message.NewMessage",
@@ -44,14 +40,12 @@
     },
     {
       "name": "Receive",
-      "command_type": "MessageReceiveCommand",
       "help": "キューからメッセージを受信します。",
       "method": "Receive",
       "response_type": "[]message.Message"
     },
     {
       "name": "ExtendTimeout",
-      "command_type": "MessageExtendTimeoutCommand",
       "help": "受信したメッセージの可視性タイムアウトを延長します。",
       "method": "ExtendTimeout",
       "response_type": "*message.Message",
@@ -66,7 +60,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "MessageDeleteCommand",
       "help": "受信したメッセージを削除します。",
       "method": "Delete",
       "arguments": [

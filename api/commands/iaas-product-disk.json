@@ -1,10 +1,6 @@
 {
   "package": "diskplanapi",
   "resource": "IaaS DiskPlan",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
@@ -12,7 +8,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "指定したゾーンで利用できるディスクプランを検索します。API 応答の Total、From、Count、DiskPlans を含む JSON を出力します。Availability と Size (サイズ、単位、利用可否) を確認できます。例: skr iaas-api product disk find --zone is1b",
       "method": "FindWithContext",
       "request_type": "FindRequest",
@@ -43,7 +38,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "指定したゾーンと ID のディスクプランを読み取って出力します。API の Availability と Size (サイズ、単位、利用可否) を確認できます。例: skr iaas-api product disk read --zone ZONE --id 4",
       "method": "ReadWithContext",
       "request_type": "ReadRequest",

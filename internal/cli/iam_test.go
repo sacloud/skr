@@ -163,9 +163,9 @@ func TestIAMGeneratedCodeMatchesConfigs(t *testing.T) {
 	} {
 		configData, err := os.ReadFile(repositoryPath(test.config))
 		require.NoError(t, err)
-		config, err := apigen.DecodeConfig(configData)
+		config, err := apigen.DecodeConfig(configData, apigen.ModeOgen)
 		require.NoError(t, err, "decode %s", test.config)
-		want, err := apigen.Generate(config)
+		want, err := apigen.Generate(config, apigen.ModeOgen)
 		require.NoError(t, err, "generate %s", test.config)
 		got, err := os.ReadFile(repositoryPath(test.output))
 		require.NoError(t, err)

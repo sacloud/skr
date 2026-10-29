@@ -17,10 +17,6 @@
 {
   "package": "main",
   "resource": "example",
-  "command_type": "exampleCommands",
-  "api_type": "exampleAPI",
-  "factory_type": "exampleAPIFactory",
-  "runtime_type": "exampleRuntime",
   "imports": {
     "example": "github.com/sacloud/example-sdk/api/example"
   },
@@ -28,7 +24,6 @@
     {
       "name": "Find",
       "command_name": "find",
-      "command_type": "exampleFindCommand",
       "help": "項目を検索します。",
       "method": "FindWithContext",
       "request_type": "example.FindRequest",
@@ -47,16 +42,19 @@
 }
 ```
 
+生成型名は設定で宣言せず、生成器がモードと操作名から導出します (ADR 0067)。IaaS は固定名 `Commands` / `API` / `APIFactory` / `Runtime` と、操作ごとの `<操作名>Command` を導出します。Ogen 系 API は `command_prefix` (例: `"command_prefix": "Eventbus"`) から `<接頭辞>Commands` などのトップレベル型名と、操作ごとの `<接頭辞><操作名>Command` を導出します。接頭辞はドメイン package 内のエクスポート済み識別子として必須で、IaaS 設定では指定できません。利用者向け CLI 名は `command_name` で明示し、型名の表記ゆれには影響されません。
+
 SDK のメソッドは `context.Context` と、指定した場合は `*request_type` を受け取ります。結果を返す操作には `response_type` を指定し、戻り値と `error` を出力します。`response_type` を省略した操作は `error` のみを返し、成功時に出力しません。`request_type` を省略した操作は入力なしで呼び出します。インポートの別名を含む型名は、`imports` に定義します。
 
 Kong の既定のコマンド名で表記できない略語を含む場合は、各操作に `command_name` を指定して利用者向けの kebab-case 名を明示します。指定する場合は、すべての操作に指定し、コマンド名が重複しないようにします。省略時は Go フィールド名から Kong が生成する名前を使います。
 
 ## IaaS 以外の API ドメイン
 
-IaaS 以外の EventBus と SimpleMQ も、同じ `cmd/apigen-api` / `generate-api` から生成します。たとえば次の項目は、位置引数を取る操作と値渡しのリクエストを表します。
+IaaS 以外の EventBus と SimpleMQ も、同じ `cmd/apigen-api` / `generate-api` から生成します。ドメイン package を共有するため、設定には `command_prefix` を記述します。たとえば次の項目は、位置引数を取る操作と値渡しのリクエストを表します。
 
 ```json
 {
+  "command_prefix": "Example",
   "arguments": [
     {
       "name": "id",
@@ -122,13 +120,13 @@ Switch コマンドは [`api/commands/iaas-switch.json`](../../api/commands/iaas
 $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=internal/iaas/switchapi/switch_api_generated.go
 ```
 
-同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型で受け付けず、出力は `go/format` で整形します。IaaS と Ogen 系 API は生成対象の形が異なるため、IaaS は専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
+同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型、モードに合わない `command_prefix` で受け付けず、出力は `go/format` で整形します。IaaS と Ogen 系 API は生成対象の形と型名の導出規則が異なるため、IaaS は専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
 
 ## 手書きコードとの境界
 
 [ADR 0047](../adr/0047-minimize-cli-request-body-validation.md) に従い、CLI の検証は入力経路と CLI 固有の制約を中心にします。本文の必須項目、値の範囲、サービス上の相関制約は SDK と API に委ね、`request.Validate()` の重複呼び出しは行いません。`validate_zone` と、無視される補助入力を防ぐ Archive の未知 OSType 拒否は維持します。変更項目のない更新も SDK へ渡し、そのエラーを利用者へ返します。EventBus の `Set*Provider` は入力補完なので残します。
 
-生成ファイルは編集せず、設定を直して再生成します。`package`、コマンド、API interface、factory、runtime の型名はリソース単位で指定します。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理を受け取ります。リクエスト検証関数はコマンドと同じ package に置き、生成コードから直接呼び出します。設定した関数が存在しない場合や引数型が一致しない場合はビルド時に検出されます。[ADR 0044](../adr/0044-typed-request-validator-callbacks.md) に従い、文字列キー、`any` による振り分け、CLI の検証 callback 接続は使いません。生成されたコマンド群の `Runtime` と SDK API factory は `New...Commands(runtime, factory)` でまとめて注入し、setter による段階的な初期化を避けます。[ADR 0045](../adr/0045-initialize-api-commands-with-constructors.md) を参照してください。
+生成ファイルは編集せず、設定を直して再生成します。`package` はリソース単位で指定し、コマンド、API interface、factory、runtime の型名はモードと操作名から導出します (ADR 0067)。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理を受け取ります。リクエスト検証関数はコマンドと同じ package に置き、生成コードから直接呼び出します。設定した関数が存在しない場合や引数型が一致しない場合はビルド時に検出されます。[ADR 0044](../adr/0044-typed-request-validator-callbacks.md) に従い、文字列キー、`any` による振り分け、CLI の検証 callback 接続は使いません。生成されたコマンド群の `Runtime` と SDK API factory は `New...Commands(runtime, factory)` でまとめて注入し、setter による段階的な初期化を避けます。[ADR 0045](../adr/0045-initialize-api-commands-with-constructors.md) を参照してください。
 
 [ADR 0030](../adr/0030-remove-table-output.md) に従い、出力形式は JSON のみです。`ValidateOutput func(*kong.Context) error` は結果を返す操作の API 呼び出し前にクエリを検証し、`WriteOutput func(*kong.Context, any) error` は結果全体またはクエリ結果を JSON で書き込みます。出力形式と表示用 Zone ラベルは callback に渡しません。手書きハンドラーも同じ契約に揃えます。
 

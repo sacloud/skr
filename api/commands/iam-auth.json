@@ -1,24 +1,19 @@
 {
   "package": "iamapi",
   "resource": "IAM authentication settings",
-  "command_type": "AuthCommands",
-  "api_type": "AuthAPI",
-  "factory_type": "AuthAPIFactory",
-  "runtime_type": "AuthRuntime",
+  "command_prefix": "Auth",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
   },
   "operations": [
     {
       "name": "ReadPasswordPolicy",
-      "command_type": "AuthReadPasswordPolicyCommand",
       "help": "組織のパスワードポリシーを参照します。",
       "method": "ReadPasswordPolicy",
       "response_type": "*v1.PasswordPolicy"
     },
     {
       "name": "UpdatePasswordPolicy",
-      "command_type": "AuthUpdatePasswordPolicyCommand",
       "help": "組織のパスワードポリシーを更新します。--request ではすべての項目を含む JSON を指定します。フラグを使う場合も4項目すべてを指定してください。",
       "method": "UpdatePasswordPolicy",
       "request_type": "v1.PasswordPolicy",
@@ -34,14 +29,12 @@
     },
     {
       "name": "ReadAuthConditions",
-      "command_type": "AuthReadConditionsCommand",
       "help": "組織の認証条件を参照します。",
       "method": "ReadAuthConditions",
       "response_type": "*v1.AuthConditions"
     },
     {
       "name": "UpdateAuthConditions",
-      "command_type": "AuthUpdateConditionsCommand",
       "help": "組織の認証条件を更新します。現在の設定を read-auth-conditions で確認し、すべての項目を含む JSON を指定してください。",
       "method": "UpdateAuthConditions",
       "request_type": "v1.AuthConditions",
@@ -50,7 +43,6 @@
     },
     {
       "name": "ReadAuthContext",
-      "command_type": "AuthReadContextCommand",
       "help": "現在の認証情報に対応する IAM 認証コンテキストを参照します。",
       "method": "ReadAuthContext",
       "response_type": "*v1.ReadAuthContextOK"

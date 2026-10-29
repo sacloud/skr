@@ -44,7 +44,7 @@ type Commands struct {
 	Organization     OrganizationCommands     `cmd:"" help:"IAM 組織とサービス利用ポリシーを参照・管理します。"`
 	Project          ProjectCommands          `cmd:"" help:"IAM プロジェクトを管理します。"`
 	ProjectAPIKey    ProjectAPIKeyCommands    `cmd:"" name:"project-api-key" help:"プロジェクト API キーを管理します。作成時の秘密情報を安全に扱ってください。"`
-	SCIM             SCIMCommands             `cmd:"" help:"ユーザープロビジョニング設定を管理します。"`
+	SCIM             ScimCommands             `cmd:"" help:"ユーザープロビジョニング設定を管理します。"`
 	ServicePolicy    ServicePolicyCommands    `cmd:"" name:"service-policy" help:"サービス利用ポリシーの有効状態とルールテンプレートを管理します。"`
 	ServicePrincipal ServicePrincipalCommands `cmd:"" name:"service-principal" help:"サービスプリンシパルと公開鍵を管理します。"`
 	SSO              SSOCommands              `cmd:"" help:"SSO プロファイルを管理します。"`

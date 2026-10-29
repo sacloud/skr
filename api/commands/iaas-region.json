@@ -1,10 +1,6 @@
 {
   "package": "regionapi",
   "resource": "IaaS Region",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "region": "github.com/sacloud/sacloud-sdk-go/service/iaas/region",
@@ -13,7 +9,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "リージョン一覧を取得します。必要な項目だけを表示する例: skr iaas-api region find --query 'map({ID,Name,Description})'",
       "method": "FindWithContext",
       "request_type": "region.FindRequest",
@@ -23,7 +18,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "指定した ID のリージョン情報を取得します。例: skr iaas-api region read --id REGION-ID",
       "method": "ReadWithContext",
       "request_type": "region.ReadRequest",

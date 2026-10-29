@@ -1,10 +1,7 @@
 {
   "package": "iamapi",
   "resource": "service principal",
-  "command_type": "ServicePrincipalCommands",
-  "api_type": "ServicePrincipalAPI",
-  "factory_type": "ServicePrincipalAPIFactory",
-  "runtime_type": "ServicePrincipalRuntime",
+  "command_prefix": "ServicePrincipal",
   "imports": {
     "serviceprincipal": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/serviceprincipal",
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1",
@@ -13,7 +10,6 @@
   "operations": [
     {
       "name": "List",
-      "command_type": "ServicePrincipalListCommand",
       "help": "サービスプリンシパルを一覧表示します。",
       "method": "List",
       "request_type": "serviceprincipal.ListParams",
@@ -30,7 +26,6 @@
     },
     {
       "name": "Create",
-      "command_type": "ServicePrincipalCreateCommand",
       "help": "サービスプリンシパルを作成します。",
       "method": "Create",
       "request_type": "serviceprincipal.CreateParams",
@@ -45,7 +40,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ServicePrincipalReadCommand",
       "help": "ID を指定してサービスプリンシパルを読み取ります。",
       "method": "Read",
       "response_type": "*v1.ServicePrincipal",
@@ -53,7 +47,6 @@
     },
     {
       "name": "Update",
-      "command_type": "ServicePrincipalUpdateCommand",
       "help": "サービスプリンシパルの名前と説明を更新します。名前と説明は必須です。",
       "method": "Update",
       "request_type": "serviceprincipal.UpdateParams",
@@ -66,14 +59,12 @@
     },
     {
       "name": "Delete",
-      "command_type": "ServicePrincipalDeleteCommand",
       "help": "ID を指定してサービスプリンシパルを削除します。",
       "method": "Delete",
       "arguments": [{"name":"id","field":"ID","type":"int","help":"削除するサービスプリンシパル ID。"}]
     },
     {
       "name": "ListKeys",
-      "command_type": "ServicePrincipalListKeysCommand",
       "help": "サービスプリンシパルに登録されたキーを一覧表示します。",
       "method": "ListKeys",
       "request_type": "serviceprincipal.ListKeysParams",
@@ -90,7 +81,6 @@
     },
     {
       "name": "UploadKey",
-      "command_type": "ServicePrincipalUploadKeyCommand",
       "help": "サービスプリンシパルに PEM 形式の RSA 公開鍵（2048～4096 ビット）を登録します。公開鍵は --public-key-file で読み込みます。",
       "method": "UploadKey",
       "handwritten": true,
@@ -102,7 +92,6 @@
     },
     {
       "name": "EnableKey",
-      "command_type": "ServicePrincipalEnableKeyCommand",
       "help": "指定したサービスプリンシパルキーを有効化します。",
       "method": "EnableKey",
       "response_type": "*v1.ServicePrincipalKey",
@@ -113,7 +102,6 @@
     },
     {
       "name": "DisableKey",
-      "command_type": "ServicePrincipalDisableKeyCommand",
       "help": "指定したサービスプリンシパルキーを無効化します。",
       "method": "DisableKey",
       "response_type": "*v1.ServicePrincipalKey",
@@ -124,7 +112,6 @@
     },
     {
       "name": "DeleteKey",
-      "command_type": "ServicePrincipalDeleteKeyCommand",
       "help": "指定したサービスプリンシパルキーを削除します。",
       "method": "DeleteKey",
       "arguments": [
@@ -134,7 +121,6 @@
     },
     {
       "name": "IssueToken",
-      "command_type": "ServicePrincipalIssueTokenCommand",
       "help": "登録済み公開鍵に対応する秘密鍵で署名した JWT アサーションからアクセストークンを発行します。アサーションは --assertion-file で読み込み、発行されたトークンは秘密情報として扱います。",
       "method": "IssueToken",
       "arguments": [{"name":"assertion","field":"Assertion","type":"string","help":"アサーション。コマンド実装ではファイルから読み込みます。"}],

@@ -1,24 +1,19 @@
 {
   "package": "iamapi",
   "resource": "IAM policy bindings",
-  "command_type": "PolicyCommands",
-  "api_type": "PolicyAPI",
-  "factory_type": "PolicyAPIFactory",
-  "runtime_type": "PolicyRuntime",
+  "command_prefix": "Policy",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
   },
   "operations": [
     {
       "name": "ReadOrganization",
-      "command_type": "PolicyReadOrganizationCommand",
       "help": "組織の IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。",
       "method": "ReadOrganizationPolicy",
       "response_type": "[]v1.IamPolicy"
     },
     {
       "name": "UpdateOrganization",
-      "command_type": "PolicyUpdateOrganizationCommand",
       "help": "組織の IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-organization の出力を基に編集してください。",
       "method": "UpdateOrganizationPolicy",
       "request_type": "[]v1.IamPolicy",
@@ -28,7 +23,6 @@
     },
     {
       "name": "ReadProject",
-      "command_type": "PolicyReadProjectCommand",
       "help": "指定したプロジェクトの IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。",
       "method": "ReadProjectPolicy",
       "response_type": "[]v1.IamPolicy",
@@ -43,7 +37,6 @@
     },
     {
       "name": "UpdateProject",
-      "command_type": "PolicyUpdateProjectCommand",
       "help": "指定したプロジェクトの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-project の出力を基に編集してください。",
       "method": "UpdateProjectPolicy",
       "request_type": "[]v1.IamPolicy",
@@ -61,7 +54,6 @@
     },
     {
       "name": "ReadFolder",
-      "command_type": "PolicyReadFolderCommand",
       "help": "指定したフォルダの IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。",
       "method": "ReadFolderPolicy",
       "response_type": "[]v1.IamPolicy",
@@ -76,7 +68,6 @@
     },
     {
       "name": "UpdateFolder",
-      "command_type": "PolicyUpdateFolderCommand",
       "help": "指定したフォルダの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-folder の出力を基に編集してください。",
       "method": "UpdateFolderPolicy",
       "request_type": "[]v1.IamPolicy",

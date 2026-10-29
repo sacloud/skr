@@ -1,10 +1,7 @@
 {
   "package": "iamapi",
   "resource": "IAM project API key",
-  "command_type": "ProjectAPIKeyCommands",
-  "api_type": "ProjectAPIKeyAPI",
-  "factory_type": "ProjectAPIKeyAPIFactory",
-  "runtime_type": "ProjectAPIKeyRuntime",
+  "command_prefix": "ProjectAPIKey",
   "imports": {
     "projectapikey": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/projectapikey",
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
@@ -12,7 +9,6 @@
   "operations": [
     {
       "name": "List",
-      "command_type": "ProjectAPIKeyListCommand",
       "help": "プロジェクト API キーを一覧表示します。",
       "method": "List",
       "request_type": "projectapikey.ListParams",
@@ -28,7 +24,6 @@
     },
     {
       "name": "Create",
-      "command_type": "ProjectAPIKeyCreateCommand",
       "help": "プロジェクト API キーを作成します。レスポンスにアクセストークンとシークレットが含まれるため、出力を安全に保管してください。",
       "method": "Create",
       "request_type": "projectapikey.CreateParams",
@@ -38,7 +33,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ProjectAPIKeyReadCommand",
       "help": "ID を指定してプロジェクト API キーを読み取ります。",
       "method": "Read",
       "response_type": "*v1.ProjectApiKey",
@@ -46,7 +40,6 @@
     },
     {
       "name": "Update",
-      "command_type": "ProjectAPIKeyUpdateCommand",
       "help": "プロジェクト API キーを更新します。現在の設定を read で確認し、変更後の設定を JSON で指定してください。",
       "method": "Update",
       "request_type": "projectapikey.UpdateParams",
@@ -57,7 +50,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "ProjectAPIKeyDeleteCommand",
       "help": "ID を指定してプロジェクト API キーを削除します。",
       "method": "Delete",
       "arguments": [{"name":"id","field":"ID","type":"int","help":"削除する API キー ID。"}]

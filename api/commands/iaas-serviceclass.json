@@ -1,10 +1,6 @@
 {
   "package": "serviceclassapi",
   "resource": "IaaS ServiceClass",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "serviceclass": "github.com/sacloud/sacloud-sdk-go/service/iaas/serviceclass"
@@ -12,7 +8,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "指定したゾーンのサービスクラスを検索します。例: skr iaas-api service-class find --zone is1b",
       "method": "FindWithContext",
       "request_type": "serviceclass.FindRequest",

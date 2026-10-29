@@ -40,9 +40,9 @@ func TestSimpleNotificationGeneratedCodeMatchesConfig(t *testing.T) {
 	} {
 		configData, err := os.ReadFile(repositoryPath(test.config))
 		require.NoError(t, err)
-		config, err := apigen.DecodeConfig(configData)
+		config, err := apigen.DecodeConfig(configData, apigen.ModeOgen)
 		require.NoError(t, err)
-		want, err := apigen.Generate(config)
+		want, err := apigen.Generate(config, apigen.ModeOgen)
 		require.NoError(t, err)
 		got, err := os.ReadFile(repositoryPath(test.output))
 		require.NoError(t, err)

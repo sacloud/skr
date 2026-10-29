@@ -1,10 +1,6 @@
 {
   "package": "switchapi",
   "resource": "IaaS Switch",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types",
@@ -13,7 +9,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "スイッチを指定したゾーンで検索して出力します。例: skr iaas-api switch find --zone tk1v",
       "method": "FindWithContext",
       "request_type": "swytch.FindRequest",
@@ -52,7 +47,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "スイッチを読み取って出力します。例: skr iaas-api switch read --zone ZONE --id 123456789012",
       "method": "ReadWithContext",
       "request_type": "swytch.ReadRequest",
@@ -79,7 +73,6 @@
     },
     {
       "name": "Create",
-      "command_type": "CreateCommand",
       "help": "スイッチを作成して出力します。例: skr iaas-api switch create --zone ZONE --name example",
       "method": "CreateWithContext",
       "request_type": "swytch.CreateRequest",
@@ -138,7 +131,6 @@
     },
     {
       "name": "Update",
-      "command_type": "UpdateCommand",
       "help": "指定項目だけを更新して出力します。例: skr iaas-api switch update --zone ZONE --id 123456789012 --name updated",
       "method": "UpdateWithContext",
       "request_type": "swytch.UpdateRequest",
@@ -210,7 +202,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "DeleteCommand",
       "help": "スイッチを削除します。成功時は出力しません。例: skr iaas-api switch delete --zone ZONE --id 123456789012",
       "method": "DeleteWithContext",
       "request_type": "swytch.DeleteRequest",

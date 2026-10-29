@@ -1,10 +1,6 @@
 {
   "package": "internetapi",
   "resource": "IaaS Internet",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types",
@@ -14,7 +10,6 @@
     {
       "name": "Find",
       "command_name": "find",
-      "command_type": "FindCommand",
       "help": "ルータ＋スイッチを指定したゾーンで検索して出力します。例: skr iaas-api internet find --zone is1b",
       "method": "FindWithContext",
       "request_type": "internet.FindRequest",
@@ -61,7 +56,6 @@
     {
       "name": "Read",
       "command_name": "read",
-      "command_type": "ReadCommand",
       "help": "ルータ＋スイッチを読み取って出力します。",
       "method": "ReadWithContext",
       "request_type": "internet.ReadRequest",
@@ -89,7 +83,6 @@
     {
       "name": "Create",
       "command_name": "create",
-      "command_type": "CreateCommand",
       "help": "ルータ＋スイッチを作成して出力します。課金対象になる場合があります。例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100",
       "method": "CreateWithContext",
       "request_type": "internet.CreateRequest",
@@ -151,7 +144,6 @@
     {
       "name": "Update",
       "command_name": "update",
-      "command_type": "UpdateCommand",
       "help": "ルータ＋スイッチの設定を更新して出力します。例: skr iaas-api internet update --zone is1b --id 123456789012 --name UPDATED-NAME",
       "method": "UpdateWithContext",
       "request_type": "internet.UpdateRequest",
@@ -210,7 +202,6 @@
     {
       "name": "Delete",
       "command_name": "delete",
-      "command_type": "DeleteCommand",
       "help": "ルータ＋スイッチを削除します。--force は IPv6 の無効化と NextHop が設定された追加サブネットの削除も行います。例: skr iaas-api internet delete --zone is1b --id 123456789012",
       "method": "DeleteWithContext",
       "request_type": "internet.DeleteRequest",
@@ -249,7 +240,6 @@
     {
       "name": "ListSubnet",
       "command_name": "list-subnet",
-      "command_type": "ListSubnetCommand",
       "help": "ルータ＋スイッチに設定された IP アドレスブロックを一覧表示します。",
       "method": "ListSubnetWithContext",
       "request_type": "internet.ListSubnetRequest",
@@ -277,7 +267,6 @@
     {
       "name": "AddSubnet",
       "command_name": "add-subnet",
-      "command_type": "AddSubnetCommand",
       "help": "ルータ＋スイッチに IP アドレスブロックを追加します。ネクストホップとなるサーバを先に用意してください。",
       "method": "AddSubnetWithContext",
       "request_type": "internet.AddSubnetRequest",
@@ -319,7 +308,6 @@
     {
       "name": "UpdateSubnet",
       "command_name": "update-subnet",
-      "command_type": "UpdateSubnetCommand",
       "help": "追加した IP アドレスブロックのネクストホップを更新します。",
       "method": "UpdateSubnetWithContext",
       "request_type": "internet.UpdateSubnetRequest",
@@ -362,7 +350,6 @@
     {
       "name": "DeleteSubnet",
       "command_name": "delete-subnet",
-      "command_type": "DeleteSubnetCommand",
       "help": "ルータ＋スイッチに追加した IP アドレスブロックを削除します。",
       "method": "DeleteSubnetWithContext",
       "request_type": "internet.DeleteSubnetRequest",
@@ -397,7 +384,6 @@
     {
       "name": "ReadIpv6",
       "command_name": "read-ipv6",
-      "command_type": "ReadIPv6Command",
       "help": "ルータ＋スイッチに割り当てられた IPv6 ネットワークを読み取ります。",
       "method": "ReadIPv6WithContext",
       "request_type": "internet.ReadIPv6Request",
@@ -425,7 +411,6 @@
     {
       "name": "EnableIpv6",
       "command_name": "enable-ipv6",
-      "command_type": "EnableIPv6Command",
       "help": "ルータ＋スイッチの IPv6 アドレス割り当てを有効にして、割り当て結果を出力します。",
       "method": "EnableIPv6WithContext",
       "request_type": "internet.EnableIPv6Request",
@@ -453,7 +438,6 @@
     {
       "name": "DisableIpv6",
       "command_name": "disable-ipv6",
-      "command_type": "DisableIPv6Command",
       "help": "ルータ＋スイッチの IPv6 アドレス割り当てを無効にします。",
       "method": "DisableIPv6WithContext",
       "request_type": "internet.DisableIPv6Request",
@@ -480,7 +464,6 @@
     {
       "name": "MonitorRouter",
       "command_name": "monitor-router",
-      "command_type": "MonitorRouterCommand",
       "help": "ルータ＋スイッチのトラフィックを指定期間で取得して出力します。例: skr iaas-api internet monitor-router --zone is1b --id 123456789012 --start 2026-10-14T00:00:00Z --end 2026-10-15T00:00:00Z",
       "method": "MonitorRouterWithContext",
       "request_type": "internet.MonitorRouterRequest",

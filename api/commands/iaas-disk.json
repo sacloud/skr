@@ -1,10 +1,6 @@
 {
   "package": "diskapi",
   "resource": "IaaS Disk",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "disk": "github.com/sacloud/sacloud-sdk-go/service/iaas/disk",
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
@@ -13,7 +9,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "ディスクを指定したゾーンで検索して出力します。例: skr iaas-api disk find --zone is1b",
       "method": "FindWithContext",
       "request_type": "disk.FindRequest",
@@ -59,7 +54,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "ディスクを読み取って出力します。例: skr iaas-api disk read --zone ZONE --id 123456789012",
       "method": "ReadWithContext",
       "request_type": "disk.ReadRequest",
@@ -86,7 +80,6 @@
     },
     {
       "name": "Create",
-      "command_type": "CreateCommand",
       "help": "ディスクを作成して出力します。基本項目はフラグ、複雑な値は --request JSON で指定します。例: skr iaas-api disk create --zone is1b --name DISK-NAME --disk-plan-id 4 --connection virtio --size-gb 20",
       "method": "CreateWithContext",
       "request_type": "disk.CreateRequest",
@@ -204,7 +197,6 @@
     },
     {
       "name": "Update",
-      "command_type": "UpdateCommand",
       "help": "ディスクの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api disk update --zone ZONE --id 123456789012 --name UPDATED-DISK-NAME",
       "method": "UpdateWithContext",
       "request_type": "disk.UpdateRequest",
@@ -276,7 +268,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "DeleteCommand",
       "help": "ディスクを削除します。サーバに接続中のディスクは削除できません。削除後は復旧できません。成功時は出力しません。例: skr iaas-api disk delete --zone ZONE --id 123456789012 --fail-if-not-found",
       "method": "DeleteWithContext",
       "request_type": "disk.DeleteRequest",

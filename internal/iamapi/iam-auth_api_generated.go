@@ -14,9 +14,9 @@ import (
 type AuthCommands struct {
 	ReadPasswordPolicy   AuthReadPasswordPolicyCommand   "cmd:\"\" help:\"組織のパスワードポリシーを参照します。\""
 	UpdatePasswordPolicy AuthUpdatePasswordPolicyCommand "cmd:\"\" help:\"組織のパスワードポリシーを更新します。--request ではすべての項目を含む JSON を指定します。フラグを使う場合も4項目すべてを指定してください。\""
-	ReadAuthConditions   AuthReadConditionsCommand       "cmd:\"\" help:\"組織の認証条件を参照します。\""
-	UpdateAuthConditions AuthUpdateConditionsCommand     "cmd:\"\" help:\"組織の認証条件を更新します。現在の設定を read-auth-conditions で確認し、すべての項目を含む JSON を指定してください。\""
-	ReadAuthContext      AuthReadContextCommand          "cmd:\"\" help:\"現在の認証情報に対応する IAM 認証コンテキストを参照します。\""
+	ReadAuthConditions   AuthReadAuthConditionsCommand   "cmd:\"\" help:\"組織の認証条件を参照します。\""
+	UpdateAuthConditions AuthUpdateAuthConditionsCommand "cmd:\"\" help:\"組織の認証条件を更新します。現在の設定を read-auth-conditions で確認し、すべての項目を含む JSON を指定してください。\""
+	ReadAuthContext      AuthReadAuthContextCommand      "cmd:\"\" help:\"現在の認証情報に対応する IAM 認証コンテキストを参照します。\""
 }
 
 type AuthAPI interface {
@@ -158,12 +158,12 @@ func (c *AuthUpdatePasswordPolicyCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type AuthReadConditionsCommand struct {
+type AuthReadAuthConditionsCommand struct {
 	factory AuthAPIFactory
 	runtime AuthRuntime
 }
 
-func (c *AuthReadConditionsCommand) Run(ctx *kong.Context) error {
+func (c *AuthReadAuthConditionsCommand) Run(ctx *kong.Context) error {
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
@@ -187,13 +187,13 @@ func (c *AuthReadConditionsCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type AuthUpdateConditionsCommand struct {
+type AuthUpdateAuthConditionsCommand struct {
 	Request *string "help:\"認証条件全体の JSON。直接指定するか @path.json で読み込みます。組織全体のログイン条件を変更するため、更新前に read-auth-conditions で確認してください。\""
 	factory AuthAPIFactory
 	runtime AuthRuntime
 }
 
-func (c *AuthUpdateConditionsCommand) Run(ctx *kong.Context) error {
+func (c *AuthUpdateAuthConditionsCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
@@ -232,12 +232,12 @@ func (c *AuthUpdateConditionsCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type AuthReadContextCommand struct {
+type AuthReadAuthContextCommand struct {
 	factory AuthAPIFactory
 	runtime AuthRuntime
 }
 
-func (c *AuthReadContextCommand) Run(ctx *kong.Context) error {
+func (c *AuthReadAuthContextCommand) Run(ctx *kong.Context) error {
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}

@@ -1,10 +1,6 @@
 {
   "package": "serverapi",
   "resource": "IaaS Server",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "server": "github.com/sacloud/sacloud-sdk-go/service/iaas/server",
@@ -13,7 +9,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "サーバを指定したゾーンで検索して出力します。例: skr iaas-api server find --zone tk1v",
       "method": "FindWithContext",
       "request_type": "server.FindRequest",
@@ -59,7 +54,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "サーバを読み取って出力します。例: skr iaas-api server read --zone ZONE --id 123456789012",
       "method": "ReadWithContext",
       "request_type": "server.ReadRequest",
@@ -86,7 +80,6 @@
     },
     {
       "name": "Create",
-      "command_type": "CreateCommand",
       "help": "サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'",
       "method": "CreateWithContext",
       "request_type": "server.CreateRequest",
@@ -225,7 +218,6 @@
     },
     {
       "name": "Boot",
-      "command_type": "BootCommand",
       "help": "サーバを起動します。cloud-init の user-data は任意で、--user-data @path.yaml または --user-data - で指定します。例: skr iaas-api server boot --zone ZONE --id 123456789012",
       "method": "BootWithContext",
       "request_type": "server.BootRequest",
@@ -233,7 +225,6 @@
     },
     {
       "name": "Update",
-      "command_type": "UpdateCommand",
       "help": "サーバの指定項目を更新して出力します。省略した項目は変更しません。CPU または MemoryGB の変更はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated",
       "method": "UpdateWithContext",
       "request_type": "server.UpdateRequest",
@@ -318,7 +309,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "DeleteCommand",
       "help": "サーバを削除します。成功時は出力しません。ディスクも削除する場合は --with-disks を指定します。例: skr iaas-api server delete --zone ZONE --id 123456789012",
       "method": "DeleteWithContext",
       "request_type": "server.DeleteRequest",
