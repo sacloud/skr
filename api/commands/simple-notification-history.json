@@ -1,24 +1,19 @@
 {
   "package": "simplenotificationapi",
   "resource": "Simple Notification history",
-  "command_type": "HistoryCommands",
-  "api_type": "HistoryAPI",
-  "factory_type": "HistoryAPIFactory",
-  "runtime_type": "HistoryRuntime",
+  "command_prefix": "History",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "HistoryListCommand",
       "help": "通知履歴を一覧表示します。",
       "method": "List",
       "response_type": "*v1.ListSimpleNotificationHistoriesResponse"
     },
     {
       "name": "Read",
-      "command_type": "HistoryReadCommand",
       "help": "通知履歴を読み取ります。",
       "method": "Read",
       "arguments": [

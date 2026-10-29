@@ -1,24 +1,19 @@
 {
   "package": "simplenotificationapi",
   "resource": "Simple Notification routing",
-  "command_type": "RoutingCommands",
-  "api_type": "RoutingAPI",
-  "factory_type": "RoutingAPIFactory",
-  "runtime_type": "RoutingRuntime",
+  "command_prefix": "Routing",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "RoutingListCommand",
       "help": "ルーティング設定を一覧表示します。",
       "method": "List",
       "response_type": "*v1.ListCommonServiceItemsResponse"
     },
     {
       "name": "Read",
-      "command_type": "RoutingReadCommand",
       "help": "ルーティング設定を読み取ります。",
       "method": "Read",
       "arguments": [
@@ -33,7 +28,6 @@
     },
     {
       "name": "Create",
-      "command_type": "RoutingCreateCommand",
       "help": "ルーティング設定を作成します。",
       "method": "Create",
       "request_type": "v1.PostCommonServiceItemRequest",
@@ -44,7 +38,6 @@
     },
     {
       "name": "Update",
-      "command_type": "RoutingUpdateCommand",
       "help": "ルーティング設定を更新します。",
       "method": "Update",
       "request_type": "v1.PutCommonServiceItemRequest",
@@ -62,7 +55,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "RoutingDeleteCommand",
       "help": "ルーティング設定を削除します。",
       "method": "Delete",
       "arguments": [
@@ -76,7 +68,6 @@
     },
     {
       "name": "Reorder",
-      "command_type": "RoutingReorderCommand",
       "help": "ルーティング設定の順序を変更します。",
       "method": "Reorder",
       "request_type": "v1.PutCommonServiceItemRoutingReorderRequest",
@@ -86,7 +77,6 @@
     },
     {
       "name": "ListSource",
-      "command_type": "RoutingListSourceCommand",
       "help": "ルーティング設定に利用できる通知元を一覧表示します。",
       "method": "ListSource",
       "response_type": "*v1.ListSourcesResponse"

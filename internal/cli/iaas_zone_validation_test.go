@@ -53,7 +53,7 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 	for _, resource := range resources {
 		data, err := os.ReadFile(repositoryPath("api/commands/" + resource.config + ".json"))
 		require.NoError(t, err, "read %s config", resource.name)
-		config, err := apigen.DecodeConfig(data)
+		config, err := apigen.DecodeConfig(data, apigen.ModeIaaS)
 		require.NoError(t, err, "decode %s config", resource.name)
 		for _, operation := range config.Operations {
 			if operation.Handwritten {

@@ -25,9 +25,9 @@ type Commands struct {
 	AddSubnet     AddSubnetCommand     "cmd:\"\" name:\"add-subnet\" help:\"ルータ＋スイッチに IP アドレスブロックを追加します。ネクストホップとなるサーバを先に用意してください。\""
 	UpdateSubnet  UpdateSubnetCommand  "cmd:\"\" name:\"update-subnet\" help:\"追加した IP アドレスブロックのネクストホップを更新します。\""
 	DeleteSubnet  DeleteSubnetCommand  "cmd:\"\" name:\"delete-subnet\" help:\"ルータ＋スイッチに追加した IP アドレスブロックを削除します。\""
-	ReadIpv6      ReadIPv6Command      "cmd:\"\" name:\"read-ipv6\" help:\"ルータ＋スイッチに割り当てられた IPv6 ネットワークを読み取ります。\""
-	EnableIpv6    EnableIPv6Command    "cmd:\"\" name:\"enable-ipv6\" help:\"ルータ＋スイッチの IPv6 アドレス割り当てを有効にして、割り当て結果を出力します。\""
-	DisableIpv6   DisableIPv6Command   "cmd:\"\" name:\"disable-ipv6\" help:\"ルータ＋スイッチの IPv6 アドレス割り当てを無効にします。\""
+	ReadIpv6      ReadIpv6Command      "cmd:\"\" name:\"read-ipv6\" help:\"ルータ＋スイッチに割り当てられた IPv6 ネットワークを読み取ります。\""
+	EnableIpv6    EnableIpv6Command    "cmd:\"\" name:\"enable-ipv6\" help:\"ルータ＋スイッチの IPv6 アドレス割り当てを有効にして、割り当て結果を出力します。\""
+	DisableIpv6   DisableIpv6Command   "cmd:\"\" name:\"disable-ipv6\" help:\"ルータ＋スイッチの IPv6 アドレス割り当てを無効にします。\""
 	MonitorRouter MonitorRouterCommand "cmd:\"\" name:\"monitor-router\" help:\"ルータ＋スイッチのトラフィックを指定期間で取得して出力します。例: skr iaas-api internet monitor-router --zone is1b --id 123456789012 --start 2026-10-14T00:00:00Z --end 2026-10-15T00:00:00Z\""
 }
 
@@ -781,7 +781,7 @@ func (c *DeleteSubnetCommand) Run(ctx *kong.Context) error {
 	return op.DeleteSubnetWithContext(context.Background(), request)
 }
 
-type ReadIPv6Command struct {
+type ReadIpv6Command struct {
 	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (ルータ＋スイッチ ID)。IPv6 が有効でない場合はエラーになります。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012}'。ID は実際の値に置き換えます。\""
 	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID      *int64  "name:\"id\" help:\"必須: ルータ＋スイッチの ID (数値)。\""
@@ -789,7 +789,7 @@ type ReadIPv6Command struct {
 	runtime Runtime
 }
 
-func (c *ReadIPv6Command) Run(ctx *kong.Context) error {
+func (c *ReadIpv6Command) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.ID != nil
@@ -848,7 +848,7 @@ func (c *ReadIPv6Command) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type EnableIPv6Command struct {
+type EnableIpv6Command struct {
 	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (ルータ＋スイッチ ID)。IPv6 の有効化は無償ですが、ルータ＋スイッチの利用料は別途必要です。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012}'。ID は実際の値に置き換えます。\""
 	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID      *int64  "name:\"id\" help:\"必須: ルータ＋スイッチの ID (数値)。\""
@@ -856,7 +856,7 @@ type EnableIPv6Command struct {
 	runtime Runtime
 }
 
-func (c *EnableIPv6Command) Run(ctx *kong.Context) error {
+func (c *EnableIpv6Command) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.ID != nil
@@ -915,7 +915,7 @@ func (c *EnableIPv6Command) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type DisableIPv6Command struct {
+type DisableIpv6Command struct {
 	Request *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (ルータ＋スイッチ ID)。割り当て済み IPv6 アドレスブロックを削除します。同じブロックを再度割り当てられるとは限らないため、無効化前に内容を確認してください。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012}'。ID は実際の値に置き換えます。\""
 	Zone    *string "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID      *int64  "name:\"id\" help:\"必須: ルータ＋スイッチの ID (数値)。\""
@@ -923,7 +923,7 @@ type DisableIPv6Command struct {
 	runtime Runtime
 }
 
-func (c *DisableIPv6Command) Run(ctx *kong.Context) error {
+func (c *DisableIpv6Command) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.ID != nil

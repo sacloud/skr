@@ -1,24 +1,19 @@
 {
   "package": "eventbusapi",
   "resource": "EventBus process configuration",
-  "command_type": "ProcessConfigurationCommands",
-  "api_type": "ProcessConfigurationAPI",
-  "factory_type": "ProcessConfigurationAPIFactory",
-  "runtime_type": "ProcessConfigurationRuntime",
+  "command_prefix": "ProcessConfiguration",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "ProcessConfigurationListCommand",
       "help": "実行設定を一覧表示します。例: skr eventbus-api process-configuration list",
       "method": "List",
       "response_type": "[]v1.CommonServiceItem"
     },
     {
       "name": "Read",
-      "command_type": "ProcessConfigurationReadCommand",
       "help": "ID を指定して実行設定を読み取ります。ID は list の出力で確認できます。",
       "method": "Read",
       "response_type": "*v1.CommonServiceItem",
@@ -33,7 +28,6 @@
     },
     {
       "name": "Create",
-      "command_type": "ProcessConfigurationCreateCommand",
       "help": "実行設定を作成します。実行先サービス（simplenotification、simplemq、autoscale）は先に作成してください。例: skr eventbus-api process-configuration create --request='{\"CommonServiceItem\":{\"Name\":\"notify\",\"Settings\":{\"Destination\":\"simplenotification\",\"Parameters\":\"{\\\"group_id\\\":\\\"GROUP-ID\\\",\\\"message\\\":\\\"hello\\\"}\"}}}'",
       "method": "Create",
       "request_type": "v1.CreateCommonServiceItemRequest",
@@ -44,7 +38,6 @@
     },
     {
       "name": "Update",
-      "command_type": "ProcessConfigurationUpdateCommand",
       "help": "実行設定を部分更新します。未指定の項目は変更されません。Settings を指定する場合は Destination と Parameters を含む設定全体を指定してください。",
       "method": "Update",
       "request_type": "v1.UpdateCommonServiceItemRequest",
@@ -62,7 +55,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "ProcessConfigurationDeleteCommand",
       "help": "ID を指定して実行設定を削除します。削除前に対象 ID を確認してください。",
       "method": "Delete",
       "arguments": [
@@ -76,7 +68,6 @@
     },
     {
       "name": "UpdateSecret",
-      "command_type": "ProcessConfigurationUpdateSecretCommand",
       "help": "実行設定が実行先サービスを呼び出すためのシークレットを登録します。シークレットは --secret-file でファイルまたは標準入力から読み込み、コマンドラインには記述しないでください。SimpleMQ の例: {\"APIKey\":\"SIMPLEMQ-API-KEY\"}",
       "method": "UpdateSecret",
       "request_type": "v1.SetSecretRequest",

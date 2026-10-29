@@ -1,10 +1,7 @@
 {
   "package": "iamapi",
   "resource": "IAM organization",
-  "command_type": "OrganizationCommands",
-  "api_type": "OrganizationAPI",
-  "factory_type": "OrganizationAPIFactory",
-  "runtime_type": "OrganizationRuntime",
+  "command_prefix": "Organization",
   "imports": {
     "organization": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/organization",
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
@@ -12,14 +9,12 @@
   "operations": [
     {
       "name": "Read",
-      "command_type": "OrganizationReadCommand",
       "help": "IAM 組織の情報を参照します。",
       "method": "Read",
       "response_type": "*v1.Organization"
     },
     {
       "name": "Update",
-      "command_type": "OrganizationUpdateCommand",
       "help": "IAM 組織名を更新します。",
       "method": "Update",
       "response_type": "*v1.Organization",
@@ -27,7 +22,6 @@
     },
     {
       "name": "ReadServicePolicy",
-      "command_type": "OrganizationReadServicePolicyCommand",
       "help": "組織のサービス利用ポリシーを参照します。",
       "method": "ReadServicePolicy",
       "request_type": "organization.GetServicePolicyParams",
@@ -45,7 +39,6 @@
     },
     {
       "name": "UpdateServicePolicy",
-      "command_type": "OrganizationUpdateServicePolicyCommand",
       "help": "組織のサービス利用ポリシー全体を更新します。設定はサービス操作に影響するため、変更前に read-service-policy で現在の設定を確認してください。",
       "method": "UpdateServicePolicy",
       "request_type": "[]v1.Rule",

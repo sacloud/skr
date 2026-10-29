@@ -1,17 +1,13 @@
 {
   "package": "apprunapi",
   "resource": "AppRun application",
-  "command_type": "ApplicationCommands",
-  "api_type": "ApplicationAPI",
-  "factory_type": "ApplicationAPIFactory",
-  "runtime_type": "ApplicationRuntime",
+  "command_prefix": "Application",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "ApplicationListCommand",
       "help": "アプリケーション一覧を取得します。ページングと並び順はフラグで指定できます。",
       "method": "List",
       "request_type": "v1.ListApplicationsParams",
@@ -52,7 +48,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ApplicationReadCommand",
       "help": "アプリケーションの設定と公開 URL を取得します。",
       "method": "Read",
       "response_type": "*v1.HandlerReadApplication",
@@ -67,7 +62,6 @@
     },
     {
       "name": "Create",
-      "command_type": "ApplicationCreateCommand",
       "help": "コンテナイメージからアプリケーションを作成します。コンテナイメージの設定にはコンポーネント名、CPU、メモリ、レジストリ設定が必要です。認証情報を含む可能性があるためリクエストは保護したファイルまたは標準入力から読み込みます。例: skr apprun-api application create --request @application.json",
       "method": "Create",
       "request_type": "v1.CreateApplicationBody",
@@ -77,7 +71,6 @@
     },
     {
       "name": "Update",
-      "command_type": "ApplicationUpdateCommand",
       "help": "アプリケーションを部分更新します。リソース構成の変更により新しいバージョンが作成されます。認証情報を含む JSON は保護したファイルまたは標準入力から渡してください。",
       "method": "Update",
       "request_type": "v1.PatchApplicationBody",
@@ -95,7 +88,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "ApplicationDeleteCommand",
       "help": "アプリケーションを削除します。削除前に対象 ID を確認してください。",
       "method": "Delete",
       "arguments": [
@@ -109,7 +101,6 @@
     },
     {
       "name": "Status",
-      "command_type": "ApplicationStatusCommand",
       "help": "アプリケーションのステータスを取得します。",
       "method": "ReadStatus",
       "response_type": "*v1.HandlerReadApplicationOnlyStatus",

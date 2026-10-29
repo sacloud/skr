@@ -30,13 +30,22 @@ import (
 	"text/template"
 )
 
+// Mode は生成器の種別を表します。生成型名の導出規則が IaaS と Ogen 系 API で異なります (ADR 0067)。
+type Mode int
+
+const (
+	// ModeIaaS は IaaS API 生成器のモードです。固定名 Commands / API / APIFactory / Runtime と、
+	// 操作ごとの <操作名>Command を導出します。command_prefix は設定できません。
+	ModeIaaS Mode = iota
+	// ModeOgen は Ogen 系 API 生成器のモードです。設定の command_prefix から
+	// <接頭辞>Commands などの型名と、操作ごとの <接頭辞><操作名>Command を導出します。
+	ModeOgen
+)
+
 type Config struct {
 	Package          string            `json:"package"`
 	Resource         string            `json:"resource"`
-	CommandType      string            `json:"command_type"`
-	APIType          string            `json:"api_type"`
-	FactoryType      string            `json:"factory_type"`
-	RuntimeType      string            `json:"runtime_type"`
+	CommandPrefix    string            `json:"command_prefix,omitempty"`
 	Imports          map[string]string `json:"imports"`
 	FactoryArguments []Argument        `json:"factory_arguments,omitempty"`
 	Operations       []Operation       `json:"operations"`
@@ -45,7 +54,6 @@ type Config struct {
 type Operation struct {
 	Name             string         `json:"name"`
 	CommandName      string         `json:"command_name,omitempty"`
-	CommandType      string         `json:"command_type"`
 	Help             string         `json:"help"`
 	Method           string         `json:"method"`
 	RequestType      string         `json:"request_type,omitempty"`
@@ -95,8 +103,62 @@ type importSpec struct {
 	Path  string
 }
 
-type templateConfig struct {
+// resolvedOperation は操作ごとのコマンド型名を導出した結果を表します。
+type resolvedOperation struct {
+	Operation
+	CommandType string
+}
+
+// resolvedConfig は生成型名を導出した設定を表します。テンプレートは導出後の型名を参照します。
+type resolvedConfig struct {
 	Config
+	CommandsType string
+	APIType      string
+	FactoryType  string
+	RuntimeType  string
+	Operations   []resolvedOperation
+}
+
+// typeNames は mode に応じてトップレベルの生成型名を導出します。
+// IaaS は固定名、Ogen 系は設定の command_prefix から導出します。
+func (c Config) typeNames(mode Mode) (commands, api, factory, runtime string) {
+	if mode == ModeIaaS {
+		return "Commands", "API", "APIFactory", "Runtime"
+	}
+	return c.CommandPrefix + "Commands", c.CommandPrefix + "API", c.CommandPrefix + "APIFactory", c.CommandPrefix + "Runtime"
+}
+
+// commandTypeName は mode に応じて操作ごとのコマンド型名を導出します。
+// IaaS は <操作名>Command、Ogen 系は <接頭辞><操作名>Command です。
+func (c Config) commandTypeName(mode Mode, operationName string) string {
+	if mode == ModeIaaS {
+		return operationName + "Command"
+	}
+	return c.CommandPrefix + operationName + "Command"
+}
+
+// resolve は mode に応じて生成型名を導出します。呼び出し前に Validate を行うこと。
+func (c Config) resolve(mode Mode) resolvedConfig {
+	commandsType, apiType, factoryType, runtimeType := c.typeNames(mode)
+	operations := make([]resolvedOperation, 0, len(c.Operations))
+	for _, operation := range c.Operations {
+		operations = append(operations, resolvedOperation{
+			Operation:   operation,
+			CommandType: c.commandTypeName(mode, operation.Name),
+		})
+	}
+	return resolvedConfig{
+		Config:       c,
+		CommandsType: commandsType,
+		APIType:      apiType,
+		FactoryType:  factoryType,
+		RuntimeType:  runtimeType,
+		Operations:   operations,
+	}
+}
+
+type templateConfig struct {
+	resolvedConfig
 	Imports                []importSpec
 	FactoryParams          string
 	HasGeneratedOperations bool
@@ -123,7 +185,7 @@ import (
 {{- end }}
 )
 
-type {{.CommandType}} struct {
+type {{.CommandsType}} struct {
 {{- range .Operations }}
 	{{.Name}} {{.CommandType}} {{commandTag .CommandName .Help}}
 {{- end }}
@@ -148,8 +210,8 @@ type {{.RuntimeType}} struct {
 {{- end }}
 }
 
-func New{{.CommandType}}(runtime {{.RuntimeType}}, factory {{.FactoryType}}) {{.CommandType}} {
-	var commands {{.CommandType}}
+func New{{.CommandsType}}(runtime {{.RuntimeType}}, factory {{.FactoryType}}) {{.CommandsType}} {
+	var commands {{.CommandsType}}
 {{- range .Operations }}
 	commands.{{.Name}}.runtime = runtime
 	commands.{{.Name}}.factory = factory
@@ -302,7 +364,7 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 {{- end }}
 {{end}}`
 
-func DecodeConfig(data []byte) (Config, error) {
+func DecodeConfig(data []byte, mode Mode) (Config, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var config Config
@@ -315,23 +377,32 @@ func DecodeConfig(data []byte) (Config, error) {
 		}
 		return Config{}, fmt.Errorf("decode generator config: trailing data: %w", err)
 	}
-	if err := config.Validate(); err != nil {
+	if err := config.Validate(mode); err != nil {
 		return Config{}, err
 	}
 	return config, nil
 }
 
-func (c Config) Validate() error {
+func (c Config) Validate(mode Mode) error {
 	if !token.IsIdentifier(c.Package) || token.Lookup(c.Package).IsKeyword() {
 		return fmt.Errorf("package must be a valid Go identifier")
 	}
-	for label, name := range map[string]string{
-		"command_type": c.CommandType, "api_type": c.APIType,
-		"factory_type": c.FactoryType, "runtime_type": c.RuntimeType,
-	} {
-		if !token.IsIdentifier(name) || token.Lookup(name).IsKeyword() {
-			return fmt.Errorf("%s must be a valid Go identifier", label)
+	// 接頭辞は mode に応じて扱いが変わります。IaaS は固定名のため設定できず、
+	// Ogen 系はドメイン package 内の識別子として必須です。
+	switch mode {
+	case ModeIaaS:
+		if c.CommandPrefix != "" {
+			return fmt.Errorf("command_prefix is not supported for IaaS API generator configs")
 		}
+	case ModeOgen:
+		if c.CommandPrefix == "" {
+			return fmt.Errorf("command_prefix is required for Ogen API generator configs")
+		}
+		if !token.IsIdentifier(c.CommandPrefix) || !token.IsExported(c.CommandPrefix) {
+			return fmt.Errorf("command_prefix must be an exported Go identifier")
+		}
+	default:
+		return fmt.Errorf("unknown generator mode: %d", int(mode))
 	}
 	if strings.TrimSpace(c.Resource) == "" {
 		return fmt.Errorf("resource must not be empty")
@@ -385,8 +456,9 @@ func (c Config) Validate() error {
 	methods := make(map[string]bool, len(c.Operations))
 	commandNames := make(map[string]bool, len(c.Operations))
 	commandNamesSet := 0
+	commandsType, apiType, factoryType, runtimeType := c.typeNames(mode)
 	commandTypes := make(map[string]bool)
-	for _, name := range []string{c.CommandType, c.APIType, c.FactoryType, c.RuntimeType} {
+	for _, name := range []string{commandsType, apiType, factoryType, runtimeType} {
 		if commandTypes[name] {
 			return fmt.Errorf("duplicate generated type name %q", name)
 		}
@@ -411,14 +483,12 @@ func (c Config) Validate() error {
 			commandNames[operation.CommandName] = true
 			commandNamesSet++
 		}
-		if !token.IsIdentifier(operation.CommandType) || token.Lookup(operation.CommandType).IsKeyword() {
-			return fmt.Errorf("operation %q command_type must be a valid Go identifier", operation.Name)
-		}
+		operationType := c.commandTypeName(mode, operation.Name)
 		if operations[operation.Name] {
 			return fmt.Errorf("duplicate operation name %q", operation.Name)
 		}
-		if commandTypes[operation.CommandType] {
-			return fmt.Errorf("duplicate generated type name %q", operation.CommandType)
+		if commandTypes[operationType] {
+			return fmt.Errorf("duplicate generated type name %q", operationType)
 		}
 		if !token.IsIdentifier(operation.Method) || token.Lookup(operation.Method).IsKeyword() {
 			return fmt.Errorf("operation %q method must be a valid Go identifier", operation.Name)
@@ -582,13 +652,16 @@ func (c Config) Validate() error {
 		}
 		operations[operation.Name] = true
 		methods[operation.Method] = true
-		commandTypes[operation.CommandType] = true
+		commandTypes[operationType] = true
 	}
 	if commandNamesSet != 0 && commandNamesSet != len(c.Operations) {
 		return fmt.Errorf("command_name must be specified for every operation or none")
 	}
-	if aliases["zones"] && commandTypes["zones"] {
-		return fmt.Errorf("generated type %q conflicts with an import alias", "zones")
+	// 導出された生成型名全体がインポートエイリアスと衝突しないことを検証します
+	for name := range commandTypes {
+		if aliases[name] {
+			return fmt.Errorf("generated type %q conflicts with an import alias", name)
+		}
 	}
 	for name := range requestValidators {
 		if commandTypes[name] {
@@ -598,7 +671,7 @@ func (c Config) Validate() error {
 			return fmt.Errorf("request_validator %q conflicts with a generated Runtime field", name)
 		}
 	}
-	constructorName := "New" + c.CommandType
+	constructorName := "New" + commandsType
 	if commandTypes[constructorName] {
 		return fmt.Errorf("generated constructor %q conflicts with a generated type name", constructorName)
 	}
@@ -633,10 +706,11 @@ func isKebabName(value string) bool {
 	return true
 }
 
-func Generate(config Config) ([]byte, error) {
-	if err := config.Validate(); err != nil {
+func Generate(config Config, mode Mode) ([]byte, error) {
+	if err := config.Validate(mode); err != nil {
 		return nil, err
 	}
+	resolved := config.resolve(mode)
 	imports := make([]importSpec, 0, len(config.Imports))
 	for alias, path := range config.Imports {
 		imports = append(imports, importSpec{Alias: alias, Path: path})
@@ -704,7 +778,7 @@ func Generate(config Config) ([]byte, error) {
 	}
 	var source bytes.Buffer
 	if err := tmpl.Execute(&source, templateConfig{
-		Config:                 config,
+		resolvedConfig:         resolved,
 		Imports:                imports,
 		FactoryParams:          strings.Join(factoryParams, ", "),
 		HasGeneratedOperations: hasGeneratedOperations,
@@ -719,16 +793,16 @@ func Generate(config Config) ([]byte, error) {
 	return formatted, nil
 }
 
-func GenerateFile(configPath, outputPath string) error {
+func GenerateFile(configPath, outputPath string, mode Mode) error {
 	data, err := os.ReadFile(configPath) // #nosec G304 -- The config path is explicitly provided by the local CLI user.
 	if err != nil {
 		return fmt.Errorf("read config %q: %w", configPath, err)
 	}
-	config, err := DecodeConfig(data)
+	config, err := DecodeConfig(data, mode)
 	if err != nil {
 		return err
 	}
-	source, err := Generate(config)
+	source, err := Generate(config, mode)
 	if err != nil {
 		return err
 	}

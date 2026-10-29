@@ -36,9 +36,9 @@ import (
 func TestServerGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-server.json"))
 	require.NoError(t, err)
-	config, err := apigen.DecodeConfig(configData)
+	config, err := apigen.DecodeConfig(configData, apigen.ModeIaaS)
 	require.NoError(t, err)
-	want, err := apigen.Generate(config)
+	want, err := apigen.Generate(config, apigen.ModeIaaS)
 	require.NoError(t, err)
 	got, err := os.ReadFile(repositoryPath("internal/iaas/serverapi/server_api_generated.go"))
 	require.NoError(t, err)

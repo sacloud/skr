@@ -12,13 +12,13 @@ import (
 	v1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 )
 
-type SCIMCommands struct {
-	List            SCIMListCommand            "cmd:\"\" help:\"ユーザープロビジョニング設定を一覧表示します。\""
-	Create          SCIMCreateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を作成します。\""
-	Read            SCIMReadCommand            "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を読み取ります。\""
-	Update          SCIMUpdateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を更新します。更新後の設定名を --name または --request JSON の name に指定してください。\""
-	Delete          SCIMDeleteCommand          "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を削除します。プロビジョニングされたユーザーとグループをすべて削除してから実行してください。\""
-	RegenerateToken SCIMRegenerateTokenCommand "cmd:\"\" help:\"ユーザープロビジョニング設定の秘密トークンを再発行します。再発行後は古いトークンが使えなくなるため、連携先を更新できる場合にのみ実行してください。\""
+type ScimCommands struct {
+	List            ScimListCommand            "cmd:\"\" help:\"ユーザープロビジョニング設定を一覧表示します。\""
+	Create          ScimCreateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を作成します。\""
+	Read            ScimReadCommand            "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を読み取ります。\""
+	Update          ScimUpdateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を更新します。更新後の設定名を --name または --request JSON の name に指定してください。\""
+	Delete          ScimDeleteCommand          "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を削除します。プロビジョニングされたユーザーとグループをすべて削除してから実行してください。\""
+	RegenerateToken ScimRegenerateTokenCommand "cmd:\"\" help:\"ユーザープロビジョニング設定の秘密トークンを再発行します。再発行後は古いトークンが使えなくなるため、連携先を更新できる場合にのみ実行してください。\""
 }
 
 type ScimAPI interface {
@@ -38,8 +38,8 @@ type ScimRuntime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-func NewSCIMCommands(runtime ScimRuntime, factory ScimAPIFactory) SCIMCommands {
-	var commands SCIMCommands
+func NewScimCommands(runtime ScimRuntime, factory ScimAPIFactory) ScimCommands {
+	var commands ScimCommands
 	commands.List.runtime = runtime
 	commands.List.factory = factory
 	commands.Create.runtime = runtime
@@ -55,7 +55,7 @@ func NewSCIMCommands(runtime ScimRuntime, factory ScimAPIFactory) SCIMCommands {
 	return commands
 }
 
-type SCIMListCommand struct {
+type ScimListCommand struct {
 	Request *string "help:\"ユーザープロビジョニング設定一覧のページング条件を含む JSON。直接指定するか @path.json で読み込みます。\""
 	Page    *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
@@ -63,7 +63,7 @@ type SCIMListCommand struct {
 	runtime ScimRuntime
 }
 
-func (c *SCIMListCommand) Run(ctx *kong.Context) error {
+func (c *ScimListCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Page != nil
 	flagsSet = flagsSet || c.PerPage != nil
@@ -111,14 +111,14 @@ func (c *SCIMListCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type SCIMCreateCommand struct {
+type ScimCreateCommand struct {
 	Request *string "help:\"ユーザープロビジョニング設定の JSON。name を指定し、直接または @path.json で読み込みます。\""
 	Name    *string "name:\"name\" help:\"必須: 設定名。\""
 	factory ScimAPIFactory
 	runtime ScimRuntime
 }
 
-func (c *SCIMCreateCommand) Run(ctx *kong.Context) error {
+func (c *ScimCreateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Name != nil
 	if c.Request != nil && flagsSet {
@@ -166,13 +166,13 @@ func (c *SCIMCreateCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type SCIMReadCommand struct {
+type ScimReadCommand struct {
 	ID      string "arg:\"\" name:\"id\" help:\"読み取る設定 ID。\""
 	factory ScimAPIFactory
 	runtime ScimRuntime
 }
 
-func (c *SCIMReadCommand) Run(ctx *kong.Context) error {
+func (c *ScimReadCommand) Run(ctx *kong.Context) error {
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
@@ -196,7 +196,7 @@ func (c *SCIMReadCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type SCIMUpdateCommand struct {
+type ScimUpdateCommand struct {
 	ID      string  "arg:\"\" name:\"id\" help:\"更新する設定 ID。\""
 	Request *string "help:\"更新後の設定名を含む JSON。name は必須です。直接指定するか @path.json で読み込みます。--request と --name は併用できません。\""
 	Name    *string "name:\"name\" help:\"必須: 更新後の設定名。\""
@@ -204,7 +204,7 @@ type SCIMUpdateCommand struct {
 	runtime ScimRuntime
 }
 
-func (c *SCIMUpdateCommand) Run(ctx *kong.Context) error {
+func (c *ScimUpdateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
 	flagsSet = flagsSet || c.Name != nil
 	if c.Request != nil && flagsSet {
@@ -252,13 +252,13 @@ func (c *SCIMUpdateCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-type SCIMDeleteCommand struct {
+type ScimDeleteCommand struct {
 	ID      string "arg:\"\" name:\"id\" help:\"削除する設定 ID。\""
 	factory ScimAPIFactory
 	runtime ScimRuntime
 }
 
-func (c *SCIMDeleteCommand) Run(ctx *kong.Context) error {
+func (c *ScimDeleteCommand) Run(ctx *kong.Context) error {
 	if c.factory == nil {
 		return fmt.Errorf("API クライアントが設定されていません")
 	}
@@ -269,13 +269,13 @@ func (c *SCIMDeleteCommand) Run(ctx *kong.Context) error {
 	return op.Delete(context.Background(), c.ID)
 }
 
-type SCIMRegenerateTokenCommand struct {
+type ScimRegenerateTokenCommand struct {
 	ID      string "arg:\"\" name:\"id\" help:\"トークンを再発行する設定 ID。\""
 	factory ScimAPIFactory
 	runtime ScimRuntime
 }
 
-func (c *SCIMRegenerateTokenCommand) Run(ctx *kong.Context) error {
+func (c *ScimRegenerateTokenCommand) Run(ctx *kong.Context) error {
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}

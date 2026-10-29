@@ -1,10 +1,7 @@
 {
   "package": "iamapi",
   "resource": "SCIM configuration",
-  "command_type": "SCIMCommands",
-  "api_type": "ScimAPI",
-  "factory_type": "ScimAPIFactory",
-  "runtime_type": "ScimRuntime",
+  "command_prefix": "Scim",
   "imports": {
     "scim": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/scim",
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
@@ -12,7 +9,6 @@
   "operations": [
     {
       "name": "List",
-      "command_type": "SCIMListCommand",
       "help": "ユーザープロビジョニング設定を一覧表示します。",
       "method": "List",
       "request_type": "scim.ListParams",
@@ -27,7 +23,6 @@
     },
     {
       "name": "Create",
-      "command_type": "SCIMCreateCommand",
       "help": "ユーザープロビジョニング設定を作成します。",
       "method": "Create",
       "request_type": "scim.CreateParams",
@@ -38,7 +33,6 @@
     },
     {
       "name": "Read",
-      "command_type": "SCIMReadCommand",
       "help": "ID を指定してユーザープロビジョニング設定を読み取ります。",
       "method": "Read",
       "response_type": "*v1.ScimConfigurationBase",
@@ -46,7 +40,6 @@
     },
     {
       "name": "Update",
-      "command_type": "SCIMUpdateCommand",
       "help": "ユーザープロビジョニング設定を更新します。更新後の設定名を --name または --request JSON の name に指定してください。",
       "method": "Update",
       "request_type": "scim.UpdateParams",
@@ -58,14 +51,12 @@
     },
     {
       "name": "Delete",
-      "command_type": "SCIMDeleteCommand",
       "help": "ID を指定してユーザープロビジョニング設定を削除します。プロビジョニングされたユーザーとグループをすべて削除してから実行してください。",
       "method": "Delete",
       "arguments": [{"name":"id","field":"ID","type":"string","help":"削除する設定 ID。"}]
     },
     {
       "name": "RegenerateToken",
-      "command_type": "SCIMRegenerateTokenCommand",
       "help": "ユーザープロビジョニング設定の秘密トークンを再発行します。再発行後は古いトークンが使えなくなるため、連携先を更新できる場合にのみ実行してください。",
       "method": "RegenerateToken",
       "response_type": "*v1.RegenerateScimConfigurationTokenOK",

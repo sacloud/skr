@@ -1,15 +1,10 @@
 {
   "package": "licenseinfoapi",
   "resource": "IaaS LicenseInfo",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {},
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "ライセンス情報を検索します。API 応答の Total、From、Count、LicenseInfo を含む JSON を出力します。名称や利用条件を確認できます。",
       "method": "FindWithContext",
       "request_type": "FindRequest",

@@ -1,24 +1,19 @@
 {
   "package": "simplenotificationapi",
   "resource": "Simple Notification group",
-  "command_type": "GroupCommands",
-  "api_type": "GroupAPI",
-  "factory_type": "GroupAPIFactory",
-  "runtime_type": "GroupRuntime",
+  "command_prefix": "Group",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "GroupListCommand",
       "help": "通知先グループを一覧表示します。",
       "method": "List",
       "response_type": "*v1.ListCommonServiceItemsResponse"
     },
     {
       "name": "Read",
-      "command_type": "GroupReadCommand",
       "help": "通知先グループの詳細を読み取ります。",
       "method": "Read",
       "arguments": [
@@ -33,7 +28,6 @@
     },
     {
       "name": "Create",
-      "command_type": "GroupCreateCommand",
       "help": "通知先グループを作成します。Settings.Destinations に通知先 ID を指定します。",
       "method": "Create",
       "request_type": "v1.PostCommonServiceItemRequest",
@@ -44,7 +38,6 @@
     },
     {
       "name": "Update",
-      "command_type": "GroupUpdateCommand",
       "help": "通知先グループの名前、説明、タグ、Settings を更新します。",
       "method": "Update",
       "request_type": "v1.PutCommonServiceItemRequest",
@@ -62,7 +55,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "GroupDeleteCommand",
       "help": "通知先グループを削除します。",
       "method": "Delete",
       "arguments": [
@@ -76,7 +68,6 @@
     },
     {
       "name": "SendMessage",
-      "command_type": "GroupSendMessageCommand",
       "help": "通知先グループにメッセージを送信します。応答は受付結果であり、通知先への到達を保証しません。",
       "method": "SendMessage",
       "request_type": "v1.SendNotificationMessageRequest",

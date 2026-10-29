@@ -1,17 +1,13 @@
 {
   "package": "apprunapi",
   "resource": "AppRun traffic",
-  "command_type": "TrafficCommands",
-  "api_type": "TrafficAPI",
-  "factory_type": "TrafficAPIFactory",
-  "runtime_type": "TrafficRuntime",
+  "command_prefix": "Traffic",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "TrafficListCommand",
       "help": "アプリケーションのトラフィック分散設定を取得します。",
       "method": "List",
       "response_type": "*v1.HandlerListTraffic",
@@ -26,7 +22,6 @@
     },
     {
       "name": "Update",
-      "command_type": "TrafficUpdateCommand",
       "help": "最大4バージョンへのトラフィック分散割合を更新します。最新バージョンを対象にする場合は is_latest_version を指定します。",
       "method": "Update",
       "request_type": "v1.UpdateTrafficBody",

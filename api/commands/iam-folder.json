@@ -1,10 +1,7 @@
 {
   "package": "iamapi",
   "resource": "IAM folder",
-  "command_type": "FolderCommands",
-  "api_type": "FolderAPI",
-  "factory_type": "FolderAPIFactory",
-  "runtime_type": "FolderRuntime",
+  "command_prefix": "Folder",
   "imports": {
     "folder": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/folder",
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
@@ -12,7 +9,6 @@
   "operations": [
     {
       "name": "List",
-      "command_type": "FolderListCommand",
       "help": "IAM フォルダを一覧表示します。ページングや絞り込みには --request または対応する個別フラグを指定します。",
       "method": "List",
       "request_type": "folder.ListParams",
@@ -29,7 +25,6 @@
     },
     {
       "name": "Create",
-      "command_type": "FolderCreateCommand",
       "help": "IAM フォルダを作成します。親フォルダを指定する場合は --parent-id を指定してください。",
       "method": "Create",
       "request_type": "folder.CreateParams",
@@ -44,7 +39,6 @@
     },
     {
       "name": "Read",
-      "command_type": "FolderReadCommand",
       "help": "ID を指定して IAM フォルダを読み取ります。",
       "method": "Read",
       "response_type": "*v1.Folder",
@@ -52,7 +46,6 @@
     },
     {
       "name": "Update",
-      "command_type": "FolderUpdateCommand",
       "help": "IAM フォルダの名前と説明を更新します。説明を変更しない場合は --description を省略します。",
       "method": "Update",
       "response_type": "*v1.Folder",
@@ -64,7 +57,6 @@
     },
     {
       "name": "Move",
-      "command_type": "FolderMoveCommand",
       "help": "指定したフォルダを親フォルダへ移動します。移動先が有効な階層になることを確認してください。",
       "method": "Move",
       "arguments": [
@@ -74,7 +66,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "FolderDeleteCommand",
       "help": "ID を指定して IAM フォルダを削除します。",
       "method": "Delete",
       "arguments": [{"name":"id","field":"ID","type":"int","help":"削除するフォルダ ID。"}]

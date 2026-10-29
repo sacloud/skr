@@ -31,7 +31,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "both -config and -out are required")
 		os.Exit(2)
 	}
-	if err := apigen.GenerateFile(*configPath, *outputPath); err != nil {
+	if err := apigen.GenerateFile(*configPath, *outputPath, apigen.ModeIaaS); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

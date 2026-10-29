@@ -1,10 +1,6 @@
 {
   "package": "serverplanapi",
   "resource": "IaaS ServerPlan",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
@@ -12,7 +8,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "指定したゾーンのサーバプランを検索します。API 応答の Total、From、Count、ServerPlans を含む JSON を出力します。CPU、メモリ、GPU、CPUコミットメント、世代、利用可否を確認できます。例: skr iaas-api product server find --zone is1b",
       "method": "FindWithContext",
       "request_type": "FindRequest",
@@ -43,7 +38,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "指定したゾーンと ID のサーバプランを参照します。例: skr iaas-api product server read --zone ZONE --id SERVER-PLAN-ID",
       "method": "ReadWithContext",
       "request_type": "ReadRequest",

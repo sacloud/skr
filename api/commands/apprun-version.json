@@ -1,17 +1,13 @@
 {
   "package": "apprunapi",
   "resource": "AppRun application version",
-  "command_type": "VersionCommands",
-  "api_type": "VersionAPI",
-  "factory_type": "VersionAPIFactory",
-  "runtime_type": "VersionRuntime",
+  "command_prefix": "Version",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "VersionListCommand",
       "help": "アプリケーションのバージョン一覧を取得します。",
       "method": "List",
       "request_type": "v1.ListApplicationVersionsParams",
@@ -62,7 +58,6 @@
     },
     {
       "name": "Read",
-      "command_type": "VersionReadCommand",
       "help": "アプリケーションのバージョン詳細を取得します。",
       "method": "Read",
       "response_type": "*v1.HandlerReadVersion",
@@ -87,7 +82,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "VersionDeleteCommand",
       "help": "アプリケーションのバージョンを削除します。最新バージョン、トラフィックの宛先に指定したバージョン、最後の1件は削除できません。",
       "method": "Delete",
       "arguments": [
@@ -111,7 +105,6 @@
     },
     {
       "name": "Status",
-      "command_type": "VersionStatusCommand",
       "help": "アプリケーションのバージョンステータスを取得します。",
       "method": "ReadStatus",
       "response_type": "*v1.HandlerReadApplicationVersionOnlyStatus",

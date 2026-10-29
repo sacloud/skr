@@ -1,24 +1,19 @@
 {
   "package": "eventbusapi",
   "resource": "EventBus trigger",
-  "command_type": "TriggerCommands",
-  "api_type": "TriggerAPI",
-  "factory_type": "TriggerAPIFactory",
-  "runtime_type": "TriggerRuntime",
+  "command_prefix": "Trigger",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "TriggerListCommand",
       "help": "トリガーを一覧表示します。",
       "method": "List",
       "response_type": "[]v1.CommonServiceItem"
     },
     {
       "name": "Read",
-      "command_type": "TriggerReadCommand",
       "help": "ID を指定してトリガーを読み取ります。",
       "method": "Read",
       "response_type": "*v1.CommonServiceItem",
@@ -33,7 +28,6 @@
     },
     {
       "name": "Create",
-      "command_type": "TriggerCreateCommand",
       "help": "イベントトリガーを作成します。Settings に Source、Types、ProcessConfigurationID を指定します。Source と Types の例示値は実際のイベントソースに置き換えてください。例: skr eventbus-api trigger create --request='{\"CommonServiceItem\":{\"Name\":\"on-change\",\"Settings\":{\"Source\":\"EVENT-SOURCE\",\"Types\":[\"EVENT-TYPE\"],\"ProcessConfigurationID\":\"PROCESS-CONFIGURATION-ID\"}}}'",
       "method": "Create",
       "request_type": "v1.CreateCommonServiceItemRequest",
@@ -44,7 +38,6 @@
     },
     {
       "name": "Update",
-      "command_type": "TriggerUpdateCommand",
       "help": "トリガーを部分更新します。未指定項目は変更されません。Settings を更新する場合は Source、Types、ProcessConfigurationID を含めます。",
       "method": "Update",
       "request_type": "v1.UpdateCommonServiceItemRequest",
@@ -62,7 +55,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "TriggerDeleteCommand",
       "help": "ID を指定してトリガーを削除します。削除前に対象 ID を確認してください。",
       "method": "Delete",
       "arguments": [

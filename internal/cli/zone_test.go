@@ -33,9 +33,9 @@ import (
 func TestZoneGeneratedCodeMatchesConfig(t *testing.T) {
 	configData, err := os.ReadFile(repositoryPath("api/commands/iaas-zone.json"))
 	require.NoError(t, err, "read zone config")
-	config, err := apigen.DecodeConfig(configData)
+	config, err := apigen.DecodeConfig(configData, apigen.ModeIaaS)
 	require.NoError(t, err, "decode zone config")
-	want, err := apigen.Generate(config)
+	want, err := apigen.Generate(config, apigen.ModeIaaS)
 	require.NoError(t, err, "generate zone commands")
 	got, err := os.ReadFile(repositoryPath("internal/iaas/zoneapi/zone_api_generated.go"))
 	require.NoError(t, err, "read generated zone commands")

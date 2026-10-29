@@ -1,17 +1,13 @@
 {
   "package": "iamapi",
   "resource": "ID role",
-  "command_type": "IDRoleCommands",
-  "api_type": "IDRoleAPI",
-  "factory_type": "IDRoleAPIFactory",
-  "runtime_type": "IDRoleRuntime",
+  "command_prefix": "IDRole",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "IDRoleListCommand",
       "help": "利用可能な ID ロールを一覧表示します。",
       "method": "List",
       "response_type": "*v1.ListIdRolesOK",
@@ -22,7 +18,6 @@
     },
     {
       "name": "Read",
-      "command_type": "IDRoleReadCommand",
       "help": "ID を指定して ID ロールを読み取ります。",
       "method": "Read",
       "response_type": "*v1.IdRole",

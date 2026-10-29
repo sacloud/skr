@@ -1,24 +1,19 @@
 {
   "package": "simplenotificationapi",
   "resource": "Simple Notification destination",
-  "command_type": "DestinationCommands",
-  "api_type": "DestinationAPI",
-  "factory_type": "DestinationAPIFactory",
-  "runtime_type": "DestinationRuntime",
+  "command_prefix": "Destination",
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
   },
   "operations": [
     {
       "name": "List",
-      "command_type": "DestinationListCommand",
       "help": "通知先を一覧表示します。",
       "method": "List",
       "response_type": "*v1.ListCommonServiceItemsResponse"
     },
     {
       "name": "Read",
-      "command_type": "DestinationReadCommand",
       "help": "通知先の詳細を読み取ります。",
       "method": "Read",
       "arguments": [
@@ -33,7 +28,6 @@
     },
     {
       "name": "Create",
-      "command_type": "DestinationCreateCommand",
       "help": "通知先を作成します。メールアドレスは確認が完了するまで送信先として利用できません。",
       "method": "Create",
       "request_type": "v1.PostCommonServiceItemRequest",
@@ -44,7 +38,6 @@
     },
     {
       "name": "Update",
-      "command_type": "DestinationUpdateCommand",
       "help": "通知先の名前、説明、タグ、Settings を更新します。通知先アドレスは変更できません。",
       "method": "Update",
       "request_type": "v1.PutCommonServiceItemRequest",
@@ -62,7 +55,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "DestinationDeleteCommand",
       "help": "通知先を削除します。グループから参照されている通知先は先にグループ設定から外してください。",
       "method": "Delete",
       "arguments": [
@@ -76,7 +68,6 @@
     },
     {
       "name": "ReadStatus",
-      "command_type": "DestinationReadStatusCommand",
       "help": "通知先の送信可否ステータスを取得します。",
       "method": "ReadStatus",
       "arguments": [

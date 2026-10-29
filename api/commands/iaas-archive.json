@@ -1,10 +1,6 @@
 {
   "package": "archiveapi",
   "resource": "IaaS Archive",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "archive": "github.com/sacloud/sacloud-sdk-go/service/iaas/archive",
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
@@ -13,7 +9,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "アーカイブを指定したゾーンで検索して出力します。API の ID、Name、Description、DiskPlanID、DiskPlanName、SizeMB、Tags を確認できます。OS 種別またはタグで絞り込めます。例: skr iaas-api archive find --zone is1b --os-type ubuntu2404",
       "method": "FindWithContext",
       "request_type": "archive.FindRequest",
@@ -59,7 +54,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "指定したゾーンと ID のアーカイブを読み取って出力します。API の DiskPlanID、DiskPlanName、SizeMB、Tags などを確認できます。例: skr iaas-api archive read --zone ZONE --id 123456789012",
       "method": "ReadWithContext",
       "request_type": "archive.ReadRequest",

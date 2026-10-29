@@ -1,10 +1,6 @@
 {
   "package": "iconapi",
   "resource": "IaaS Icon",
-  "command_type": "Commands",
-  "api_type": "API",
-  "factory_type": "APIFactory",
-  "runtime_type": "Runtime",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "icon": "github.com/sacloud/sacloud-sdk-go/service/iaas/icon",
@@ -13,7 +9,6 @@
   "operations": [
     {
       "name": "Find",
-      "command_type": "FindCommand",
       "help": "アイコンを検索して出力します。Names、Tags、Scope、Sort は --request JSON で指定できます。条件を省略すると一覧を取得します。例: skr iaas-api icon find --request @icon-find.json",
       "method": "FindWithContext",
       "request_type": "icon.FindRequest",
@@ -23,7 +18,6 @@
     },
     {
       "name": "Read",
-      "command_type": "ReadCommand",
       "help": "ID を指定してアイコンを読み取って出力します。例: skr iaas-api icon read --id 123456789012",
       "method": "ReadWithContext",
       "request_type": "icon.ReadRequest",
@@ -42,7 +36,6 @@
     },
     {
       "name": "Create",
-      "command_type": "CreateCommand",
       "help": "画像ファイルからアイコンを作成して出力します。例: skr iaas-api icon create --name example --image-file ./icon.png",
       "method": "CreateWithContext",
       "request_type": "icon.CreateRequest",
@@ -52,7 +45,6 @@
     },
     {
       "name": "Update",
-      "command_type": "UpdateCommand",
       "help": "アイコンの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api icon update --id 123456789012 --name updated",
       "method": "UpdateWithContext",
       "request_type": "icon.UpdateRequest",
@@ -62,7 +54,6 @@
     },
     {
       "name": "Delete",
-      "command_type": "DeleteCommand",
       "help": "アイコンを削除します。成功時は出力しません。例: skr iaas-api icon delete --id 123456789012",
       "method": "DeleteWithContext",
       "request_type": "icon.DeleteRequest",
