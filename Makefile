@@ -66,6 +66,8 @@ generate-wiring:
 		$(patsubst %,api/commands/%,$(filter simplemq-%,$(notdir $(wildcard api/commands/*.json))))
 	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/simple_notification_wiring_generated.go \
 		$(patsubst %,api/commands/%,$(filter simple-notification-%,$(notdir $(wildcard api/commands/*.json))))
+	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/apprun_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter apprun-%,$(notdir $(wildcard api/commands/*.json))))
 
 .PHONY: docs-site
 docs-site:

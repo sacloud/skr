@@ -37,5 +37,7 @@
       ]
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "AppRunAPI.Traffic",
+  "sdk_factory": "apprunapi.NewTrafficAPI",
+  "decoder": "apprunapi.DecodeRequest"
 }

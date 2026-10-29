@@ -19,5 +19,7 @@
       "response_type": "*v1.HandlerCreateUser"
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "AppRunAPI.User",
+  "sdk_factory": "apprunapi.NewUserAPI",
+  "decoder": "apprunapi.DecodeRequest"
 }

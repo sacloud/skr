@@ -37,5 +37,7 @@
       ]
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "AppRunAPI.PacketFilter",
+  "sdk_factory": "apprunapi.NewPacketFilterAPI",
+  "decoder": "apprunapi.DecodeRequest"
 }

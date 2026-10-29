@@ -18,6 +18,7 @@ internal/cli の init 関数群 (約 309 行) は、IaaS 15 リソースと各 O
 - ドメイン固有の decoder が必要な場合は設定で参照先を明示します (例: `decoder`)。既定は共有の入力処理です。
 - `factory_arguments` を使うクライアント生成 (SimpleMQ メッセージ API) は手書き init に残し、設定で配線対象から外せるようにします (例: `wiring: "handwritten"`)。手書き init と生成配線は internal/cli に共存します。
 - simple-notification の集約 (`NewCommands(runtime, trace func() bool)`) は標準形 (リソースごとの constructor と named decoder) に再設計して配線対象に含めます。通知先のエラー保護 adapter は constructor の中に隠蔽します。
+- apprun の Factories 構造体集約 (`NewCommands(runtime, factories)`) も標準形 (リソースごとの constructor) に置き換えて配線対象に含めます。ドメインには既にリソースごとの constructor (`NewApplicationAPI` など) があるため、設定は標準の配線フィールドだけで足ります。
 - 配線コードはドメインごとに 1 ファイルにまとめます (例: `internal/cli/iaas_wiring_generated.go`)。生成器は 1 回の実行で複数の設定を処理し、具体的な Makefile の呼び出し形は設計ドキュメントに記録します。
 - ルート構造体、フラグ定義、`run()` からの init 呼び出しは手書きのままにします。生成配線は cli struct のフィールドへの代入のみを行います。
 - テスト注入 (`set*Factory`) は維持します。生成配線と同じ package にあるテストが、生成配線が設定した Commands を差し替えられます。
