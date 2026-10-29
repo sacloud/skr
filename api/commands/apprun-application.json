@@ -114,5 +114,7 @@
       ]
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "AppRunAPI.Application",
+  "sdk_factory": "apprunapi.NewApplicationAPI",
+  "decoder": "apprunapi.DecodeRequest"
 }

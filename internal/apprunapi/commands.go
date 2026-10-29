@@ -14,46 +14,10 @@
 
 package apprunapi
 
-import "github.com/alecthomas/kong"
-
 type Commands struct {
 	Application  ApplicationCommands  `cmd:"" help:"AppRun アプリケーションを管理します。"`
 	Version      VersionCommands      `cmd:"" help:"アプリケーションのバージョンを確認・削除します。"`
 	PacketFilter PacketFilterCommands `cmd:"" name:"packet-filter" help:"アプリケーションのパケットフィルターを確認・変更します。"`
 	Traffic      TrafficCommands      `cmd:"" help:"アプリケーションのバージョン間でトラフィックを分散します。"`
 	User         UserCommands         `cmd:"" help:"AppRun のユーザー情報を確認します。"`
-}
-
-type Runtime struct {
-	DecodeRequest  func(string, any) error
-	ValidateOutput func(*kong.Context) error
-	WriteOutput    func(*kong.Context, any) error
-}
-
-type Factories struct {
-	Application  ApplicationAPIFactory
-	Version      VersionAPIFactory
-	PacketFilter PacketFilterAPIFactory
-	Traffic      TrafficAPIFactory
-	User         UserAPIFactory
-}
-
-func NewCommands(runtime Runtime, factories Factories) Commands {
-	return Commands{
-		Application: NewApplicationCommands(ApplicationRuntime{
-			DecodeRequest: runtime.DecodeRequest, ValidateOutput: runtime.ValidateOutput, WriteOutput: runtime.WriteOutput,
-		}, factories.Application),
-		Version: NewVersionCommands(VersionRuntime{
-			DecodeRequest: runtime.DecodeRequest, ValidateOutput: runtime.ValidateOutput, WriteOutput: runtime.WriteOutput,
-		}, factories.Version),
-		PacketFilter: NewPacketFilterCommands(PacketFilterRuntime{
-			DecodeRequest: runtime.DecodeRequest, ValidateOutput: runtime.ValidateOutput, WriteOutput: runtime.WriteOutput,
-		}, factories.PacketFilter),
-		Traffic: NewTrafficCommands(TrafficRuntime{
-			DecodeRequest: runtime.DecodeRequest, ValidateOutput: runtime.ValidateOutput, WriteOutput: runtime.WriteOutput,
-		}, factories.Traffic),
-		User: NewUserCommands(UserRuntime{
-			DecodeRequest: runtime.DecodeRequest, ValidateOutput: runtime.ValidateOutput, WriteOutput: runtime.WriteOutput,
-		}, factories.User),
-	}
 }

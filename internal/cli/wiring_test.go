@@ -106,6 +106,18 @@ func TestGeneratedWiringMatchesConfig(t *testing.T) {
 			mode:     apigen.ModeOgen,
 			expected: "internal/cli/simple_notification_wiring_generated.go",
 		},
+		{
+			name: "AppRun",
+			configs: []string{
+				"apprun-application.json",
+				"apprun-packet-filter.json",
+				"apprun-traffic.json",
+				"apprun-user.json",
+				"apprun-version.json",
+			},
+			mode:     apigen.ModeOgen,
+			expected: "internal/cli/apprun_wiring_generated.go",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
