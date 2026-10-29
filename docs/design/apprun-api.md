@@ -22,7 +22,7 @@ Version の作成は Application の更新で新しいバージョンが作ら�
 
 Application / Version の一覧で指定する `sort-order` は、SDK の enum 検証を SDK 呼び出し前に実行します。受け付ける値は `asc` と `desc` です。
 
-生成された各リソースの `Commands`、API interface、factory、Runtime は、`internal/apprunapi/commands.go` の `NewCommands` で一括して CLI に注入します。SDK クライアントは共通の認証設定から作成し、ドメイン固有の request decoder と共通出力処理を Runtime に渡します。
+生成された各リソースの `Commands`、API interface、factory、Runtime に加え、パッケージはリソースごとの constructor (`NewApplicationAPI` など) を公開します。`internal/cli/` の配線は `make generate-wiring` から生成し、各リソースの factory が SDK クライアントを共通の認証設定から作成し、ドメイン固有の request decoder と共通出力処理を Runtime に接続します。
 
 ## リクエスト入力と秘密情報
 
