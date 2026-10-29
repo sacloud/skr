@@ -142,7 +142,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 多くの runner は対象コマンドを網羅しています。タスク3完了後の未検証は35コマンドで、apprun-dedicated-api 35 です。
 
-2026-10-23 にタスク1として `server update`、`internet update`、`internet monitor-router`、`version` の4コマンドをライブ検証しました。既存 runner へのシナリオ追加と専用 runner の新規作成、そのライブ実行を完了しています。version の E2E は 2026-10-27 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテスト ([test/e2e/version/](test/e2e/version/)) へ移行し、同日に移行後のシナリオをライブ再実行しました。2026-10-29 に `internet monitor-router` の入力を `--request` から `--zone`、`--id`、`--start`、`--end` の個別フラグへ変更しました ([ADR 0066](docs/adr/0066-internet-monitor-router-flags.md))。フラグ経路のライブ確認は次回の internet E2E 実行時に行います。
+2026-10-23 にタスク1として `server update`、`internet update`、`internet monitor-router`、`version` の4コマンドをライブ検証しました。既存 runner へのシナリオ追加と専用 runner の新規作成、そのライブ実行を完了しています。version の E2E は 2026-10-27 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテスト ([test/e2e/version/](test/e2e/version/)) へ移行し、同日に移行後のシナリオをライブ再実行しました。2026-10-29 に `internet monitor-router` の入力を `--request` から `--zone`、`--id`、`--start`、`--end` の個別フラグへ変更しました ([ADR 0066](docs/adr/0066-internet-monitor-router-flags.md))。フラグ経路は 2026-10-29 の internet E2E ライブ実行 (証跡 `test/e2e/internet/e2e-output/internet-api-20261029104344.md`) で正常実行を確認しました。
 
 2026-10-23 にタスク2として 25 コマンドをライブ検証しました。internet のサブネット3操作と IPv6 3操作です。eventbus-api の schedule 5操作、process-configuration update、trigger update です。apprun の Update、Version 4操作、Traffic 2操作、PacketFilter 2操作、User 2操作です。
 
