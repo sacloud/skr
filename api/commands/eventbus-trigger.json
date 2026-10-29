@@ -66,5 +66,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "EventbusAPI.Trigger",
+  "sdk_factory": "eventbusapi.NewTriggerAPI",
+  "decoder": "eventbusapi.DecodeRequest"
 }

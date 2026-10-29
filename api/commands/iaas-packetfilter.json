@@ -205,5 +205,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.PacketFilter",
+  "sdk_factory": "packetfilter.New",
+  "client_factory": "iaasclient.New"
 }

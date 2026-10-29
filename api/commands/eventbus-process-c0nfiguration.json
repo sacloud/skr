@@ -82,5 +82,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "EventbusAPI.ProcessConfiguration",
+  "sdk_factory": "eventbusapi.NewProcessConfigurationAPI",
+  "decoder": "eventbusapi.DecodeRequest"
 }

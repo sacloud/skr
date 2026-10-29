@@ -1,11 +1,11 @@
 # 低レベル API コマンド生成器
 
 - Status: Implemented
-- Related ADR: [ADR 0016](../adr/0016-generate-low-level-api-commands.md)
+- Related ADR: [ADR 0016](../adr/0016-generate-low-level-api-commands.md)、[ADR 0068](../adr/0068-generate-cli-wiring.md)
 
 ## 目的
 
-`cmd/apigen-iaas` は、明示した IaaS SDK 操作のコマンド登録、型付き API インターフェース、操作ハンドラー、標準的なリクエスト入力と出力を Go ソースに生成します。IaaS 以外の Ogen 系 API には共通入口 `cmd/apigen-api` を使います。生成コードはリポジトリに含め、実行時や通常のビルド時に生成器を必要としません。設定解析と共有可能な生成処理は `internal/apigen` にあります。IaaS と Ogen 系 API は別の CLI 入口を保ち、共通化できる範囲で実装を共有します。
+`cmd/apigen-iaas` は、明示した IaaS SDK 操作のコマンド登録、型付き API インターフェース、操作ハンドラー、標準的なリクエスト入力と出力を Go ソースに生成します。IaaS 以外の Ogen 系 API には共通入口 `cmd/apigen-api` を使います。`cmd/apigen-wiring` は同じ設定 JSON から `internal/cli` 配下の配線コードを生成します (ADR 0068)。生成コードはリポジトリに含め、実行時や通常のビルド時に生成器を必要としません。設定解析と共有可能な生成処理は `internal/apigen` にあります。IaaS と Ogen 系 API は別の CLI 入口を保ち、共通化できる範囲で実装を共有します。
 
 生成器は SDK の操作を探索して公開範囲や入力の意味を決めません。対象操作、SDK メソッド名、リクエスト／レスポンス型、個別フラグ、ヘルプは設定で明示します。設定内容は SDK の公開インターフェースとリクエスト型に照らして確認します。
 
@@ -121,6 +121,22 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 ```
 
 同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型、モードに合わない `command_prefix` で受け付けず、出力は `go/format` で整形します。IaaS と Ogen 系 API は生成対象の形と型名の導出規則が異なるため、IaaS は専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
+
+## internal/cli 配下の配線コード
+
+[ADR 0068](../adr/0068-generate-cli-wiring.md) に従い、`cmd/apigen-wiring` は同じ設定 JSON から `internal/cli` 配下の配線コードを生成します。配線対象の設定には、代入先を表す `wiring_target` (例: `"IaaSAPI.Archive"`) と、API クライアント生成式を表す `sdk_factory` (例: `"archive.New"`) を記述します。IaaS の設定では、共有クライアント生成式を `client_factory` (例: `"iaasclient.New"`) にも記述し、2 段階のクロージャで `client, err := client_factory(c.Trace)` から `sdk_factory(client)` を組み立てます。IaaS 以外の設定では `sdk_factory` を `c.Trace` で直接呼び出します。
+
+ドメイン固有の decoder を使う操作には `decoder` (例: `"eventbusapi.DecodeRequest"`) を記述します。省略時は共有の入力処理 `decodeRequest` を接続します。`request_transform` を指定した操作は、transform 関数をドメイン package に置き、配線は `packetfilterapi.TransformCreateRequest` の形で接続します。`factory_arguments` を使うクライアント生成など、標準パターンに合わない設定には `"wiring": "handwritten"` を指定して配線対象から外し、手書き init に残します。
+
+配線コードはドメインごとに 1 ファイルへまとめます。`initIaaSAPI` のように、`wiring_target` の最初の要素を関数名の一部にします。同一ファイルに含まれる設定の `wiring_target` は同じ最初の要素を持つ必要があり、異なる最初の要素の混在は検証で拒否します。ルート構造体、フラグ定義、`newCLI()` からの init 呼び出しは手書きのままにします。
+
+リポジトリルートから実行します。Makefile のターゲットは、各ドメインの設定を検出して配線コードを再生成します。
+
+```console
+$ make generate-wiring
+```
+
+生成済みの配線ファイルと設定の一致は `internal/cli/wiring_test.go` が確認します。設定を変更した場合は `make generate-wiring` で再生成してください。
 
 ## 手書きコードとの境界
 

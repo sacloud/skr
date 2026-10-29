@@ -63,5 +63,8 @@
       "response_type": "*v1.SSOProfile",
       "arguments": [{"name":"id","field":"ID","type":"int","help":"リンクを解除する SSO プロファイル ID。"}]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.SSO",
+  "sdk_factory": "iamapi.NewSSOAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

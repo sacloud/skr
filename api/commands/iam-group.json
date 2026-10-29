@@ -128,5 +128,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.Group",
+  "sdk_factory": "iamapi.NewGroupAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

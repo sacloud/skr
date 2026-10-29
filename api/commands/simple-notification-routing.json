@@ -81,5 +81,6 @@
       "method": "ListSource",
       "response_type": "*v1.ListSourcesResponse"
     }
-  ]
+  ],
+  "wiring": "handwritten"
 }

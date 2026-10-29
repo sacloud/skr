@@ -127,5 +127,8 @@
       "response_type": "*v1.ServicePrincipalOAuth2AccessToken",
       "handwritten": true
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.ServicePrincipal",
+  "sdk_factory": "iamapi.NewServicePrincipalAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

@@ -54,6 +54,17 @@ generate-iaas-api:
 	@test -n "$(API_OUTPUT)" || (echo "API_OUTPUT is required" >&2; exit 2)
 	$(GO) run ./cmd/apigen-iaas -config "$(API_CONFIG)" -out "$(API_OUTPUT)"
 
+.PHONY: generate-wiring
+generate-wiring:
+	$(GO) run ./cmd/apigen-wiring -mode iaas -out internal/cli/iaas_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter iaas-%,$(notdir $(wildcard api/commands/*.json))))
+	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/eventbus_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter eventbus-%,$(notdir $(wildcard api/commands/*.json))))
+	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/iam_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter iam-%,$(notdir $(wildcard api/commands/*.json))))
+	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/simplemq_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter simplemq-%,$(notdir $(wildcard api/commands/*.json))))
+
 .PHONY: docs-site
 docs-site:
 	@set -eu; \

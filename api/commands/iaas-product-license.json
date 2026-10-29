@@ -12,5 +12,8 @@
       "request_help": "入力は任意です。--count、--from、または API リクエスト JSON の Filter、Sort、Include、Exclude を指定できます。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。",
       "handwritten": true
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.Product.License",
+  "sdk_factory": "licenseinfoapi.NewSDKAPI",
+  "client_factory": "iaasclient.New"
 }

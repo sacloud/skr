@@ -43,6 +43,8 @@ description: cmd/apigen-iaas を使って IaaS API コマンドの設定を更�
    ```
 
    `API_CONFIG` と `API_OUTPUT` はどちらも必須です。新しいリソースでは既存の設定ファイル配置・命名規則に合わせ、出力先ディレクトリが存在することを確認します。生成後に、設定ファイルと生成ファイルの差分だけでなく、CLI 登録と手書き runtime／factory の接続も確認します。
+
+   配線コードは [ADR 0068](../../../docs/adr/0068-generate-cli-wiring.md) に従い、`make generate-wiring` で再生成します。配線対象の設定には `wiring_target` と `sdk_factory` (IaaS は加えて `client_factory`) を記述し、`factory_arguments` を使う設定など標準パターンに合わないものには `"wiring": "handwritten"` を指定します。配線の追加・変更は `internal/cli/wiring_test.go` の生成物比較テストで検証します。
 7. 生成器のロジックやテンプレートを変更した場合は、`internal/apigen` の対象テストを追加・更新し、少なくとも次を実行します。
 
    ```console

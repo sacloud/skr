@@ -47,5 +47,8 @@
       "method": "ReadAuthContext",
       "response_type": "*v1.ReadAuthContextOK"
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.Auth",
+  "sdk_factory": "iamapi.NewAuthAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

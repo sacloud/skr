@@ -34,5 +34,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.Zone",
+  "sdk_factory": "zone.New",
+  "client_factory": "iaasclient.New"
 }

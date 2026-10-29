@@ -249,5 +249,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.Switch",
+  "sdk_factory": "swytch.New",
+  "client_factory": "iaasclient.New"
 }

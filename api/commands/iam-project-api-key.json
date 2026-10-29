@@ -54,5 +54,8 @@
       "method": "Delete",
       "arguments": [{"name":"id","field":"ID","type":"int","help":"削除する API キー ID。"}]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.ProjectAPIKey",
+  "sdk_factory": "iamapi.NewProjectAPIKeyAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

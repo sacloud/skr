@@ -72,5 +72,8 @@
       "method": "Delete",
       "arguments": [{"name":"id","field":"ID","type":"int","help":"削除するプロジェクト ID。"}]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.Project",
+  "sdk_factory": "iamapi.NewProjectAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

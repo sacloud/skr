@@ -350,5 +350,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.Server",
+  "sdk_factory": "server.New",
+  "client_factory": "iaasclient.New"
 }

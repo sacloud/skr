@@ -1,0 +1,337 @@
+// Copyright 2022-2026 The sacloud/skr Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package apigen
+
+import (
+	"bytes"
+	"fmt"
+	"go/format"
+	"go/token"
+	"os"
+	"sort"
+	"strings"
+	"text/template"
+)
+
+// modeKnownImports は mode 固有の共有 package のインポート解決表です。
+// IaaS の配線は共有クライアント (internal/iaas/client) を使うため、設定の imports に
+// 追加しなくても iaasclient を参照できます。
+var modeKnownImports = map[Mode]map[string]string{
+	ModeIaaS: {
+		"iaasclient": "github.com/sacloud/skr/internal/iaas/client",
+	},
+	ModeOgen: {},
+}
+
+// commandPackagePath はコマンド package のインポートパスを導出します。
+// IaaS は internal/iaas/ 配下、Ogen 系は internal/ 直下の配置に対応します。
+func commandPackagePath(pkg string, mode Mode) string {
+	if mode == ModeIaaS {
+		return "github.com/sacloud/skr/internal/iaas/" + pkg
+	}
+	return "github.com/sacloud/skr/internal/" + pkg
+}
+
+// resolveWiringImportPath は配線式の限定子をインポートパスへ解決します。
+// コマンド package、設定の imports、mode 固有の共有 package の順に解決します。
+func (c Config) resolveWiringImportPath(qualifier string, mode Mode) (string, bool) {
+	if qualifier == c.Package {
+		return commandPackagePath(c.Package, mode), true
+	}
+	if path, ok := c.Imports[qualifier]; ok {
+		return path, true
+	}
+	if path, ok := modeKnownImports[mode][qualifier]; ok {
+		return path, true
+	}
+	return "", false
+}
+
+// validateWiring は配線設定を検証します (ADR 0068)。wiring に handwritten を指定した設定は
+// 配線対象から外れるため、他の配線フィールドと併用できません。配線フィールドを指定した場合は
+// wiring_target と sdk_factory が必須で、未指定の場合は配線対象外として扱います。
+func (c Config) validateWiring(mode Mode) error {
+	if c.Wiring != "" && c.Wiring != "handwritten" {
+		return fmt.Errorf("wiring must be %q", "handwritten")
+	}
+	if c.Wiring == "handwritten" {
+		if c.WiringTarget != "" || c.SDKFactory != "" || c.ClientFactory != "" || c.Decoder != "" {
+			return fmt.Errorf("wiring handwritten cannot be combined with wiring_target, sdk_factory, client_factory, or decoder")
+		}
+		return nil
+	}
+	if c.WiringTarget == "" && c.SDKFactory == "" && c.ClientFactory == "" && c.Decoder == "" {
+		// 配線フィールドが未指定の場合は配線対象外です (コマンド生成のみで使う設定)
+		return nil
+	}
+	if err := validateWiringTarget(c.WiringTarget); err != nil {
+		return err
+	}
+	if err := validateWiringExpression(c.SDKFactory, "sdk_factory", c, mode); err != nil {
+		return err
+	}
+	if c.ClientFactory != "" {
+		if err := validateWiringExpression(c.ClientFactory, "client_factory", c, mode); err != nil {
+			return err
+		}
+	}
+	if c.Decoder != "" {
+		if err := validateWiringExpression(c.Decoder, "decoder", c, mode); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateWiringTarget は配線の代入先を検証します。ドット区切りのエクスポート済み識別子です。
+func validateWiringTarget(target string) error {
+	if target == "" {
+		return fmt.Errorf("wiring_target is required for generated wiring")
+	}
+	for _, segment := range strings.Split(target, ".") {
+		if !token.IsIdentifier(segment) || token.Lookup(segment).IsKeyword() {
+			return fmt.Errorf("wiring_target segment %q must be a valid Go identifier", segment)
+		}
+		if !token.IsExported(segment) {
+			return fmt.Errorf("wiring_target segment %q must be exported", segment)
+		}
+	}
+	return nil
+}
+
+// validateWiringExpression は配線式を <package>.<Name> 形式で検証します。
+// 限定子はコマンド package、設定の imports、mode 固有の共有 package に解決できる必要があります。
+func validateWiringExpression(value, field string, config Config, mode Mode) error {
+	if value == "" {
+		return fmt.Errorf("%s is required for generated wiring", field)
+	}
+	qualifier, name, ok := strings.Cut(value, ".")
+	if !ok || qualifier == "" || name == "" || strings.Contains(name, ".") {
+		return fmt.Errorf("%s must be <package>.<Name> form, got %q", field, value)
+	}
+	if !token.IsIdentifier(qualifier) || !token.IsExported(name) {
+		return fmt.Errorf("%s must be <package>.<Name> form, got %q", field, value)
+	}
+	if _, ok := config.resolveWiringImportPath(qualifier, mode); !ok {
+		return fmt.Errorf("%s qualifier %q does not resolve to an import", field, qualifier)
+	}
+	return nil
+}
+
+// wiringCommandSpec は 1 設定の配線内容を表します。
+type wiringCommandSpec struct {
+	Target       string
+	Pkg          string
+	CommandsType string
+	RuntimeType  string
+	APIType      string
+	Decoder      string
+	Factory      string
+	Transforms   []wiringTransformSpec
+}
+
+// wiringTransformSpec は request_transform callback の接続を表します。
+type wiringTransformSpec struct {
+	Field string
+	Expr  string
+}
+
+type templateWiringConfig struct {
+	ConfigPaths []string
+	Imports     []importSpec
+	InitFunc    string
+	Commands    []wiringCommandSpec
+}
+
+const wiringTemplate = `// Code generated by cmd/apigen-wiring; DO NOT EDIT.
+//
+// internal/cli の配線コードです。設定を変更した場合は再生成してください (ADR 0068)。
+// 設定:
+{{- range .ConfigPaths }}
+//   {{ . }}
+{{- end }}
+
+package cli
+
+import (
+{{- range .Imports }}
+	{{ .Alias }} {{ printf "%q" .Path }}
+{{- end }}
+)
+
+func (c *cli) {{ .InitFunc }}() {
+{{- range .Commands }}
+	c.{{ .Target }} = {{ .Pkg }}.New{{ .CommandsType }}({{ .Pkg }}.{{ .RuntimeType }}{
+		DecodeRequest:  {{ .Decoder }},
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
+{{- range .Transforms }}
+		{{ .Field }}: {{ .Expr }},
+{{- end }}
+	}, {{ .Factory }})
+{{- end }}
+}
+`
+
+// GenerateWiring は複数の設定から internal/cli 配下の配線コードを 1 ファイルに生成します (ADR 0068)。
+// wiring に handwritten を指定した設定は読み飛ばします。標準パターンのみを生成し、
+// 共有の Runtime callbacks、遅延評価のクライアント factory、request_transform callback を接続します。
+func GenerateWiring(configPaths []string, mode Mode) ([]byte, error) {
+	if _, ok := modeKnownImports[mode]; !ok {
+		return nil, fmt.Errorf("unknown generator mode: %d", int(mode))
+	}
+	var commands []wiringCommandSpec
+	var includedPaths []string
+	imports := make(map[string]importSpec)
+	initRoot := ""
+	for _, configPath := range configPaths {
+		data, err := os.ReadFile(configPath) // #nosec G304 -- The config path is explicitly provided by the local CLI user.
+		if err != nil {
+			return nil, fmt.Errorf("read config %q: %w", configPath, err)
+		}
+		config, err := DecodeConfig(data, mode)
+		if err != nil {
+			return nil, fmt.Errorf("config %q: %w", configPath, err)
+		}
+		if config.Wiring == "handwritten" {
+			continue
+		}
+		if config.WiringTarget == "" {
+			return nil, fmt.Errorf("config %q: %w", configPath, fmt.Errorf("wiring_target is required for generated wiring"))
+		}
+		root, _, _ := strings.Cut(config.WiringTarget, ".")
+		if initRoot == "" {
+			initRoot = root
+		}
+		if root != initRoot {
+			return nil, fmt.Errorf("config %q wiring_target root %q does not match %q", configPath, root, initRoot)
+		}
+		spec, err := buildWiringCommand(config, mode, imports)
+		if err != nil {
+			return nil, fmt.Errorf("config %q: %w", configPath, err)
+		}
+		commands = append(commands, spec)
+		includedPaths = append(includedPaths, configPath)
+	}
+	if len(commands) == 0 {
+		return nil, fmt.Errorf("no wirable configs are provided")
+	}
+	sortedImports := make([]importSpec, 0, len(imports))
+	for _, spec := range imports {
+		sortedImports = append(sortedImports, spec)
+	}
+	sort.Slice(sortedImports, func(i, j int) bool { return sortedImports[i].Path < sortedImports[j].Path })
+
+	tmpl, err := template.New("wiring").Parse(wiringTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("parse wiring template: %w", err)
+	}
+	var source bytes.Buffer
+	if err := tmpl.Execute(&source, templateWiringConfig{
+		ConfigPaths: includedPaths,
+		Imports:     sortedImports,
+		InitFunc:    "init" + initRoot,
+		Commands:    commands,
+	}); err != nil {
+		return nil, fmt.Errorf("render wiring source: %w", err)
+	}
+	formatted, err := format.Source(source.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("format generated source: %w", err)
+	}
+	return formatted, nil
+}
+
+// buildWiringCommand は 1 設定の配線内容を組み立て、必要なインポートを imports に追加します。
+func buildWiringCommand(config Config, mode Mode, imports map[string]importSpec) (wiringCommandSpec, error) {
+	pkg := config.Package
+	if err := addWiringImport(imports, pkg, commandPackagePath(pkg, mode)); err != nil {
+		return wiringCommandSpec{}, err
+	}
+	commandsType, apiType, _, runtimeType := config.typeNames(mode)
+	spec := wiringCommandSpec{
+		Target:       config.WiringTarget,
+		Pkg:          pkg,
+		CommandsType: commandsType,
+		RuntimeType:  runtimeType,
+		APIType:      apiType,
+		Decoder:      "decodeRequest",
+	}
+	if config.Decoder != "" {
+		spec.Decoder = config.Decoder
+	}
+	if config.ClientFactory != "" {
+		if err := addWiringExpressionImport(imports, config.ClientFactory, config, mode); err != nil {
+			return wiringCommandSpec{}, err
+		}
+		spec.Factory = fmt.Sprintf("func() (%s.%s, error) {\n\t\tclient, err := %s(c.Trace)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\treturn %s(client), nil\n\t}", pkg, apiType, config.ClientFactory, config.SDKFactory)
+	} else {
+		spec.Factory = fmt.Sprintf("func() (%s.%s, error) {\n\t\treturn %s(c.Trace)\n\t}", pkg, apiType, config.SDKFactory)
+	}
+	if err := addWiringExpressionImport(imports, config.SDKFactory, config, mode); err != nil {
+		return wiringCommandSpec{}, err
+	}
+	if config.Decoder != "" {
+		if err := addWiringExpressionImport(imports, config.Decoder, config, mode); err != nil {
+			return wiringCommandSpec{}, err
+		}
+	}
+	for _, operation := range config.Operations {
+		if operation.RequestTransform == "" {
+			continue
+		}
+		spec.Transforms = append(spec.Transforms, wiringTransformSpec{
+			Field: operation.RequestTransform,
+			Expr:  pkg + "." + operation.RequestTransform,
+		})
+	}
+	return spec, nil
+}
+
+// addWiringExpressionImport は配線式の限定子を解決し、コマンド package 以外のインポートを追加します。
+func addWiringExpressionImport(imports map[string]importSpec, expression string, config Config, mode Mode) error {
+	qualifier, _, _ := strings.Cut(expression, ".")
+	if qualifier == config.Package {
+		return nil
+	}
+	path, ok := config.resolveWiringImportPath(qualifier, mode)
+	if !ok {
+		return fmt.Errorf("expression %q qualifier %q does not resolve to an import", expression, qualifier)
+	}
+	return addWiringImport(imports, qualifier, path)
+}
+
+func addWiringImport(imports map[string]importSpec, alias, path string) error {
+	if existing, ok := imports[alias]; ok {
+		if existing.Path != path {
+			return fmt.Errorf("import alias %q conflicts between %q and %q", alias, existing.Path, path)
+		}
+		return nil
+	}
+	imports[alias] = importSpec{Alias: alias, Path: path}
+	return nil
+}
+
+// GenerateWiringFile は複数の設定から internal/cli 配下の配線コードを outputPath へ生成します (ADR 0068)。
+func GenerateWiringFile(configPaths []string, outputPath string, mode Mode) error {
+	source, err := GenerateWiring(configPaths, mode)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(outputPath, source, 0o644); err != nil { // #nosec G306 G703 -- The local user selects the output path; generated Go source is non-sensitive and must remain readable.
+		return fmt.Errorf("write generated Go file %q: %w", outputPath, err)
+	}
+	return nil
+}

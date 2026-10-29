@@ -50,5 +50,6 @@
       "method": "DeleteSecurityKey",
       "arguments": [{"name":"security-key-id","field":"SecurityKeyID","type":"int","help":"削除するセキュリティキー ID。"}]
     }
-  ]
+  ],
+  "wiring": "handwritten"
 }
