@@ -500,5 +500,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.Internet",
+  "sdk_factory": "internet.New",
+  "client_factory": "iaasclient.New"
 }

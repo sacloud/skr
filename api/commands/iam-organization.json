@@ -46,5 +46,8 @@
       "request_help": "サービス利用ポリシーのルール全体を表す JSON 配列。直接指定するか @path.json で読み込みます。",
       "response_type": "[]v1.RuleResponse"
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.Organization",
+  "sdk_factory": "iamapi.NewOrganizationAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

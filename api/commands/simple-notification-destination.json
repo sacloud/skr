@@ -80,5 +80,6 @@
       ],
       "response_type": "*v1.GetCommonServiceItemStatusResponse"
     }
-  ]
+  ],
+  "wiring": "handwritten"
 }

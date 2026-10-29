@@ -66,5 +66,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "EventbusAPI.Schedule",
+  "sdk_factory": "eventbusapi.NewScheduleAPI",
+  "decoder": "eventbusapi.DecodeRequest"
 }

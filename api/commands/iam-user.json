@@ -103,5 +103,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.User",
+  "sdk_factory": "iamapi.NewUserAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

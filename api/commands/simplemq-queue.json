@@ -108,5 +108,7 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "SimpleMQAPI.Queue",
+  "sdk_factory": "simplemqapi.NewQueueAPI"
 }

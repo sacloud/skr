@@ -83,5 +83,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.Policy",
+  "sdk_factory": "iamapi.NewPolicyAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

@@ -166,27 +166,3 @@ func TestPacketFilterHelpExampleDecodes(t *testing.T) {
 		t.Fatalf("decoded request = %+v", request)
 	}
 }
-
-func TestDecodePacketFilterExpressions(t *testing.T) {
-	path := t.TempDir() + "/rules.json"
-	fileContent := `[{"Protocol":"udp","DestinationPort":"53","Action":"allow"}]`
-	err := os.WriteFile(path, []byte(fileContent), 0o600)
-	require.NoError(t, err)
-	for _, input := range []string{
-		`[{"Protocol":"tcp","DestinationPort":"443","Action":"allow"}]`,
-		"@" + path,
-	} {
-		expressions, err := decodePacketFilterExpressions([]string{input})
-		require.NoError(t, err, "decodePacketFilterExpressions(%q)", input)
-		require.Len(t, expressions, 1, "decoded %q to %d expressions, want 1", input, len(expressions))
-	}
-	for _, inputs := range [][]string{
-		{"{"},
-		{`{"Protocol":"tcp"}`},
-		{"[]", "[]"},
-	} {
-		if _, err := decodePacketFilterExpressions(inputs); err == nil {
-			t.Errorf("decodePacketFilterExpressions(%q) succeeded, want error", inputs)
-		}
-	}
-}

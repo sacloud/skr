@@ -21,5 +21,8 @@
       "request_help": "組織の ID ポリシー全体を表す JSON 配列。直接指定するか @path.json で読み込みます。既存設定全体を置き換えるため、更新前に read-organization で確認してください。",
       "response_type": "[]v1.IdPolicy"
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.IDPolicy",
+  "sdk_factory": "iamapi.NewIDPolicyAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

@@ -16,14 +16,9 @@ package cli
 
 import "github.com/sacloud/skr/internal/simplemqapi"
 
-func (c *cli) initSimpleMQAPI() {
-	c.SimpleMQAPI.Queue = simplemqapi.NewQueueCommands(simplemqapi.QueueRuntime{
-		DecodeRequest:  decodeRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}, func() (simplemqapi.QueueAPI, error) {
-		return simplemqapi.NewQueueAPI(c.Trace)
-	})
+// initSimpleMQMessage は Message コマンドの配線を行います。factory_arguments (queue-name、api-key-file) を factory に渡すため手書きです (ADR 0068)。
+// Queue コマンドの配線は simplemq_wiring_generated.go が行います。
+func (c *cli) initSimpleMQMessage() {
 	c.SimpleMQAPI.Message = simplemqapi.NewMessageCommands(simplemqapi.MessageRuntime{
 		ValidateOutput: validateOutput,
 		WriteOutput:    writeOutput,

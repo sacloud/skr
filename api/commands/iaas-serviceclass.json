@@ -36,5 +36,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.ServiceClass",
+  "sdk_factory": "serviceclass.New",
+  "client_factory": "iaasclient.New"
 }

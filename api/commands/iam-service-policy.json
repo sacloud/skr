@@ -40,5 +40,8 @@
         {"name":"type","field":"Type","type":"string","help":"任意: 種別で絞り込みます。","pointer":true,"conversion":"v1.ListServicePolicyRuleTemplatesType"}
       ]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.ServicePolicy",
+  "sdk_factory": "iamapi.NewServicePolicyAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

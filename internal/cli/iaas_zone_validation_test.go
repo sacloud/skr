@@ -79,7 +79,7 @@ func TestIaaSCommonZoneValidation(t *testing.T) {
 						commandLine.IaaSAPI.Product.Disk = diskplanapi.NewCommands(diskplanapi.Runtime{DecodeRequest: decodeRequest}, func() (diskplanapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Product.Internet = internetplanapi.NewCommands(internetplanapi.Runtime{DecodeRequest: decodeRequest}, func() (internetplanapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
-							DecodeRequest: decodeRequest, TransformCreateRequest: transformPacketFilterCreateRequest, TransformUpdateRequest: transformPacketFilterUpdateRequest,
+							DecodeRequest: decodeRequest, TransformCreateRequest: packetfilterapi.TransformCreateRequest, TransformUpdateRequest: packetfilterapi.TransformUpdateRequest,
 						}, func() (packetfilterapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Product.PrivateHost = privatehostplanapi.NewCommands(privatehostplanapi.Runtime{DecodeRequest: decodeRequest}, func() (privatehostplanapi.API, error) { return nil, factoryError() })
 						commandLine.IaaSAPI.Server = serverapi.NewCommands(serverapi.Runtime{

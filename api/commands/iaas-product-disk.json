@@ -62,5 +62,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.Product.Disk",
+  "sdk_factory": "diskplanapi.NewSDKAPI",
+  "client_factory": "iaasclient.New"
 }

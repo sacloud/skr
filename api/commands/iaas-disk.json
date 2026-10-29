@@ -315,5 +315,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.Disk",
+  "sdk_factory": "disk.New",
+  "client_factory": "iaasclient.New"
 }

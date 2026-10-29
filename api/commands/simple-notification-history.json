@@ -26,5 +26,6 @@
       ],
       "response_type": "*v1.GetSimpleNotificationHistoryResponse"
     }
-  ]
+  ],
+  "wiring": "handwritten"
 }

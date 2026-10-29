@@ -62,5 +62,8 @@
       "response_type": "*v1.RegenerateScimConfigurationTokenOK",
       "arguments": [{"name":"id","field":"ID","type":"string","help":"トークンを再発行する設定 ID。"}]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.SCIM",
+  "sdk_factory": "iamapi.NewSCIMAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

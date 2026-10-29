@@ -78,5 +78,8 @@
         }
       ]
     }
-  ]
+  ],
+  "wiring_target": "IaaSAPI.Archive",
+  "sdk_factory": "archive.New",
+  "client_factory": "iaasclient.New"
 }

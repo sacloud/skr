@@ -49,6 +49,23 @@ type Config struct {
 	Imports          map[string]string `json:"imports"`
 	FactoryArguments []Argument        `json:"factory_arguments,omitempty"`
 	Operations       []Operation       `json:"operations"`
+
+	// WiringTarget は internal/cli 配下の配線の代入先を表します (例: "IaaSAPI.Archive")。指定はドット区切りの
+	// エクスポート済み識別子です。wiring に handwritten を指定した設定では使えません。
+	WiringTarget string `json:"wiring_target,omitempty"`
+	// SDKFactory は API クライアントを生成する式です (例: "archive.New")。限定子はコマンド package、
+	// 設定の imports、mode 固有の共有 package の順に解決します。client_factory を指定した場合は client を、
+	// 未指定の場合は c.Trace を引数に呼び出します。
+	SDKFactory string `json:"sdk_factory,omitempty"`
+	// ClientFactory は共有クライアントを生成する式です (IaaS: "iaasclient.New")。指定すると 2 段階の
+	// factory クロージャを生成します。
+	ClientFactory string `json:"client_factory,omitempty"`
+	// Decoder は Runtime の DecodeRequest に接続する式です (例: "eventbusapi.DecodeRequest")。
+	// 省略時は internal/cli の共有入力処理 (decodeRequest) を接続します。
+	Decoder string `json:"decoder,omitempty"`
+	// Wiring は配線対象から外す設定を明示します (例: "handwritten")。指定した設定は配線生成から除外され、
+	// internal/cli の手書き init が接続を担当します。
+	Wiring string `json:"wiring,omitempty"`
 }
 
 type Operation struct {
@@ -403,6 +420,9 @@ func (c Config) Validate(mode Mode) error {
 		}
 	default:
 		return fmt.Errorf("unknown generator mode: %d", int(mode))
+	}
+	if err := c.validateWiring(mode); err != nil {
+		return err
 	}
 	if strings.TrimSpace(c.Resource) == "" {
 		return fmt.Errorf("resource must not be empty")

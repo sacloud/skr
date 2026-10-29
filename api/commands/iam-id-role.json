@@ -23,5 +23,8 @@
       "response_type": "*v1.IdRole",
       "arguments": [{"name":"id","field":"ID","type":"string","help":"読み取る ID ロール ID。"}]
     }
-  ]
+  ],
+  "wiring_target": "IAMAPI.IDRole",
+  "sdk_factory": "iamapi.NewIDRoleAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

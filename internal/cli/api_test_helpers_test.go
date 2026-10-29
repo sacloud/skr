@@ -71,8 +71,8 @@ func setLicenseInfoAPIFactory(commandLine *cli, factory licenseinfoapi.APIFactor
 func setPacketFilterAPIFactory(commandLine *cli, factory packetfilterapi.APIFactory) {
 	commandLine.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
-		TransformCreateRequest: transformPacketFilterCreateRequest,
-		TransformUpdateRequest: transformPacketFilterUpdateRequest,
+		TransformCreateRequest: packetfilterapi.TransformCreateRequest,
+		TransformUpdateRequest: packetfilterapi.TransformUpdateRequest,
 	}, factory)
 }
 
