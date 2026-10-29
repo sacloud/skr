@@ -55,6 +55,30 @@ func TestWriteSSHMaterial(t *testing.T) {
 	require.Equal(t, filepath.Dir(m.PrivateKeyPath), filepath.Dir(m.KnownHostsPath))
 }
 
+// TestWriteSSHMaterialWithRuncmd は追加の runcmd を含む cloud-init user-data の作成を確認する。
+func TestWriteSSHMaterialWithRuncmd(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen is not available, skipping test")
+	}
+
+	m := WriteSSHMaterialWithRuncmd(t, "skr-e2e", false, "ip route replace default via 192.0.2.1", "echo done")
+
+	data, err := os.ReadFile(m.UserDataPath)
+	require.NoError(t, err, "read cloud-init user-data with runcmd")
+	userData := string(data)
+	require.Contains(t, userData, "#cloud-config")
+	require.Contains(t, userData, "name: skr-e2e")
+	require.Contains(t, userData, "runcmd:", "the user-data should contain the runcmd section")
+	require.Contains(t, userData, `[sh, -c, "ip route replace default via 192.0.2.1"]`)
+	require.Contains(t, userData, `[sh, -c, "echo done"]`)
+
+	// runcmd を渡さない場合は従来と同じ user-data を作成する
+	plain := WriteSSHMaterial(t, "skr-e2e", false)
+	plainData, err := os.ReadFile(plain.UserDataPath)
+	require.NoError(t, err, "read cloud-init user-data without runcmd")
+	require.NotContains(t, string(plainData), "runcmd:")
+}
+
 // TestSSHConnectArgs は SSH ログイン確認のコマンド引数を確認する。
 func TestSSHConnectArgs(t *testing.T) {
 	m := SSHMaterial{
