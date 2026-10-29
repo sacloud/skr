@@ -27,5 +27,6 @@
       "response_type": "*v1.GetSimpleNotificationHistoryResponse"
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "SimpleNotificationAPI.History",
+  "sdk_factory": "simplenotificationapi.NewHistoryAPI"
 }

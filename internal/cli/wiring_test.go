@@ -95,6 +95,17 @@ func TestGeneratedWiringMatchesConfig(t *testing.T) {
 			mode:     apigen.ModeOgen,
 			expected: "internal/cli/simplemq_wiring_generated.go",
 		},
+		{
+			name: "SimpleNotification",
+			configs: []string{
+				"simple-notification-destination.json",
+				"simple-notification-group.json",
+				"simple-notification-history.json",
+				"simple-notification-routing.json",
+			},
+			mode:     apigen.ModeOgen,
+			expected: "internal/cli/simple_notification_wiring_generated.go",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

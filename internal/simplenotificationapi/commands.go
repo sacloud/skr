@@ -20,7 +20,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alecthomas/kong"
 	simplenotification "github.com/sacloud/sacloud-sdk-go/api/simple-notification"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 	clientconfig "github.com/sacloud/skr/internal/saclient"
@@ -33,78 +32,68 @@ type Commands struct {
 	History     HistoryCommands     `cmd:"" help:"通知履歴を参照します。"`
 }
 
-type Runtime struct {
-	DecodeRequest  func(string, any) error
-	ValidateOutput func(*kong.Context) error
-	WriteOutput    func(*kong.Context, any) error
+// NewDestinationAPI は通知先の API 操作を構築します。SDK のエラーを入力値を含まない
+// メッセージへ変換する adapter で包んで返します。
+func NewDestinationAPI(trace bool) (DestinationAPI, error) {
+	client, err := NewClient(trace)
+	if err != nil {
+		return nil, err
+	}
+	return destinationAdapter{simplenotification.NewDestinationOp(client)}, nil
 }
 
-func NewCommands(runtime Runtime, trace func() bool) Commands {
-	destinationRuntime := DestinationRuntime{
-		DecodeRequest: func(input string, destination any) error {
-			return decodeDestinationRequest(input, destination, runtime.DecodeRequest,
-				v1.CommonServiceItemProviderClassSaknoticedestination,
-				v1.CommonServiceItemServiceClassCloudSaknoticedestination2)
-		},
-		ValidateOutput: runtime.ValidateOutput,
-		WriteOutput:    runtime.WriteOutput,
+// NewGroupAPI は通知先グループの API 操作を構築します。
+func NewGroupAPI(trace bool) (GroupAPI, error) {
+	client, err := NewClient(trace)
+	if err != nil {
+		return nil, err
 	}
-	groupRuntime := GroupRuntime{
-		DecodeRequest: func(input string, destination any) error {
-			return decodeResourceRequest(input, destination, runtime.DecodeRequest,
-				v1.CommonServiceItemProviderClassSaknoticegroup,
-				v1.CommonServiceItemServiceClassCloudSaknoticegroup2)
-		},
-		ValidateOutput: runtime.ValidateOutput,
-		WriteOutput:    runtime.WriteOutput,
-	}
-	routingRuntime := RoutingRuntime{
-		DecodeRequest: func(input string, destination any) error {
-			return decodeResourceRequest(input, destination, runtime.DecodeRequest,
-				v1.CommonServiceItemProviderClassSaknoticerouting,
-				v1.CommonServiceItemServiceClassCloudSaknoticerouting2)
-		},
-		ValidateOutput: runtime.ValidateOutput,
-		WriteOutput:    runtime.WriteOutput,
-	}
-	historyRuntime := HistoryRuntime{
-		DecodeRequest:  runtime.DecodeRequest,
-		ValidateOutput: runtime.ValidateOutput,
-		WriteOutput:    runtime.WriteOutput,
-	}
-	return Commands{
-		Destination: NewDestinationCommands(destinationRuntime, func() (DestinationAPI, error) {
-			client, err := NewClient(trace())
-			if err != nil {
-				return nil, err
-			}
-			return destinationAdapter{simplenotification.NewDestinationOp(client)}, nil
-		}),
-		Group: NewGroupCommands(groupRuntime, func() (GroupAPI, error) {
-			client, err := NewClient(trace())
-			if err != nil {
-				return nil, err
-			}
-			return simplenotification.NewGroupOp(client), nil
-		}),
-		Routing: NewRoutingCommands(routingRuntime, func() (RoutingAPI, error) {
-			client, err := NewClient(trace())
-			if err != nil {
-				return nil, err
-			}
-			return simplenotification.NewRoutingOp(client), nil
-		}),
-		History: NewHistoryCommands(historyRuntime, func() (HistoryAPI, error) {
-			client, err := NewClient(trace())
-			if err != nil {
-				return nil, err
-			}
-			return simplenotification.NewHistoryOp(client), nil
-		}),
-	}
+	return simplenotification.NewGroupOp(client), nil
 }
 
-func decodeDestinationRequest(input string, destination any, decode func(string, any) error, provider v1.CommonServiceItemProviderClass, serviceClass v1.CommonServiceItemServiceClass) error {
+// NewRoutingAPI は通知ルーティング設定の API 操作を構築します。
+func NewRoutingAPI(trace bool) (RoutingAPI, error) {
+	client, err := NewClient(trace)
+	if err != nil {
+		return nil, err
+	}
+	return simplenotification.NewRoutingOp(client), nil
+}
+
+// NewHistoryAPI は通知履歴の API 操作を構築します。
+func NewHistoryAPI(trace bool) (HistoryAPI, error) {
+	client, err := NewClient(trace)
+	if err != nil {
+		return nil, err
+	}
+	return simplenotification.NewHistoryOp(client), nil
+}
+
+// DecodeDestinationRequest は通知先のリクエストを読み込みます。メールアドレスや Webhook URL を
+// 保護するため、Settings を含むリクエストは @path.json 形式での入力を要求します。
+func DecodeDestinationRequest(input string, destination any) error {
+	return decodeDestinationRequest(input, destination,
+		v1.CommonServiceItemProviderClassSaknoticedestination,
+		v1.CommonServiceItemServiceClassCloudSaknoticedestination2)
+}
+
+// DecodeGroupRequest は通知先グループのリクエストを読み込みます。作成リクエストには
+// Provider.Class と ServiceClass を自動設定します。
+func DecodeGroupRequest(input string, destination any) error {
+	return decodeResourceRequest(input, destination,
+		v1.CommonServiceItemProviderClassSaknoticegroup,
+		v1.CommonServiceItemServiceClassCloudSaknoticegroup2)
+}
+
+// DecodeRoutingRequest は通知ルーティング設定のリクエストを読み込みます。作成リクエストには
+// Provider.Class と ServiceClass を自動設定します。
+func DecodeRoutingRequest(input string, destination any) error {
+	return decodeResourceRequest(input, destination,
+		v1.CommonServiceItemProviderClassSaknoticerouting,
+		v1.CommonServiceItemServiceClassCloudSaknoticerouting2)
+}
+
+func decodeDestinationRequest(input string, destination any, provider v1.CommonServiceItemProviderClass, serviceClass v1.CommonServiceItemServiceClass) error {
 	requiresFile := false
 	switch destination.(type) {
 	case *v1.PostCommonServiceItemRequest:
@@ -128,23 +117,16 @@ func decodeDestinationRequest(input string, destination any, decode func(string,
 		return fmt.Errorf("通知先のメールアドレスやWebhook URLを保護するため、--request は @path.json で指定してください")
 	}
 	return protectDestinationError("通知先リクエストを読み込めません。JSON の形式と入力ファイルを確認してください",
-		decodeResourceRequest(input, destination, decode, provider, serviceClass))
+		decodeResourceRequest(input, destination, provider, serviceClass))
 }
 
-func decodeResourceRequest(input string, destination any, decode func(string, any) error, provider v1.CommonServiceItemProviderClass, serviceClass v1.CommonServiceItemServiceClass) error {
-	if _, isCreateRequest := destination.(*v1.PostCommonServiceItemRequest); !isCreateRequest {
-		if decode == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		return decode(input, destination)
-	}
-	if decode == nil {
-		return fmt.Errorf("API リクエスト処理が設定されていません")
-	}
-
+func decodeResourceRequest(input string, destination any, provider v1.CommonServiceItemProviderClass, serviceClass v1.CommonServiceItemServiceClass) error {
 	data, err := requestData(input)
 	if err != nil {
 		return err
+	}
+	if _, isCreateRequest := destination.(*v1.PostCommonServiceItemRequest); !isCreateRequest {
+		return decodeJSON(data, destination)
 	}
 	var request map[string]json.RawMessage
 	if err := json.Unmarshal(data, &request); err != nil {
@@ -184,7 +166,15 @@ func decodeResourceRequest(input string, destination any, decode func(string, an
 	if err != nil {
 		return fmt.Errorf("encode create request: %w", err)
 	}
-	return decode(string(data), destination)
+	return decodeJSON(data, destination)
+}
+
+// decodeJSON はリクエスト JSON を destination へ展開します。
+func decodeJSON(data []byte, destination any) error {
+	if err := json.Unmarshal(data, destination); err != nil {
+		return fmt.Errorf("decode request JSON: %w", err)
+	}
+	return nil
 }
 
 func requestData(input string) ([]byte, error) {

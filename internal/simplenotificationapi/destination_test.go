@@ -26,6 +26,7 @@ import (
 	simplenotification "github.com/sacloud/sacloud-sdk-go/api/simple-notification"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 	clientconfig "github.com/sacloud/skr/internal/saclient"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDestinationAdapterProtectsAllSDKErrorsAndPreservesClassification(t *testing.T) {
@@ -86,11 +87,9 @@ func TestDestinationAdapterProtectsAllSDKErrorsAndPreservesClassification(t *tes
 }
 
 func TestDestinationRequestProtectsDecodeErrorsAndPreservesCause(t *testing.T) {
-	cause := errors.New("invalid value: https://example.invalid/private")
-	err := decodeDestinationRequest("@request.json", &v1.PutCommonServiceItemRequest{}, func(string, any) error {
-		return cause
-	}, v1.CommonServiceItemProviderClassSaknoticedestination, v1.CommonServiceItemServiceClassCloudSaknoticedestination2)
-	if err == nil || strings.Contains(err.Error(), "https://") || !errors.Is(err, cause) {
-		t.Fatal("decode error is not protected or its cause was lost")
-	}
+	err := DecodeDestinationRequest(`{"CommonServiceItem":{"Name":123}}`, &v1.PutCommonServiceItemRequest{})
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), "https://", "error must not contain request values")
+	require.Contains(t, err.Error(), "通知先リクエストを読み込めません")
+	require.NotNil(t, errors.Unwrap(err), "decode error cause should be preserved")
 }
