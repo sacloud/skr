@@ -19,6 +19,8 @@ import (
 	"go/token"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerate(t *testing.T) {
@@ -432,6 +434,58 @@ func TestGenerateHandwrittenOnlyOperationsOmitFmtImport(t *testing.T) {
 	if strings.Contains(string(source), `"fmt"`) {
 		t.Fatal("generated source imports fmt without generated handlers")
 	}
+}
+
+func TestGenerateTimeFlag(t *testing.T) {
+	baseConfig := Config{
+		Package:     "internetapi",
+		Resource:    "IaaS Internet",
+		CommandType: "Commands",
+		APIType:     "API",
+		FactoryType: "APIFactory",
+		RuntimeType: "Runtime",
+		Operations: []Operation{{
+			Name:        "MonitorRouter",
+			CommandType: "MonitorRouterCommand",
+			Help:        "取得します。",
+			Method:      "MonitorRouterWithContext",
+			RequestType: "MonitorRouterRequest",
+			Flags: []Flag{
+				{Name: "zone", Field: "Zone", Type: "string", Help: "Zone.", Required: true},
+				{Name: "id", Field: "ID", Type: "int64", Help: "ID.", Required: true, Conversion: "types.ID"},
+				{Name: "start", Field: "Start", Type: "time.Time", Help: "Start."},
+				{Name: "end", Field: "End", Type: "time.Time", Help: "End."},
+			},
+		}},
+	}
+
+	t.Run("generates time flags and import", func(t *testing.T) {
+		source, err := Generate(baseConfig)
+		require.NoError(t, err)
+		generated := string(source)
+		require.Contains(t, generated, "\t\"time\"")
+		require.Regexp(t, `Start\s+\*time\.Time`, generated)
+		require.Regexp(t, `End\s+\*time\.Time`, generated)
+		require.Contains(t, generated, "request.Start = *c.Start")
+		require.Contains(t, generated, "request.End = *c.End")
+	})
+
+	t.Run("omits time import without time flags", func(t *testing.T) {
+		config := baseConfig
+		config.Operations = []Operation{{
+			Name:        "MonitorRouter",
+			CommandType: "MonitorRouterCommand",
+			Help:        "取得します。",
+			Method:      "MonitorRouterWithContext",
+			RequestType: "MonitorRouterRequest",
+			Flags: []Flag{
+				{Name: "zone", Field: "Zone", Type: "string", Help: "Zone.", Required: true},
+			},
+		}}
+		source, err := Generate(config)
+		require.NoError(t, err)
+		require.NotContains(t, string(source), "\t\"time\"")
+	})
 }
 
 func TestGenerateFactoryArgumentsAndNamedMethodArguments(t *testing.T) {

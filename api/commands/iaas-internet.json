@@ -481,12 +481,41 @@
       "name": "MonitorRouter",
       "command_name": "monitor-router",
       "command_type": "MonitorRouterCommand",
-      "help": "ルータ＋スイッチのトラフィックを指定期間で取得して出力します。",
+      "help": "ルータ＋スイッチのトラフィックを指定期間で取得して出力します。例: skr iaas-api internet monitor-router --zone is1b --id 123456789012 --start 2026-10-14T00:00:00Z --end 2026-10-15T00:00:00Z",
       "method": "MonitorRouterWithContext",
       "request_type": "internet.MonitorRouterRequest",
       "response_type": "[]*iaas.MonitorRouterValue",
       "validate_zone": true,
-      "request_help": "この操作は JSON 入力専用です。--request に JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、ID (ルータ＋スイッチ ID)、Start、End (RFC3339 形式の日時)。例: --request='{\"Zone\":\"is1b\",\"ID\":123456789012,\"Start\":\"2026-10-14T00:00:00Z\",\"End\":\"2026-10-15T00:00:00Z\"}'。ゾーン、ID、日時は実際の値に置き換えます。"
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、ID (ルータ＋スイッチ ID)。任意: Start、End (RFC3339 形式の日時)。省略時は終了が現在時刻、開始がその1時間前。フラグ例: skr iaas-api internet monitor-router --zone is1b --id 123456789012 --start 2026-10-14T00:00:00Z --end 2026-10-15T00:00:00Z。ゾーン、ID、日時は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象のルータ＋スイッチ ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "start",
+          "field": "Start",
+          "type": "time.Time",
+          "help": "任意: 取得期間の開始日時 (RFC3339 形式)。省略時は終了日時の1時間前。"
+        },
+        {
+          "name": "end",
+          "field": "End",
+          "type": "time.Time",
+          "help": "任意: 取得期間の終了日時 (RFC3339 形式)。省略時は現在時刻。"
+        }
+      ]
     }
   ]
 }

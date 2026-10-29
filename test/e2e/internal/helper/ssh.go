@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,17 @@ type SSHMaterial struct {
 // 公開鍵だけを user-data に記載し、秘密鍵の内容は含めません。
 // 秘密鍵と user-data は所有者のみ読める一時ファイルに保存され、テスト終了時に削除されます。
 func WriteSSHMaterial(t *testing.T, user string, sudo bool) SSHMaterial {
+	return WriteSSHMaterialWithRuncmd(t, user, sudo)
+}
+
+// WriteSSHMaterialWithRuncmd は ssh-keygen で一時的な SSH 鍵ペアを生成し、
+// 指定されたユーザーでログインする cloud-init user-data に、追加の runcmd を含めて作成します。
+// 各コマンドは runcmd に [sh, -c, <command>] として追加されます。ルータ＋スイッチ接続の
+// Server の NIC 設定のように、OS 起動後に実行するコマンドを渡します。
+// sudo を設定すると、NOPASSWD の sudo 権限を user-data に含めます。
+// 公開鍵だけを user-data に記載し、秘密鍵の内容は含めません。
+// 秘密鍵と user-data は所有者のみ読める一時ファイルに保存され、テスト終了時に削除されます。
+func WriteSSHMaterialWithRuncmd(t *testing.T, user string, sudo bool, commands ...string) SSHMaterial {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -45,8 +57,17 @@ func WriteSSHMaterial(t *testing.T, user string, sudo bool) SSHMaterial {
 	if err != nil {
 		t.Fatalf("read temporary public SSH key: %v", err)
 	}
-	userDataPath := filepath.Join(dir, "user-data.yaml")
 	userData := sshUserData(user, string(publicKey), sudo)
+	if len(commands) > 0 {
+		var b strings.Builder
+		b.WriteString(userData)
+		b.WriteString("runcmd:\n")
+		for _, command := range commands {
+			fmt.Fprintf(&b, "  - [sh, -c, %s]\n", strconv.Quote(command))
+		}
+		userData = b.String()
+	}
+	userDataPath := filepath.Join(dir, "user-data.yaml")
 	if err := os.WriteFile(userDataPath, []byte(userData), 0o600); err != nil {
 		t.Fatalf("write temporary cloud-init user-data: %v", err)
 	}

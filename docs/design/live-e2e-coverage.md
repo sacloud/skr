@@ -20,6 +20,7 @@
 | `test/e2e/container-registry-api` | registry 5操作、user 4操作(9) | 全コマンド実装済み |
 | `test/e2e/networking-suite` | subnet-group 5、subnet 5、interface-connection 2、address 2(14) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/gslb` | find / read / create / update / delete(5) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答と ping 監視による切り替え・復帰を確認済み |
+| `test/e2e/internet` | find / read / create / update / delete、list-subnet、add-subnet / update-subnet / delete-subnet、read-ipv6 / enable-ipv6 / disable-ipv6、monitor-router(13) | 全コマンド実装済み。2026-10-29 に testing.T ベースのシナリオテストへ移行済み。ルータ＋スイッチとスイッチ接続 Server の作成、追加サブネットと IPv6 の操作、SSH ログイン、削除後の不在確認を確認する。ライブは移行前の runner で全コマンドの正常実行を確認済み |
 | `test/e2e/icon`、`test/e2e/packetfilter` | 各 CRUD(5) | 全コマンド実装済み。2026-10-28 に packetfilter と icon を testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/disk`、`test/e2e/switch` | 各 CRUD(5) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/region` | find / read(2) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
@@ -53,13 +54,13 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 ### タスク1: 追加リソースなし・費用なしの拡張(完了)
 
 - `server update`(1コマンド): 完了。`test/e2e/server/` の E2E に作成済みサーバーの名前と説明を更新して応答で反映を確認し、元に戻すフローとして組み込みました。restore に失敗した場合、削除フローは名前の不一致を検出して削除を拒否します。2026-10-23 にライブで正常実行を確認し、2026-10-27 に [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテストへ移行しました。
-- `internet update` と `internet monitor-router`(2コマンド): 完了。`test/e2e/internet/` の既存 runner に `scenario_update.go` と `scenario_monitor_router.go` として追加します。作成済みルータ＋スイッチの名前・説明の更新と復元を Read で確認し、直近 10 分間の `monitor-router` を `--request` で実行します。トラフィックのない新規ルータに対する空配列は整形式の応答として扱います。2026-10-23 にライブで正常実行を確認しました。
+- `internet update` と `internet monitor-router`(2コマンド): 完了。作成済みルータ＋スイッチの名前・説明の更新と復元を Read で確認し、直近 10 分間の `monitor-router` を `--zone`、`--id`、`--start`、`--end` で実行します。トラフィックのない新規ルータに対する空配列は整形式の応答として扱います。2026-10-23 にライブで正常実行を確認しました。2026-10-29 に `monitor-router` の入力を `--request` から個別フラグへ変更しました。
 - `version`(1コマンド): 完了。`skr version` が `v<semver> <os>/<arch>, build <revision>` 形式で出力して正常終了することを確認します。2026-10-23 にライブで正常実行を確認しました。2026-10-27 に [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテスト (`test/e2e/version/scenario_version_test.go`) へ移行し、同日に移行後のシナリオをライブ再実行しました。
 
 ### タスク2: 同一実行リソース上の拡張(完了)
 
-- `internet` の add-subnet / update-subnet / delete-subnet(3コマンド): 完了。`test/e2e/internet/` の既存 runner に `scenario_subnet.go` として追加し、作成済みルータ＋スイッチに追加スイッチを作成してサブネットを追加・NextHop 更新・削除を Read で確認します。2026-10-23 にライブで正常実行を確認しました。
-- `internet` の enable-ipv6 / read-ipv6 / disable-ipv6(3コマンド): 完了。`scenario_ipv6.go` として同じ runner に追加し、同一ルータ＋スイッチで IPv6 の有効化・参照・無効化を Read で確認します。2026-10-23 にライブで正常実行を確認しました。
+- `internet` の add-subnet / update-subnet / delete-subnet(3コマンド): 完了。作成済みルータ＋スイッチに追加スイッチを作成してサブネットを追加・NextHop 更新・削除を Read で確認します。2026-10-23 にライブで正常実行を確認しました。
+- `internet` の enable-ipv6 / read-ipv6 / disable-ipv6(3コマンド): 完了。同一ルータ＋スイッチで IPv6 の有効化・参照・無効化を Read で確認します。2026-10-23 にライブで正常実行を確認しました。
 - `eventbus-api` の schedule 5コマンドと process-configuration update、trigger update(7コマンド): 完了。2026-10-23 にライブで正常実行を確認しました。2026-10-27 に `test/e2e/eventbus-api/` を [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行し、同じシナリオ内で再実行しました。schedule は現在時刻の1年後に1日周期で発火する設定を作成し、テスト時間内に発火しません。process-configuration の update はメッセージ内容を更新し、その内容を SimpleMQ 待ち受けが受信することでライブ更新を証明します。trigger の update は説明のみを更新して復元します。
 - `apprun` の application update と version の list / read / status / delete(5コマンド): 完了。`test/e2e/apprun/` に application update で 1 vCPU / 2Gi の新バージョンを作成して Healthy 待ち、traffic を最新バージョンに100%割り当ててから前バージョンを削除するシナリオを追加します。2026-10-23 にライブで正常実行を確認しました。
 - application update は新しいバージョンを作るため、version 操作と組み合わせて作成・参照・削除まで確認します。
@@ -92,9 +93,9 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 ## 命名ルールの適用状況
 
 - 既存 runner のディレクトリ名と証跡識別名は kebab-case で規則に適合しています。既存 runner の一括改名は行いません。
-- タスク1で追加した `scenario_update.go`、`scenario_monitor_router.go` と対応する `_test.go` は命名規則に従います。証跡ステップは `test-update`、`test-monitor-router` のような kebab-case です。version の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/version/scenario_version_test.go`) へ移行しました。旧 runner (`main.go`、`main_test.go`) は削除しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
-- タスク2で追加した `scenario_subnet.go` と `scenario_ipv6.go` は `test/e2e/internet/` にあります。eventbus-api のシナリオは `test/e2e/eventbus-api/` にあり、2026-10-27 に [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行しました。apprun のシナリオは `test/e2e/apprun/` にあり、同日に移行しました。
-- タスク2の internet runner の証跡ステップは `test-add-subnet`、`test-update-subnet`、`test-delete-subnet`、`test-enable-ipv6`、`test-read-ipv6` などの kebab-case です。
+- タスク1で追加した更新とモニタリングのシナリオと対応する `_test.go` は命名規則に従います。証跡ステップは `test-update`、`test-monitor-router` のような kebab-case でした。version の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/version/scenario_version_test.go`) へ移行しました。internet の E2E は 2026-10-29 に testing.T ベースのシナリオテスト (`test/e2e/internet/scenario_internet_test.go` ほか) へ移行しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
+- タスク2で追加したサブネットと IPv6 のシナリオは `test/e2e/internet/` の testing.T ベースのシナリオテストに統合しました。2026-10-29 に [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従い、internet の旧 runner (`main.go`、`main_test.go`、`scenario_*.go`) を testing.T ベースのシナリオテストへ移行しました。eventbus-api のシナリオは `test/e2e/eventbus-api/` にあり、2026-10-27 に [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行しました。apprun のシナリオは `test/e2e/apprun/` にあり、同日に移行しました。
+- internet の旧 runner の証跡ステップは `test-add-subnet`、`test-update-subnet`、`test-delete-subnet`、`test-enable-ipv6`、`test-read-ipv6` などの kebab-case でした。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 - タスク2の eventbus runner の証跡ステップは `update-configuration`、`update-trigger`、`schedule-create`、`schedule-read`、`schedule-update` などの kebab-case です。2026-10-27 に testing.T ベースのシナリオテストへ移行しました。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 - タスク2の apprun は 2026-10-27 に testing.T ベースのシナリオテストへ移行しました。旧 runner の証跡ステップは `update-application`、`list-versions`、`read-version`、`list-traffic`、`update-traffic`、`read-packet-filter` などの kebab-case です。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。
 - server の E2E は 2026-10-27 に testing.T ベースのシナリオテスト (`test/e2e/server/scenario_server_test.go` ほか) へ移行しました。旧 runner (`main.go`、`scenario_update.go`) は削除し、SSH 鍵の生成と SSH 接続の確認は `test/e2e/internal/helper` に移しました ([ADR 0063](../adr/0063-reusable-ssh-and-local-command-recording.md))。移行後はシナリオの CLI 呼び出しの説明が実行記録の見出しになります。同日に作成前の同名確認、後片付けの再照合と不在確認、起動待ちのポーリングを SDK で直接実行するよう変更しました ([ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md))。実行記録にはテスト対象の CLI 操作だけが残ります。同日に偽の操作 (`fakeServerCommands`) によるシナリオ経路の単体テストを廃止し、実ロジックの単体テストだけを残しました。テストファイルはシナリオ・SDK の確認操作・共有ロジックの3つに整理し、CLI の引数はシナリオの呼び出し箇所に直接書きました。引数を組み立てるだけの関数、インターフェース、操作を束ねる構造体も削除しました。

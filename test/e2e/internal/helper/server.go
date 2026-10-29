@@ -48,6 +48,8 @@ const (
 	ServerSSHWaitTimeout = 20 * time.Minute
 	// ServerSSHPolling は SSH ログインと起動・停止の再確認間隔です。
 	ServerSSHPolling = 10 * time.Second
+	// BootAcceptWaitTimeout は起動 API のエラー後に起動の受理を確認する期限です。
+	BootAcceptWaitTimeout = 3 * time.Minute
 	// findPageSize は SDK の一括検索で使う1ページの件数です。
 	findPageSize = 100
 )
@@ -176,7 +178,7 @@ func SharedIPOfServer(item ServerItem) string {
 func RequireNoServerNameCollision(t *testing.T, servers *serverSDK.Service, disks *diskSDK.Service, name string) {
 	t.Helper()
 
-	srvMatches, err := lookupServers(t, servers, name)
+	srvMatches, err := LookupServers(t, servers, name)
 	require.NoError(t, err, "find existing servers")
 	require.Empty(t, srvMatches, "test server name %q already exists; refusing to modify it", name)
 	diskMatches, err := lookupDisks(t, disks, name)
@@ -184,9 +186,11 @@ func RequireNoServerNameCollision(t *testing.T, servers *serverSDK.Service, disk
 	require.Empty(t, diskMatches, "test disk name %q already exists; refusing to modify it", name)
 }
 
-// CreateCloudInitServer は cloud-init ディスクと共有 NIC を持つテスト用 Server を skr CLI で作成し、
-// 作成応答と作成した Disk が期待する内容と一致することを SDK で確認します。作成に成功した Server を返します。
-func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name, description string, params ServerDiskParams) ServerItem {
+// CreateCloudInitServer は cloud-init ディスクと指定した接続先の NIC を持つテスト用 Server を
+// skr CLI で作成し、作成応答と作成した Disk が期待する内容と一致することを SDK で確認します。
+// upstream は NIC の接続先で、共有セグメントは "shared"、ルータ＋スイッチの Switch はその ID です。
+// 作成に成功した Server を返します。
+func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name, description string, params ServerDiskParams, upstream string) ServerItem {
 	t.Helper()
 
 	// 作成応答に作成結果が含まれる。ディスクと NIC は ADR 0041 の反復可能オプションで指定します
@@ -195,7 +199,7 @@ func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name
 		"--zone", ServerZone, "--name", name, "--description", description,
 		"--cpu", "1", "--memory-gb", "1",
 		"--disk", fmt.Sprintf("archive-id=%d,plan-id=%d,size-gb=%d", params.ArchiveID, params.DiskPlanID, params.SizeGB),
-		"--nic", "upstream=shared",
+		"--nic", "upstream="+upstream,
 	)
 	require.NoError(t, err, "create Server with cloud-init disk")
 	item, err := ParseServerOutput(data)
@@ -226,7 +230,10 @@ func BootServer(t *testing.T, h *Helper, id types.ID) {
 
 // BootServerWithUserData は cloud-init の user-data を指定して Server を起動します。
 // user-data は @path 形式でのみ渡し、内容を引数に含めません。
-func BootServerWithUserData(t *testing.T, h *Helper, id types.ID, userDataPath string) {
+// 起動 API は受理後に応答を失い、リトライが 409 になることがあります。
+// この場合も起動は進行するため、SDK で Server の状態を確認し、
+// down のままの場合だけ失敗として扱います。
+func BootServerWithUserData(t *testing.T, h *Helper, servers *serverSDK.Service, id types.ID, userDataPath string) {
 	t.Helper()
 
 	_, _, err := h.CallAllowingFailure(t, "cloud-init の user-data を指定してサーバーを起動する",
@@ -234,7 +241,33 @@ func BootServerWithUserData(t *testing.T, h *Helper, id types.ID, userDataPath s
 		"--zone", ServerZone, "--id", id.String(),
 		"--user-data", "@"+userDataPath,
 	)
-	require.NoError(t, err, "boot Server with user-data")
+	if err == nil {
+		return
+	}
+	if !bootInProgress(t, servers, id) {
+		require.NoError(t, err, "boot Server with user-data")
+	}
+}
+
+// bootInProgress は起動 API のエラー後に Server の状態を確認し、起動の受理を待ちます。
+// down 以外の状態に変われば起動が受理されたとみなします。証跡に残さない安全確認です。
+func bootInProgress(t *testing.T, servers *serverSDK.Service, id types.ID) bool {
+	t.Helper()
+
+	deadline := time.Now().Add(BootAcceptWaitTimeout)
+	for {
+		item, err := FetchServer(t, servers, id)
+		if err != nil {
+			return false
+		}
+		if !item.InstanceStatus.IsDown() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(ServerSSHPolling)
+	}
 }
 
 // WaitForServerSSH は SDK で起動と共有 NIC の IP アドレスを確認し、SSH ログインが
@@ -242,6 +275,26 @@ func BootServerWithUserData(t *testing.T, h *Helper, id types.ID, userDataPath s
 // cloud-init の反映はベストエフォートで待ち、期限を過ぎたらテストを失敗させます。
 // SSH の接続試行は実行記録に残り、成功の判断は hostname の取得で行います。
 func WaitForServerSSH(t *testing.T, h *Helper, servers *serverSDK.Service, id types.ID, name, description string, material SSHMaterial) {
+	waitForServerSSH(t, h, servers, id, name, description, material, func(item ServerItem) (string, bool) {
+		ip := SharedIPOfServer(item)
+		return ip, ip != ""
+	})
+}
+
+// WaitForServerSSHAt は SDK で起動を確認しながら、指定した IPv4 アドレスの Server に
+// SSH ログインが成功するまで期限付きで待ちます。ルータ＋スイッチ接続の Server のように、
+// SSH 接続先が起動前に決まっている場合に使います。
+// 起動待ちのポーリングは証跡に残りません。SSH の接続試行は実行記録に残り、
+// 成功の判断は hostname の取得で行います。
+func WaitForServerSSHAt(t *testing.T, h *Helper, servers *serverSDK.Service, id types.ID, name, description string, material SSHMaterial, ip string) {
+	waitForServerSSH(t, h, servers, id, name, description, material, func(ServerItem) (string, bool) {
+		return ip, ip != ""
+	})
+}
+
+// waitForServerSSH は起動待ちのポーリングを共通化した本体です。ipOf は各ポーリングで
+// SSH の接続先を返し、接続先を取得できるまで起動の反映を待ちます。
+func waitForServerSSH(t *testing.T, h *Helper, servers *serverSDK.Service, id types.ID, name, description string, material SSHMaterial, ipOf func(ServerItem) (string, bool)) {
 	t.Helper()
 
 	deadline := time.Now().Add(ServerSSHWaitTimeout)
@@ -251,7 +304,7 @@ func WaitForServerSSH(t *testing.T, h *Helper, servers *serverSDK.Service, id ty
 		require.NoError(t, CheckServerIdentity(item, id, name, description),
 			"the Server should keep its identity while booting")
 		if item.InstanceStatus.IsUp() {
-			if ip := SharedIPOfServer(item); ip != "" {
+			if ip, ok := ipOf(item); ok {
 				if err := h.ConnectSSH(t, material, ServerSSHUser, ip, "SSH ログインを確認する"); err == nil {
 					return
 				} else {
@@ -318,7 +371,7 @@ func CleanupServerResources(t *testing.T, h *Helper, servers *serverSDK.Service,
 	serverID := id
 	if serverID.IsEmpty() {
 		for _, identity := range identities {
-			matches, err := lookupServers(t, servers, identity.Name)
+			matches, err := LookupServers(t, servers, identity.Name)
 			if err != nil {
 				return fmt.Errorf("cannot locate possibly created Server: %w", err)
 			}
@@ -376,8 +429,9 @@ func FetchServer(t *testing.T, servers *serverSDK.Service, id types.ID) (ServerI
 	return serverFromSDK(server), nil
 }
 
-// lookupServers は SDK で名前部分一致検索を行い、全ページの結果を返します。
-func lookupServers(t *testing.T, servers *serverSDK.Service, name string) ([]ServerItem, error) {
+// LookupServers は SDK で名前部分一致検索を行い、全ページの結果を返します。
+// 後片て付けでの残存確認など、証跡に残さない安全確認で使います。
+func LookupServers(t *testing.T, servers *serverSDK.Service, name string) ([]ServerItem, error) {
 	t.Helper()
 
 	items, err := paginateFind(t, func(ctx context.Context, from int) ([]ServerItem, error) {
@@ -457,7 +511,7 @@ func requireServerAbsent(t *testing.T, servers *serverSDK.Service, names ...stri
 	t.Helper()
 
 	for _, name := range names {
-		matches, err := lookupServers(t, servers, name)
+		matches, err := LookupServers(t, servers, name)
 		if err != nil {
 			return fmt.Errorf("verify Server absence after cleanup: %w", err)
 		}

@@ -72,7 +72,7 @@ func TestScenarioServer(t *testing.T) {
 	}()
 
 	// テスト用の Server を cloud-init ディスクと共有 NIC 付きで作成し、作成した Disk も含めて確認する
-	item := helper.CreateCloudInitServer(t, h, disks, name, helper.ServerDescription, params)
+	item := helper.CreateCloudInitServer(t, h, disks, name, helper.ServerDescription, params, "shared")
 	serverID = item.ID
 
 	// server read が作成済みの Server を返すことを確認する。--query で確認に必要な項目へ絞り込みます
@@ -99,7 +99,7 @@ func TestScenarioServer(t *testing.T) {
 	require.Equal(t, serverID, matches[0].ID, "server find --name should return the created Server")
 
 	// cloud-init の user-data を指定して起動する。user-data は @path 形式でのみ渡し、内容を引数に含めません
-	helper.BootServerWithUserData(t, h, serverID, material.UserDataPath)
+	helper.BootServerWithUserData(t, h, servers, serverID, material.UserDataPath)
 
 	// 起動を確認しながら SSH ログインできるまで待つ
 	helper.WaitForServerSSH(t, h, servers, serverID, name, helper.ServerDescription, material)
