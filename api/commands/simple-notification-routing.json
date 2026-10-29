@@ -82,5 +82,7 @@
       "response_type": "*v1.ListSourcesResponse"
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "SimpleNotificationAPI.Routing",
+  "sdk_factory": "simplenotificationapi.NewRoutingAPI",
+  "decoder": "simplenotificationapi.DecodeRoutingRequest"
 }

@@ -85,11 +85,7 @@ func TestGroupCommandsUseSDKRequestAndResponse(t *testing.T) {
 	createCommand := GroupCreateCommand{
 		Request: &requestJSON,
 		runtime: GroupRuntime{
-			DecodeRequest: func(input string, destination any) error {
-				return decodeResourceRequest(input, destination, func(input string, destination any) error {
-					return json.Unmarshal([]byte(input), destination)
-				}, v1.CommonServiceItemProviderClassSaknoticegroup, v1.CommonServiceItemServiceClassCloudSaknoticegroup2)
-			},
+			DecodeRequest:  DecodeGroupRequest,
 			ValidateOutput: func(*kong.Context) error { return nil },
 			WriteOutput: func(_ *kong.Context, value any) error {
 				createOutput = value

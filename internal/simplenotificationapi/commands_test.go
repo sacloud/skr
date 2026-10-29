@@ -20,11 +20,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/alecthomas/kong"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
+	"github.com/stretchr/testify/require"
 )
 
 type destinationAPIMock struct {
@@ -73,15 +73,9 @@ func TestCreateProviderCallbacks(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			request := v1.PostCommonServiceItemRequest{}
-			if err := test.set(&request); err != nil {
-				t.Fatal(err)
-			}
-			if got := request.CommonServiceItem.Provider.Class; got != test.providerClass {
-				t.Errorf("Provider.Class = %q, want %q", got, test.providerClass)
-			}
-			if got := request.CommonServiceItem.ServiceClass; got != test.serviceClass {
-				t.Errorf("ServiceClass = %q, want %q", got, test.serviceClass)
-			}
+			require.NoError(t, test.set(&request))
+			require.Equal(t, test.providerClass, request.CommonServiceItem.Provider.Class)
+			require.Equal(t, test.serviceClass, request.CommonServiceItem.ServiceClass)
 		})
 	}
 }
@@ -89,20 +83,14 @@ func TestCreateProviderCallbacks(t *testing.T) {
 func TestDestinationCreateCommandSetsProviderAndPreservesSettings(t *testing.T) {
 	requestJSON := `{"CommonServiceItem":{"Name":"test-destination","Provider":{"Class":"saknoticegroup"},"Settings":{"Type":"email","Value":"example@example.test"}}}`
 	requestFile := filepath.Join(t.TempDir(), "destination.json")
-	if err := os.WriteFile(requestFile, []byte(requestJSON), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(requestFile, []byte(requestJSON), 0o600))
 	requestInput := "@" + requestFile
 	var gotRequest v1.PostCommonServiceItemRequest
 	var output any
 	command := DestinationCreateCommand{
 		Request: &requestInput,
 		runtime: DestinationRuntime{
-			DecodeRequest: func(input string, destination any) error {
-				return decodeDestinationRequest(input, destination, func(input string, destination any) error {
-					return json.Unmarshal([]byte(input), destination)
-				}, v1.CommonServiceItemProviderClassSaknoticedestination, v1.CommonServiceItemServiceClassCloudSaknoticedestination2)
-			},
+			DecodeRequest:  DecodeDestinationRequest,
 			ValidateOutput: func(*kong.Context) error { return nil },
 			WriteOutput: func(_ *kong.Context, value any) error {
 				output = value
@@ -112,34 +100,21 @@ func TestDestinationCreateCommandSetsProviderAndPreservesSettings(t *testing.T) 
 		factory: func() (DestinationAPI, error) {
 			return destinationAPIMock{
 				create: func(ctx context.Context, request v1.PostCommonServiceItemRequest) (*v1.CreateCommonServiceItemCreated, error) {
-					if ctx == nil {
-						t.Fatal("Create received a nil context")
-					}
+					require.NotNil(t, ctx, "Create received a nil context")
 					gotRequest = request
 					return &v1.CreateCommonServiceItemCreated{}, nil
 				},
 			}, nil
 		},
 	}
-	if err := command.Run(&kong.Context{}); err != nil {
-		t.Fatal(err)
-	}
-	if gotRequest.CommonServiceItem.Provider.Class != v1.CommonServiceItemProviderClassSaknoticedestination {
-		t.Errorf("Provider.Class = %q", gotRequest.CommonServiceItem.Provider.Class)
-	}
-	if gotRequest.CommonServiceItem.ServiceClass != v1.CommonServiceItemServiceClassCloudSaknoticedestination2 {
-		t.Errorf("ServiceClass = %q", gotRequest.CommonServiceItem.ServiceClass)
-	}
+	require.NoError(t, command.Run(&kong.Context{}))
+	require.Equal(t, v1.CommonServiceItemProviderClassSaknoticedestination, gotRequest.CommonServiceItem.Provider.Class)
+	require.Equal(t, v1.CommonServiceItemServiceClassCloudSaknoticedestination2, gotRequest.CommonServiceItem.ServiceClass)
 	settings, ok := gotRequest.CommonServiceItem.Settings.GetDestinationSettings()
-	if !ok {
-		t.Fatal("Settings is not a destination settings variant")
-	}
-	if settings.Type != v1.DestinationSettingsTypeEmail || settings.Value != "example@example.test" {
-		t.Errorf("Settings = %+v", settings)
-	}
-	if _, ok := output.(*v1.CreateCommonServiceItemCreated); !ok {
-		t.Errorf("output has type %T, want create response", output)
-	}
+	require.True(t, ok, "Settings is not a destination settings variant")
+	require.Equal(t, v1.DestinationSettingsTypeEmail, settings.Type)
+	require.Equal(t, "example@example.test", settings.Value)
+	require.IsType(t, &v1.CreateCommonServiceItemCreated{}, output, "output should be a create response")
 }
 
 func TestSendMessageFlagAndJSONInputs(t *testing.T) {
@@ -169,19 +144,15 @@ func TestSendMessageFlagAndJSONInputs(t *testing.T) {
 				factory: func() (GroupAPI, error) {
 					return groupAPIMock{sendMessage: func(ctx context.Context, id string, request v1.SendNotificationMessageRequest) (*v1.SendNotificationMessageResponse, error) {
 						called = true
-						if ctx == nil || id != "group-123" || request.Message != message {
-							t.Fatalf("SendMessage(%v, %q, %+v)", ctx, id, request)
-						}
+						require.NotNil(t, ctx)
+						require.Equal(t, "group-123", id)
+						require.Equal(t, message, request.Message)
 						return &v1.SendNotificationMessageResponse{IsOk: true}, nil
 					}}, nil
 				},
 			}
-			if err := command.Run(&kong.Context{}); err != nil {
-				t.Fatal(err)
-			}
-			if !called {
-				t.Fatal("SendMessage was not called")
-			}
+			require.NoError(t, command.Run(&kong.Context{}))
+			require.True(t, called, "SendMessage was not called")
 		})
 	}
 }
@@ -200,9 +171,8 @@ func TestSendMessageRejectsMissingOrMixedInput(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			command := GroupSendMessageCommand{Request: test.request, Message: test.message}
 			err := command.Run(&kong.Context{})
-			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("error = %v, want %q", err, test.want)
-			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.want)
 		})
 	}
 }
@@ -210,9 +180,7 @@ func TestSendMessageRejectsMissingOrMixedInput(t *testing.T) {
 func TestCreateCommandPropagatesDecodeAndAPIErrors(t *testing.T) {
 	requestJSON := `{"CommonServiceItem":{"Name":"test","Settings":{"Type":"email","Value":"example@example.test"}}}`
 	requestFile := filepath.Join(t.TempDir(), "destination.json")
-	if err := os.WriteFile(requestFile, []byte(requestJSON), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(requestFile, []byte(requestJSON), 0o600))
 	requestInput := "@" + requestFile
 	wantErr := errors.New("provider API failed")
 	command := DestinationCreateCommand{
@@ -222,26 +190,21 @@ func TestCreateCommandPropagatesDecodeAndAPIErrors(t *testing.T) {
 			ValidateOutput: func(*kong.Context) error { return nil },
 		},
 	}
-	if err := command.Run(&kong.Context{}); err == nil || !strings.Contains(err.Error(), "decode failed") {
-		t.Fatalf("decode error = %v", err)
-	}
+	err := command.Run(&kong.Context{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "decode failed")
 
-	command.runtime.DecodeRequest = func(input string, destination any) error {
-		return decodeDestinationRequest(input, destination, func(input string, destination any) error {
-			return json.Unmarshal([]byte(input), destination)
-		}, v1.CommonServiceItemProviderClassSaknoticedestination, v1.CommonServiceItemServiceClassCloudSaknoticedestination2)
-	}
+	command.runtime.DecodeRequest = DecodeDestinationRequest
 	command.factory = func() (DestinationAPI, error) {
 		return destinationAPIMock{create: func(context.Context, v1.PostCommonServiceItemRequest) (*v1.CreateCommonServiceItemCreated, error) {
 			return nil, wantErr
 		}}, nil
 	}
-	if err := command.Run(&kong.Context{}); !errors.Is(err, wantErr) {
-		t.Fatalf("API error = %v, want %v", err, wantErr)
-	}
+	require.ErrorIs(t, command.Run(&kong.Context{}), wantErr)
 }
 
 func TestDestinationRequestRequiresFileForAddressSettings(t *testing.T) {
+	const webhookURL = "https://example.test/secret"
 	for _, test := range []struct {
 		name        string
 		destination any
@@ -252,14 +215,14 @@ func TestDestinationRequestRequiresFileForAddressSettings(t *testing.T) {
 		{
 			name:        "create",
 			destination: &v1.PostCommonServiceItemRequest{},
-			input:       `{"CommonServiceItem":{"Name":"destination","Settings":{"Type":"webhook","Value":"https://example.test/secret"}}}`,
+			input:       `{"CommonServiceItem":{"Name":"destination","Settings":{"Type":"webhook","Value":"` + webhookURL + `"}}}`,
 			wantError:   true,
 			wantMessage: "@path.json",
 		},
 		{
 			name:        "update settings",
 			destination: &v1.PutCommonServiceItemRequest{},
-			input:       `{"CommonServiceItem":{"Name":"destination","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"webhook","Value":"https://example.test/secret"}}}`,
+			input:       `{"CommonServiceItem":{"Name":"destination","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"webhook","Value":"` + webhookURL + `"}}}`,
 			wantError:   true,
 			wantMessage: "@path.json",
 		},
@@ -271,27 +234,23 @@ func TestDestinationRequestRequiresFileForAddressSettings(t *testing.T) {
 		{
 			name:        "malformed update cannot bypass file requirement",
 			destination: &v1.PutCommonServiceItemRequest{},
-			input:       `{"CommonServiceItem":{"Name":"destination","Settings":{"Type":"webhook","Value":"https://example.test/secret"}},"commonserviceitem":0}`,
+			input:       `{"CommonServiceItem":{"Name":"destination","Settings":{"Type":"webhook","Value":"` + webhookURL + `"}},"commonserviceitem":0}`,
 			wantError:   true,
 			wantMessage: "通知先リクエストを読み込めません",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			called := false
-			err := decodeDestinationRequest(test.input, test.destination, func(string, any) error {
-				called = true
-				return nil
-			}, v1.CommonServiceItemProviderClassSaknoticedestination, v1.CommonServiceItemServiceClassCloudSaknoticedestination2)
+			err := DecodeDestinationRequest(test.input, test.destination)
 			if test.wantError {
-				if err == nil || !strings.Contains(err.Error(), test.wantMessage) || strings.Contains(err.Error(), "https://example.test/secret") {
-					t.Fatalf("error = %v, want safe message containing %q", err, test.wantMessage)
-				}
-				if called {
-					t.Fatal("inline address was passed to the JSON decoder")
-				}
-			} else if err != nil || !called {
-				t.Fatalf("metadata request error = %v, decoder called = %v", err, called)
+				require.Error(t, err)
+				require.Contains(t, err.Error(), test.wantMessage)
+				require.NotContains(t, err.Error(), webhookURL, "error must not contain the protected address")
+				return
 			}
+			require.NoError(t, err)
+			request, ok := test.destination.(*v1.PutCommonServiceItemRequest)
+			require.True(t, ok)
+			require.Equal(t, "destination", request.CommonServiceItem.Name, "metadata request should be decoded")
 		})
 	}
 }
@@ -299,42 +258,23 @@ func TestDestinationRequestRequiresFileForAddressSettings(t *testing.T) {
 func TestDecodeResourceCreateRequestSupportsFileAndPreservesFields(t *testing.T) {
 	input := `{"CommonServiceItem":{"Name":"test-group","Description":"kept description","Tags":["kept-tag"],"Provider":{"Class":"wrong"},"ServiceClass":"wrong","Settings":{"Destinations":["123456789012"]}}}`
 	path := filepath.Join(t.TempDir(), "request.json")
-	if err := os.WriteFile(path, []byte(input), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(path, []byte(input), 0o600))
 
 	var request v1.PostCommonServiceItemRequest
-	err := decodeResourceRequest("@"+path, &request, func(input string, destination any) error {
-		return json.Unmarshal([]byte(input), destination)
-	}, v1.CommonServiceItemProviderClassSaknoticegroup, v1.CommonServiceItemServiceClassCloudSaknoticegroup2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, DecodeGroupRequest("@"+path, &request))
 	item := request.CommonServiceItem
-	if item.Name != "test-group" || item.Description != "kept description" {
-		t.Errorf("Name/Description = %q/%q", item.Name, item.Description)
-	}
-	if item.Provider.Class != v1.CommonServiceItemProviderClassSaknoticegroup ||
-		item.ServiceClass != v1.CommonServiceItemServiceClassCloudSaknoticegroup2 {
-		t.Errorf("provider/service class = %q/%q", item.Provider.Class, item.ServiceClass)
-	}
-	if len(item.Tags) != 1 || item.Tags[0] != "kept-tag" {
-		t.Errorf("Tags = %#v", item.Tags)
-	}
-	if !item.Icon.IsNull() {
-		t.Errorf("omitted Icon should be represented as null, got %#v", item.Icon)
-	}
-	if settings, ok := item.Settings.GetGroupSettings(); !ok || len(settings.Destinations) != 1 {
-		t.Errorf("Settings = %#v, want one group destination", item.Settings)
-	}
+	require.Equal(t, "test-group", item.Name)
+	require.Equal(t, "kept description", item.Description)
+	require.Equal(t, v1.CommonServiceItemProviderClassSaknoticegroup, item.Provider.Class)
+	require.Equal(t, v1.CommonServiceItemServiceClassCloudSaknoticegroup2, item.ServiceClass)
+	require.Equal(t, []string{"kept-tag"}, item.Tags)
+	require.True(t, item.Icon.IsNull(), "omitted Icon should be represented as null")
+	settings, ok := item.Settings.GetGroupSettings()
+	require.True(t, ok)
+	require.Equal(t, []string{"123456789012"}, settings.Destinations)
 }
 
 func TestDecodeResourceCreateRequestErrors(t *testing.T) {
-	decode := func(input string, destination any) error {
-		return decodeResourceRequest(input, destination, func(input string, destination any) error {
-			return json.Unmarshal([]byte(input), destination)
-		}, v1.CommonServiceItemProviderClassSaknoticegroup, v1.CommonServiceItemServiceClassCloudSaknoticegroup2)
-	}
 	for _, test := range []struct {
 		name  string
 		input string
@@ -348,10 +288,9 @@ func TestDecodeResourceCreateRequestErrors(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var request v1.PostCommonServiceItemRequest
-			err := decode(test.input, &request)
-			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("error = %v, want %q", err, test.want)
-			}
+			err := DecodeGroupRequest(test.input, &request)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.want)
 		})
 	}
 }

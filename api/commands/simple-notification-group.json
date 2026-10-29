@@ -93,5 +93,7 @@
       ]
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "SimpleNotificationAPI.Group",
+  "sdk_factory": "simplenotificationapi.NewGroupAPI",
+  "decoder": "simplenotificationapi.DecodeGroupRequest"
 }

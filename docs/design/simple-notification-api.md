@@ -15,9 +15,9 @@
 
 ## パッケージと生成
 
-各リソースの操作は `api/commands/simple-notification-*.json` で明示し、`make generate-api` から `internal/simplenotificationapi/` に生成します。リソース固有の SDK 接続、リクエスト補完、通知先入力の保護処理も同じパッケージに配置します。CLI の登録と Runtime／SDK factory の接続は `internal/cli/` が担当します。
+各リソースの操作は `api/commands/simple-notification-*.json` で明示し、`make generate-api` から `internal/simplenotificationapi/` に生成します。リソース固有の SDK 接続、リクエスト補完、通知先入力の保護処理も同じパッケージに配置します。パッケージはリソースごとの constructor (`NewDestinationAPI` など) と named decoder (`DecodeDestinationRequest` など) を公開し、通知先のエラー保護 adapter は constructor の中に隠蔽します。`internal/cli/` の配線は `make generate-wiring` から生成します。
 
-生成コードを直接編集せず、設定を変更して再生成します。生成コードと設定の一致は `internal/cli/simplenotification_test.go` で確認します。手書き処理と SDK 呼び出しは `internal/simplenotificationapi/` の単体テストで、CLI 登録とヘルプは `internal/cli/` のテストで確認します。
+生成コードを直接編集せず、設定を変更して再生成します。コマンドの生成コードと設定の一致は `internal/cli/simplenotification_test.go` で、配線の一致は `internal/cli/wiring_test.go` で確認します。手書き処理と SDK 呼び出しは `internal/simplenotificationapi/` の単体テストで、CLI 登録とヘルプは `internal/cli/` のテストで確認します。
 
 トレース設定はコマンド初期化時に固定せず、引数解析後のクライアント生成時に参照します。`--trace` の有無で HTTP トレースの出力を切り替えることを、CLI から公開 SDK を通すテストで確認します。
 

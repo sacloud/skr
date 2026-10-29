@@ -81,5 +81,7 @@
       "response_type": "*v1.GetCommonServiceItemStatusResponse"
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "SimpleNotificationAPI.Destination",
+  "sdk_factory": "simplenotificationapi.NewDestinationAPI",
+  "decoder": "simplenotificationapi.DecodeDestinationRequest"
 }
