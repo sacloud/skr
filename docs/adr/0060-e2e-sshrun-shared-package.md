@@ -1,6 +1,6 @@
 # ADR 0060: E2E の SSH 待機とログイン確認を共通パッケージに集約する
 
-- Status: Proposed
+- Status: Superseded by [ADR 0063](0063-reusable-ssh-and-local-command-recording.md)
 - Date: 2026-10-26
 
 ## Context
@@ -19,6 +19,10 @@ server / internet / gslb のライブ E2E runner は、それぞれ `waitForSSH`
 - runner は `observe`（記録しない状態確認）と `call`（記録する操作）を分け、待機中の確認は `observe` を使います。待機の結果だけが証跡に残ります。
 - この移行は server / internet / gslb の runner に適用します。`networking-suite` は `ubuntu` ユーザーと NIC の同一性確認など要件が異なるため今回の対象外とし、必要になれば別途移行を検討します。
 - 秘密鍵と cloud-config の内容は evidence に記録しません。コマンドの引数と応答だけを記録します。
+
+## Superseded
+
+この ADR に従って `test/e2e/internal/sshrun` を実装しましたが、server / internet / gslb の runner を [ADR 0062](0062-e2e-testing-t-based-scenario.md) の testing.T ベースのシナリオへ移行した際、SSH 処理は [ADR 0063](0063-reusable-ssh-and-local-command-recording.md) の `test/e2e/internal/helper` に置き換わりました。待機中の SSH 接続試行はすべて実行記録に残る方式になり、sshrun 固有の待機要約記録は使われなくなりました。2026-10-29 に利用者がいない `test/e2e/internal/sshrun` と、その依存先の `test/e2e/internal/evidence` を削除しました。
 
 ## Consequences
 

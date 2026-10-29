@@ -90,11 +90,9 @@ Runtime は `ValidateOutput(ctx)` と `WriteOutput(ctx, value)` を受け取り�
 
 `sakumock v0.9.1` に IaaS mock がないため、Switch の CLI テストでは `internal/sakumock/iaas` のインメモリ実装を使用します。この実装は SDK の `api/iaas.APICaller` を満たし、Switch の API 操作をテストします。将来 sakumock に IaaS 対応が追加された場合は、テストで使う API caller を置き換え、CLI と SDK の操作テストを維持します。
 
-ライブの管理操作は `test/e2e/switch` の Go スクリプトで再現します。ビルド済みの skr CLI を起動し、単純な操作では個別フラグ、`Names` による検索では JSON 経路を使います。`tk1v` だけを対象とし、実行確認フラグを必須にします。実行前に `skr-e2e-` で始まるスイッチを全ページから探し、E2E 用の説明値が一致するものだけ ID と内容を再確認して削除します。その後、固定名 `skr-e2e-switch` で作成し、JSON で操作結果を検証するとともに、ID と名前を投影した JSON も証跡に記録します。確認後、ID と名前・説明を照合して削除します。コマンドの入出力は共通の `test/e2e/internal/evidence` を使い、`tmp/switch-api/<YYYYMMDDHHmm>/` に記録して異常終了後の調査に使います。完了時には全 E2E 共通の `REPORT.md` を生成し、実行コマンド、標準出力、標準エラー、終了コード、最終結果を一覧します。
+Switch API のライブ E2E は `test/e2e/switch` の `scenario_switch_test.go` で検証します。`SKR_E2E` を設定して `go test` を実行すると `skr-e2e` プロファイルでライブ実行し、通常の `go test` では実行環境を変更しません。シナリオは `is1b` で、ランダムな接尾辞付きのスイッチの作成、名前検索、`--query` での射影、参照、名前とタグの更新、削除と不在確認まで行います。作成前に `skr-e2e-switch-` で始まる同名スイッチがないことを SDK で確認し、削除時は ID と名前・説明を照合してから削除します。実行記録は helper が Git 管理外の `e2e-output/` 配下の Markdown に保存します。
 
-Disk API のライブ操作は `test/e2e/disk` で検証します。対象は `is1b` の SSD プラン ID 4、20 GB のディスクです。ランダムな名前を使い、同名のディスクがあれば変更せず中止します。作成後は検索・参照・名前更新・再参照・削除し、削除後に対象が存在しないことを確認します。途中で失敗した場合も ID、名前、E2E 説明、サイズを照合してから作成済みのディスクだけを削除します。実行確認フラグを必須とし、コマンドの入出力は `test/e2e/internal/evidence` を使って `tmp/disk-api/<YYYYMMDDHHmm>/` に保存します。
-
-Switch runner は `--confirm-is1b-live` でも実行できます。`--confirm-tk1v` との併用は拒否します。この経路では `is1b` にランダム名のスイッチを作成し、既存リソースの事前削除は行いません。検索、参照、更新、投影 JSON の確認後に今回作成した ID と名前・説明を照合して削除し、不在を検証します。
+Disk API のライブ E2E は `test/e2e/disk` の `scenario_disk_test.go` で検証します。対象は `is1b` の SSD プラン (ID 4) の 20 GB ディスクです。ランダムな名前を使い、同名のディスクがあれば変更せず中止します。作成後は参照・名前更新・再参照・削除し、削除後に対象が存在しないことを確認します。途中で失敗した場合も ID、名前、説明を照合してから作成済みのディスクだけを削除します。実行記録は helper が Git 管理外の `e2e-output/` 配下の Markdown に保存します。
 
 Zone API の読み取り専用ライブ E2E は `test/e2e/zone` の `scenario_zone_test.go` で検証します。`SKR_E2E` を設定して `go test` を実行すると `skr-e2e` プロファイルでライブ実行し、通常の `go test` では実行環境を変更しません。シナリオはゾーン一覧の取得、`--query 'map(.Name)'` での名前抽出、一覧の先頭ゾーンの ID での参照を確認します。クラウドリソースの作成・変更・削除は行いません。実行記録は helper が Git 管理外の `e2e-output/` 配下の Markdown に保存します。
 
