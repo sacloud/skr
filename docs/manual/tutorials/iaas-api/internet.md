@@ -31,26 +31,27 @@ $ skr iaas-api server delete --help
 
 ## Step 2: Archive と DiskPlan を選ぶ
 
-cloud-init 対応パブリックアーカイブを is1b で検索します。名前と説明から `cloudimg` を選び、Archive の `ID` を `CLOUDIMG_ARCHIVE_ID` に設定します。Archive API の結果を参照して、アーカイブの ID、名前、サイズも確認してください。
+cloud-init 対応パブリックアーカイブを is1b で検索し、Ubuntu の cloudimg に絞り込んで ID が最大 (最新) のものをシェル変数に取り込みます。アーカイブの ID、名前、サイズを参照で確認してください。
 
 ```console
-$ skr iaas-api archive find --zone is1b \
-    --query 'map({ID,Name,Description,DiskPlanID,DiskPlanName,SizeMB})'
-$ CLOUDIMG_ARCHIVE_ID=CLOUDIMG_ARCHIVE_ID
-$ skr iaas-api archive read --zone is1b --id "$CLOUDIMG_ARCHIVE_ID"
+$ CLOUDIMG_ARCHIVE_ID=$(skr iaas-api archive find --zone is1b \
+    --query 'map(select(.Name | test("Ubuntu") and test("cloudimg"))) | sort_by(-.ID) | .[0].ID')
+$ echo "$CLOUDIMG_ARCHIVE_ID"
+$ skr iaas-api archive read --zone is1b --id "$CLOUDIMG_ARCHIVE_ID" \
+    --query '{ID,Name,SizeMB}'
 ```
 
-次に、同じゾーンで利用可能な DiskPlan とサイズを検索し、`DISK_PLAN_ID` と `DISK_SIZE_GB` を設定します。
+次に、SSDプランのうち ID が最小のものと、プラン内で利用可能な最小の GB 単位のサイズを取り込みます。
 
 ```console
-$ skr iaas-api product disk find --zone is1b \
-    --query '.DiskPlans | map({ID,Name,Availability,Size})'
-$ DISK_PLAN_ID=DISK_PLAN_ID
-$ DISK_SIZE_GB=DISK_SIZE_GB
-$ skr iaas-api product disk read --zone is1b --id "$DISK_PLAN_ID"
+$ DISK_PLAN_ID=$(skr iaas-api product disk find --zone is1b \
+    --query '.DiskPlans | map(select(.Name | test("SSD"))) | sort_by(.ID) | .[0].ID')
+$ DISK_SIZE_GB=$(skr iaas-api product disk read --zone is1b --id "$DISK_PLAN_ID" \
+    --query '[.Size[] | select(.Availability == "available" and .DisplaySuffix == "GB") | .DisplaySize] | .[0]')
+$ echo "$DISK_PLAN_ID, $DISK_SIZE_GB"
 ```
 
-各代入の右辺は実際に選んだ正の整数に置き換えます。Archive と DiskPlan の選び方は [Archive API チュートリアル](archive.md)と[DiskPlan API チュートリアル](disk-plan.md)も参照してください。
+Archive と DiskPlan の選び方は [Archive API チュートリアル](archive.md)と[DiskPlan API チュートリアル](disk-plan.md)も参照してください。
 
 ## Step 3: ルータ＋スイッチとサブネットを確認する
 
