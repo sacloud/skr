@@ -61,5 +61,5 @@ $ skr iaas-api ipaddress read --zone is1b --ip-address 192.0.2.10
 
 ## 参考情報
 
-- [グローバル IP アドレスと逆引きホスト名](https://manual.sakura.ad.jp/cloud/server/reverse-dns.html)
+- [IP アドレスの逆引き設定 (スイッチ、ルータ＋スイッチ)](https://manual.sakura.ad.jp/cloud/network/switch/reverse-dns.html)
 - [sacloud-sdk-go v0.3.1 IPAddress API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.1/service/iaas/ipaddress)
