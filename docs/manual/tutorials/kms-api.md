@@ -1,9 +1,9 @@
 # KMS API: キーを作成し、暗号化と復号を行う
 
-さくらのクラウド KMS (Key Management Service) は、FIPS 140-3 level 3 認証の HSM と連携した暗号鍵の管理サービスです。対称鍵 AES-256 bit の暗号化・復号を提供し、鍵素材は HSM の外に取り出せません。キーの削除は猶予期間 7〜90 日の削除予約制です（[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)）。
+さくらのクラウド KMS (Key Management Service) は、FIPS 140-3 level 3 認証の HSM と連携した暗号鍵の管理サービスです。対称鍵 AES-256 bit の暗号化・復号を提供し、鍵素材は HSM の外に取り出せません。キーの削除は猶予期間つきの削除予約制です（[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)）。
 
 > [!WARNING]
-> この手順では、KMS キーを 1 件作成し、暗号化と復号、ローテーション、削除予約の取り消しを確認してから削除します。キーは作成から削除まで課金対象です (レガシーキーを除く)。実行前に `skr config current` でプロファイルを確認し、影響範囲について必要な承認を得てください。プロジェクトあたりのキー上限は 100 個です。
+> この手順では、KMS キーを 1 件作成し、暗号化と復号、ローテーション、削除予約の取り消しを確認してから削除します。キーは作成から削除まで課金対象です (レガシーキーを除く)。実行前に `skr config current` でプロファイルを確認し、影響範囲について必要な承認を得てください。
 
 ## 前提条件
 
@@ -135,7 +135,7 @@ $ skr kms-api key read KEY-ID --query '{ID,LatestVersion}'
 
 ## Step 6: 削除を予約し、取り消す
 
-削除は猶予期間 7〜90 日の削除予約制です。`schedule-destruction` の `--pending-days` で猶予日数を指定します。削除予約中のキーはステータス `pending_destruction` になり、利用できません。
+削除は猶予期間つきの削除予約制です。`schedule-destruction` の `--pending-days` で猶予日数を指定します。削除予約中のキーはステータス `pending_destruction` になり、利用できません。
 
 ```console
 $ skr kms-api key schedule-destruction KEY-ID --pending-days 7

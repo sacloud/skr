@@ -333,4 +333,13 @@ simplemq-api queue delete live
 simplemq-api queue list live
 simplemq-api queue read live
 simplemq-api queue rotate-api-key live
+secretmanager-api secret create live
+secretmanager-api secret delete live
+secretmanager-api secret list live
+secretmanager-api secret unveil live
+secretmanager-api vault create live
+secretmanager-api vault delete live
+secretmanager-api vault list live
+secretmanager-api vault read live
+secretmanager-api vault update live
 version live

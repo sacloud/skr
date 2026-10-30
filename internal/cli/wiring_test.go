@@ -130,6 +130,15 @@ func TestGeneratedWiringMatchesConfig(t *testing.T) {
 			mode:     apigen.ModeOgen,
 			expected: "internal/cli/apprun_wiring_generated.go",
 		},
+		{
+			name: "SecretManager",
+			configs: []string{
+				"secretmanager-secret.json",
+				"secretmanager-vault.json",
+			},
+			mode:     apigen.ModeOgen,
+			expected: "internal/cli/secretmanager_wiring_generated.go",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
