@@ -53,10 +53,10 @@
 | `TestScenarioObjectStorageAccount` | 未作成サイトでアカウント ID、プラン一覧、アカウントキーの全操作と削除後の不在を確認します | サイトアカウント1個とアカウントキー1個を扱います |
 | `TestScenarioObjectStorageArchive` | プラン一覧と作成結果のプランを照合し、`Bucket` シナリオと同じ権限・キー操作を実行します | アーカイブバケット1個、パーミッション1個とキー1個を扱います |
 | `TestScenarioObjectStorageMetrics` | サイトの状態・クォータ、バケットの利用量・クォータを照合します | 一時通常バケット1個、パーミッション1個とキー1個を扱います |
-| `TestScenarioObjectStorageEncryption` | 東京第1サイトで既存 KMS キーを指定し、暗号化の有効化・キー ID の照合・無効化を確認します | 一時通常バケットとその権限・キーを扱います。KMS キー自体は変更・削除しません |
+| `TestScenarioObjectStorageEncryption` | 東京第1サイトでテスト専用の KMS キーを作成し、暗号化の有効化・キー ID の照合・無効化を確認します | 一時通常バケットとその権限・キー、生成モードの KMS キー1個を扱います。KMS キーは後片付けで削除し、既存の KMS キーは変更・削除しません |
 | `TestScenarioObjectStorageReplication` | 異なる通常サイトの2バケット間で設定し、送信元・宛先の名前とサイト、`created` 状態、無効化後の設定不在を確認します | 通常バケット2個と各バケットのパーミッション・キーを扱います |
 
-バケットを使う各シナリオは基本の権限・キー操作も実行します。サイトアカウントが未作成である場合は `Account` と `Replication` のシナリオでアカウントを作成し、後片付けで削除します。既存アカウントの変更・削除や再作成は拒否します。`Encryption` は KMS キー作成が未実装のため ([#141](https://github.com/sacloud/skr/issues/141))、既存キー ID を環境変数 `SKR_E2E_OBJECT_STORAGE_KMS_KEY_ID` で指定した場合だけ実行します。
+バケットを使う各シナリオは基本の権限・キー操作も実行します。サイトアカウントが未作成である場合は `Account` と `Replication` のシナリオでアカウントを作成し、後片付けで削除します。既存アカウントの変更・削除や再作成は拒否します。`Encryption` はテスト専用の KMS キーを生成モードで作成します ([#141](https://github.com/sacloud/skr/issues/141))。生成モードのため秘密鍵の値は発生せず、実行記録に秘密情報は残りません。KMS キーの削除はバケットの後片付けの後に行い、一覧に残っていないことを確認します。
 
 通常バケットとアーカイブバケットの作成には料金が発生し、レプリケーションは通常バケット2個を作成します。実行前に選択中のプロファイル、対象サイト、作成するリソースと料金を確認します。今回の実行では、利用者から料金を理由に範囲を制限しない承認を得ています。料金とサービス条件は[基本情報](https://manual.sakura.ad.jp/cloud/objectstorage/about.html)、[レプリケーション](https://manual.sakura.ad.jp/cloud/objectstorage/crr.html)、[暗号化](https://manual.sakura.ad.jp/cloud/objectstorage/encryption.html)を参照します。
 
@@ -80,16 +80,15 @@ SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageM
 # 異なる通常サイトの2バケット間でレプリケーションを検証します。
 SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageReplication -v
 
-# KEY-ID に既存 KMS キーの識別子を指定して暗号化を検証します。
-SKR_E2E_OBJECT_STORAGE_KMS_KEY_ID=KEY-ID \
-  SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageEncryption -v
+# 東京第1サイトでテスト専用の KMS キーを作成し、暗号化を検証します。
+SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageEncryption -v
 ```
 
 すべてのシナリオをまとめて実行する場合は `-run TestScenarioObjectStorage` を使います。
 
 ### コマンド対応とライブ実行状況
 
-2026-10-28 の実行結果です。全34コマンドにシナリオがあり、このうち29コマンドで正常応答と期待内容をライブ確認しました。暗号化3操作は合意により延期し、残る2操作は API エラーのため成功未確認です。
+2026-10-30 の実行結果です。全34コマンドにシナリオがあり、このうち32コマンドで正常応答と期待内容をライブ確認しました。暗号化3操作もテスト専用の KMS キーでライブ確認し、残る2操作は API エラーのため成功未確認です。
 
 | `object-storage-api` 以下のコマンド | 個数 | 主なシナリオ | ライブ結果 |
 | --- | --- | --- | --- |
@@ -103,10 +102,10 @@ SKR_E2E_OBJECT_STORAGE_KMS_KEY_ID=KEY-ID \
 | `permission access-key list / create / read / delete` | 4 | `Bucket` | 成功しました |
 | `bucket usage / quota` | 2 | `Metrics` | 東京第1サイトで成功しました |
 | `bucket penalty` | 1 | deferred | HTTP 404 が返り、成功未確認です。#142 で追跡します |
-| `bucket encryption read / enable / disable` | 3 | `Encryption` | KMS キー作成が未実装のため、#141 で追跡します |
+| `bucket encryption read / enable / disable` | 3 | `Encryption` | 2026-10-30 にテスト専用の KMS キーでライブ実行し、有効化・キー ID の照合・無効化と無効化後の不在を確認しました |
 | `bucket replication read / enable / disable` | 3 | `Replication` | 石狩第1サイトから東京第1サイトへの設定で成功しました |
 
-暗号化は [#141](https://github.com/sacloud/skr/issues/141)、テレメトリーの失敗は [#142](https://github.com/sacloud/skr/issues/142) で追跡します。`penalty` の404をペナルティなしと解釈したり、`bucket-metering` の400を空利用量で置き換えたりしません。CLI は公開 SDK にサイト、バケット名、期間を渡しており、失敗の原因が CLI・SDK・サービスのどこにあるかは未確定です。両操作は baseline で deferred として扱い、正常系のシナリオでは呼び出しません。
+暗号化の3操作は [#141](https://github.com/sacloud/skr/issues/141) で 2026-10-30 に実装・ライブ検証しました。テレメトリーの失敗は [#142](https://github.com/sacloud/skr/issues/142) で追跡します。`penalty` の404をペナルティなしと解釈したり、`bucket-metering` の400を空利用量で置き換えたりしません。CLI は公開 SDK にサイト、バケット名、期間を渡しており、失敗の原因が CLI・SDK・サービスのどこにあるかは未確定です。両操作は baseline で deferred として扱い、正常系のシナリオでは呼び出しません。
 
 ### 安全性と証跡
 
@@ -116,6 +115,6 @@ SKR_E2E_OBJECT_STORAGE_KMS_KEY_ID=KEY-ID \
 
 レプリケーションは設定を無効化してから両バケットを削除します。失敗・キャンセル時も独立した期限付きコンテキストで後片付けし、削除失敗を最終終了コードへ反映します。所有を確認できない対象は自動削除を拒否します。
 
-暗号化も無効化直前に設定を再取得し、現在の `kms_key_id` が今回指定したキー ID と一致する場合だけ無効化します。明確な404は設定不在として変更せず終了し、不一致・不正応答・キー ID 欠落・照会失敗は変更を拒否します。キャンセル後の片付けにも同じ条件を適用します。設定の所有を確認できない場合は親バケットも自動削除せず、手動確認を求めるエラーを返します。
+暗号化も無効化直前に設定を再取得し、現在の `kms_key_id` が今回指定したキー ID と一致する場合だけ無効化します。明確な404は設定不在として変更せず終了し、不一致・不正応答・キー ID 欠落・照会失敗は変更を拒否します。キャンセル後の片付けにも同じ条件を適用します。設定の所有を確認できない場合は親バケットも自動削除せず、手動確認を求めるエラーを返します。シナリオが作成した KMS キーはバケットの後片付けの後に削除し、一覧に残っていないことを確認します。
 
-証跡は共有ヘルパーが Git 管理外の `test/e2e/object-storage-api/e2e-output/<識別名>-<実行日時>.md` に Markdown で保存します。2026-10-28 の実行では `object-storage-bucket`、`object-storage-account`、`object-storage-archive`、`object-storage-metrics`、`object-storage-replication` の記録を残しました。作成したバケット・権限・キー・サイトアカウントの削除と不在確認は完了しています。
+証跡は共有ヘルパーが Git 管理外の `test/e2e/object-storage-api/e2e-output/<識別名>-<実行日時>.md` に Markdown で保存します。2026-10-28 の実行では `object-storage-bucket`、`object-storage-account`、`object-storage-archive`、`object-storage-metrics`、`object-storage-replication` の記録を残しました。2026-10-30 の実行では `object-storage-encryption` の記録を残し、テスト専用の KMS キー・サイトアカウント・バケット・権限・キーの削除と不在確認を完了しています。
