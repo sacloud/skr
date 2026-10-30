@@ -1,0 +1,158 @@
+{
+  "package": "serviceendpointgatewayapi",
+  "resource": "Service Endpoint Gateway",
+  "command_prefix": "Appliance",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/service-endpoint-gateway/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "サービスエンドポイントゲートウェイを一覧表示します。",
+      "method": "List",
+      "response_type": "*v1.ModelsApplianceApplianceListResponseBody"
+    },
+    {
+      "name": "Read",
+      "help": "ID を指定してサービスエンドポイントゲートウェイを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.ModelsApplianceApplianceGetResponseBody",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "list の出力にあるサービスエンドポイントゲートウェイのリソース ID。"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "help": "スイッチにサービスエンドポイントゲートウェイを作成します。サービスエンドポイントゲートウェイはスイッチ単体でのみ利用でき、ルータ＋スイッチでは作成できません。1 つのスイッチに対して複数のサービスエンドポイントゲートウェイを作成することはできません。作成には接続先スイッチ ID とゲートウェイに割り当てるサブネットマスク長が必要です。--request は Appliance.Remark に Switch.ID、Network.NetworkMaskLen、Servers[].IPAddress を指定する JSON を受け付け、Class と Plan は自動設定されます。--request と個別フラグは併用できません。",
+      "method": "Create",
+      "request_type": "v1.ModelsApplianceApplianceCreateRequest",
+      "request_by_value": true,
+      "response_type": "*v1.ModelsApplianceApplianceCreateResponseBody",
+      "handwritten": true
+    },
+    {
+      "name": "Update",
+      "help": "サービスエンドポイントゲートウェイの接続先マネージドサービス設定を更新します。Settings は全体置換です。既存の設定を維持したい項目は JSON に再指定してください。EnabledServices には接続先マネージドサービスを Type と Config で指定します (Type: ObjectStorage、ContainerRegistry、MonitoringSuite、AppRunDedicatedControlPlane など)。MonitoringSuite と DNSForwarding の Enabled は True または False です。設定の反映は apply で行います。",
+      "method": "Update",
+      "request_type": "v1.ModelsApplianceApplianceUpdateRequest",
+      "request_by_value": true,
+      "response_type": "*v1.ModelsApplianceApplianceGetResponseBody",
+      "request_help": "Appliance.Settings を含むリクエスト JSON。ServiceEndpointGateway 配下に EnabledServices (Type と Config.Endpoints)、MonitoringSuite (Enabled)、DNSForwarding (Enabled、PrivateHostedZone、UpstreamDNS1、UpstreamDNS2) を指定します。Settings は全体置換です。直接 JSON または @path.json。例: skr service-endpoint-gateway-api appliance update ID --request '{\"Appliance\":{\"Settings\":{\"ServiceEndpointGateway\":{\"EnabledServices\":[{\"Type\":\"ObjectStorage\",\"Config\":{\"Endpoints\":[\"s3.isk01.sakurastorage.jp\"]}]}}}}}'",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新するサービスエンドポイントゲートウェイのリソース ID。"
+        }
+      ]
+    },
+    {
+      "name": "Apply",
+      "help": "update で変更した設定をサービスエンドポイントゲートウェイへ反映します。接続先マネージドサービスの変更時、ゲートウェイ経由の通信が一時的に中断することがあります。",
+      "method": "Apply",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "設定を反映するサービスエンドポイントゲートウェイのリソース ID。"
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "help": "ID を指定してサービスエンドポイントゲートウェイを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するサービスエンドポイントゲートウェイのリソース ID。"
+        }
+      ]
+    },
+    {
+      "name": "ReadInterface",
+      "help": "サービスエンドポイントゲートウェイのインターフェース情報を取得します。ゲートウェイの IPv4 アドレスは、利用するサーバーの DNS 設定に使います。",
+      "method": "ReadInterface",
+      "response_type": "*v1.ModelsApplianceApplianceGetInterfaceResponseBody",
+      "arguments": [
+        {
+          "name": "appliance-id",
+          "field": "ApplianceID",
+          "type": "string",
+          "help": "サービスエンドポイントゲートウェイのリソース ID。"
+        },
+        {
+          "name": "interface-id",
+          "field": "InterfaceID",
+          "type": "string",
+          "help": "参照するインターフェースのスイッチ ID。read の Interfaces にある Switch で確認できます。"
+        }
+      ]
+    },
+    {
+      "name": "ReadPowerStatus",
+      "help": "サービスエンドポイントゲートウェイの電源状態を取得します。",
+      "method": "ReadPowerStatus",
+      "response_type": "*v1.ModelsPowerApplianceGetPowerStatusResponseBody",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "サービスエンドポイントゲートウェイのリソース ID。"
+        }
+      ]
+    },
+    {
+      "name": "PowerOn",
+      "help": "サービスエンドポイントゲートウェイの電源を投入します。作成直後は起動処理が行われていることがあります。",
+      "method": "PowerOn",
+      "response_type": "*v1.ModelsPowerApplianceUpdatePowerStatusResponseBody",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "電源を投入するサービスエンドポイントゲートウェイのリソース ID。"
+        }
+      ]
+    },
+    {
+      "name": "Shutdown",
+      "help": "サービスエンドポイントゲートウェイの電源を停止します。ゲートウェイ経由の通信が停止します。",
+      "method": "Shutdown",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "電源を停止するサービスエンドポイントゲートウェイのリソース ID。"
+        }
+      ]
+    },
+    {
+      "name": "Reset",
+      "help": "サービスエンドポイントゲートウェイの電源を再起動します。ゲートウェイ経由の通信が一時的に中断します。",
+      "method": "Reset",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "再起動するサービスエンドポイントゲートウェイのリソース ID。"
+        }
+      ]
+    }
+  ],
+  "wiring_target": "ServiceEndpointGatewayAPI.Appliance",
+  "sdk_factory": "serviceendpointgatewayapi.NewApplianceAPI"
+}

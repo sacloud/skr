@@ -72,6 +72,8 @@ generate-wiring:
 		$(patsubst %,api/commands/%,$(filter apprun-%,$(notdir $(wildcard api/commands/*.json))))
 	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/secretmanager_wiring_generated.go \
 		$(patsubst %,api/commands/%,$(filter secretmanager-%,$(notdir $(wildcard api/commands/*.json))))
+	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/service_endpoint_gateway_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter service-endpoint-gateway%,$(notdir $(wildcard api/commands/*.json))))
 
 .PHONY: docs-site
 docs-site:
