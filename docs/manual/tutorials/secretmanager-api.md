@@ -1,9 +1,9 @@
 # SecretManager API: シークレット保管庫を作成し、シークレットを保管・取得する
 
-さくらのクラウド シークレットマネージャー (Secret Manager) は、KMS キーで暗号化したシークレットを契約単位で保管するサービスです。シークレットは Vault (シークレット保管庫) 単位で管理され、最新を含む 50 世代まで保持します。シークレットの作成は upsert で、同名シークレットへの作成は新しいバージョンの登録として扱われます（[シークレットマネージャー基本情報](https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html)）。
+さくらのクラウド シークレットマネージャー (Secret Manager) は、KMS キーで暗号化したシークレットを契約単位で保管するサービスです。シークレットは Vault (シークレット保管庫) 単位で管理されます。シークレットの作成は upsert で、同名シークレットへの作成は新しいバージョンの登録として扱われます（[シークレットマネージャー基本情報](https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html)）。
 
 > [!WARNING]
-> この手順では、KMS キー 1 件とシークレット保管庫 (Vault) 1 件を作成し、シークレットの保管と取得を確認してから削除します。Vault は作成から削除まで課金対象です。実行前に `skr config current` でプロファイルを確認し、影響範囲について必要な承認を得てください。契約あたりのシークレット上限は 100 個、API の利用は 1 分あたり 100 リクエストまでです。
+> この手順では、KMS キー 1 件とシークレット保管庫 (Vault) 1 件を作成し、シークレットの保管と取得を確認してから削除します。Vault は作成から削除まで課金対象です。実行前に `skr config current` でプロファイルを確認し、影響範囲について必要な承認を得てください。
 
 ## 前提条件
 
@@ -115,7 +115,7 @@ $ skr secretmanager-api secret create VAULT-ID --name 'SECRET-NAME' --value-file
 }
 ```
 
-同名シークレットに再作成すると、新しいバージョンとして登録されます (upsert)。シークレットは最新を含む 50 世代まで保持されます。
+同名シークレットに再作成すると、新しいバージョンとして登録されます (upsert)。
 
 ```console
 $ printf 'db-password-value-2' > secret-value.txt

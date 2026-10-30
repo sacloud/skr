@@ -8,7 +8,7 @@
 | --- | --- |
 | `key` | `list`、`read`、`create`、`update`、`delete`、`rotate`、`change-status`、`schedule-destruction`、`encrypt`、`decrypt` |
 
-KMS は FIPS 140-3 level 3 認証の HSM と連携し、対称鍵 AES-256 bit の暗号化・復号を提供します。キーは取り出しやバックアップができず、プロジェクトあたり最大 100 個まで作成できます。削除は猶予期間 7〜90 日の削除予約制で、削除予約中のキーは状態変更で取り消せます。ローテーションは有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。レガシーキー (`cloud/kms/key/legacy`) は課金対象外で、新規作成はできません（[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)）。
+KMS は FIPS 140-3 level 3 認証の HSM と連携し、対称鍵 AES-256 bit の暗号化・復号を提供します。キーは取り出しやバックアップができません。削除は削除予約制で、削除予約中のキーは状態変更で取り消せます。ローテーションは有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。レガシーキー (`cloud/kms/key/legacy`) は課金対象外で、新規作成はできません。キーの作成数や削除の猶予期間などの上限は[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)を参照してください。
 
 API エンドポイントは `https://secure.sakura.ad.jp/cloud/zone/{ゾーン名}/api/cloud/1.1/kms` で、SDK の既定値は tk1a ゾーンです。コマンドはゾーン引数を持たず、SDK の既定値を使います。エンドポイントは `SAKURA_ENDPOINTS_KMS` 環境変数で変更できます（[KMS API](https://manual.sakura.ad.jp/api/cloud/security-encryption/#tag/kms-key)）。
 

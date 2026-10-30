@@ -9,7 +9,7 @@
 | `vault` | `list`、`read`、`create`、`update`、`delete` |
 | `secret` | `list`、`create`、`delete`、`unveil` |
 
-シークレットマネージャーは KMS キーで暗号化したシークレットを契約単位で 100 個まで保管し、シークレットは最新を含む 50 世代まで保持します。API の利用は 1 分あたり 100 リクエストまでです。シークレットの作成は upsert で、同名シークレットへの作成は新しいバージョンの登録として扱われます。Vault 単位で課金が行われ、Vault が作成されてから削除されるまでの間課金されます（[シークレットマネージャー基本情報](https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html)）。
+シークレットマネージャーは KMS キーで暗号化したシークレットを契約単位で保管し、シークレットは最新を含む複数世代を保持します。シークレットの作成は upsert で、同名シークレットへの作成は新しいバージョンの登録として扱われます。Vault 単位で課金が行われ、Vault が作成されてから削除されるまでの間課金されます。保管できるシークレット数、保持できる世代数、API のレート制限などの上限は[シークレットマネージャー基本情報](https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html)を参照してください。
 
 シークレットの値の取得は `secret unveil` で行います。SDK のシークレット取得 API は `unveil` のみを提供し、値を返す read 操作はありません。バージョンを指定しない場合は最新バージョンを取得します。
 
