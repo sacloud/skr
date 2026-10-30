@@ -1,5 +1,51 @@
 # Changelog
 
+## [v0.0.5](https://github.com/sacloud/skr/compare/v0.0.4...v0.0.5) - 2026-10-30
+
+### 🚀 Changes
+- AppRun 共用型 API コマンドとライブ E2E を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/140
+- Object Storage 管理 API・チュートリアル・全サブコマンドの E2E を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/143
+- ライブ E2E のコマンド網羅状況の整備と iam-api・タスク1/2 のライブ検証 by @tokuhirom in https://github.com/sacloud/skr/pull/145
+- AGENTS.md にコードコメントを日本語とするルールを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/146
+- E2E 証跡レポートのステップ説明を呼び出し元に記述し、シナリオ情報を Recorder 生成時に渡す by @tokuhirom in https://github.com/sacloud/skr/pull/147
+- コメントを日本語化 by @tokuhirom in https://github.com/sacloud/skr/pull/148
+- E2E の SSH 待機とログイン確認を test/e2e/internal/sshrun に集約し、待機の要約を 1 件記録する by @tokuhirom in https://github.com/sacloud/skr/pull/149
+- E2e runner shared library by @tokuhirom in https://github.com/sacloud/skr/pull/150
+- E2e scenario migration by @tokuhirom in https://github.com/sacloud/skr/pull/151
+- internal/saclient/client_test.go を testify に統一した by @tokuhirom in https://github.com/sacloud/skr/pull/152
+- test/e2e/version を testing.T ベースのシナリオテストに作り直した by @tokuhirom in https://github.com/sacloud/skr/pull/153
+- test/e2e/switch を testing.T ベースのシナリオテストに作り直した by @tokuhirom in https://github.com/sacloud/skr/pull/154
+- test/e2e/simplemq を testing.T ベースのシナリオテストに作り直した by @tokuhirom in https://github.com/sacloud/skr/pull/155
+- test/e2e/simple-notification を testing.T ベースのシナリオテストに作り直した by @tokuhirom in https://github.com/sacloud/skr/pull/156
+- test/e2e/serviceclass を testing.T ベースのシナリオテストに作り直した by @tokuhirom in https://github.com/sacloud/skr/pull/157
+- test/e2e/serverplan を testing.T ベースのシナリオテストに作り直した by @tokuhirom in https://github.com/sacloud/skr/pull/158
+- test/e2e/server の偽の操作による単体テストを廃止し、テストファイルを整理した by @tokuhirom in https://github.com/sacloud/skr/pull/159
+- E2E コマンド網羅を baseline で管理する仕組みを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/160
+- region の E2E を testing.T ベースのシナリオテストへ移行 by @tokuhirom in https://github.com/sacloud/skr/pull/161
+- object-storage-api のライブ E2E を testing.T ベースのシナリオに移行 by @tokuhirom in https://github.com/sacloud/skr/pull/163
+- networking-suite のライブ E2E を testing.T ベースのシナリオに移行 by @tokuhirom in https://github.com/sacloud/skr/pull/164
+- http のライブ E2E を testing.T ベースのシナリオに移行 by @tokuhirom in https://github.com/sacloud/skr/pull/165
+- packetfilter の E2E を testing.T ベースのシナリオテストへ移行 by @tokuhirom in https://github.com/sacloud/skr/pull/162
+- iam-api の E2E を testing.T ベースのシナリオテストへ移行 by @tokuhirom in https://github.com/sacloud/skr/pull/166
+- iaas-product-plans の E2E を testing.T ベースのシナリオテストへ移行する by @tokuhirom in https://github.com/sacloud/skr/pull/167
+- GSLB E2E を testing.T ベースのシナリオへ移行し、Server 共通処理を helper に整理 by @tokuhirom in https://github.com/sacloud/skr/pull/168
+- icon の E2E を testing.T ベースのシナリオテストへ移行する by @tokuhirom in https://github.com/sacloud/skr/pull/169
+- internet の E2E を testing.T ベースのシナリオテストへ移行する by @tokuhirom in https://github.com/sacloud/skr/pull/170
+- iaas-lookup の E2E をコマンド名ごとのシナリオテストへ移行・分割する by @tokuhirom in https://github.com/sacloud/skr/pull/171
+- 使われていない test/e2e/internal/evidence と sshrun を削除する by @tokuhirom in https://github.com/sacloud/skr/pull/172
+- 生成型名をモードと操作名から導出する by @tokuhirom in https://github.com/sacloud/skr/pull/173
+- internal/cli の配線コードを設定から生成する (ADR 0068) by @tokuhirom in https://github.com/sacloud/skr/pull/174
+- simple-notification ドメインを標準形に再設計して配線を生成する by @tokuhirom in https://github.com/sacloud/skr/pull/175
+- apprun ドメインの配線を設定から生成する by @tokuhirom in https://github.com/sacloud/skr/pull/176
+- iam-user-2fa の配線を設定から生成する by @tokuhirom in https://github.com/sacloud/skr/pull/179
+- ipv6net、ipv6addr、ipaddress の IaaS API コマンドを追加する by @tokuhirom in https://github.com/sacloud/skr/pull/181
+- IPv6 と逆引き設定のマニュアルへのリンクを修正する by @tokuhirom in https://github.com/sacloud/skr/pull/182
+- ipv6addr・ipaddress の変更系コマンドのライブ E2E を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/183
+### 📦 Dependency Updates
+- ci: bump Songmu/tagpr from 1.21.2 to 1.21.3 by @dependabot[bot] in https://github.com/sacloud/skr/pull/138
+- ci: bump Songmu/tagpr from 1.21.3 to 1.21.4 by @dependabot[bot] in https://github.com/sacloud/skr/pull/178
+- ci: bump docker/login-action from 4.6.0 to 4.7.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/177
+
 ## [v0.0.4](https://github.com/sacloud/skr/compare/v0.0.3...v0.0.4) - 2026-10-22
 
 ### 🚀 Changes
