@@ -31,7 +31,7 @@
 | `test/e2e/archive` | archive find / read(2) | 全コマンド実装済み。2026-10-29 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/diskplan` | product disk find / read(2) | 全コマンド実装済み。2026-10-29 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/iaas-product-plans` | product internet find / read、product license find、product privatehost find / read(5) | testing.T ベースのシナリオに移行済み。ライブは5コマンドの正常実行を確認済み |
-| `test/e2e/object-storage-api` | 6シナリオで34コマンド | testing.T ベースのシナリオに移行済み。ライブは29コマンドの正常応答を確認済みで、`bucket penalty` と `site status bucket-metering` は API エラー、暗号化3操作は KMS キー作成未実装のため延期。状況は `PLAN.md` を参照 |
+| `test/e2e/object-storage-api` | 6シナリオで34コマンド | testing.T ベースのシナリオに移行済み。ライブは32コマンドの正常応答を確認済みで、`bucket penalty` と `site status bucket-metering` は API エラー。2026-10-30 にテスト専用の KMS キーで暗号化3操作をライブ検証済み。状況は `PLAN.md` を参照 |
 | `test/e2e/kms-api` | key 10操作(10) | 全コマンド実装済み。2026-10-30 に testing.T ベースのシナリオでライブ実行し、生成モードと BYOK モードのキー作成から削除後の不在まで正常応答を確認済み |
 | `test/e2e/iam-api` | 9シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | testing.T ベースのシナリオに移行済み。ライブは57コマンドの正常実行を確認済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
 
