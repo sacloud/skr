@@ -1,8 +1,8 @@
 # IaaS IPv6Net API: ゾーン内の IPv6 ネットワークを確認する
 
-[IPv6 ネットワーク](https://manual.sakura.ad.jp/cloud/network/ipv6/ipv6-basic.html)は、ルータ＋スイッチに IPv6 アドレスの割り当てを有効化したときに作られる、IPv6 プレフィクスの割り当て情報です。このチュートリアルでは、`skr iaas-api ipv6net` を使い、ゾーン内の IPv6 ネットワークを検索して、プレフィクスの内容を確認します。リソースの作成・変更・削除は行いません。
+[IPv6 ネットワーク](https://manual.sakura.ad.jp/cloud/network/switch/ipv6.html)は、ルータ＋スイッチに IPv6 アドレスの割り当てを有効化したときに作られる、IPv6 プレフィクスの割り当て情報です。このチュートリアルでは、`skr iaas-api ipv6net` を使い、ゾーン内の IPv6 ネットワークを検索して、プレフィクスの内容を確認します。リソースの作成・変更・削除は行いません。
 
-IPv6 アドレスの割り当ては、ルータ＋スイッチの詳細画面から IPv6 を有効化すると作成されます（[IPv6 の利用手順](https://manual.sakura.ad.jp/cloud/network/ipv6/ipv6-howto.html)）。`skr iaas-api internet` の `enable-ipv6` でも有効化できます。有効化していないプロジェクトでは、検索結果は空の一覧になります。
+IPv6 アドレスの割り当ては、ルータ＋スイッチの詳細画面から IPv6 を有効化すると作成されます（[IPv6 の利用手順](https://manual.sakura.ad.jp/cloud/network/switch/ipv6.html)）。`skr iaas-api internet` の `enable-ipv6` でも有効化できます。有効化していないプロジェクトでは、検索結果は空の一覧になります。
 
 ## 前提条件
 
@@ -61,6 +61,5 @@ $ skr iaas-api ipv6net read --zone is1b --id 123456789012
 
 ## 参考情報
 
-- [IPv6 アドレスの基本](https://manual.sakura.ad.jp/cloud/network/ipv6/ipv6-basic.html)
-- [IPv6 アドレスの利用手順](https://manual.sakura.ad.jp/cloud/network/ipv6/ipv6-howto.html)
+- [IPv6 アドレス (スイッチ、ルータ＋スイッチ)](https://manual.sakura.ad.jp/cloud/network/switch/ipv6.html)
 - [sacloud-sdk-go v0.3.1 IPv6Net API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.1/service/iaas/ipv6net)

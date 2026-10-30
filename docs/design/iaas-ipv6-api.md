@@ -49,5 +49,6 @@
 - [SDK IPv6Net API v0.3.1 の検索操作](https://raw.githubusercontent.com/sacloud/sacloud-sdk-go/v0.3.1/service/iaas/ipv6net/find_service.go)
 - [SDK IPv6Addr API v0.3.1 の登録操作](https://raw.githubusercontent.com/sacloud/sacloud-sdk-go/v0.3.1/service/iaas/ipv6addr/create_service.go)
 - [SDK IPAddress API v0.3.1 の逆引きホスト名変更操作](https://raw.githubusercontent.com/sacloud/sacloud-sdk-go/v0.3.1/service/iaas/ipaddress/update_host_name_service.go)
-- [さくらのクラウド API v1.1 IPv6 関連 API](https://manual.sakura.ad.jp/cloud-api/1.1/ipv6/index.html)
-- [IPv6 アドレスの基本](https://manual.sakura.ad.jp/cloud/network/ipv6/ipv6-basic.html)
+- [さくらのクラウド API v1.1 ルータ＋スイッチ関連 API](https://manual.sakura.ad.jp/cloud-api/1.1/internet/index.html)
+- [IPv6 アドレス (スイッチ、ルータ＋スイッチ)](https://manual.sakura.ad.jp/cloud/network/switch/ipv6.html)
+- [IP アドレスの逆引き設定 (スイッチ、ルータ＋スイッチ)](https://manual.sakura.ad.jp/cloud/network/switch/reverse-dns.html)

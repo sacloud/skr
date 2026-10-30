@@ -1,6 +1,6 @@
 # IaaS IPv6Addr API: ゾーン内の IPv6 アドレスを確認する
 
-[IPv6 アドレス](https://manual.sakura.ad.jp/cloud/network/ipv6/ipv6-basic.html)は、IPv6 ネットワークのプレフィクス内の個別アドレスです。逆引きホスト名を登録できます。このチュートリアルでは、`skr iaas-api ipv6addr` を使い、ゾーン内の IPv6 アドレスを検索して、内容を確認します。リソースの作成・変更・削除は行いません。
+[IPv6 アドレス](https://manual.sakura.ad.jp/cloud/network/switch/ipv6.html)は、IPv6 ネットワークのプレフィクス内の個別アドレスです。逆引きホスト名を登録できます。このチュートリアルでは、`skr iaas-api ipv6addr` を使い、ゾーン内の IPv6 アドレスを検索して、内容を確認します。リソースの作成・変更・削除は行いません。
 
 IPv6 アドレスの一覧は、ゾーンに割り当てられた IPv6 ネットワークのプレフィクス内のアドレスを、逆引きホスト名の登録の有無にかかわらず表示します。IPv6 アドレスの割り当てを有効化していないプロジェクトでは、検索結果は空の一覧になります。
 
@@ -63,6 +63,6 @@ $ skr iaas-api ipv6addr read --zone is1b --ipv6-addr 2001:db8:a001::1
 
 ## 参考情報
 
-- [IPv6 アドレスの基本](https://manual.sakura.ad.jp/cloud/network/ipv6/ipv6-basic.html)
-- [IPv6 アドレスの利用手順](https://manual.sakura.ad.jp/cloud/network/ipv6/ipv6-howto.html)
+- [IPv6 アドレス (スイッチ、ルータ＋スイッチ)](https://manual.sakura.ad.jp/cloud/network/switch/ipv6.html)
+- [IP アドレスの逆引き設定 (スイッチ、ルータ＋スイッチ)](https://manual.sakura.ad.jp/cloud/network/switch/reverse-dns.html)
 - [sacloud-sdk-go v0.3.1 IPv6Addr API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.1/service/iaas/ipv6addr)
