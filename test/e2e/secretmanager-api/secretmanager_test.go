@@ -148,6 +148,20 @@ func deleteSecretManagerSecret(t *testing.T, h *helper.Helper, vaultID, name str
 		"secretmanager-api", "secret", "delete", vaultID, name)
 }
 
+// secretManagerSecretExists は Vault 内に指定したシークレットが存在するかを確認します。
+// 実 API は存在しないシークレットの削除に 422 を返すため、後片付けは削除前に不在確認を行い、
+// 不在なら変更せず終了します。
+func secretManagerSecretExists(t *testing.T, h *helper.Helper, vaultID, name, description string) bool {
+	t.Helper()
+
+	for _, item := range listSecretManagerSecrets(t, h, vaultID, description) {
+		if item.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // writeSecretValueFile はシークレットの値を一時ファイルに書き込みます。
 func writeSecretValueFile(t *testing.T, value string) string {
 	t.Helper()

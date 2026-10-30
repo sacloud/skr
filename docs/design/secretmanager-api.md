@@ -51,7 +51,7 @@ SecretManager API の応答フィールドは PascalCase (`ID`、`Name`、`KmsKe
 $ SKR_E2E=1 go test ./test/e2e/secretmanager-api/ -run TestScenarioSecretManager
 ```
 
-実行には `SKR_E2E` の設定と `skr-e2e` プロファイルが必要です。シナリオは作成前に同名 Vault が存在しないことを確認し、Vault 作成に必要な KMS キーはテスト専用キーとして生成モードで作成して、後片付けで Vault、シークレット、KMS キーの順に削除と不在確認まで行います。既存の KMS キーは変更・削除しません。
+実行には `SKR_E2E` の設定と `skr-e2e` プロファイルが必要です。シナリオは作成前に同名 Vault が存在しないことを確認し、Vault 作成に必要な KMS キーはテスト専用キーとして生成モードで作成して、後片付けで Vault、シークレット、KMS キーの順に削除と不在確認まで行います。既存の KMS キーは変更・削除しません。2026-10-30 にライブ実行し、Vault 作成から削除後の不在までの全ステップと、シークレットの upsert によるバージョン増加、unveil で取得した値 (最新とバージョン 1) を確認しました。ライブ実行では実 API が存在しないシークレットの削除に 422 を返すことを確認したため、後片付けは削除前に不在を確認し、不在なら変更せず終了します。
 
 sakumock を使った CLI と SDK の統合テストは `internal/cli/secretmanager_test.go` で、手書き処理の単体テストは `internal/secretmanagerapi/commands_test.go` で確認します。
 

@@ -47,9 +47,12 @@ func TestScenarioSecretManager(t *testing.T) {
 	require.Equal(t, key.ID, created.KmsKeyID, "created vault should reference the scenario KMS key")
 	vaultID := created.ID
 
-	// 後片付け: シークレットを削除してから Vault を削除し、一覧に残っていないことを確認する
+	// 後片付け: シークレットが残っていれば削除してから Vault を削除し、一覧に残っていないことを確認する。
+	// 実 API は存在しないシークレットの削除に 422 を返すため、削除前に不在確認を行い、不在なら変更せず終了する。
 	defer func() {
-		deleteSecretManagerSecret(t, h, vaultID, secretName)
+		if secretManagerSecretExists(t, h, vaultID, secretName, "後片付け: シークレットの残存を確認する") {
+			deleteSecretManagerSecret(t, h, vaultID, secretName)
+		}
 		deleteSecretManagerVault(t, h, vaultID)
 		remaining := listSecretManagerVaults(t, h, "削除後に Vault が一覧に残っていないことを確認する")
 		for _, item := range remaining {
@@ -89,12 +92,15 @@ func TestScenarioSecretManager(t *testing.T) {
 	require.Equal(t, secretName, secretCreated.Name, "created secret name should match the requested name")
 	require.Equal(t, 1, secretCreated.LatestVersion, "first create should register version 1: %+v", secretCreated)
 
-	// 後片付け: 作成したシークレットを削除し、一覧に残っていないことを確認する
+	// 後片付け: 作成したシークレットを削除し、一覧に残っていないことを確認する。
+	// 実 API は存在しないシークレットの削除に 422 を返すため、削除前に不在確認を行い、不在なら変更せず終了する。
 	defer func() {
-		deleteSecretManagerSecret(t, h, vaultID, secretName)
-		remaining := listSecretManagerSecrets(t, h, vaultID, "削除後にシークレットが一覧に残っていないことを確認する")
-		for _, item := range remaining {
-			require.NotEqual(t, secretName, item.Name, "secret %q should not remain after deletion", secretName)
+		if secretManagerSecretExists(t, h, vaultID, secretName, "後片付け: シークレットの残存を確認する") {
+			deleteSecretManagerSecret(t, h, vaultID, secretName)
+			remaining := listSecretManagerSecrets(t, h, vaultID, "削除後にシークレットが一覧に残っていないことを確認する")
+			for _, item := range remaining {
+				require.NotEqual(t, secretName, item.Name, "secret %q should not remain after deletion", secretName)
+			}
 		}
 	}()
 
