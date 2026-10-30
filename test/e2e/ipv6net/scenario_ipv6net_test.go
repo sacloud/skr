@@ -17,12 +17,18 @@ package main
 import (
 	"testing"
 
-	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	internetSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
+
+// ipv6NetNamePrefix はテスト用ルータ＋スイッチの名前の接頭辞です。ランダムな接尾辞とともに
+// 使い、過去の実行のリソースと衝突しないようにします。
+const ipv6NetNamePrefix = "skr-e2e-ipv6net-"
+
+// ipv6NetDesc はテスト用ルータ＋スイッチに付ける固定の説明です。後片て付けの識別にも使います。
+const ipv6NetDesc = "Temporary Internet for skr ipv6net E2E"
 
 // TestScenarioIPv6Net は ipv6net コマンドのライブ E2E です。ルータ＋スイッチを作成して
 // IPv6 アドレス割り当てを有効化し、ipv6net find で作成した IPv6 ネットワークを見つけられる
@@ -40,32 +46,22 @@ func TestScenarioIPv6Net(t *testing.T) {
 
 	// 作成前に同名リソースが存在しないことを SDK で確認する。確認の実行は証跡に残らず、
 	// 既存リソースを変更しないまま終了する。
-	requireNoInternetNameCollision(t, internets, name)
+	helper.RequireNoInternetNameCollision(t, internets, helper.InternetZone, name)
 
-	var internetID, switchID types.ID
+	var created helper.InternetItem
 	defer func() {
-		if err := cleanupInternet(t, h, internets, name, internetID, switchID); err != nil {
+		if err := helper.CleanupInternet(t, h, internets, helper.InternetZone, name, ipv6NetDesc, created.ID, created.Switch.ID); err != nil {
 			t.Errorf("Internet cleanup failed: %v", err)
 		}
 	}()
 
-	// ルータ＋スイッチを作成します。作成直後の404を最大30分リトライする SDK の待機を
-	// 許容して35分の期限を設けます
-	data := h.CallWithTimeout(t, ipv6NetCreateTimeout, "ルータ＋スイッチを作成する",
-		"iaas-api", "internet", "create",
-		"--zone", ipv6NetZone, "--name", name, "--description", ipv6NetDesc,
-		"--network-mask-len", "28", "--band-width-mbps", "100",
-	)
-	router, err := parseInternetItem(data)
-	require.NoError(t, err, "decode created Internet")
-	internetID, switchID = router.ID, router.Switch.ID
-	require.NoError(t, checkInternetIdentity(router, internetID, name, switchID),
-		"the create response should contain the created Internet")
+	// ルータ＋スイッチを作成します
+	created = helper.CreateInternet(t, h, helper.InternetZone, name, ipv6NetDesc)
 
 	// IPv6 アドレス割り当てを有効化します
-	enabled, err := enableIPv6(t, h, internetID)
+	enabled, err := helper.EnableIPv6(t, h, helper.InternetZone, created.ID)
 	require.NoError(t, err, "enable-ipv6 should succeed")
-	require.NoError(t, checkIPv6NetItem(enabled, internetID),
+	require.NoError(t, helper.CheckIPv6NetItem(enabled, created.ID),
 		"enable-ipv6 should return a valid IPv6 network")
 
 	// ipv6net find で有効化した IPv6 ネットワークを見つけられることを確認します

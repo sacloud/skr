@@ -38,11 +38,14 @@
 
 - `ipv6net` は、ルータ＋スイッチを作成して IPv6 アドレス割り当てを有効化したうえで、`find` と `read` を検証する [ライブ E2E](../../test/e2e/ipv6net/scenario_ipv6net_test.go) があります。2026-10-30 に is1b でライブ実行し、有効化した IPv6 ネットワークの ID とプレフィクスが `find` と `read` の応答に一致することを確認しました。IPv6 ネットワークの ID はルータ＋スイッチの ID とは別の番号 (数値) です。後片て付けはルータ＋スイッチの削除で行い、削除前に SDK で識別情報を再照合し、削除後に名前検索で不在を確認しました。
 - `ipv6addr` と `ipaddress` は、検索と一覧、および存在しないアドレスの参照を確認する [ライブ E2E](../../test/e2e/ipv6addr/scenario_ipv6addr_test.go) があります。2026-10-30 に is1b でライブ実行し、`ipv6addr` の find は空の一覧 (割り当てられた IPv6 アドレスがない正常な不在) を確認し、存在しないアドレスの参照が 404 Not Found でエラーになることを確認しました。`ipaddress` の list は割り当て済みのアドレス 1件を確認し、read の応答が一覧と一致すること、存在しないアドレスの参照が 404 Not Found でエラーになることを確認しました。
-- `ipv6addr` の create、update、delete と `ipaddress update-host-name` は、有効化済みの IPv6 ネットワークや割り当て済みのサーバが必要なため、[Issue 180](https://github.com/sacloud/skr/issues/180) で追跡します。
+- `ipv6addr` の create、update、delete は、ルータ＋スイッチを作成して IPv6 アドレス割り当てを有効化したうえで、有効化したプレフィクス内のアドレスに対して検証する [ライブ E2E](../../test/e2e/ipv6addr/scenario_ipv6addr_hostname_test.go) があります。2026-10-30 に is1b でライブ実行しました。create の応答と read が登録内容と一致すること、update で変更できること、delete で解除できることを確認しました。解除後の参照が 404 Not Found でエラーになることも確認しました。登録するアドレスは使用可能な範囲 (末尾64bitが `0:0:0:4` 以降) から選びます。
+- `ipaddress update-host-name` は、共有セグメントにサーバを作成して起動したうえで、割り当てられたグローバル IP アドレスに対して検証する [ライブ E2E](../../test/e2e/ipaddress/scenario_ipaddress_hostname_test.go) があります。2026-10-30 に is1b でライブ実行し、`list` に割り当てアドレスが含まれること、`--host-name` の指定で逆引きホスト名を設定できること、省略時は空に設定される (登録が解除される) ことを確認しました。後片て付けは、逆引きホスト名を空に戻したうえでサーバとディスクの削除で行います。
+- 逆引き登録には、対象のアドレスへの正引き (A または AAAA レコード) が必要です ([IP アドレスの逆引き設定](https://manual.sakura.ad.jp/cloud/network/switch/reverse-dns.html))。実行ごとに変わるテストのアドレスに対する正引きは、ホスト名に含まれるアドレスを応答するワイルドカード DNS (sslip.io) で表現します。IPv6 は `2401-2500-10a-2002--10.sslip.io` のようなダッシュ形式で、IPv4 は `153.120.167.220.sslip.io` のようなドット形式になります。
+- `ipv6net` の E2E と同じく、ルータ＋スイッチの作成と削除、サーバの作成と削除などの共有処理は `test/e2e/internal/helper` ([internet.go](../../test/e2e/internal/helper/internet.go)、[server.go](../../test/e2e/internal/helper/server.go)) にあります。事前の同名確認、削除前の再照合、削除後の不在確認、起動待ちのポーリングはリソースを変更しないため SDK で直接実行し、証跡には残りません。
 
 ## チュートリアル
 
-読み取り系の操作について、[IPv6Net](../manual/tutorials/iaas-api/ipv6net.md)、[IPv6Addr](../manual/tutorials/iaas-api/ipv6addr.md)、[IPAddress](../manual/tutorials/iaas-api/ipaddress.md) のチュートリアルがあります。リソースを作成しない手順です。
+[IPv6Net](../manual/tutorials/iaas-api/ipv6net.md)、[IPv6Addr](../manual/tutorials/iaas-api/ipv6addr.md)、[IPAddress](../manual/tutorials/iaas-api/ipaddress.md) のチュートリアルがあります。IPv6Net はリソースを作成しない手順で、検索と参照を説明します。IPv6Addr と IPAddress はルータ＋スイッチの IPv6 アドレス割り当ての有効化や共有セグメントのサーバ作成を含む手順で、逆引きホスト名の登録、変更、解除を説明します。
 
 ## 参照
 

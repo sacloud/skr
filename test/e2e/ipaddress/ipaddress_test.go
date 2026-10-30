@@ -66,6 +66,33 @@ func readIPAddress(t *testing.T, h *helper.Helper, addr string) ipAddressItem {
 	return item
 }
 
+// updateIPAddressHostName は skr CLI で指定したグローバル IP アドレスの逆引きホスト名を変更します。
+// hostName が空の場合は --host-name を省略し、逆引きホスト名を空に設定します。
+// 成功時は出力しないため、実行の成否のみを確認します。
+func updateIPAddressHostName(t *testing.T, h *helper.Helper, addr, hostName string) {
+	t.Helper()
+
+	args := []string{"iaas-api", "ipaddress", "update-host-name",
+		"--zone", ipAddressZone, "--ip-address", addr,
+	}
+	if hostName != "" {
+		args = append(args, "--host-name", hostName)
+	}
+	_, _, err := h.CallAllowingFailure(t, "グローバル IP アドレスの逆引きホスト名を変更する", args...)
+	require.NoError(t, err, "ipaddress update-host-name should succeed")
+}
+
+// findIPAddressByAddr は一覧から指定したアドレスのグローバル IP アドレスを返します。
+// 見つからない場合は nil を返します。
+func findIPAddressByAddr(items []ipAddressItem, addr string) *ipAddressItem {
+	for i := range items {
+		if items[i].IPAddress == addr {
+			return &items[i]
+		}
+	}
+	return nil
+}
+
 // TestDecodeIPAddress は ipaddress コマンドの参照応答の解析を確認します。
 func TestDecodeIPAddress(t *testing.T) {
 	item, err := decodeIPAddress([]byte(`{"IPAddress":"192.0.2.1","HostName":"www.example.com"}`))
@@ -75,4 +102,17 @@ func TestDecodeIPAddress(t *testing.T) {
 
 	_, err = decodeIPAddress([]byte(`not-json`))
 	require.Error(t, err, "invalid JSON should fail")
+}
+
+// TestFindIPAddressByAddr は一覧からのアドレス指定検索を検証します。
+func TestFindIPAddressByAddr(t *testing.T) {
+	items := []ipAddressItem{
+		{IPAddress: "192.0.2.10", HostName: "a.example.com"},
+		{IPAddress: "192.0.2.11", HostName: "b.example.com"},
+	}
+	found := findIPAddressByAddr(items, "192.0.2.11")
+	require.NotNil(t, found)
+	require.Equal(t, "b.example.com", found.HostName)
+
+	require.Nil(t, findIPAddressByAddr(items, "192.0.2.12"), "unknown address should not be found")
 }

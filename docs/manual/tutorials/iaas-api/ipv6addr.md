@@ -1,16 +1,14 @@
 # IaaS IPv6Addr API: ゾーン内の IPv6 アドレスを確認する
 
-[IPv6 アドレス](https://manual.sakura.ad.jp/cloud/network/switch/ipv6.html)は、IPv6 ネットワークのプレフィクス内の個別アドレスです。逆引きホスト名を登録できます。このチュートリアルでは、`skr iaas-api ipv6addr` を使い、ゾーン内の IPv6 アドレスを検索して、内容を確認します。リソースの作成・変更・削除は行いません。
+[IPv6 アドレス](https://manual.sakura.ad.jp/cloud/network/switch/ipv6.html)は、IPv6 ネットワークのプレフィクス内の個別アドレスです。逆引きホスト名を登録できます。このチュートリアルでは、`skr iaas-api ipv6addr` を使い、ゾーン内の IPv6 アドレスを検索して内容を確認し、逆引きホスト名を登録、変更、解除します。
 
 IPv6 アドレスの一覧は、ゾーンに割り当てられた IPv6 ネットワークのプレフィクス内のアドレスを、逆引きホスト名の登録の有無にかかわらず表示します。IPv6 アドレスの割り当てを有効化していないプロジェクトでは、検索結果は空の一覧になります。
-
-> [!NOTE]
-> `create`、`update`、`delete` は、有効化済みの IPv6 ネットワークが必要です。このチュートリアルでは扱いません。
 
 ## 前提条件
 
 - `skr iaas-api ipv6addr` を含むバイナリが利用できること。リポジトリで `make build` を実行すると `./skr` が生成されます。以下の `skr` は、そのバイナリを実行するコマンドとして記載します。
-- 対象プロジェクトに対する認証情報を、プロファイルまたは `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で設定済みであること。読み取り操作のため、参照できる権限があれば十分です。認証情報はコマンド例や JSON ファイルに書かないでください。
+- 対象プロジェクトに対する認証情報を、プロファイルまたは `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` 環境変数で設定済みであること。Step 4 以降の操作はリソースを変更するため、ルータ＋スイッチを作成・削除できる権限が必要です。認証情報はコマンド例や JSON ファイルに書かないでください。
+- 逆引き登録の対象には、ルータ＋スイッチの IPv6 アドレス割り当ての有効化が必要です。有効化と無効化は `skr iaas-api internet enable-ipv6` と `disable-ipv6` で行えます。手順は [IPv6Net API のチュートリアル](ipv6net.md)を参照してください。
 
 ## Step 1: 対象環境とヘルプを確認する
 
@@ -60,6 +58,36 @@ $ skr iaas-api ipv6addr read --zone is1b --ipv6-addr 2001:db8:a001::1
 ```
 
 出力の `HostName` が逆引きホスト名の登録内容と一致することを確認します。逆引きホスト名を登録していないアドレスでは、`HostName` は空になります。
+
+## Step 4: 逆引きホスト名を登録する
+
+登録するアドレスは、使用可能な範囲 (末尾64bitが `0:0:0:4` 以降) から選んでください。
+
+```console
+$ skr iaas-api ipv6addr create --help
+$ skr iaas-api ipv6addr create --zone is1b --ipv6-addr 2001:db8:a001::10 --host-name www.example.com
+```
+
+登録するアドレスへの正引き (AAAA レコード) が設定されていない場合、逆引き登録はできません。あらかじめ DNS に AAAA レコードを登録してから操作してください。詳細は [IP アドレスの逆引き設定](https://manual.sakura.ad.jp/cloud/network/switch/reverse-dns.html)を参照してください。
+
+## Step 5: 逆引きホスト名を変更する
+
+```console
+$ skr iaas-api ipv6addr update --help
+$ skr iaas-api ipv6addr update --zone is1b --ipv6-addr 2001:db8:a001::10 --host-name www2.example.com
+```
+
+変更後のホスト名についても、同じアドレスへの AAAA レコードが必要です。変更後に `read` で `HostName` を確認してください。
+
+## Step 6: 逆引きホスト名の登録を解除する
+
+`delete` は成功時に出力しません。解除後に `read` を実行すると、参照する IPv6 アドレスが存在しないためエラーになります。
+
+```console
+$ skr iaas-api ipv6addr delete --help
+$ skr iaas-api ipv6addr delete --zone is1b --ipv6-addr 2001:db8:a001::10
+$ skr iaas-api ipv6addr read --zone is1b --ipv6-addr 2001:db8:a001::10
+```
 
 ## 参考情報
 
