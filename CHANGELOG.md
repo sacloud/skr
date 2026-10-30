@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.0.6](https://github.com/sacloud/skr/compare/v0.0.5...v0.0.6) - 2026-10-30
+
+### 🚀 Changes
+- kms-api コマンドを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/184
+- object-storage 暗号化シナリオをテスト専用 KMS キーで実行 (#141) by @tokuhirom in https://github.com/sacloud/skr/pull/186
+- secretmanager 対応を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/187
+- Server チュートリアルのアーカイブとディスクプラン選択を簡潔にする by @tokuhirom in https://github.com/sacloud/skr/pull/188
+- service-endpoint-gateway-api のコマンド、ライブ E2E とチュートリアルを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/190
+
 ## [v0.0.5](https://github.com/sacloud/skr/compare/v0.0.4...v0.0.5) - 2026-10-30
 
 ### 🚀 Changes
