@@ -177,6 +177,21 @@ func TestValidateWiring(t *testing.T) {
 			},
 		},
 		{
+			name: "factory_arguments with client_factory",
+			change: func(c *Config) {
+				c.WiringTarget = "IaaSAPI.Example"
+				c.SDKFactory = "example.New"
+				c.ClientFactory = "iaasclient.New"
+				c.FactoryArguments = []Argument{{
+					Name:  "example-id",
+					Field: "ExampleID",
+					Type:  "int",
+					Help:  "対象 ID。",
+				}}
+			},
+			wantErr: "factory_arguments cannot be combined with client_factory",
+		},
+		{
 			name: "decoder resolves via config imports",
 			change: func(c *Config) {
 				c.WiringTarget = "EventbusAPI.Example"
@@ -266,6 +281,26 @@ func TestGenerateWiringDirectFactory(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(got), "return exampleapi.NewExampleAPI(c.Trace)")
 	require.NotContains(t, string(got), "iaasclient")
+}
+
+func TestGenerateWiringFactoryArguments(t *testing.T) {
+	// factory_arguments がある設定は、factory_arguments を引数に取る factory クロージャを生成します。
+	// sdk_factory は c.Trace に続けて factory_arguments を受け取ります。
+	content := strings.Replace(sampleOgenWiringConfigJSON("ExampleAPI.Example", "exampleapi.NewExampleAPI"), `"client_factory": "iaasclient.New",`, ``, 1)
+	content = strings.Replace(content, `"operations": [`, `"factory_arguments": [
+    {"name": "user-id", "field": "UserID", "type": "int", "help": "対象ユーザー ID。"}
+  ],
+  "operations": [`, 1)
+	path := writeWiringConfigJSON(t, "example.json", content)
+	got, err := GenerateWiring([]string{path}, ModeOgen)
+	require.NoError(t, err)
+	require.Contains(t, string(got), "func(UserID int) (exampleapi.ExampleAPI, error) {")
+	require.Contains(t, string(got), "return exampleapi.NewExampleAPI(c.Trace, UserID)")
+
+	// 再生成が決定的であること
+	second, err := GenerateWiring([]string{path}, ModeOgen)
+	require.NoError(t, err)
+	require.Equal(t, string(got), string(second), "wiring generation is not deterministic")
 }
 
 func TestGenerateWiringFile(t *testing.T) {

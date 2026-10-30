@@ -51,5 +51,7 @@
       "arguments": [{"name":"security-key-id","field":"SecurityKeyID","type":"int","help":"削除するセキュリティキー ID。"}]
     }
   ],
-  "wiring": "handwritten"
+  "wiring_target": "IAMAPI.User2FA",
+  "sdk_factory": "iamapi.NewUser2FAAPI",
+  "decoder": "iamapi.DecodeRequest"
 }

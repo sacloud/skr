@@ -16,6 +16,7 @@
 //   api/commands/iam-service-policy.json
 //   api/commands/iam-service-principal.json
 //   api/commands/iam-sso.json
+//   api/commands/iam-user-2fa.json
 //   api/commands/iam-user.json
 
 package cli
@@ -122,6 +123,13 @@ func (c *cli) initIAMAPI() {
 		WriteOutput:    writeOutput,
 	}, func() (iamapi.SSOAPI, error) {
 		return iamapi.NewSSOAPI(c.Trace)
+	})
+	c.IAMAPI.User2FA = iamapi.NewUser2FACommands(iamapi.User2FARuntime{
+		DecodeRequest:  iamapi.DecodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
+	}, func(UserID int) (iamapi.User2FAAPI, error) {
+		return iamapi.NewUser2FAAPI(c.Trace, UserID)
 	})
 	c.IAMAPI.User = iamapi.NewUserCommands(iamapi.UserRuntime{
 		DecodeRequest:  iamapi.DecodeRequest,

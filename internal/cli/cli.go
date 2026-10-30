@@ -109,7 +109,6 @@ func newCLI() *cli {
 	result.initContainerRegistryAPI()
 	result.initObjectStorageAPI()
 	result.initIAMAPI()
-	result.initIAMUser2FA()
 	result.initSimpleMQMessage()
 	result.initHTTP()
 	return result

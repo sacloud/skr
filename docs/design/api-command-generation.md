@@ -126,7 +126,7 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 [ADR 0068](../adr/0068-generate-cli-wiring.md) に従い、`cmd/apigen-wiring` は同じ設定 JSON から `internal/cli` 配下の配線コードを生成します。配線対象の設定には、代入先を表す `wiring_target` (例: `"IaaSAPI.Archive"`) と、API クライアント生成式を表す `sdk_factory` (例: `"archive.New"`) を記述します。IaaS の設定では、共有クライアント生成式を `client_factory` (例: `"iaasclient.New"`) にも記述し、2 段階のクロージャで `client, err := client_factory(c.Trace)` から `sdk_factory(client)` を組み立てます。IaaS 以外の設定では `sdk_factory` を `c.Trace` で直接呼び出します。
 
-ドメイン固有の decoder を使う操作には `decoder` (例: `"eventbusapi.DecodeRequest"`) を記述します。省略時は共有の入力処理 `decodeRequest` を接続します。`request_transform` を指定した操作は、transform 関数をドメイン package に置き、配線は `packetfilterapi.TransformCreateRequest` の形で接続します。`factory_arguments` を使うクライアント生成など、標準パターンに合わない設定には `"wiring": "handwritten"` を指定して配線対象から外し、手書き init に残します。
+ドメイン固有の decoder を使う操作には `decoder` (例: `"eventbusapi.DecodeRequest"`) を記述します。省略時は共有の入力処理 `decodeRequest` を接続します。`request_transform` を指定した操作は、transform 関数をドメイン package に置き、配線は `packetfilterapi.TransformCreateRequest` の形で接続します。`factory_arguments` を持つ設定は、`factory_arguments` を引数に取る factory クロージャを生成します。`sdk_factory` は `c.Trace` に続けて `factory_arguments` を受け取る必要があります (例: `iamapi.NewUser2FAAPI(c.Trace, UserID)`)。`factory_arguments` と `client_factory` の併用は設定検証で拒否します。標準パターンに合わない設定には `"wiring": "handwritten"` を指定して配線対象から外し、手書き init に残します (例: 認証機構が別の simplemq-message)。
 
 配線コードはドメインごとに 1 ファイルへまとめます。`initIaaSAPI` のように、`wiring_target` の最初の要素を関数名の一部にします。同一ファイルに含まれる設定の `wiring_target` は同じ最初の要素を持つ必要があり、異なる最初の要素の混在は検証で拒否します。ルート構造体、フラグ定義、`newCLI()` からの init 呼び出しは手書きのままにします。
 
