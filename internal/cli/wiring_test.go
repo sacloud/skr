@@ -82,6 +82,7 @@ func TestGeneratedWiringMatchesConfig(t *testing.T) {
 				"iam-service-policy.json",
 				"iam-service-principal.json",
 				"iam-sso.json",
+				"iam-user-2fa.json",
 				"iam-user.json",
 			},
 			mode:     apigen.ModeOgen,

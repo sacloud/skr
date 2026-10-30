@@ -86,6 +86,9 @@ func (c Config) validateWiring(mode Mode) error {
 		if err := validateWiringExpression(c.ClientFactory, "client_factory", c, mode); err != nil {
 			return err
 		}
+		if len(c.FactoryArguments) > 0 {
+			return fmt.Errorf("factory_arguments cannot be combined with client_factory")
+		}
 	}
 	if c.Decoder != "" {
 		if err := validateWiringExpression(c.Decoder, "decoder", c, mode); err != nil {
@@ -272,12 +275,24 @@ func buildWiringCommand(config Config, mode Mode, imports map[string]importSpec)
 	if config.Decoder != "" {
 		spec.Decoder = config.Decoder
 	}
-	if config.ClientFactory != "" {
+	switch {
+	case len(config.FactoryArguments) > 0:
+		// factory_arguments がある設定は、解析済みの factory_arguments を factory に渡します (ADR 0068)。
+		// sdk_factory は c.Trace に続けて factory_arguments を受け取る必要があります。
+		params := make([]string, 0, len(config.FactoryArguments))
+		args := make([]string, 0, len(config.FactoryArguments))
+		for _, argument := range config.FactoryArguments {
+			params = append(params, argument.Field+" "+argument.Type)
+			args = append(args, argument.Field)
+		}
+		spec.Factory = fmt.Sprintf("func(%s) (%s.%s, error) {\n\t\treturn %s(c.Trace, %s)\n\t}",
+			strings.Join(params, ", "), pkg, apiType, config.SDKFactory, strings.Join(args, ", "))
+	case config.ClientFactory != "":
 		if err := addWiringExpressionImport(imports, config.ClientFactory, config, mode); err != nil {
 			return wiringCommandSpec{}, err
 		}
 		spec.Factory = fmt.Sprintf("func() (%s.%s, error) {\n\t\tclient, err := %s(c.Trace)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\treturn %s(client), nil\n\t}", pkg, apiType, config.ClientFactory, config.SDKFactory)
-	} else {
+	default:
 		spec.Factory = fmt.Sprintf("func() (%s.%s, error) {\n\t\treturn %s(c.Trace)\n\t}", pkg, apiType, config.SDKFactory)
 	}
 	if err := addWiringExpressionImport(imports, config.SDKFactory, config, mode); err != nil {
