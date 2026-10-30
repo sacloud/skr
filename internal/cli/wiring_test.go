@@ -100,6 +100,14 @@ func TestGeneratedWiringMatchesConfig(t *testing.T) {
 			expected: "internal/cli/simplemq_wiring_generated.go",
 		},
 		{
+			name: "Kms",
+			configs: []string{
+				"kms-key.json",
+			},
+			mode:     apigen.ModeOgen,
+			expected: "internal/cli/kms_wiring_generated.go",
+		},
+		{
 			name: "SimpleNotification",
 			configs: []string{
 				"simple-notification-destination.json",

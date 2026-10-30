@@ -1,0 +1,117 @@
+{
+  "package": "kmsapi",
+  "resource": "KMS key",
+  "command_prefix": "Key",
+  "imports": {
+    "kms": "github.com/sacloud/sacloud-sdk-go/api/kms",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "KMS キーを一覧表示します。--count と --from でページングできます。",
+      "method": "List",
+      "response_type": "[]v1.Key",
+      "arguments": [
+        {"name":"count","field":"Count","type":"*int","flag":true,"help":"任意: 1 ページの取得件数。"},
+        {"name":"from","field":"From","type":"*int","flag":true,"help":"任意: 取得開始位置 (0 開始)。"}
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "ID を指定して KMS キーを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.Key",
+      "arguments": [
+        {"name":"id","field":"ID","type":"string","help":"list の出力にある KMS キー ID。"}
+      ]
+    },
+    {
+      "name": "Create",
+      "help": "KMS キーを作成します。",
+      "method": "Create",
+      "request_type": "kms.CreateParams",
+      "request_by_value": true,
+      "response_type": "*v1.CreateKeyResponse",
+      "handwritten": true
+    },
+    {
+      "name": "Update",
+      "help": "KMS キーの名前、説明、タグを更新します。--name が必須です。Description は指定した場合だけリクエストに含まれます。Tags は常にリクエストに含まれ、個別フラグのみでの更新では null (タグのクリア) として送信されます。タグを設定・維持する場合は --request JSON で Tags を指定してください。",
+      "method": "Update",
+      "request_type": "kms.UpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.Key",
+      "arguments": [
+        {"name":"id","field":"ID","type":"string","help":"更新する KMS キー ID。"}
+      ],
+      "flags": [
+        {"name":"name","field":"Name","type":"string","required":true,"help":"必須: 更新後のキー名 (1〜255 文字)。例: my-key"},
+        {"name":"description","field":"Description","type":"string","pointer":true,"help":"任意: 更新後のキーの説明。省略するとリクエスト本文に含まれません。"}
+      ]
+    },
+    {
+      "name": "Delete",
+      "help": "ID を指定して KMS キーを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {"name":"id","field":"ID","type":"string","help":"削除する KMS キー ID。"}
+      ]
+    },
+    {
+      "name": "Rotate",
+      "help": "KMS キーをローテーションします。有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。",
+      "method": "Rotate",
+      "response_type": "*v1.Key",
+      "arguments": [
+        {"name":"id","field":"ID","type":"string","help":"ローテーションする KMS キー ID。"}
+      ]
+    },
+    {
+      "name": "ChangeStatus",
+      "help": "KMS キーの状態を変更します。",
+      "method": "ChangeStatus",
+      "response_type": "v1.ChangeKeyStateStatus",
+      "arguments": [
+        {"name":"id","field":"ID","type":"string","help":"状態を変更する KMS キー ID。"},
+        {"name":"status","field":"Status","type":"v1.ChangeKeyStateRequestStatus","help":"設定する状態。active (有効: 暗号化・復号可)、restricted (制限中: 復号のみ可)、suspended (一時停止中: 操作不可) のいずれか。"}
+      ],
+      "handwritten": true
+    },
+    {
+      "name": "ScheduleDestruction",
+      "help": "KMS キーの削除を予約します。削除予約中のキーは利用できませんが、状態変更で削除を取り消せます。",
+      "method": "ScheduleDestruction",
+      "response_type": "v1.KeyScheduledDestruction",
+      "arguments": [
+        {"name":"id","field":"ID","type":"string","help":"削除を予約する KMS キー ID。"},
+        {"name":"pending-days","field":"PendingDays","type":"int","flag":true,"required":true,"help":"必須: 削除までの猶予日数 (7〜90)。"}
+      ]
+    },
+    {
+      "name": "Encrypt",
+      "help": "KMS キーで平文を暗号化します。",
+      "method": "Encrypt",
+      "response_type": "string",
+      "arguments": [
+        {"name":"id","field":"ID","type":"string","help":"暗号化に使う KMS キー ID。"},
+        {"name":"plain","field":"Plain","type":"[]byte","help":"暗号化する平文。"},
+        {"name":"algo","field":"Algo","type":"v1.EncryptionRequestAlgo","help":"暗号化アルゴリズム。aes-256-gcm、aes-256-cbc、aes-256-kw のいずれか。"}
+      ],
+      "handwritten": true
+    },
+    {
+      "name": "Decrypt",
+      "help": "KMS キーで暗号文を復号します。",
+      "method": "Decrypt",
+      "response_type": "[]byte",
+      "arguments": [
+        {"name":"id","field":"ID","type":"string","help":"復号に使う KMS キー ID。"},
+        {"name":"cipher","field":"Cipher","type":"string","help":"encrypt の出力にある暗号文 (base64 テキスト)。"}
+      ],
+      "handwritten": true
+    }
+  ],
+  "wiring_target": "KmsAPI.Key",
+  "sdk_factory": "kmsapi.NewKeyAPI"
+}
