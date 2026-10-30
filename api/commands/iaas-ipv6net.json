@@ -1,0 +1,70 @@
+{
+  "package": "ipv6netapi",
+  "resource": "IaaS IPv6Net",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "ipv6net": "github.com/sacloud/sacloud-sdk-go/service/iaas/ipv6net",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "help": "IPv6 ネットワークを指定したゾーンで検索して出力します。例: skr iaas-api ipv6net find --zone is1b",
+      "method": "FindWithContext",
+      "request_type": "ipv6net.FindRequest",
+      "response_type": "[]*iaas.IPv6Net",
+      "validate_zone": true,
+      "request_help": "任意: FindRequest JSON を直接または @path.json で指定します。Sort、および接続先スイッチやルータ＋スイッチでの絞り込み (SwitchIDs、SwitchNames、InternetIDs、InternetNames) は JSON、Count と From は個別フラグで指定できます。省略時はゾーン内の IPv6 ネットワークを一覧します。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 検索対象のゾーン名です。例: --zone is1b",
+          "required": true
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数です。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置です。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "指定した ID の IPv6 ネットワークを取得します。例: skr iaas-api ipv6net read --zone is1b --id 123456789012",
+      "method": "ReadWithContext",
+      "request_type": "ipv6net.ReadRequest",
+      "response_type": "*iaas.IPv6Net",
+      "validate_zone": true,
+      "request_help": "必須: Zone (ゾーン名) と ID (数値)。--zone と --id、または ReadRequest JSON を直接／@path.json で指定します。個別フラグと --request は併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象のゾーン名です。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 参照する IPv6 ネットワークの ID (数値) です。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    }
+  ],
+  "wiring_target": "IaaSAPI.IPv6Net",
+  "sdk_factory": "ipv6net.New",
+  "client_factory": "iaasclient.New"
+}

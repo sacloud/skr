@@ -1,0 +1,86 @@
+{
+  "package": "ipaddressapi",
+  "resource": "IaaS IPAddress",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "ipaddress": "github.com/sacloud/sacloud-sdk-go/service/iaas/ipaddress"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "グローバル IP アドレスを指定したゾーンで一覧表示します。例: skr iaas-api ipaddress list --zone is1b",
+      "method": "ListWithContext",
+      "request_type": "ipaddress.ListRequest",
+      "response_type": "[]*iaas.IPAddress",
+      "validate_zone": true,
+      "request_help": "必須: Zone (ゾーン名)。--zone または ListRequest JSON を直接／@path.json で指定します。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 一覧を取得するゾーン名です。例: --zone is1b",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "指定したグローバル IP アドレスの情報を取得します。例: skr iaas-api ipaddress read --zone is1b --ip-address 192.0.2.1",
+      "method": "ReadWithContext",
+      "request_type": "ipaddress.ReadRequest",
+      "response_type": "*iaas.IPAddress",
+      "validate_zone": true,
+      "request_help": "必須: Zone (ゾーン名) と IPAddress (対象の IP アドレス)。--zone と --ip-address、または ReadRequest JSON を直接／@path.json で指定します。個別フラグと --request は併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象のゾーン名です。",
+          "required": true
+        },
+        {
+          "name": "ip-address",
+          "field": "IPAddress",
+          "type": "string",
+          "help": "必須: 参照するグローバル IP アドレスです。",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "UpdateHostName",
+      "help": "指定したグローバル IP アドレスの逆引きホスト名を変更します。成功時は出力しません。例: skr iaas-api ipaddress update-host-name --zone is1b --ip-address 192.0.2.1 --host-name www.example.com",
+      "method": "UpdateHostNameWithContext",
+      "request_type": "ipaddress.UpdateHostNameRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、IPAddress (対象の IP アドレス)。任意: HostName (--host-name、省略時は逆引きホスト名を空にします)、RetryMax と RetryInterval (JSON のみ、一時的な失敗時のリトライ回数と間隔)。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象のゾーン名です。",
+          "required": true
+        },
+        {
+          "name": "ip-address",
+          "field": "IPAddress",
+          "type": "string",
+          "help": "必須: 逆引きホスト名を変更するグローバル IP アドレスです。",
+          "required": true
+        },
+        {
+          "name": "host-name",
+          "field": "HostName",
+          "type": "string",
+          "help": "任意: 変更後の逆引きホスト名です。省略時は空にします。"
+        }
+      ]
+    }
+  ],
+  "wiring_target": "IaaSAPI.IPAddress",
+  "sdk_factory": "ipaddress.New",
+  "client_factory": "iaasclient.New"
+}

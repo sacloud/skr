@@ -21,6 +21,9 @@ import (
 	iconapi "github.com/sacloud/skr/internal/iaas/iconapi"
 	internetapi "github.com/sacloud/skr/internal/iaas/internetapi"
 	internetplanapi "github.com/sacloud/skr/internal/iaas/internetplanapi"
+	ipaddressapi "github.com/sacloud/skr/internal/iaas/ipaddressapi"
+	ipv6addrapi "github.com/sacloud/skr/internal/iaas/ipv6addrapi"
+	ipv6netapi "github.com/sacloud/skr/internal/iaas/ipv6netapi"
 	licenseinfoapi "github.com/sacloud/skr/internal/iaas/licenseinfoapi"
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	privatehostplanapi "github.com/sacloud/skr/internal/iaas/privatehostplanapi"
@@ -37,6 +40,9 @@ type iaasAPICommand struct {
 	Disk         diskapi.Commands         `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
 	Icon         iconapi.Commands         `cmd:"" help:"ユーザー作成アイコンを検索、参照、作成、更新、削除します。"`
 	Internet     internetapi.Commands     `cmd:"" help:"さくらのクラウドのルータ＋スイッチと、関連する IP アドレスブロックおよび IPv6 設定を操作します。"`
+	IPAddress    ipaddressapi.Commands    `cmd:"" name:"ipaddress" help:"さくらのクラウドのグローバル IP アドレスを検索・参照し、逆引きホスト名を変更します。"`
+	IPv6Addr     ipv6addrapi.Commands     `cmd:"" name:"ipv6addr" help:"さくらのクラウドの IPv6 アドレスを検索、参照、作成、更新、削除します。IPv6 プレフィクス内のアドレスに逆引きホスト名を登録します。"`
+	IPv6Net      ipv6netapi.Commands      `cmd:"" name:"ipv6net" help:"さくらのクラウドの IPv6 ネットワーク (IPv6 アドレス割り当て) を検索・参照します。IPv6 の有効化と無効化は skr iaas-api internet の enable-ipv6 と disable-ipv6 を使います。"`
 	PacketFilter packetfilterapi.Commands `cmd:"" name:"packetfilter" help:"さくらのクラウドのパケットフィルタを検索、参照、作成、更新、削除します。ルール配列は --expressions JSON または --request JSON で指定します。"`
 	Product      iaasProductCommand       `cmd:"" help:"商品 API のプラン情報を検索・参照します。"`
 	Region       regionapi.Commands       `cmd:"" help:"リージョン情報を検索・参照します。"`
