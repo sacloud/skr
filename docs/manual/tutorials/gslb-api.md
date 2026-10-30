@@ -12,7 +12,7 @@ GSLB は、実サーバーのヘルスチェック結果に応じて DNS 応答�
 - `skr`、`ssh`、`ssh-keygen`、`dig` を利用できる環境が必要です。
 - GSLB の操作と、is1b のアーカイブ・ディスクプランの参照、サーバー・ディスクの作成・起動・削除が許可された認証プロファイルを用意してください。
 - 作業端末から一時サーバーへの SSH 接続と、GSLB からの ping を許可してください。共有セグメントに接続するサーバーはインターネットから到達可能になります。
-- 以下のコマンドは同じシェルで実行します。`CLOUDIMG_ARCHIVE_ID` など代入の右辺にあるプレースホルダーは、実際の値に置き換えてください。
+- 以下のコマンドは同じシェルで実行します。作成したリソースの ID はコマンド出力から設定してください。
 
 独自ドメインは不要です。GSLB が生成する FQDN に直接問い合わせるため、この手順では DNS CNAME を作成・変更しません。
 
@@ -42,33 +42,27 @@ GSLB 自体にはゾーンを指定しません。サーバー、ディスク、
 
 ## Step 2: cloud-init 対応アーカイブとディスクプランを選ぶ
 
-`cloud-init` タグで絞り、Ubuntu Server 24.04 の名前に `(cloudimg)` が付いたアーカイブを選びます。通常の Ubuntu アーカイブと cloudimg は別のアーカイブです。`--os-type ubuntu2404` だけで選ばず、必ず `Tags` と名前を確認してください（[cloud-init 対応アーカイブ](https://manual.sakura.ad.jp/cloud/server/cloud-init.html)）。
+Ubuntu の cloudimg に絞り込んで ID が最大 (最新) のアーカイブをシェル変数に取り込みます。通常の Ubuntu アーカイブと cloudimg は別のアーカイブです。cloudimg でなければ cloud-init user-data が処理されません（[cloud-init 対応アーカイブ](https://manual.sakura.ad.jp/cloud/server/cloud-init.html)）。
 
 ```console
-$ skr iaas-api archive find --zone is1b --tags cloud-init --count 100 \
-    --query 'map(select(.Name | contains("Ubuntu Server 24.04")) | {ID,Name,SizeMB})'
-[
-  {
-    "ID": 123456789001,
-    "Name": "Ubuntu Server 24.04.2 LTS 64bit (cloudimg)",
-    "SizeMB": 20480
-  }
-]
-$ CLOUDIMG_ARCHIVE_ID=CLOUDIMG_ARCHIVE_ID
+$ CLOUDIMG_ARCHIVE_ID=$(skr iaas-api archive find --zone is1b \
+    --query 'map(select(.Name | test("Ubuntu") and test("cloudimg"))) | sort_by(-.ID) | .[0].ID')
+$ echo "$CLOUDIMG_ARCHIVE_ID"
 $ skr iaas-api archive read --zone is1b --id "$CLOUDIMG_ARCHIVE_ID" \
     --query '{ID,Name,SizeMB,Tags}'
 ```
 
-出力例は検索結果から1件を抜粋し、ID を置き換えています。アーカイブの提供状況は変わるため、実際の検索結果から選んでください。選択したアーカイブに `cloud-init` タグがなければ、先へ進まないでください。
-
-次に SSD プラン ID 4 の利用可否とサイズを確認します。この手順では 20 GB を使います。プランと `Size` 内の 20 GB の `Availability` が `available` であることを確認してください。アーカイブの `SizeMB` が 20480 を超える場合は、より大きい利用可能なサイズを選びます（[ディスクのプランとサイズ](https://manual.sakura.ad.jp/cloud/storage/disk.html)）。
+続いて SSDプランのうち ID が最小のものと、プラン内で利用可能な最小の GB 単位のサイズを取り込みます。
 
 ```console
-$ skr iaas-api product disk read --zone is1b --id 4 \
-    --query '{ID,Name,Availability,Size}'
-$ DISK_PLAN_ID=4
-$ DISK_SIZE_GB=20
+$ DISK_PLAN_ID=$(skr iaas-api product disk find --zone is1b \
+    --query '.DiskPlans | map(select(.Name | test("SSD"))) | sort_by(.ID) | .[0].ID')
+$ DISK_SIZE_GB=$(skr iaas-api product disk read --zone is1b --id "$DISK_PLAN_ID" \
+    --query '[.Size[] | select(.Availability == "available" and .DisplaySuffix == "GB") | .DisplaySize] | .[0]')
+$ echo "$DISK_PLAN_ID, $DISK_SIZE_GB"
 ```
+
+`--disk` に指定するディスクのサイズはアーカイブのサイズ以上が必要です。より大きいサイズが必要な場合は、`skr iaas-api product disk read` の結果から選び直してください（[ディスクのプランとサイズ](https://manual.sakura.ad.jp/cloud/storage/disk.html)）。
 
 ## Step 3: SSH 鍵と cloud-init 設定を準備する
 
@@ -133,7 +127,7 @@ $ ssh -i "$KEY_PATH" -o IdentitiesOnly=yes \
 
 初回接続ではホスト鍵の指紋を確認してください。接続できない場合は GSLB の作成へ進まず、アーカイブが cloudimg であること、公開鍵、OS の起動状態、SSH の許可を確認します。
 
-同じアーカイブ・プラン・user-data を使い、ソーリーサーバーを別に作成します。各代入の右辺は今回の出力に置き換えてください。`DISK_ID` と `SORRY_DISK_ID` には、それぞれのサーバーへ接続されたディスクの ID を控えます。
+同じアーカイブ・プラン・user-data を使い、ソーリーサーバーを別に作成します。`DISK_ID` と `SORRY_DISK_ID` には、それぞれのサーバーへ接続されたディスクの ID を控えます。
 
 ```console
 $ DISK_ID=DISK_ID
