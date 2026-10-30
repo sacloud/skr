@@ -242,6 +242,16 @@ iam-api user-2fa delete-trusted-device live
 iam-api user-2fa list-security-keys live
 iam-api user-2fa list-trusted-devices live
 iam-api user-2fa read-security-key live
+kms-api key change-status live
+kms-api key create live
+kms-api key decrypt live
+kms-api key delete live
+kms-api key encrypt live
+kms-api key list live
+kms-api key read live
+kms-api key rotate live
+kms-api key schedule-destruction live
+kms-api key update live
 networking-suite-api address list live
 networking-suite-api address read live
 networking-suite-api interface-connection create live

@@ -62,6 +62,8 @@ generate-wiring:
 		$(patsubst %,api/commands/%,$(filter eventbus-%,$(notdir $(wildcard api/commands/*.json))))
 	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/iam_wiring_generated.go \
 		$(patsubst %,api/commands/%,$(filter iam-%,$(notdir $(wildcard api/commands/*.json))))
+	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/kms_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter kms-%,$(notdir $(wildcard api/commands/*.json))))
 	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/simplemq_wiring_generated.go \
 		$(patsubst %,api/commands/%,$(filter simplemq-%,$(notdir $(wildcard api/commands/*.json))))
 	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/simple_notification_wiring_generated.go \
