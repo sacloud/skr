@@ -15,6 +15,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -192,10 +194,14 @@ func writeCipherFile(t *testing.T, cipherJSON []byte) string {
 }
 
 // writeKmsPlainKeyFile は BYOK モードでインポートする秘密鍵を一時ファイルに書き込みます。
-func writeKmsPlainKeyFile(t *testing.T, plainKey string) string {
+// プレーン鍵は 256 bit 長の対称鍵を base64 エンコードした形式が必要です。
+func writeKmsPlainKeyFile(t *testing.T) string {
 	t.Helper()
 
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	require.NoError(t, err, "generate 256 bit key")
 	path := filepath.Join(t.TempDir(), "plainkey.txt")
-	require.NoError(t, os.WriteFile(path, []byte(plainKey+"\n"), 0o600), "write plain key file")
+	require.NoError(t, os.WriteFile(path, []byte(base64.StdEncoding.EncodeToString(key)+"\n"), 0o600), "write plain key file")
 	return path
 }

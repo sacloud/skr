@@ -163,7 +163,7 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 	// BYOK モード: --plain-key-file から秘密鍵を読み込んで作成する
 	dir := t.TempDir()
 	plainKeyFile := filepath.Join(dir, "plainkey.txt")
-	require.NoError(t, os.WriteFile(plainKeyFile, []byte(base64.StdEncoding.EncodeToString([]byte("test-only-kms-imported-material"))+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(plainKeyFile, []byte(base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))+"\n"), 0o600))
 	var imported struct {
 		ID        string `json:"ID"`
 		KeyOrigin string `json:"KeyOrigin"`

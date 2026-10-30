@@ -60,20 +60,26 @@ func TestScenarioKmsKey(t *testing.T) {
 	require.Equal(t, "cloud/kms/key", created.ServiceClass, "created key should use the standard service class")
 	keyID := created.ID
 
+	// 後片付け: 作成したキーを削除し、一覧に残っていないことを確認する
+	defer func() {
+		deleteKmsKey(t, h, keyID)
+		remaining := listKmsKeys(t, h, "削除後にキーが一覧に残っていないことを確認する")
+		for _, item := range remaining {
+			require.NotEqual(t, keyID, item.ID, "key %q should not remain after deletion", keyID)
+		}
+	}()
+
 	// BYOK モードのキーも作成する
-	imported := createKmsKeyWithPlainKeyFile(t, h, keyName+"-byok", writeKmsPlainKeyFile(t, "skr-e2e-kms-plainkey"))
+	imported := createKmsKeyWithPlainKeyFile(t, h, keyName+"-byok", writeKmsPlainKeyFile(t))
 	require.NotEmpty(t, imported.ID, "imported key should have an ID: %+v", imported)
 	require.Equal(t, "imported", imported.KeyOrigin, "BYOK key should be imported")
 	importedID := imported.ID
 
-	// 後片付け: 作成したキーを削除し、一覧に残っていないことを確認する
+	// 後片付け: BYOK キーも作成直後に登録する
 	defer func() {
-		for _, id := range []string{keyID, importedID} {
-			deleteKmsKey(t, h, id)
-		}
+		deleteKmsKey(t, h, importedID)
 		remaining := listKmsKeys(t, h, "削除後にキーが一覧に残っていないことを確認する")
 		for _, item := range remaining {
-			require.NotEqual(t, keyID, item.ID, "key %q should not remain after deletion", keyID)
 			require.NotEqual(t, importedID, item.ID, "key %q should not remain after deletion", importedID)
 		}
 	}()

@@ -32,19 +32,18 @@
 | `test/e2e/diskplan` | product disk find / read(2) | 全コマンド実装済み。2026-10-29 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/iaas-product-plans` | product internet find / read、product license find、product privatehost find / read(5) | testing.T ベースのシナリオに移行済み。ライブは5コマンドの正常実行を確認済み |
 | `test/e2e/object-storage-api` | 6シナリオで34コマンド | testing.T ベースのシナリオに移行済み。ライブは29コマンドの正常応答を確認済みで、`bucket penalty` と `site status bucket-metering` は API エラー、暗号化3操作は KMS キー作成未実装のため延期。状況は `PLAN.md` を参照 |
-| `test/e2e/kms-api` | key 10操作(10) | 全コマンド実装済み。testing.T ベースのシナリオを実装済みで、課金対象のキー作成を伴うためライブは承認後に実施 |
+| `test/e2e/kms-api` | key 10操作(10) | 全コマンド実装済み。2026-10-30 に testing.T ベースのシナリオでライブ実行し、生成モードと BYOK モードのキー作成から削除後の不在まで正常応答を確認済み |
 | `test/e2e/iam-api` | 9シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | testing.T ベースのシナリオに移行済み。ライブは57コマンドの正常実行を確認済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
 
 `config` は CLI のメタコマンドとして上表に含めます。`version` は `test/e2e/version` の testing.T ベースのシナリオテストで検証します。
 
 ## 未検証コマンド
 
-タスク3の完了後、未検証は35コマンドです。kms-api の10コマンドはシナリオ実装済みで、課金対象のキー作成を伴うためライブは承認後に実施します。
+タスク3の完了後、未検証は35コマンドです。
 
 | サービス | 未検証コマンド | 件数 |
 | --- | --- | --- |
 | apprun-dedicated-api | 次節の35コマンド | 35 |
-| kms-api | `key` の10コマンド | 10 |
 
 ### apprun-dedicated-api の未検証35コマンド
 
