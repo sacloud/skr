@@ -1,0 +1,9 @@
+{
+  "Appliance": {
+    "Remark": {
+      "Switch": {"ID": "112900500001"},
+      "Network": {"NetworkMaskLen": 24},
+      "Servers": [{"IPAddress": "192.168.2.100"}]
+    }
+  }
+}
