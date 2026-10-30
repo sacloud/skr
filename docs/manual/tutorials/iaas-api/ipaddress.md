@@ -1,11 +1,8 @@
 # IaaS IPAddress API: ゾーン内のグローバル IP アドレスを確認する
 
-グローバル IP アドレスは、サーバやルータ＋スイッチに割り当てられたインターネット側の IP アドレスです。このチュートリアルでは、`skr iaas-api ipaddress` を使い、ゾーン内のグローバル IP アドレスを一覧表示して、内容を確認します。リソースの作成・変更・削除は行いません。
+グローバル IP アドレスは、サーバやルータ＋スイッチに割り当てられたインターネット側の IP アドレスです。このチュートリアルでは、`skr iaas-api ipaddress` を使い、ゾーン内のグローバル IP アドレスを一覧表示して内容を確認し、逆引きホスト名を設定・解除します。
 
 一覧は、ゾーンのプロジェクトに割り当てられたグローバル IP アドレスを表示します。割り当てられたグローバル IP アドレスがないプロジェクトでは、空の一覧になります。
-
-> [!NOTE]
-> `update-host-name` は、グローバル IP アドレスが割り当てられたサーバまたはスイッチが必要です。このチュートリアルでは扱いません。
 
 ## 前提条件
 
@@ -58,6 +55,27 @@ $ skr iaas-api ipaddress read --zone is1b --ip-address 192.0.2.10
 ```
 
 出力の `HostName` が逆引きホスト名の登録内容と一致することを確認します。逆引きホスト名を登録していないアドレスでは、`HostName` は空になります。
+
+## Step 4: 逆引きホスト名を設定する
+
+逆引き設定するアドレスには、正引き (A レコード) が設定されている必要があります。あらかじめ DNS に A レコードを登録してから操作してください。詳細は [IP アドレスの逆引き設定](https://manual.sakura.ad.jp/cloud/network/switch/reverse-dns.html)を参照してください。
+
+```console
+$ skr iaas-api ipaddress update-host-name --help
+$ skr iaas-api ipaddress update-host-name --zone is1b --ip-address 192.0.2.10 --host-name www.example.com
+```
+
+設定後に `read` で `HostName` を確認してください。
+
+## Step 5: 逆引きホスト名の登録を解除する
+
+`--host-name` を省略すると、逆引きホスト名は空に設定され、登録が解除されます。
+
+```console
+$ skr iaas-api ipaddress update-host-name --zone is1b --ip-address 192.0.2.10
+```
+
+解除後に `read` を実行して、`HostName` が空であることを確認してください。
 
 ## 参考情報
 
