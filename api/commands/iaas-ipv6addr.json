@@ -1,0 +1,156 @@
+{
+  "package": "ipv6addrapi",
+  "resource": "IaaS IPv6Addr",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "ipv6addr": "github.com/sacloud/sacloud-sdk-go/service/iaas/ipv6addr"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "help": "IPv6 アドレスを指定したゾーンで検索して出力します。例: skr iaas-api ipv6addr find --zone is1b",
+      "method": "FindWithContext",
+      "request_type": "ipv6addr.FindRequest",
+      "response_type": "[]*iaas.IPv6Addr",
+      "validate_zone": true,
+      "request_help": "任意: FindRequest JSON を直接または @path.json で指定します。Sort、および接続先スイッチやホスト名での絞り込み (SwitchIDs、HostNames、IPv6Addresses) は JSON、Count と From は個別フラグで指定できます。省略時はゾーン内の IPv6 アドレスを一覧します。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 検索対象のゾーン名です。例: --zone is1b",
+          "required": true
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数です。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置です。"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "help": "IPv6 プレフィクス内のアドレスに逆引きホスト名を登録して出力します。例: skr iaas-api ipv6addr create --zone is1b --ipv6-addr 2001:db8::1 --host-name www.example.com",
+      "method": "CreateWithContext",
+      "request_type": "ipv6addr.CreateRequest",
+      "response_type": "*iaas.IPv6Addr",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、IPv6Addr (登録する IPv6 アドレス)、HostName (逆引きホスト名)。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 作成先のゾーン名です。",
+          "required": true
+        },
+        {
+          "name": "ipv6-addr",
+          "field": "IPv6Addr",
+          "type": "string",
+          "help": "必須: 登録する IPv6 アドレスです。有効化済みの IPv6 ネットワークのプレフィクス内を指定します。",
+          "required": true
+        },
+        {
+          "name": "host-name",
+          "field": "HostName",
+          "type": "string",
+          "help": "必須: 逆引きホスト名です。",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "指定した IPv6 アドレスの情報を取得します。例: skr iaas-api ipv6addr read --zone is1b --ipv6-addr 2001:db8::1",
+      "method": "ReadWithContext",
+      "request_type": "ipv6addr.ReadRequest",
+      "response_type": "*iaas.IPv6Addr",
+      "validate_zone": true,
+      "request_help": "必須: Zone (ゾーン名) と IPv6Addr (対象の IPv6 アドレス)。--zone と --ipv6-addr、または ReadRequest JSON を直接／@path.json で指定します。個別フラグと --request は併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象のゾーン名です。",
+          "required": true
+        },
+        {
+          "name": "ipv6-addr",
+          "field": "IPv6Addr",
+          "type": "string",
+          "help": "必須: 参照する IPv6 アドレスです。",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "help": "指定した IPv6 アドレスの逆引きホスト名を変更して出力します。例: skr iaas-api ipv6addr update --zone is1b --ipv6-addr 2001:db8::1 --host-name www.example.com",
+      "method": "UpdateWithContext",
+      "request_type": "ipv6addr.UpdateRequest",
+      "response_type": "*iaas.IPv6Addr",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、IPv6Addr (対象の IPv6 アドレス)、HostName (変更後の逆引きホスト名)。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象のゾーン名です。",
+          "required": true
+        },
+        {
+          "name": "ipv6-addr",
+          "field": "IPv6Addr",
+          "type": "string",
+          "help": "必須: 変更する IPv6 アドレスです。",
+          "required": true
+        },
+        {
+          "name": "host-name",
+          "field": "HostName",
+          "type": "string",
+          "help": "必須: 変更後の逆引きホスト名です。",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "help": "指定した IPv6 アドレスの逆引きホスト名の登録を解除します。成功時は出力しません。例: skr iaas-api ipv6addr delete --zone is1b --ipv6-addr 2001:db8::1",
+      "method": "DeleteWithContext",
+      "request_type": "ipv6addr.DeleteRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、IPv6Addr (解除する IPv6 アドレス)。任意: FailIfNotFound (真偽値、対象が見つからない場合にエラーにします)。--request と個別フラグは併用できません。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象のゾーン名です。",
+          "required": true
+        },
+        {
+          "name": "ipv6-addr",
+          "field": "IPv6Addr",
+          "type": "string",
+          "help": "必須: 解除する IPv6 アドレスです。",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "wiring_target": "IaaSAPI.IPv6Addr",
+  "sdk_factory": "ipv6addr.New",
+  "client_factory": "iaasclient.New"
+}

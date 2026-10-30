@@ -6,6 +6,9 @@
 //   api/commands/iaas-disk.json
 //   api/commands/iaas-icon.json
 //   api/commands/iaas-internet.json
+//   api/commands/iaas-ipaddress.json
+//   api/commands/iaas-ipv6addr.json
+//   api/commands/iaas-ipv6net.json
 //   api/commands/iaas-packetfilter.json
 //   api/commands/iaas-product-disk.json
 //   api/commands/iaas-product-internet.json
@@ -25,6 +28,9 @@ import (
 	disk "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	icon "github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
 	internet "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
+	ipaddress "github.com/sacloud/sacloud-sdk-go/service/iaas/ipaddress"
+	ipv6addr "github.com/sacloud/sacloud-sdk-go/service/iaas/ipv6addr"
+	ipv6net "github.com/sacloud/sacloud-sdk-go/service/iaas/ipv6net"
 	packetfilter "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	region "github.com/sacloud/sacloud-sdk-go/service/iaas/region"
 	server "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
@@ -38,6 +44,9 @@ import (
 	iconapi "github.com/sacloud/skr/internal/iaas/iconapi"
 	internetapi "github.com/sacloud/skr/internal/iaas/internetapi"
 	internetplanapi "github.com/sacloud/skr/internal/iaas/internetplanapi"
+	ipaddressapi "github.com/sacloud/skr/internal/iaas/ipaddressapi"
+	ipv6addrapi "github.com/sacloud/skr/internal/iaas/ipv6addrapi"
+	ipv6netapi "github.com/sacloud/skr/internal/iaas/ipv6netapi"
 	licenseinfoapi "github.com/sacloud/skr/internal/iaas/licenseinfoapi"
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	privatehostplanapi "github.com/sacloud/skr/internal/iaas/privatehostplanapi"
@@ -93,6 +102,39 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return internet.New(client), nil
+	})
+	c.IaaSAPI.IPAddress = ipaddressapi.NewCommands(ipaddressapi.Runtime{
+		DecodeRequest:  decodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
+	}, func() (ipaddressapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return ipaddress.New(client), nil
+	})
+	c.IaaSAPI.IPv6Addr = ipv6addrapi.NewCommands(ipv6addrapi.Runtime{
+		DecodeRequest:  decodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
+	}, func() (ipv6addrapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return ipv6addr.New(client), nil
+	})
+	c.IaaSAPI.IPv6Net = ipv6netapi.NewCommands(ipv6netapi.Runtime{
+		DecodeRequest:  decodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
+	}, func() (ipv6netapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return ipv6net.New(client), nil
 	})
 	c.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 		DecodeRequest:          decodeRequest,

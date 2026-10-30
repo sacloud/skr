@@ -115,6 +115,16 @@ iaas-api internet read live
 iaas-api internet read-ipv6 live
 iaas-api internet update live
 iaas-api internet update-subnet live
+iaas-api ipaddress list live
+iaas-api ipaddress read live
+iaas-api ipaddress update-host-name deferred #180 割り当て済みのサーバまたはスイッチが必要
+iaas-api ipv6addr create deferred #180 有効化済みの IPv6 ネットワークが必要
+iaas-api ipv6addr delete deferred #180 有効化済みの IPv6 ネットワークが必要
+iaas-api ipv6addr find live
+iaas-api ipv6addr read live
+iaas-api ipv6addr update deferred #180 有効化済みの IPv6 ネットワークが必要
+iaas-api ipv6net find live
+iaas-api ipv6net read live
 iaas-api packetfilter create live
 iaas-api packetfilter delete live
 iaas-api packetfilter find live
