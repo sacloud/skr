@@ -275,9 +275,9 @@ object-storage-api account delete live
 object-storage-api account read live
 object-storage-api bucket create live
 object-storage-api bucket delete live
-object-storage-api bucket encryption disable deferred #141 KMS キー作成が未実装のため
-object-storage-api bucket encryption enable deferred #141 KMS キー作成が未実装のため
-object-storage-api bucket encryption read deferred #141 KMS キー作成が未実装のため
+object-storage-api bucket encryption disable live
+object-storage-api bucket encryption enable live
+object-storage-api bucket encryption read live
 object-storage-api bucket list live
 object-storage-api bucket penalty deferred #142 API がエラーを返すため
 object-storage-api bucket quota live

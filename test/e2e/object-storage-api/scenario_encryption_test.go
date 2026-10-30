@@ -14,14 +14,19 @@ import (
 // TestScenarioObjectStorageEncryption はテスト専用の KMS キーを作成し、一時バケットの暗号化の
 // 有効化・キー ID の照合・無効化を検証します。KMS キーは生成モードで作成するため、
 // 秘密鍵の値は発生しません。後片付けで作成した KMS キーを削除し、既存の KMS キーは変更・削除しません (#141)。
+// 東京第1サイトのアカウントが未作成の場合は Metrics シナリオと同じく作成し、後片付けで削除します。
 func TestScenarioObjectStorageEncryption(t *testing.T) {
 	h := helper.New(t, "object-storage-encryption",
 		"一時バケットの暗号化を有効化・無効化し、KMS キー ID が正しく反映されることを確認する")
 
 	// テスト専用の KMS キーを作成する
 	key := createEncryptionKmsKey(t, h)
-	// 後片付け: バケットの削除が先に実行されるよう、テスト関数の defer で KMS キーを削除する
+	// 後片付け: バケットとサイトアカウントの後片付けが先に実行されるよう、テスト関数の defer で KMS キーを削除する
 	defer deleteEncryptionKmsKey(t, h, key.ID)
+
+	// 東京第1サイトのアカウントが未作成なら作成し、後片付けで削除する。既存アカウントは変更しない。
+	cleanupAccount := ensureObjectStorageAccount(t, h, "tky01")
+	defer cleanupAccount()
 
 	runBucketScenario(t, h, "tky01", "", func(t *testing.T, h *helper.Helper, siteID, bucket string, cleanupVetoed *bool) {
 		runEncryptionLifecycle(t, h, siteID, bucket, key.ID, cleanupVetoed)

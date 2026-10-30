@@ -88,7 +88,7 @@ SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageE
 
 ### コマンド対応とライブ実行状況
 
-2026-10-28 の実行結果です。全34コマンドにシナリオがあり、このうち29コマンドで正常応答と期待内容をライブ確認しました。暗号化3操作は合意により延期し、残る2操作は API エラーのため成功未確認です。
+2026-10-30 の実行結果です。全34コマンドにシナリオがあり、このうち32コマンドで正常応答と期待内容をライブ確認しました。暗号化3操作もテスト専用の KMS キーでライブ確認し、残る2操作は API エラーのため成功未確認です。
 
 | `object-storage-api` 以下のコマンド | 個数 | 主なシナリオ | ライブ結果 |
 | --- | --- | --- | --- |
@@ -102,10 +102,10 @@ SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageE
 | `permission access-key list / create / read / delete` | 4 | `Bucket` | 成功しました |
 | `bucket usage / quota` | 2 | `Metrics` | 東京第1サイトで成功しました |
 | `bucket penalty` | 1 | deferred | HTTP 404 が返り、成功未確認です。#142 で追跡します |
-| `bucket encryption read / enable / disable` | 3 | `Encryption` | KMS キー作成が未実装のため、#141 で追跡します |
+| `bucket encryption read / enable / disable` | 3 | `Encryption` | 2026-10-30 にテスト専用の KMS キーでライブ実行し、有効化・キー ID の照合・無効化と無効化後の不在を確認しました |
 | `bucket replication read / enable / disable` | 3 | `Replication` | 石狩第1サイトから東京第1サイトへの設定で成功しました |
 
-暗号化は [#141](https://github.com/sacloud/skr/issues/141)、テレメトリーの失敗は [#142](https://github.com/sacloud/skr/issues/142) で追跡します。`penalty` の404をペナルティなしと解釈したり、`bucket-metering` の400を空利用量で置き換えたりしません。CLI は公開 SDK にサイト、バケット名、期間を渡しており、失敗の原因が CLI・SDK・サービスのどこにあるかは未確定です。両操作は baseline で deferred として扱い、正常系のシナリオでは呼び出しません。
+暗号化の3操作は [#141](https://github.com/sacloud/skr/issues/141) で 2026-10-30 に実装・ライブ検証しました。テレメトリーの失敗は [#142](https://github.com/sacloud/skr/issues/142) で追跡します。`penalty` の404をペナルティなしと解釈したり、`bucket-metering` の400を空利用量で置き換えたりしません。CLI は公開 SDK にサイト、バケット名、期間を渡しており、失敗の原因が CLI・SDK・サービスのどこにあるかは未確定です。両操作は baseline で deferred として扱い、正常系のシナリオでは呼び出しません。
 
 ### 安全性と証跡
 
@@ -117,4 +117,4 @@ SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageE
 
 暗号化も無効化直前に設定を再取得し、現在の `kms_key_id` が今回指定したキー ID と一致する場合だけ無効化します。明確な404は設定不在として変更せず終了し、不一致・不正応答・キー ID 欠落・照会失敗は変更を拒否します。キャンセル後の片付けにも同じ条件を適用します。設定の所有を確認できない場合は親バケットも自動削除せず、手動確認を求めるエラーを返します。シナリオが作成した KMS キーはバケットの後片付けの後に削除し、一覧に残っていないことを確認します。
 
-証跡は共有ヘルパーが Git 管理外の `test/e2e/object-storage-api/e2e-output/<識別名>-<実行日時>.md` に Markdown で保存します。2026-10-28 の実行では `object-storage-bucket`、`object-storage-account`、`object-storage-archive`、`object-storage-metrics`、`object-storage-replication` の記録を残しました。作成したバケット・権限・キー・サイトアカウントの削除と不在確認は完了しています。
+証跡は共有ヘルパーが Git 管理外の `test/e2e/object-storage-api/e2e-output/<識別名>-<実行日時>.md` に Markdown で保存します。2026-10-28 の実行では `object-storage-bucket`、`object-storage-account`、`object-storage-archive`、`object-storage-metrics`、`object-storage-replication` の記録を残しました。2026-10-30 の実行では `object-storage-encryption` の記録を残し、テスト専用の KMS キー・サイトアカウント・バケット・権限・キーの削除と不在確認を完了しています。
