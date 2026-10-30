@@ -31,6 +31,7 @@ import (
 	"github.com/sacloud/skr/internal/kmsapi"
 	"github.com/sacloud/skr/internal/networkingsuiteapi"
 	"github.com/sacloud/skr/internal/objectstorageapi"
+	"github.com/sacloud/skr/internal/secretmanagerapi"
 	"github.com/sacloud/skr/internal/simplemqapi"
 	"github.com/sacloud/skr/internal/simplenotificationapi"
 	"github.com/sacloud/skr/version"
@@ -54,6 +55,7 @@ type cli struct {
 	ObjectStorageAPI      objectstorageapi.Commands      `cmd:"" name:"object-storage-api" help:"さくらのオブジェクトストレージ管理 API でサイト、バケット、サイトアカウント、パーミッションを操作します。S3 互換 API のオブジェクト本体の転送ではなく、管理操作を行います。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。バケット作成は課金対象です。アクセスキーのシークレットは発行時の応答にのみ含まれます。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/objectstorage/api.html"`
 	IAMAPI                iamapi.Commands                `cmd:"" name:"iam-api" help:"さくらのクラウド IAM のユーザー、グループ、組織、プロジェクト、フォルダ、ポリシーなどを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。各機能を利用するには、対象機能の権限を付与したサービスプリンシパルが必要です。詳細: https://manual.sakura.ad.jp/cloud/controlpanel/iam-policy.html"`
 	KmsAPI                kmsapi.Commands                `cmd:"" name:"kms-api" help:"さくらのクラウド KMS (Key Management Service) で暗号鍵を操作します。FIPS 140-3 level 3 認証の HSM と連携し、対称鍵 AES-256 bit の暗号化・復号を提供します。キーの削除は猶予期間 7〜90 日の削除予約制です。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。API エンドポイントのゾーンは SDK の既定値 (tk1a) を使い、SAKURA_ENDPOINTS_KMS で変更できます。平文や暗号文、BYOK の秘密鍵はファイルまたは標準入力から読み込みます。結果は JSON で出力しますが、decrypt の平文はバイト列のまま出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/kms/index.html"`
+	SecretManagerAPI      secretmanagerapi.Commands      `cmd:"" name:"secretmanager-api" help:"さくらのクラウド シークレットマネージャーでシークレット保管庫 (Vault) とシークレットを操作します。シークレットは Vault 単位で暗号化され、最新を含む 50 世代まで保管されます。Vault 作成には既存の KMS キー ID が必要です。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。シークレットの値は --value-file で指定したファイルまたは標準入力から読み込み、unveil は値をそのまま標準出力へ出力します。結果は JSON で出力しますが、unveil は値のみを出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html"`
 	HTTP                  httpCommand                    `cmd:"" name:"http" help:"SDK の認証情報を使って HTTPS URL に直接リクエストを送ります。指定したホストへアカウントの認証情報が送信されるため、信頼できる API エンドポイントだけを指定してください。レスポンス本文は形式を変えずに出力し、--query による加工は行いません。例: skr http 'https://api.example.test/path' --method GET"`
 }
 
@@ -112,6 +114,7 @@ func newCLI() *cli {
 	result.initObjectStorageAPI()
 	result.initIAMAPI()
 	result.initKmsAPI()
+	result.initSecretManagerAPI()
 	result.initSimpleMQMessage()
 	result.initHTTP()
 	return result
