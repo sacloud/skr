@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/database"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	"github.com/stretchr/testify/require"
 
@@ -100,6 +100,8 @@ func TestScenarioDatabase(t *testing.T) {
 	name := dbNamePrefix + suffix
 	updatedDescription := dbDescription + " (updated)"
 	password := "e2e-db-" + suffix + "-pass"
+	// created は後片てつきの中で ID 照合に使うため、作成前に宣言する
+	var created databaseItem
 
 	// 作成前の同名確認を実施する
 	client, err := iaasclient.New(false)
@@ -107,21 +109,50 @@ func TestScenarioDatabase(t *testing.T) {
 	require.Empty(t, lookupDatabases(t, client, name), "database name %q already exists; refusing to modify it", name)
 
 	// テスト用のスイッチを作成する。データベースはスイッチへの接続が必須のため
+	switchName := "skr-e2e-database-switch-" + suffix
 	switchData := h.Call(t, "データベースの接続先となるスイッチを作成する",
 		"iaas-api", "switch", "create",
 		"--zone", dbZone,
-		"--name", "skr-e2e-database-switch-"+suffix,
+		"--name", switchName,
 		"--description", dbDescription)
 	var createdSwitch struct {
-		ID types.ID
+		ID          types.ID
+		Name        string
+		Description string
 	}
 	require.NoError(t, json.Unmarshal(switchData, &createdSwitch), "decode created switch")
-	require.NotZero(t, createdSwitch.ID, "switch ID is missing")
+	require.Equal(t, switchName, createdSwitch.Name, "created switch name should match the request")
+	require.Equal(t, dbDescription, createdSwitch.Description, "created switch description should match the request")
 
 	defer func() {
-		// スイッチを削除する。データベースの削除はデータベースの後片付けで行う
+		// スイッチを削除する前に、保持した ID と識別情報を再照合する。
+		// データベースの削除はデータベースの後片付けで行う
+		switchOp := iaas.NewSwitchOp(client)
+		current, err := switchOp.Read(t.Context(), dbZone, createdSwitch.ID)
+		if iaas.IsNotFoundError(err) {
+			return // 不在なら変更せず終了する
+		}
+		require.NoError(t, err, "re-verify switch %s before cleanup", createdSwitch.ID)
+		require.NotNil(t, current, "re-verified switch should not be nil")
+		require.Equal(t, createdSwitch.ID, current.ID, "cleanup target switch ID mismatch")
+		require.Equal(t, switchName, current.Name, "cleanup target switch name mismatch")
+		require.Equal(t, dbDescription, current.Description, "cleanup target switch description mismatch")
+		// スイッチに接続するデータベースが残っていないことを確認する。
+		// 接続が残る場合や照合に失敗した場合はスイッチを削除しない (背景は ADR 0064)
+		remaining := lookupDatabases(t, client, name)
+		for _, item := range remaining {
+			if item.ID == created.ID {
+				t.Errorf("database %s still exists; refusing to delete the switch %s", created.ID, createdSwitch.ID)
+				return
+			}
+			require.NotEqual(t, createdSwitch.ID, item.SwitchID,
+				"database %s still connects to the switch %s; refusing to delete it", item.ID, createdSwitch.ID)
+		}
 		_ = h.Call(t, "テスト用スイッチを削除する",
 			"iaas-api", "switch", "delete", "--zone", dbZone, "--id", createdSwitch.ID.String(), "--fail-if-not-found")
+		// 削除後の不在確認を行う
+		_, err = switchOp.Read(t.Context(), dbZone, createdSwitch.ID)
+		require.True(t, iaas.IsNotFoundError(err), "switch %s should not remain after deletion", createdSwitch.ID)
 	}()
 
 	// テストで使うプラン ID は dbPlanID (10GB プラン) を使う
@@ -149,10 +180,29 @@ func TestScenarioDatabase(t *testing.T) {
 		"--password", "@" + passwordFile,
 	}
 	data := h.CallWithTimeout(t, dbCreateTimeout, "データベースを作成する", createArgs...)
-	created := parseDatabase(t, data)
+	created = parseDatabase(t, data)
 	require.NotZero(t, created.ID, "created database ID is missing")
 
 	defer func() {
+		// データベースを削除する前に、保持した ID と識別情報を再照合する
+		dbOp := iaas.NewDatabaseOp(client)
+		current, err := dbOp.Read(t.Context(), dbZone, created.ID)
+		if iaas.IsNotFoundError(err) {
+			return // 不在なら変更せず終了する
+		}
+		require.NoError(t, err, "re-verify database %s before cleanup", created.ID)
+		require.NotNil(t, current, "re-verified database should not be nil")
+		require.Equal(t, created.ID, current.ID, "cleanup target database ID mismatch")
+		require.Equal(t, name, current.Name, "cleanup target database name mismatch")
+		// 説明はこのシナリオ後半で更新するため、作成直後の説明と更新後の説明のどちらも今回設定した値として扱う
+		require.Contains(t, []string{dbDescription, updatedDescription}, current.Description,
+			"cleanup target database description mismatch")
+		// 接続先と IP 設定を再照合する。保持したスイッチ ID、指定した IP アドレスとマスク長が
+		// 現在値と一致しない場合は削除を呼ばない (背景は ADR 0064)
+		require.Equal(t, createdSwitch.ID, current.SwitchID, "cleanup target database switch mismatch")
+		require.NotEmpty(t, current.IPAddresses, "cleanup target database should have an IP address")
+		require.Equal(t, dbIPAddress, current.IPAddresses[0], "cleanup target database IP address mismatch")
+		require.Equal(t, dbNetworkMaskLen, current.NetworkMaskLen, "cleanup target database network mask length mismatch")
 		// データベースを削除し、名前でも残っていないことを確認する
 		_ = h.CallWithTimeout(t, dbDeleteTimeout, "データベースを削除する",
 			"iaas-api", "database", "delete",
@@ -305,16 +355,13 @@ func parseDatabase(t *testing.T, data []byte) databaseItem {
 func waitForDatabaseReady(t *testing.T, client *iaas.Client, id types.ID) {
 	t.Helper()
 
-	service := database.New(client)
+	op := iaas.NewDatabaseOp(client)
 	require.Eventually(t, func() bool {
-		item, err := service.ReadWithContext(t.Context(), &database.ReadRequest{
-			Zone: dbZone,
-			ID:   id,
-		})
+		db, err := op.Read(t.Context(), dbZone, id)
 		if err != nil {
 			return false
 		}
-		return item != nil && item.InstanceStatus == types.ServerInstanceStatuses.Up
+		return db != nil && db.InstanceStatus == types.ServerInstanceStatuses.Up
 	}, dbCreateTimeout, 15*time.Second, "database %s should become up", id)
 }
 
@@ -337,21 +384,21 @@ func readDatabaseModel(t *testing.T, h *helper.Helper, description string, id ty
 func lookupDatabases(t *testing.T, client *iaas.Client, name string) []databaseItem {
 	t.Helper()
 
-	service := database.New(client)
-	found, err := service.FindWithContext(t.Context(), &database.FindRequest{
-		Zone:  dbZone,
-		Names: []string{name},
-		Count: dbFindPageSize,
+	op := iaas.NewDatabaseOp(client)
+	result, err := op.Find(t.Context(), dbZone, &iaas.FindCondition{
+		Count:  dbFindPageSize,
+		Filter: map[search.FilterKey]any{search.Key("Name"): search.AndEqual(name)},
 	})
 	require.NoError(t, err, "find databases by name %q", name)
-	items := make([]databaseItem, 0, len(found))
-	for _, db := range found {
+	items := make([]databaseItem, 0, len(result.Databases))
+	for _, db := range result.Databases {
 		if db == nil {
 			continue
 		}
 		items = append(items, databaseItem{
-			ID:   db.ID,
-			Name: db.Name,
+			ID:       db.ID,
+			Name:     db.Name,
+			SwitchID: db.SwitchID,
 		})
 	}
 	// 1ページで取りきれない結果は不在の判断に使わない

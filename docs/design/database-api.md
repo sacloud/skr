@@ -41,7 +41,7 @@ api 層の操作を直接呼び出す理由は次のとおりです。
 
 ### create
 
-- `--request` は `@path.json` 形式または `-` (標準入力) のみを受け付けます。インラインの JSON は秘密情報を含み得るため拒否します。`--request` と個別フラグは併用できません。
+- `--request` は `@path.json` 形式または `-` (標準入力) のみを受け付けます。インラインの JSON は秘密情報を含み得るため拒否します。`--request` と個別フラグは併用できません。併用の検出は、Kong が明示的に指定されたときだけ値を設定するポインタ型のフラグで行います。明示的な false・空文字列も指定とみなします。スライス型のフラグは値型のまま、Kong が指定時に空スライスを設定する挙動に合わせて nil チェックで検出するため、`--tags=` のような空の指定も併用として検出します (service-endpoint-gateway-api に同じ規約)。
 - 個別フラグは次のとおりです。
 
 | フラグ | 内容 |
@@ -74,20 +74,21 @@ api 層の操作を直接呼び出す理由は次のとおりです。
 ### update
 
 - `--zone` と `--id` が必須で、更新内容は `--request` JSON (`@path.json` 形式または `-`) のみを受け付けます。
-- 送信した内容で設定が置き換わります。api 層の更新リクエストをそのまま送るため、既存の設定を維持したい項目は JSON に再指定してください。読み取った現在の設定 (read の出力) を基に JSON を組み立てるのが確実です。省略したトップレベルの項目は送信されません。
+- 送信した内容で設定が置き換わります。api 層の更新リクエストをそのまま送るため、既存の設定を維持したい項目は JSON に再指定してください。読み取った現在の設定 (read の出力) を基に JSON を組み立てるのが確実です。更新リクエストの空の `Name` は送信されませんが、`Description` と `Tags` は常に送信されます。ネストした設定 (`CommonSetting`、`BackupSetting`、`Backupv2Setting`、`ReplicationSetting`、`MonitoringSuite`) は nil のとき省略されます。
 - read の応答の `UserPassword` と `ReplicaPassword` はマスク済みの値で返ります。API はマスク済みの値を受け付けないため、設定を再指定する場合はパスワードに実値を指定してください。
 - 冗長化を有効にする変更など、一度の変更で複数の操作 (設定変更と反映) を行う場合、変更はデータベースの再起動を伴うことがあります。
 
 ### delete / boot / shutdown / reset
 
 - `delete` は `--force` と `--fail-if-not-found` に対応します。`--force` を付けない場合、起動中のデータベースはエラーになり、付けた場合は電源 OFF (強制終了) してから削除します。
+- `delete` のワークフローは起動中なら強制終了して停止を待ち、その後削除します。停止済みでも可用性が準備中 (unknown や failed) の場合は待ちます。InstanceStatus が Unknown の場合は状態が確認できないため待たずに削除し、可用性が available で停止済みの場合も待ちません。
 - `boot` は `--no-wait`、`shutdown` は `--no-wait` と `--force` (強制終了) に対応します。いずれも省略時は完了を待ちます。
 
 ### monitor 系 / list-parameter
 
 - `monitor-cpu`、`monitor-disk`、`monitor-interface`、`monitor-database` は `--zone` と `--id` が必須で、期間を `--start` と `--end` (RFC3339) で指定できます。
 - `monitor-database` は未指定時に直近 1 時間の期間を秒精度で自動設定します (`SetMonitorDatabasePeriod`)。データベースのモニタリング API はナノ秒精度の時刻を受け付けないため、SDK 既定の `time.Now()` の値をそのまま送ると 400 エラーになります。`monitor-cpu` / `monitor-disk` / `monitor-interface` は SDK の既定値 (直近の期間) を使います。
-- `list-parameter` は設定パラメータの一覧を返します。パラメータの変更は update の JSON 経路で行います。
+- `list-parameter` は設定パラメータの一覧を返します。RDBMS 固有のパラメータの変更は、更新リクエスト (`DatabaseUpdateRequest`) に Parameters が含まれないため、この CLI の update では行えません。コントロールパネルで変更してください。
 
 ## 出力
 
@@ -109,7 +110,9 @@ update は送信した内容で設定が置き換わるため、シナリオは 
 
 パスワードはテスト実行時に生成し、一時ファイル経由で `--password @path` に渡します。実行記録にはファイルパスだけが残り、秘密情報は記録しません。
 
-sakumock は v0.13.0 に database サーバーを含まないため、sakumock を使った CLI と SDK の統合テストはありません。手書き処理の単体テストは `internal/iaas/databaseapi/commands_test.go` で、CLI 登録とヘルプは `internal/cli/database_test.go` で確認します。
+sakumock は v0.13.0 に database サーバーを含みません。そのため、sakumock パッケージ本体の database 対応を待たずに、ADR 0006 に従って `internal/sakumock/iaas` に公開 `APICaller` モックの Database 操作を実装しています。モックは必要な操作に限って find、read、delete、boot (PUT /power)、shutdown (DELETE /power)、reset、モニタリング系 (cpu / disk / interface / database)、list-parameter を再現します。
+
+`internal/cli/database_test.go` の `TestIaaSDatabaseCommandsThroughNewAPIWithSakumock` はモックを `databaseapi.NewAPI` に接続します。CLI から生成コマンド、NewAPI、SDK の DatabaseOp、caller までの経路を確認します。応答とエラーも同じテストで確認します。手書き処理の単体テストは `internal/iaas/databaseapi/commands_test.go` にあります。CLI 登録とヘルプも `internal/cli/database_test.go` で確認します。
 
 ## 参考資料
 
