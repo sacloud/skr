@@ -317,8 +317,8 @@ $ skr service-endpoint-gateway-api appliance list --query '.Appliances | map(sel
 削除の反映には時間を要することがあります。期待する出力が返るまで再実行してください。ゲートウェイの削除後に、接続先スイッチを削除します。削除前に ID と名前を照合してください。
 
 ```console
-$ skr iaas-api switch read --zone is1a "$SWITCH_ID" --query '{ID,Name,Description}'
-$ skr iaas-api switch delete --zone is1a "$SWITCH_ID"
+$ skr iaas-api switch read --zone is1a --id "$SWITCH_ID" --query '{ID,Name,Description}'
+$ skr iaas-api switch delete --zone is1a --id "$SWITCH_ID"
 ```
 
 ## 参考情報
