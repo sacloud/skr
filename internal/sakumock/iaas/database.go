@@ -99,13 +99,19 @@ func (s *Server) doDatabase(method string, parts []string, uri string, body any)
 		if _, ok := s.databases[key]; !ok {
 			return nil, databaseNotFound(method, uri, id)
 		}
-		// boot は PUT /power を送ります
+		// boot は PUT /power を送ります。モックは起動状態を up に変更します
+		if err := s.setDatabaseInstanceStatus(key, "up"); err != nil {
+			return nil, err
+		}
 		return nil, nil
 	case method == "DELETE" && id != "" && len(suffix) == 1 && suffix[0] == "power":
 		if _, ok := s.databases[key]; !ok {
 			return nil, databaseNotFound(method, uri, id)
 		}
-		// shutdown は DELETE /power を送ります
+		// shutdown は DELETE /power を送ります。モックは起動状態を down に変更します
+		if err := s.setDatabaseInstanceStatus(key, "down"); err != nil {
+			return nil, err
+		}
 		return nil, nil
 	case method == "PUT" && id != "" && len(suffix) == 1 && suffix[0] == "reset":
 		if _, ok := s.databases[key]; !ok {
@@ -203,6 +209,43 @@ func databaseNotFound(method, uri, id string) error {
 	return iaas.NewAPIError(method, requestURL, http.StatusNotFound, &iaas.APIErrorResponse{
 		ErrorCode: "not_found", ErrorMessage: fmt.Sprintf("database %s not found", id),
 	})
+}
+
+// setDatabaseInstanceStatus は Database の起動状態 (Instance.Status) を更新します。
+func (s *Server) setDatabaseInstanceStatus(key, status string) error {
+	item, ok := s.databases[key]
+	if !ok {
+		return fmt.Errorf("database %s not found", key)
+	}
+	data, err := json.Marshal(item)
+	if err != nil {
+		return fmt.Errorf("encode mock Database: %w", err)
+	}
+	var current map[string]any
+	if err := json.Unmarshal(data, &current); err != nil {
+		return fmt.Errorf("decode mock Database: %w", err)
+	}
+	instance, ok := current["Instance"].(map[string]any)
+	if !ok {
+		instance = map[string]any{}
+	}
+	instance["Status"] = status
+	current["Instance"] = instance
+	return s.replaceDatabase(key, current)
+}
+
+// replaceDatabase は保持した Database を指定した内容で置き換えます。
+func (s *Server) replaceDatabase(key string, value map[string]any) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("encode mock Database: %w", err)
+	}
+	var updatedItem map[string]json.RawMessage
+	if err := json.Unmarshal(data, &updatedItem); err != nil {
+		return fmt.Errorf("decode mock Database: %w", err)
+	}
+	s.databases[key] = updatedItem
+	return nil
 }
 
 func (s *Server) databasesAsSlice(zone string) []map[string]json.RawMessage {

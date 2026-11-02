@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/defaults"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/internal/apigen"
 	databaseapi "github.com/sacloud/skr/internal/iaas/databaseapi"
@@ -405,6 +406,14 @@ func mockDatabaseNaked() map[string]any {
 	}
 }
 
+// runningDatabaseNaked は sakumock に登録する起動中の Database の naked 形式の内容です。
+func runningDatabaseNaked() map[string]any {
+	item := mockDatabaseNaked()
+	item["ID"] = 112700000003
+	item["Instance"] = map[string]any{"Status": "up"}
+	return item
+}
+
 // TestIaaSDatabaseCommandsThroughNewAPIWithSakumock は公開 APICaller モック (sakumock) を
 // databaseapi.NewAPI に接続し、CLI から生成コマンド、NewAPI、SDK の DatabaseOp、caller までの
 // 経路を検証します (ADR 0006)。
@@ -465,6 +474,29 @@ func TestIaaSDatabaseCommandsThroughNewAPIWithSakumock(t *testing.T) {
 
 	t.Run("delete fails on missing database with fail-if-not-found", func(t *testing.T) {
 		_, stderr, code := run("delete", "--zone", "is1b", "--id", "999", "--force", "--fail-if-not-found")
+		require.NotEqual(t, 0, code)
+		require.Contains(t, stderr, "not found")
+	})
+
+	t.Run("delete rejects running database without force", func(t *testing.T) {
+		// 起動中のデータベースは --force なしでは削除できません
+		require.NoError(t, server.AddDatabase("is1b", "112700000003", runningDatabaseNaked()))
+		_, stderr, code := run("delete", "--zone", "is1b", "--id", "112700000003")
+		require.NotEqual(t, 0, code)
+		require.Contains(t, stderr, "has not yet shut down")
+	})
+
+	t.Run("delete with force shuts down and deletes running database", func(t *testing.T) {
+		// --force 付きの削除は shutdown (DELETE /power) を送り、停止を待ってから削除します。
+		// モックは shutdown を受けると起動状態を down に変更するため、待機は即座に完了します。
+		// テストの実行時間を短くするためポーリング間隔を短くします
+		originalInterval := defaults.DefaultStatePollingInterval
+		defaults.DefaultStatePollingInterval = 10 * time.Millisecond
+		defer func() { defaults.DefaultStatePollingInterval = originalInterval }()
+		_, stderr, code := run("delete", "--zone", "is1b", "--id", "112700000003", "--force")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		// 削除後は存在しないこと
+		_, stderr, code = run("read", "--zone", "is1b", "--id", "112700000003")
 		require.NotEqual(t, 0, code)
 		require.Contains(t, stderr, "not found")
 	})

@@ -70,7 +70,15 @@ func TestDatabaseOperations(t *testing.T) {
 
 	t.Run("power operations and reset are accepted", func(t *testing.T) {
 		require.NoError(t, op.Boot(ctx, "is1b", types.ID(112700000001)))
+		// boot を受けた Database は起動状態が up に変わること
+		booted, err := op.Read(ctx, "is1b", types.ID(112700000001))
+		require.NoError(t, err)
+		require.Equal(t, types.ServerInstanceStatuses.Up, booted.InstanceStatus)
 		require.NoError(t, op.Shutdown(ctx, "is1b", types.ID(112700000001), nil))
+		// shutdown を受けた Database は起動状態が down に変わること
+		shutdown, err := op.Read(ctx, "is1b", types.ID(112700000001))
+		require.NoError(t, err)
+		require.Equal(t, types.ServerInstanceStatuses.Down, shutdown.InstanceStatus)
 		require.NoError(t, op.Reset(ctx, "is1b", types.ID(112700000001)))
 	})
 
