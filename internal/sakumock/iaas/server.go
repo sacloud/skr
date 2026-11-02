@@ -35,12 +35,13 @@ type Config struct {
 	Zones []string
 }
 
-// Server はモックの Switch と PacketFilter のリソースを保持し、IaaS SDK の caller インターフェースを実装します。
+// Server はモックの Switch、PacketFilter、Database のリソースを保持し、IaaS SDK の caller インターフェースを実装します。
 type Server struct {
 	mu            sync.Mutex
 	switches      map[string]map[string]json.RawMessage
 	packetFilters map[string]map[string]json.RawMessage
 	icons         map[string]map[string]json.RawMessage
+	databases     map[string]map[string]json.RawMessage
 	zones         []string
 	nextID        int
 }
@@ -51,6 +52,7 @@ func NewTestServer(config Config) *Server {
 		switches:      make(map[string]map[string]json.RawMessage),
 		packetFilters: make(map[string]map[string]json.RawMessage),
 		icons:         make(map[string]map[string]json.RawMessage),
+		databases:     make(map[string]map[string]json.RawMessage),
 		zones:         append([]string(nil), config.Zones...),
 		nextID:        1000,
 	}
@@ -80,6 +82,9 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 		return s.doZone(method, uri, parts[n-1])
 	}
 	for _, part := range parts {
+		if part == "appliance" {
+			return s.doDatabase(method, parts, uri, body)
+		}
 		if part == "packetfilter" {
 			return s.doPacketFilter(method, parts, uri, body)
 		}

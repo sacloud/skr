@@ -28,6 +28,7 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/sacloud/skr/internal/apigen"
 	databaseapi "github.com/sacloud/skr/internal/iaas/databaseapi"
+	sakumockiaas "github.com/sacloud/skr/internal/sakumock/iaas"
 	"github.com/stretchr/testify/require"
 )
 
@@ -386,4 +387,116 @@ func (api *databaseAPITestDouble) MonitorDatabaseWithContext(_ context.Context, 
 func (api *databaseAPITestDouble) ListParameterWithContext(_ context.Context, request *databaseapi.ListParameterRequest) ([]*databaseapi.Parameter, error) {
 	api.listParameterRequest = request
 	return []*databaseapi.Parameter{}, nil
+}
+
+// mockDatabaseNaked は sakumock に登録する Database の naked 形式の内容です。
+func mockDatabaseNaked() map[string]any {
+	return map[string]any{
+		"ID":           112700000001,
+		"Name":         "db-01",
+		"Availability": "available",
+		"Instance":     map[string]any{"Status": "down"},
+		"Remark": map[string]any{
+			"Switch":  map[string]any{"ID": 112900500001},
+			"Plan":    map[string]any{"ID": 10},
+			"Network": map[string]any{"DefaultRoute": "192.168.0.1", "NetworkMaskLen": 24},
+			"Servers": []map[string]any{{"IPAddress": "192.168.0.11"}},
+		},
+	}
+}
+
+// TestIaaSDatabaseCommandsThroughNewAPIWithSakumock は公開 APICaller モック (sakumock) を
+// databaseapi.NewAPI に接続し、CLI から生成コマンド、NewAPI、SDK の DatabaseOp、caller までの
+// 経路を検証します (ADR 0006)。
+func TestIaaSDatabaseCommandsThroughNewAPIWithSakumock(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	server := sakumockiaas.NewTestServer(sakumockiaas.Config{Zones: []string{"is1b"}})
+	defer server.Close()
+	require.NoError(t, server.AddDatabase("is1b", "112700000001", mockDatabaseNaked()))
+	commandLine := newCLI()
+	setDatabaseAPIFactory(commandLine, func() (databaseapi.API, error) {
+		return databaseapi.NewAPI(server), nil
+	})
+
+	run := func(args ...string) (string, string, int) {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		code := runCLI(append([]string{"iaas-api", "database"}, args...), &stdout, &stderr, commandLine)
+		return stdout.String(), stderr.String(), code
+	}
+
+	t.Run("find returns appliances", func(t *testing.T) {
+		stdout, stderr, code := run("find", "--zone", "is1b", "--name", "db-01")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		require.Contains(t, stdout, "db-01")
+	})
+
+	t.Run("read returns the appliance", func(t *testing.T) {
+		stdout, stderr, code := run("read", "--zone", "is1b", "--id", "112700000001")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		require.Contains(t, stdout, "db-01")
+		require.Contains(t, stdout, "192.168.0.11")
+	})
+
+	t.Run("read propagates API errors", func(t *testing.T) {
+		_, stderr, code := run("read", "--zone", "is1b", "--id", "999")
+		require.NotEqual(t, 0, code)
+		require.Contains(t, stderr, "not found")
+	})
+
+	t.Run("delete removes the stopped database", func(t *testing.T) {
+		stdout, stderr, code := run("delete", "--zone", "is1b", "--id", "112700000001", "--force")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		_ = stdout
+		// 削除後は存在しないため read がエラーになること
+		_, stderr, code = run("read", "--zone", "is1b", "--id", "112700000001")
+		require.NotEqual(t, 0, code)
+		require.Contains(t, stderr, "not found")
+	})
+
+	t.Run("boot and shutdown send power operations", func(t *testing.T) {
+		require.NoError(t, server.AddDatabase("is1b", "112700000002", mockDatabaseNaked()))
+		_, stderr, code := run("boot", "--zone", "is1b", "--id", "112700000002", "--no-wait")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		_, stderr, code = run("shutdown", "--zone", "is1b", "--id", "112700000002", "--no-wait")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+	})
+
+	t.Run("reset succeeds", func(t *testing.T) {
+		_, stderr, code := run("reset", "--zone", "is1b", "--id", "112700000002")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+	})
+
+	t.Run("monitor-cpu returns values", func(t *testing.T) {
+		stdout, stderr, code := run("monitor-cpu", "--zone", "is1b", "--id", "112700000002")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		require.Contains(t, stdout, "CPUTime")
+	})
+
+	t.Run("monitor-database returns values", func(t *testing.T) {
+		stdout, stderr, code := run("monitor-database", "--zone", "is1b", "--id", "112700000002")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		require.Contains(t, stdout, "BinlogUsedSizeKiB")
+	})
+
+	t.Run("monitor-disk returns values", func(t *testing.T) {
+		stdout, stderr, code := run("monitor-disk", "--zone", "is1b", "--id", "112700000002")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		require.Contains(t, stdout, "Read")
+		require.Contains(t, stdout, "Write")
+	})
+
+	t.Run("monitor-interface returns values", func(t *testing.T) {
+		stdout, stderr, code := run("monitor-interface", "--zone", "is1b", "--id", "112700000002")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		require.Contains(t, stdout, "Send")
+		require.Contains(t, stdout, "Receive")
+	})
+
+	t.Run("list-parameter returns metadata and settings", func(t *testing.T) {
+		stdout, stderr, code := run("list-parameter", "--zone", "is1b", "--id", "112700000002")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+		require.Contains(t, stdout, "最大接続数")
+		require.Contains(t, stdout, "max_connections")
+	})
 }

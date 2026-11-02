@@ -160,18 +160,21 @@ func (f *fakeDatabaseOp) SetParameter(context.Context, string, types.ID, map[str
 	return errors.New("not implemented")
 }
 
-// speedUpWaiters は待ち処理のポーリング間隔をテスト用に短くします。戻り値で元の値を復元します。
+// speedUpWaiters は待ち処理のポーリング間隔とタイムアウトをテスト用に短くします。戻り値で元の値を復元します。
 func speedUpWaiters() func() {
 	originalInterval := defaults.DefaultStatePollingInterval
+	originalTimeout := defaults.DefaultStatePollingTimeout
 	originalShutdownSpan := power.ShutdownRetrySpan
 	originalInitialTimeout := power.InitialRequestTimeout
 	originalInitialSpan := power.InitialRequestRetrySpan
 	defaults.DefaultStatePollingInterval = time.Millisecond
+	defaults.DefaultStatePollingTimeout = 50 * time.Millisecond
 	power.ShutdownRetrySpan = time.Millisecond
 	power.InitialRequestTimeout = time.Second
 	power.InitialRequestRetrySpan = time.Millisecond
 	return func() {
 		defaults.DefaultStatePollingInterval = originalInterval
+		defaults.DefaultStatePollingTimeout = originalTimeout
 		power.ShutdownRetrySpan = originalShutdownSpan
 		power.InitialRequestTimeout = originalInitialTimeout
 		power.InitialRequestRetrySpan = originalInitialSpan
@@ -214,6 +217,20 @@ func TestDeleteWorkflowDeletesStoppedDatabaseWithoutForce(t *testing.T) {
 	require.NoError(t, api.DeleteWithContext(context.Background(), &DeleteRequest{Zone: "is1c", ID: 123, FailIfNotFound: true}))
 
 	require.Equal(t, []string{"read", "delete"}, op.operations)
+}
+
+func TestDeleteWorkflowWaitsForNonAvailableStoppedDatabase(t *testing.T) {
+	// 停止済みでも可用性が unknown の場合は待ち、処理中のリソースへ削除を送りません
+	restore := speedUpWaiters()
+	defer restore()
+
+	op := &fakeDatabaseOp{database: &iaas.Database{ID: 123, Availability: types.Availabilities.Unknown, InstanceStatus: types.ServerInstanceStatuses.Down}}
+	api := &databaseAPI{op: op}
+
+	err := api.DeleteWithContext(context.Background(), &DeleteRequest{Zone: "is1c", ID: 123, FailIfNotFound: true})
+
+	require.Error(t, err, "waiting for availability should time out with the test deadline")
+	require.NotContains(t, op.operations, "delete", "delete must not be called while availability is not available")
 }
 
 func TestDeleteWorkflowToleratesMissingDatabaseWithoutFailIfNotFound(t *testing.T) {

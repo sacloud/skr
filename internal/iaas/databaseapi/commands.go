@@ -91,8 +91,10 @@ func (a *databaseAPI) DeleteWithContext(ctx context.Context, req *DeleteRequest)
 		if _, err := wait.UntilDatabaseIsDown(ctx, a.op, req.Zone, req.ID); err != nil {
 			return err
 		}
-	} else if target.InstanceStatus != types.ServerInstanceStatuses.Down && target.InstanceStatus != types.ServerInstanceStatuses.Unknown {
-		// Cleaning など停止処理中の状態では停止を待ちます。既に停止済みか Unknown の場合は待たずに削除します
+	} else if !(target.InstanceStatus == types.ServerInstanceStatuses.Down && target.Availability == types.Availabilities.Available) {
+		// 停止済みでも可用性が準備中 (unknown や failed) の場合は待ちます。
+		// Cleaning など停止処理中の状態も待ちます。可用性が available で停止済みの
+		// 場合は待たずに削除します
 		if _, err := wait.UntilDatabaseIsDown(ctx, a.op, req.Zone, req.ID); err != nil {
 			return err
 		}

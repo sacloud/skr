@@ -109,7 +109,9 @@ update は送信した内容で設定が置き換わるため、シナリオは 
 
 パスワードはテスト実行時に生成し、一時ファイル経由で `--password @path` に渡します。実行記録にはファイルパスだけが残り、秘密情報は記録しません。
 
-sakumock は v0.13.0 に database サーバーを含まないため、sakumock を使った CLI と SDK の統合テストはありません。手書き処理の単体テストは `internal/iaas/databaseapi/commands_test.go` で、CLI 登録とヘルプは `internal/cli/database_test.go` で確認します。
+sakumock は v0.13.0 に database サーバーを含みません。そのため、sakumock パッケージ本体の database 対応を待たずに、ADR 0006 に従って `internal/sakumock/iaas` に公開 `APICaller` モックの Database 操作を実装しています。モックは必要な操作に限って find、read、delete、boot (PUT /power)、shutdown (DELETE /power)、reset、モニタリング系 (cpu / disk / interface / database)、list-parameter を再現します。
+
+`internal/cli/database_test.go` の `TestIaaSDatabaseCommandsThroughNewAPIWithSakumock` はモックを `databaseapi.NewAPI` に接続します。CLI から生成コマンド、NewAPI、SDK の DatabaseOp、caller までの経路を確認します。応答とエラーも同じテストで確認します。手書き処理の単体テストは `internal/iaas/databaseapi/commands_test.go` にあります。CLI 登録とヘルプも `internal/cli/database_test.go` で確認します。
 
 ## 参考資料
 
