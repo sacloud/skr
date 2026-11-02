@@ -444,6 +444,37 @@ func TestDatabaseCreateCommandRequestJSON(t *testing.T) {
 		require.Nil(t, fake.createRequest, "input error should not reach API")
 	})
 
+	t.Run("request and empty slice flags are mutually exclusive", func(t *testing.T) {
+		// --tags= のような空の配列指定も Kong が空スライスを設定するため、nil チェックで指定済みとして検出します
+		path := filepath.Join(t.TempDir(), "db-create.json")
+		require.NoError(t, os.WriteFile(path, []byte(requestJSON), 0o600))
+		fake := &fakeDatabaseAPI{}
+		command := &CreateCommand{
+			factory: func() (API, error) { return fake, nil },
+			runtime: testRuntime(),
+		}
+		kongCtx := parseCommand(t, command, "--zone", "is1b", "--request", "@"+path, "--tags=")
+		err := command.Run(kongCtx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "--request と個別フラグは併用できません")
+		require.Nil(t, fake.createRequest, "input error should not reach API")
+	})
+
+	t.Run("empty slice flag alone does not satisfy the required input", func(t *testing.T) {
+		// 空の配列指定だけでは必須フラグの欠落を補えません
+		fake := &fakeDatabaseAPI{}
+		command := &CreateCommand{
+			factory: func() (API, error) { return fake, nil },
+			runtime: testRuntime(),
+		}
+		kongCtx := parseCommand(t, command, "--zone", "is1b", "--tags=")
+		err := command.Run(kongCtx)
+		require.Error(t, err)
+		// 空の配列指定は個別フラグ経路に入るため、必須フラグの欠落が検出されます
+		require.Contains(t, err.Error(), "--name が必要です")
+		require.Nil(t, fake.createRequest, "input error should not reach API")
+	})
+
 	t.Run("no flags and no request", func(t *testing.T) {
 		fake := &fakeDatabaseAPI{}
 		command := &CreateCommand{

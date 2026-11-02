@@ -349,19 +349,21 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 
 // flagsSet は個別フラグが1つでも明示的に指定されたかを返します。
 // フラグはポインタ型で、Kong は明示的に指定されたときだけ値を設定するため、
-// false・0・空文字列の明示も検出できます。
+// false・0・空文字列の明示も検出できます。スライス型は値型のまま、
+// Kong が指定時に空スライスを設定する挙動に合わせて nil チェックで検出します
+// (--tags= のような空の指定も検出対象です)。
 func (c *CreateCommand) flagsSet() bool {
 	return c.Name != nil ||
 		c.Description != nil ||
-		len(c.Tags) != 0 ||
+		c.Tags != nil ||
 		c.IconID != nil ||
 		c.PlanID != nil ||
 		c.SwitchID != nil ||
-		len(c.IPAddresses) != 0 ||
+		c.IPAddresses != nil ||
 		c.NetworkMaskLen != nil ||
 		c.DefaultRoute != nil ||
 		c.Port != nil ||
-		len(c.SourceNetwork) != 0 ||
+		c.SourceNetwork != nil ||
 		c.DatabaseType != nil ||
 		c.DatabaseVersion != nil ||
 		c.Username != nil ||
@@ -370,11 +372,11 @@ func (c *CreateCommand) flagsSet() bool {
 		c.ReplicaUserPassword != nil ||
 		c.EnableWebUI != nil ||
 		c.EnableBackup != nil ||
-		len(c.BackupWeekdays) != 0 ||
+		c.BackupWeekdays != nil ||
 		c.BackupStartTimeHour != nil ||
 		c.BackupStartTimeMinute != nil ||
 		c.EnableBackupv2 != nil ||
-		len(c.Backupv2Weekdays) != 0 ||
+		c.Backupv2Weekdays != nil ||
 		c.Backupv2StartTimeHour != nil ||
 		c.Backupv2StartTimeMinute != nil ||
 		c.Backupv2Connect != nil ||

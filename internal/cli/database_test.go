@@ -247,6 +247,9 @@ func TestIaaSDatabaseRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 		{"create", "--zone", "test-zone", "--name", "db", "--plan-id", "10", "--switch-id", "112900500001", "--ip-address", "192.168.0.11", "--network-mask-len", "24", "--database-type", "mariadb", "--username", "dbuser", "--password", "@" + passwordFile, "--enable-replication"},
 		{"create", "--zone", "test-zone", "--request", `{"Name":"db"}`},
 		{"create", "--request", "@" + requestFile, "--name", "other"},
+		// 空の配列指定も Kong が空スライスを設定するため、--request との併用として検出されます
+		{"create", "--request", "@" + requestFile, "--tags="},
+		{"create", "--request", "@" + requestFile, "--backup-weekday="},
 		{"update"},
 		{"update", "--zone", "test-zone"},
 		{"update", "--zone", "test-zone", "--id", "123"},

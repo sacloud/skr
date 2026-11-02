@@ -37,14 +37,32 @@ type fakeDatabaseOp struct {
 	shutdownErr error
 	deleteErr   error
 	operations  []string
+
+	findZone         string
+	findCondition    *iaas.FindCondition
+	findResult       *iaas.DatabaseFindResult
+	findErr          error
+	monitorCondition *iaas.MonitorCondition
+	cpuValues        *iaas.CPUTimeActivity
+	cpuErr           error
+	databaseValues   *iaas.DatabaseActivity
+	databaseErr      error
+	parameters       *iaas.DatabaseParameter
+	parameterErr     error
 }
 
 func (f *fakeDatabaseOp) record(operation string) {
 	f.operations = append(f.operations, operation)
 }
 
-func (f *fakeDatabaseOp) Find(context.Context, string, *iaas.FindCondition) (*iaas.DatabaseFindResult, error) {
-	return nil, errors.New("not implemented")
+func (f *fakeDatabaseOp) Find(_ context.Context, zone string, conditions *iaas.FindCondition) (*iaas.DatabaseFindResult, error) {
+	f.record("find")
+	f.findZone = zone
+	f.findCondition = conditions
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	return f.findResult, nil
 }
 
 func (f *fakeDatabaseOp) Create(context.Context, string, *iaas.DatabaseCreateRequest) (*iaas.Database, error) {
@@ -100,8 +118,13 @@ func (f *fakeDatabaseOp) Reset(context.Context, string, types.ID) error {
 	return errors.New("not implemented")
 }
 
-func (f *fakeDatabaseOp) MonitorCPU(context.Context, string, types.ID, *iaas.MonitorCondition) (*iaas.CPUTimeActivity, error) {
-	return nil, errors.New("not implemented")
+func (f *fakeDatabaseOp) MonitorCPU(_ context.Context, _ string, _ types.ID, condition *iaas.MonitorCondition) (*iaas.CPUTimeActivity, error) {
+	f.record("monitor-cpu")
+	f.monitorCondition = condition
+	if f.cpuErr != nil {
+		return nil, f.cpuErr
+	}
+	return f.cpuValues, nil
 }
 
 func (f *fakeDatabaseOp) MonitorDisk(context.Context, string, types.ID, *iaas.MonitorCondition) (*iaas.DiskActivity, error) {
@@ -112,16 +135,25 @@ func (f *fakeDatabaseOp) MonitorInterface(context.Context, string, types.ID, *ia
 	return nil, errors.New("not implemented")
 }
 
-func (f *fakeDatabaseOp) MonitorDatabase(context.Context, string, types.ID, *iaas.MonitorCondition) (*iaas.DatabaseActivity, error) {
-	return nil, errors.New("not implemented")
+func (f *fakeDatabaseOp) MonitorDatabase(_ context.Context, _ string, _ types.ID, condition *iaas.MonitorCondition) (*iaas.DatabaseActivity, error) {
+	f.record("monitor-database")
+	f.monitorCondition = condition
+	if f.databaseErr != nil {
+		return nil, f.databaseErr
+	}
+	return f.databaseValues, nil
 }
 
 func (f *fakeDatabaseOp) Status(context.Context, string, types.ID) (*iaas.DatabaseStatus, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (f *fakeDatabaseOp) GetParameter(context.Context, string, types.ID) (*iaas.DatabaseParameter, error) {
-	return nil, errors.New("not implemented")
+func (f *fakeDatabaseOp) GetParameter(_ context.Context, _ string, _ types.ID) (*iaas.DatabaseParameter, error) {
+	f.record("get-parameter")
+	if f.parameterErr != nil {
+		return nil, f.parameterErr
+	}
+	return f.parameters, nil
 }
 
 func (f *fakeDatabaseOp) SetParameter(context.Context, string, types.ID, map[string]any) error {

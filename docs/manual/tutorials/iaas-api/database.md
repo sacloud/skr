@@ -113,14 +113,20 @@ $ skr iaas-api database create --zone is1b --name DB-NAME \
 }
 ```
 
-出力例は `Instance` や `Settings` などの既存項目を除いて編集しています。作成結果の `ID` を控え、以降の `DB-ID` に指定してください。データベースを作成したら、ID をシェル変数に取り込みます。
+出力例は `Instance` や `Settings` などの既存項目を除いて編集しています。作成結果の `ID` を控え、シェル変数に取り込みます。以降の参照や変更操作はこの ID を手掛かりに実行します。`作成応答のID` は、控えた作成結果の `ID` に置き換えてください。
+
+```console
+$ CREATED_DB_ID=作成応答のID
+```
+
+データベースを作成したら、find で検索し、作成応答の `ID` と接続先スイッチが一致する 1 件を確認してから ID を取り込みます。作成が失敗していたり同名の既存データベースが残っていたりした場合に、誤った対象を後続の変更操作に進めないためです。
 
 ```console
 $ DB_ID=$(skr iaas-api database find --zone is1b --name DB-NAME \
-    --query 'map(select(.Name == "DB-NAME")) | map({ID,Name}) | if length == 1 then .[0].ID else error("not unique") end')
+    --query 'map(select(.Name == "DB-NAME" and .ID == '"$CREATED_DB_ID"' and .SwitchID == '"$SWITCH_ID"')) | if length == 1 then .[0].ID else error("created database not found") end')
 ```
 
-`--name` は部分一致検索のため、結果には名前の一部が一致する別のデータベースも含まれることがあります。名前の完全一致で絞り込み、結果が 1 件のときだけ ID を取り込みます。複数件ある場合は、コントロールパネルで対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
+`--name` は部分一致検索のため、結果には名前の一部が一致する別のデータベースも含まれることがあります。作成応答の `ID` と接続先スイッチの `ID` で絞り込み、結果が 1 件のときだけ ID を取り込みます。複数件ある場合や 0 件の場合は、コントロールパネルで対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
 
 ```json
 "DB-ID"
