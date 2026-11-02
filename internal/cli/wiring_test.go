@@ -37,6 +37,7 @@ func TestGeneratedWiringMatchesConfig(t *testing.T) {
 			name: "IaaS",
 			configs: []string{
 				"iaas-archive.json",
+				"iaas-database.json",
 				"iaas-disk.json",
 				"iaas-icon.json",
 				"iaas-internet.json",

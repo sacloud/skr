@@ -19,7 +19,6 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
 - [ ] `bridge`
 - [ ] `cdrom`
 - [ ] `coupon`
-- [ ] `database`
 - [ ] `iface`
 - [ ] `license`
 - [ ] `loadbalancer`
@@ -38,6 +37,13 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - `iaas-api archive` の Find / Read を実装済みです。Find はゾーン、タグ、公開アーカイブの OS 種別で検索できます。
     - SDK の Create / Update / Delete / Upload / Download / OpenFTP / CloseFTP / WaitReady は未対応です。
     - 読み取り専用の [testing.T ベースのシナリオテスト](test/e2e/archive/scenario_archive_test.go) ([ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md)) と[チュートリアル](docs/manual/tutorials/iaas-api/archive.md)があります。is1b で検索・参照を確認済みです。2026-10-29 に testing.T ベースのシナリオテストへ移行し、コマンド名に合わせて [test/e2e/archive/](test/e2e/archive/) へ分割しました。
+- [x] `database`
+    - `iaas-api database` の Find / Read / Create / Update / Delete、Boot / Shutdown / Reset、Monitor (CPU / Disk / Interface / Database)、ListParameter を実装済みです。
+    - Find は `--name` による単一名の部分一致検索に対応します。Create はパスワードという秘密情報を含むため `--request` は保護したファイルまたは標準入力に限定し、個別フラグのパスワードも `@path` または `-` で受け付けます。Create は起動の完了を待たずに応答を返します。
+    - Create / Update は SDK の service 層 (builder) を経由せず api 層の操作を直接呼び出します。Update はゾーン・ID を個別フラグで指定し、更新内容は JSON 専用 (`@path.json` または `-`) です。送信した内容で設定が置き換わるため、既存の設定を維持する項目は JSON に再指定します。Monitor は RFC3339 の `--start` / `--end` を個別フラグで指定できます。設計は[設計文書](docs/design/database-api.md)を参照してください。
+    - ライブ E2E は create → read → list-parameter → find → Monitor 4種 → update → shutdown → boot → reset → delete まで確認済みです。sacloud-sdk-go の service 層の不具合 ([#319](https://github.com/sacloud/sacloud-sdk-go/issues/319)、[#320](https://github.com/sacloud/sacloud-sdk-go/issues/320)) は update も api 層の操作に移行して回避し、実機で検証しました。
+    - [チュートリアル](docs/manual/tutorials/iaas-api/database.md)を作成済みです。
+    - 未対応: database の他の操作 (Find / Read / Delete / Boot / Shutdown / Reset / Monitor 系 / ListParameter) は SDK の service 層の委譲のままです。api 層への移行は[アーキテクチャ](docs/design/cli-command-architecture.md)の方針に従って段階的に検討します。Boot / Shutdown / Delete は起動待ちや `--force` の電源操作を含むため、移行すると挙動が変わります。
 - [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。Create は必須・任意の単純値とタグ、Update はゾーン・ID・変更する単純値とタグを個別フラグで指定でき、複雑な入力には JSON を使います。Find は `--name` による単一名の部分一致検索に対応します。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
 - [x] `internet` — `iaas-api internet` の Find / Read / Create / Update / Delete、サブネット操作、IPv6 操作、MonitorRouter を実装済みです。Find は `--name` による単一名の部分一致検索、Delete は `--force` と `--fail-if-not-found` に対応します。ルータ＋スイッチ、Server、起動 Disk を作成し、サブネットから選んだ IPv4 アドレスを NIC の OS 設定へ適用して SSH 接続する [ライブ E2E](test/e2e/internet/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet.md)があります。個別オプションだけの操作で is1b の作成・NIC 接続・名前検索・サブネット参照・SSH ログイン・削除後の不在に加え、Update(更新と復元)、MonitorRouter、追加サブネットの追加・NextHop 更新・削除、IPv6 の有効化・参照・無効化のライブ検証を確認済みです。E2E は 2026-10-29 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテストへ移行済みです。
 - [x] `ipaddress` — `iaas-api ipaddress` の List / Read / UpdateHostName を実装済みです。List と Read はゾーンを必須とし、UpdateHostName は逆引きホスト名を `--host-name` で指定し、省略時は空に設定します。[ライブ E2E](test/e2e/ipaddress/) と[チュートリアル](docs/manual/tutorials/iaas-api/ipaddress.md)があります。is1b で一覧・参照、存在しないアドレスの参照、共有セグメントのサーバに割り当てられたアドレスへの逆引き設定と解除を確認済みです。設計は[設計文書](docs/design/iaas-ipv6-api.md)を参照してください。

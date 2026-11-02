@@ -16,6 +16,7 @@ package cli
 
 import (
 	archiveapi "github.com/sacloud/skr/internal/iaas/archiveapi"
+	databaseapi "github.com/sacloud/skr/internal/iaas/databaseapi"
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
 	diskplanapi "github.com/sacloud/skr/internal/iaas/diskplanapi"
 	iconapi "github.com/sacloud/skr/internal/iaas/iconapi"
@@ -37,6 +38,7 @@ import (
 
 type iaasAPICommand struct {
 	Archive      archiveapi.Commands      `cmd:"" help:"さくらのクラウドのアーカイブを検索・参照します。検索では対象ゾーン、タグまたは OS 種別を指定できます。"`
+	Database     databaseapi.Commands     `cmd:"" help:"さくらのクラウドのデータベースアプライアンスを検索、参照、作成、更新、削除します。作成は個別フラグまたは --request JSON、更新はゾーン・ID と --request JSON を使用します。"`
 	Disk         diskapi.Commands         `cmd:"" help:"さくらのクラウドのディスクを検索、参照、作成、更新、削除します。作成と更新は --request JSON を使用します。"`
 	Icon         iconapi.Commands         `cmd:"" help:"ユーザー作成アイコンを検索、参照、作成、更新、削除します。"`
 	Internet     internetapi.Commands     `cmd:"" help:"さくらのクラウドのルータ＋スイッチと、関連する IP アドレスブロックおよび IPv6 設定を操作します。"`

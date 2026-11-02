@@ -1,0 +1,432 @@
+{
+  "package": "databaseapi",
+  "resource": "IaaS Database",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types",
+    "database": "github.com/sacloud/sacloud-sdk-go/service/iaas/database"
+  },
+  "operations": [
+    {
+      "name": "Find",
+      "help": "データベースアプライアンスを指定したゾーンで検索して出力します。例: skr iaas-api database find --zone tk1v --name example",
+      "method": "FindWithContext",
+      "request_type": "database.FindRequest",
+      "response_type": "[]*iaas.Database",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: 単一名の部分一致検索は --name、複数名の Names と Sort (ソートキーの配列) は JSON で指定します。Tags は --tags のカンマ区切りまたは JSON 配列、Count と From は個別フラグでも指定できます。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'。フラグ例: skr iaas-api database find --zone tk1v --name example",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。例: --zone tk1v",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Names",
+          "type": "string",
+          "help": "任意: 部分一致で検索する単一の名前。カンマを含めて1つの名前として扱います。API の名前検索条件に対応し、JSON では Names 配列で指定します。",
+          "singleton": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
+          "conversion": "types.Tags",
+          "separator": ","
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数 (整数)。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置 (整数)。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "データベースアプライアンスを読み取って出力します。例: skr iaas-api database read --zone ZONE --id 123456789012",
+      "method": "ReadWithContext",
+      "request_type": "database.ReadRequest",
+      "response_type": "*iaas.Database",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (作成結果にある数値)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 作成結果の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "help": "データベースアプライアンスを作成して出力します。基本項目はフラグ、複雑な値は --request JSON で指定します。例: skr iaas-api database create --zone tk1v --name example --plan-id 10 --switch-id 123456789012 --ip-address 192.168.0.11 --network-mask-len 24 --database-type mariadb --username dbuser --password @db-password.txt",
+      "method": "Create",
+      "request_type": "iaas.DatabaseCreateRequest",
+      "response_type": "*iaas.Database",
+      "handwritten": true,
+      "arguments": [
+        {
+          "name": "zone",
+          "type": "string",
+          "help": "作成先ゾーン名。",
+          "field": "Zone"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "help": "データベースアプライアンスの設定を更新します。送信した内容で設定が置き換わるため、保持したい項目も含めて指定してください。ゾーンと ID はフラグ、更新内容は --request JSON で指定します。例: skr iaas-api database update --zone tk1v --id 123456789012 --request @db-update.json",
+      "method": "Update",
+      "request_type": "iaas.DatabaseUpdateRequest",
+      "response_type": "*iaas.Database",
+      "handwritten": true,
+      "arguments": [
+        {
+          "name": "zone",
+          "type": "string",
+          "help": "対象ゾーン名。",
+          "field": "Zone"
+        },
+        {
+          "name": "id",
+          "type": "types.ID",
+          "help": "更新するデータベースアプライアンスの ID。",
+          "field": "ID"
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "help": "データベースアプライアンスを削除します。成功時は出力しません。例: skr iaas-api database delete --zone ZONE --id 123456789012",
+      "method": "DeleteWithContext",
+      "request_type": "database.DeleteRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: FailIfNotFound (真偽値)、Force (真偽値。電源 OFF (強制終了) してから削除します)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 削除対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "fail-if-not-found",
+          "field": "FailIfNotFound",
+          "type": "bool",
+          "help": "任意: 対象が見つからない場合にエラーにします (真偽値)。"
+        },
+        {
+          "name": "force",
+          "field": "Force",
+          "type": "bool",
+          "help": "任意: 電源 OFF (強制終了) してから削除します (真偽値)。"
+        }
+      ]
+    },
+    {
+      "name": "Boot",
+      "help": "データベースアプライアンスを起動します。成功時は出力しません。例: skr iaas-api database boot --zone ZONE --id 123456789012",
+      "method": "BootWithContext",
+      "request_type": "database.BootRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: NoWait (真偽値。true で起動の完了を待ちません)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 起動対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "no-wait",
+          "field": "NoWait",
+          "type": "bool",
+          "help": "任意: 起動の完了を待たずに返ります (真偽値)。"
+        }
+      ]
+    },
+    {
+      "name": "Shutdown",
+      "help": "データベースアプライアンスをシャットダウンします。成功時は出力しません。例: skr iaas-api database shutdown --zone ZONE --id 123456789012",
+      "method": "ShutdownWithContext",
+      "request_type": "database.ShutdownRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: NoWait (真偽値。true でシャットダウンの完了を待ちません)、ForceShutdown (真偽値。true で強制終了します)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: シャットダウン対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "no-wait",
+          "field": "NoWait",
+          "type": "bool",
+          "help": "任意: シャットダウンの完了を待たずに返ります (真偽値)。"
+        },
+        {
+          "name": "force",
+          "field": "ForceShutdown",
+          "type": "bool",
+          "help": "任意: 強制終了します (真偽値)。"
+        }
+      ]
+    },
+    {
+      "name": "Reset",
+      "help": "データベースアプライアンスを再起動します。成功時は出力しません。例: skr iaas-api database reset --zone ZONE --id 123456789012",
+      "method": "ResetWithContext",
+      "request_type": "database.ResetRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 再起動対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "MonitorCPU",
+      "help": "CPU 使用率のモニタリング値を指定した期間で取得して出力します。例: skr iaas-api database monitor-cpu --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00",
+      "method": "MonitorCPUWithContext",
+      "request_type": "database.MonitorCPURequest",
+      "response_type": "[]*iaas.MonitorCPUTimeValue",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Start と End (RFC3339 形式の取得期間)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "start",
+          "field": "Start",
+          "type": "time.Time",
+          "help": "任意: 取得期間の開始 (RFC3339 形式)。例: --start 2025-01-01T00:00:00+09:00"
+        },
+        {
+          "name": "end",
+          "field": "End",
+          "type": "time.Time",
+          "help": "任意: 取得期間の終了 (RFC3339 形式)。"
+        }
+      ]
+    },
+    {
+      "name": "MonitorDisk",
+      "help": "ディスク使用量のモニタリング値を指定した期間で取得して出力します。例: skr iaas-api database monitor-disk --zone ZONE --id 123456789012",
+      "method": "MonitorDiskWithContext",
+      "request_type": "database.MonitorDiskRequest",
+      "response_type": "[]*iaas.MonitorDiskValue",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Start と End (RFC3339 形式の取得期間)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "start",
+          "field": "Start",
+          "type": "time.Time",
+          "help": "任意: 取得期間の開始 (RFC3339 形式)。例: --start 2025-01-01T00:00:00+09:00"
+        },
+        {
+          "name": "end",
+          "field": "End",
+          "type": "time.Time",
+          "help": "任意: 取得期間の終了 (RFC3339 形式)。"
+        }
+      ]
+    },
+    {
+      "name": "MonitorInterface",
+      "help": "ネットワーク送受信のモニタリング値を指定した期間で取得して出力します。例: skr iaas-api database monitor-interface --zone ZONE --id 123456789012",
+      "method": "MonitorInterfaceWithContext",
+      "request_type": "database.MonitorInterfaceRequest",
+      "response_type": "[]*iaas.MonitorInterfaceValue",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Start と End (RFC3339 形式の取得期間)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "start",
+          "field": "Start",
+          "type": "time.Time",
+          "help": "任意: 取得期間の開始 (RFC3339 形式)。例: --start 2025-01-01T00:00:00+09:00"
+        },
+        {
+          "name": "end",
+          "field": "End",
+          "type": "time.Time",
+          "help": "任意: 取得期間の終了 (RFC3339 形式)。"
+        }
+      ]
+    },
+    {
+      "name": "MonitorDatabase",
+      "help": "メモリやレプリケーション遅延などデータベース固有のモニタリング値を指定した期間で取得して出力します。例: skr iaas-api database monitor-database --zone ZONE --id 123456789012",
+      "method": "MonitorDatabaseWithContext",
+      "request_type": "database.MonitorDatabaseRequest",
+      "response_type": "[]*iaas.MonitorDatabaseValue",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Start と End (RFC3339 形式の取得期間)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "start",
+          "field": "Start",
+          "type": "time.Time",
+          "help": "任意: 取得期間の開始 (RFC3339 形式)。未指定時は End の 1 時間前を自動設定します。"
+        },
+        {
+          "name": "end",
+          "field": "End",
+          "type": "time.Time",
+          "help": "任意: 取得期間の終了 (RFC3339 形式)。未指定時は現在時刻を自動設定します。"
+        }
+      ],
+      "request_validator": "SetMonitorDatabasePeriod"
+    },
+    {
+      "name": "ListParameter",
+      "help": "データベースアプライアンスの設定パラメータ一覧を取得して出力します。パラメータは RDBMS 固有の設定値です。例: skr iaas-api database list-parameter --zone ZONE --id 123456789012",
+      "method": "ListParameterWithContext",
+      "request_type": "database.ListParameterRequest",
+      "response_type": "[]*database.Parameter",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    }
+  ],
+  "wiring_target": "IaaSAPI.Database",
+  "sdk_factory": "databaseapi.NewAPI",
+  "client_factory": "iaasclient.New"
+}

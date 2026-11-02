@@ -3,6 +3,7 @@
 // internal/cli の配線コードです。設定を変更した場合は再生成してください (ADR 0068)。
 // 設定:
 //   api/commands/iaas-archive.json
+//   api/commands/iaas-database.json
 //   api/commands/iaas-disk.json
 //   api/commands/iaas-icon.json
 //   api/commands/iaas-internet.json
@@ -39,6 +40,7 @@ import (
 	zone "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	archiveapi "github.com/sacloud/skr/internal/iaas/archiveapi"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
+	databaseapi "github.com/sacloud/skr/internal/iaas/databaseapi"
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
 	diskplanapi "github.com/sacloud/skr/internal/iaas/diskplanapi"
 	iconapi "github.com/sacloud/skr/internal/iaas/iconapi"
@@ -69,6 +71,17 @@ func (c *cli) initIaaSAPI() {
 			return nil, err
 		}
 		return archive.New(client), nil
+	})
+	c.IaaSAPI.Database = databaseapi.NewCommands(databaseapi.Runtime{
+		DecodeRequest:  decodeRequest,
+		ValidateOutput: validateOutput,
+		WriteOutput:    writeOutput,
+	}, func() (databaseapi.API, error) {
+		client, err := iaasclient.New(c.Trace)
+		if err != nil {
+			return nil, err
+		}
+		return databaseapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.Disk = diskapi.NewCommands(diskapi.Runtime{
 		DecodeRequest:  decodeRequest,
