@@ -17,7 +17,11 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
+
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 )
 
 // AddDatabase はテストの初期状態として Database を登録します。CLI 側の API factory から
@@ -82,35 +86,35 @@ func (s *Server) doDatabase(method string, parts []string, uri string, body any)
 	case method == "GET" && id != "" && len(suffix) == 0:
 		item, ok := s.databases[key]
 		if !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		return marshalJSON(map[string]any{"IsOk": true, "Appliance": item})
 	case method == "DELETE" && id != "" && len(suffix) == 0:
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		delete(s.databases, key)
 		return nil, nil
 	case method == "PUT" && id != "" && len(suffix) == 1 && suffix[0] == "power":
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		// boot は PUT /power を送ります
 		return nil, nil
 	case method == "DELETE" && id != "" && len(suffix) == 1 && suffix[0] == "power":
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		// shutdown は DELETE /power を送ります
 		return nil, nil
 	case method == "PUT" && id != "" && len(suffix) == 1 && suffix[0] == "reset":
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		return nil, nil
 	case method == "GET" && id != "" && len(suffix) == 2 && suffix[0] == "cpu" && suffix[1] == "monitor":
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		// アクティビティモニタはタイムスタンプがキーの map を直接返します
 		return marshalJSON(map[string]any{
@@ -121,7 +125,7 @@ func (s *Server) doDatabase(method string, parts []string, uri string, body any)
 		})
 	case method == "GET" && id != "" && len(suffix) == 2 && suffix[0] == "database" && suffix[1] == "monitor":
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		return marshalJSON(map[string]any{
 			"IsOk": true,
@@ -139,7 +143,7 @@ func (s *Server) doDatabase(method string, parts []string, uri string, body any)
 		})
 	case method == "GET" && id != "" && len(suffix) == 3 && suffix[0] == "disk" && suffix[2] == "monitor":
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		return marshalJSON(map[string]any{
 			"IsOk": true,
@@ -152,7 +156,7 @@ func (s *Server) doDatabase(method string, parts []string, uri string, body any)
 		})
 	case method == "GET" && id != "" && len(suffix) == 2 && suffix[0] == "interface" && suffix[1] == "monitor":
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		return marshalJSON(map[string]any{
 			"IsOk": true,
@@ -165,7 +169,7 @@ func (s *Server) doDatabase(method string, parts []string, uri string, body any)
 		})
 	case method == "GET" && id != "" && len(suffix) == 2 && suffix[0] == "database" && suffix[1] == "parameter":
 		if _, ok := s.databases[key]; !ok {
-			return nil, fmt.Errorf("database %s in zone %s not found", id, zone)
+			return nil, databaseNotFound(method, uri, id)
 		}
 		return marshalJSON(map[string]any{
 			"Database": map[string]any{
@@ -188,6 +192,17 @@ func (s *Server) doDatabase(method string, parts []string, uri string, body any)
 	default:
 		return nil, fmt.Errorf("unsupported IaaS operation: %s %s", method, uri)
 	}
+}
+
+// databaseNotFound は Database API の存在しない対象に対する API 404 エラーを返します。
+func databaseNotFound(method, uri, id string) error {
+	requestURL, err := url.Parse(uri)
+	if err != nil {
+		return fmt.Errorf("parse Database request URL: %w", err)
+	}
+	return iaas.NewAPIError(method, requestURL, http.StatusNotFound, &iaas.APIErrorResponse{
+		ErrorCode: "not_found", ErrorMessage: fmt.Sprintf("database %s not found", id),
+	})
 }
 
 func (s *Server) databasesAsSlice(zone string) []map[string]json.RawMessage {

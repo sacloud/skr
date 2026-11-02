@@ -233,6 +233,17 @@ func TestDeleteWorkflowWaitsForNonAvailableStoppedDatabase(t *testing.T) {
 	require.NotContains(t, op.operations, "delete", "delete must not be called while availability is not available")
 }
 
+func TestDeleteWorkflowDeletesUnknownStatusDatabaseWithoutForce(t *testing.T) {
+	// Unknown は状態が確認できないため待たずに削除へ進みます (移行前の service 層と同様)
+	op := &fakeDatabaseOp{database: &iaas.Database{ID: 123, Availability: types.Availabilities.Available, InstanceStatus: types.ServerInstanceStatuses.Unknown}}
+	api := &databaseAPI{op: op}
+
+	err := api.DeleteWithContext(context.Background(), &DeleteRequest{Zone: "is1c", ID: 123, Force: true})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"read", "delete"}, op.operations, "unknown status should skip the shutdown wait")
+}
+
 func TestDeleteWorkflowToleratesMissingDatabaseWithoutFailIfNotFound(t *testing.T) {
 	op := &fakeDatabaseOp{readErr: notFoundError()}
 	api := &databaseAPI{op: op}

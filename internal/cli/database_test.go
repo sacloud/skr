@@ -448,8 +448,23 @@ func TestIaaSDatabaseCommandsThroughNewAPIWithSakumock(t *testing.T) {
 		stdout, stderr, code := run("delete", "--zone", "is1b", "--id", "112700000001", "--force")
 		require.Equal(t, 0, code, "stderr: %s", stderr)
 		_ = stdout
-		// 削除後は存在しないため read がエラーになること
+		// 削除後は存在しないため read がエラーになること。
+		// 404 の APIError は iaas.IsNotFoundError で判定されるため、エラーメッセージは
+		// API の not_found が返ること
 		_, stderr, code = run("read", "--zone", "is1b", "--id", "112700000001")
+		require.NotEqual(t, 0, code)
+		require.Contains(t, stderr, "not found")
+	})
+
+	t.Run("delete tolerates missing database without fail-if-not-found", func(t *testing.T) {
+		// 不在は 404 の APIError として返るため、--fail-if-not-found 未指定の削除は
+		// 存在しない ID でも成功すること
+		_, stderr, code := run("delete", "--zone", "is1b", "--id", "999", "--force")
+		require.Equal(t, 0, code, "stderr: %s", stderr)
+	})
+
+	t.Run("delete fails on missing database with fail-if-not-found", func(t *testing.T) {
+		_, stderr, code := run("delete", "--zone", "is1b", "--id", "999", "--force", "--fail-if-not-found")
 		require.NotEqual(t, 0, code)
 		require.Contains(t, stderr, "not found")
 	})

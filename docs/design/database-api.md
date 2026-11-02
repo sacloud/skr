@@ -81,6 +81,7 @@ api 層の操作を直接呼び出す理由は次のとおりです。
 ### delete / boot / shutdown / reset
 
 - `delete` は `--force` と `--fail-if-not-found` に対応します。`--force` を付けない場合、起動中のデータベースはエラーになり、付けた場合は電源 OFF (強制終了) してから削除します。
+- `delete` のワークフローは起動中なら強制終了して停止を待ち、その後削除します。停止済みでも可用性が準備中 (unknown や failed) の場合は待ちます。InstanceStatus が Unknown の場合は状態が確認できないため待たずに削除し、可用性が available で停止済みの場合も待ちません。
 - `boot` は `--no-wait`、`shutdown` は `--no-wait` と `--force` (強制終了) に対応します。いずれも省略時は完了を待ちます。
 
 ### monitor 系 / list-parameter
