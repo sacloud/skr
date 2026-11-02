@@ -292,6 +292,70 @@ func TestDatabaseCreateCommandRunWithFlags(t *testing.T) {
 	})
 }
 
+func TestDatabaseCreateCommandOmittedBackupTimeFlags(t *testing.T) {
+	t.Run("omits both backup time flags", func(t *testing.T) {
+		// --enable-backup を指定して時刻フラグを両方省略しても panic せず、既定値 00:00 を使うこと
+		fake := &fakeDatabaseAPI{}
+		command := &CreateCommand{
+			factory: func() (API, error) { return fake, nil },
+			runtime: testRuntime(),
+		}
+		passwordFile := writePasswordFile(t, "secret-password")
+		kongCtx := parseCommand(t, command,
+			"--zone", "is1b", "--name", "db-05",
+			"--plan-id", "10", "--switch-id", "112900500001",
+			"--ip-address", "192.168.0.11", "--network-mask-len", "24",
+			"--database-type", "mariadb", "--username", "dbuser",
+			"--password", "@"+passwordFile,
+			"--enable-backup",
+		)
+		require.NoError(t, command.Run(kongCtx))
+		require.NotNil(t, fake.createRequest.BackupSetting)
+		require.Equal(t, "00:00", fake.createRequest.BackupSetting.Time)
+	})
+
+	t.Run("omits only the backup minute flag", func(t *testing.T) {
+		fake := &fakeDatabaseAPI{}
+		command := &CreateCommand{
+			factory: func() (API, error) { return fake, nil },
+			runtime: testRuntime(),
+		}
+		passwordFile := writePasswordFile(t, "secret-password")
+		kongCtx := parseCommand(t, command,
+			"--zone", "is1b", "--name", "db-06",
+			"--plan-id", "10", "--switch-id", "112900500001",
+			"--ip-address", "192.168.0.11", "--network-mask-len", "24",
+			"--database-type", "mariadb", "--username", "dbuser",
+			"--password", "@"+passwordFile,
+			"--enable-backup", "--backup-start-time-hour", "2",
+		)
+		require.NoError(t, command.Run(kongCtx))
+		require.NotNil(t, fake.createRequest.BackupSetting)
+		require.Equal(t, "02:00", fake.createRequest.BackupSetting.Time)
+	})
+
+	t.Run("omits both backup v2 time flags", func(t *testing.T) {
+		fake := &fakeDatabaseAPI{}
+		command := &CreateCommand{
+			factory: func() (API, error) { return fake, nil },
+			runtime: testRuntime(),
+		}
+		passwordFile := writePasswordFile(t, "secret-password")
+		kongCtx := parseCommand(t, command,
+			"--zone", "is1b", "--name", "db-07",
+			"--plan-id", "10", "--switch-id", "112900500001",
+			"--ip-address", "192.168.0.11", "--network-mask-len", "24",
+			"--database-type", "mariadb", "--username", "dbuser",
+			"--password", "@"+passwordFile,
+			"--enable-backup-v2", "--backup-v2-weekday", "mon",
+			"--backup-v2-connect", "public",
+		)
+		require.NoError(t, command.Run(kongCtx))
+		require.NotNil(t, fake.createRequest.Backupv2Setting)
+		require.Equal(t, "00:00", fake.createRequest.Backupv2Setting.Time)
+	})
+}
+
 func TestDatabaseCreateCommandRequestJSON(t *testing.T) {
 	requestJSON := `{"Name":"db-json","PlanID":10,"SwitchID":112900500001,` +
 		`"IPAddresses":["192.168.0.11"],"NetworkMaskLen":24,` +

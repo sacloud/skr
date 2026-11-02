@@ -181,7 +181,9 @@ func TestScenarioDatabase(t *testing.T) {
 		require.NotNil(t, current, "re-verified database should not be nil")
 		require.Equal(t, created.ID, current.ID, "cleanup target database ID mismatch")
 		require.Equal(t, name, current.Name, "cleanup target database name mismatch")
-		require.Equal(t, dbDescription, current.Description, "cleanup target database description mismatch")
+		// 説明はこのシナリオ後半で更新するため、作成直後の説明と更新後の説明のどちらも今回設定した値として扱う
+		require.Contains(t, []string{dbDescription, updatedDescription}, current.Description,
+			"cleanup target database description mismatch")
 		// データベースを削除し、名前でも残っていないことを確認する
 		_ = h.CallWithTimeout(t, dbDeleteTimeout, "データベースを削除する",
 			"iaas-api", "database", "delete",

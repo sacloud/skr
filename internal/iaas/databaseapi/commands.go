@@ -87,9 +87,12 @@ func (a *databaseAPI) DeleteWithContext(ctx context.Context, req *DeleteRequest)
 		if err := a.op.Shutdown(ctx, req.Zone, req.ID, &iaas.ShutdownOption{Force: true}); err != nil {
 			return err
 		}
-	}
-	// 元の状態が Unknown でなければ停止を待ちます
-	if target.InstanceStatus != types.ServerInstanceStatuses.Unknown {
+		// 強制終了後に停止を待ちます
+		if _, err := wait.UntilDatabaseIsDown(ctx, a.op, req.Zone, req.ID); err != nil {
+			return err
+		}
+	} else if target.InstanceStatus != types.ServerInstanceStatuses.Down && target.InstanceStatus != types.ServerInstanceStatuses.Unknown {
+		// Cleaning など停止処理中の状態では停止を待ちます。既に停止済みか Unknown の場合は待たずに削除します
 		if _, err := wait.UntilDatabaseIsDown(ctx, a.op, req.Zone, req.ID); err != nil {
 			return err
 		}
@@ -520,14 +523,14 @@ func (c *CreateCommand) buildRequest(stdin io.Reader) (*iaas.DatabaseCreateReque
 	}
 	if derefValue(c.EnableBackup) {
 		request.BackupSetting = &iaas.DatabaseSettingBackup{
-			Time:      fmt.Sprintf("%02d:%02d", *c.BackupStartTimeHour, *c.BackupStartTimeMinute),
+			Time:      fmt.Sprintf("%02d:%02d", derefValue(c.BackupStartTimeHour), derefValue(c.BackupStartTimeMinute)),
 			DayOfWeek: backupWeekdays,
 			Rotate:    8,
 		}
 	}
 	if derefValue(c.EnableBackupv2) {
 		request.Backupv2Setting = &iaas.DatabaseSettingBackupv2{
-			Time:      fmt.Sprintf("%02d:%02d", *c.Backupv2StartTimeHour, *c.Backupv2StartTimeMinute),
+			Time:      fmt.Sprintf("%02d:%02d", derefValue(c.Backupv2StartTimeHour), derefValue(c.Backupv2StartTimeMinute)),
 			DayOfWeek: backupv2Weekdays,
 			Connect:   *c.Backupv2Connect,
 			Rotate:    8,
