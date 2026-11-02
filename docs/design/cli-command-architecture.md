@@ -62,6 +62,13 @@ API コマンドのリクエストには `User-Agent: skr/v<version> (<os>/<arch
 
 `skr iaas-api` は sacloud-sdk-go が公開する IaaS の API 操作を直接公開する境界とします。現状の IaaS API が OpenAPI 定義ではないことは、SDK の定義形式の違いであり、高レベル層であることを意味しません。低レベルコマンドは、OpenAPI 定義の有無によらず、SDK の公開メソッドと型を基準に生成します。
 
+`iaas-api` の低レベルコマンドは、SDK の service 層 (`sacloud-sdk-go/service/iaas/...`) に依存してはならず、api 層の公開操作 (`api/iaas` の API interface と request 型) を使います。service 層は builder によるオーケストレーション (起動待ち、現在値の読み取りとマージ、既定値の補完) を行う高レベルな入口です。低レベルコマンドで使うと、入力が暗黙に置き換わったり、待ち合わせが隠れたりします。database の create では service 層の builder がリクエストの `DatabaseType` を検証せずに既定値へ置き換え、update ではマスク済みのパスワード (`********`) がマージされる問題が実際に起こりました。したがって `iaas-api` の create / update は api 層のリクエストをそのまま送り、起動待ちや設定のマージを行いません。起動待ちが必要な利用者は、作成後に `read` や電源操作で状態を確認してください。
+
+現状の移行状況は次のとおりです。
+
+- database の `create` / `update` は api 層の操作に移行済みです ([database-api.md](database-api.md))。
+- database の他の操作 (`find` / `read` / `delete` / `boot` / `shutdown` / `reset` / `monitor` 系 / `list-parameter`) と他の IaaS リソースは service 層の委譲のままです。service 層が薄い委譲 (検証と変換のみ) の操作は api 層への移行でも応答が変わりませんが、`boot` / `shutdown` / `delete` は起動待ちや `--force` の電源操作を含むため、移行すると挙動が変わります。移行は挙動の変更とヘルプ・ドキュメントの更新を含めて段階的に進め、[PLAN.md](../../PLAN.md) で追跡します。
+
 `skr iaas` の高レベル操作が必要になった場合は、SDK の API 操作を組み合わせる skr 内の service layer を実装し、それをコマンドから呼び出します。SDK の `service/iaas/<resource>` という配置を、そのまま `skr iaas` の実装境界とみなす設計ではありません。全リソースに同じ操作があるとは仮定せず、SDK の実際の操作とサービス上の意味を確認して公開範囲を決めます。
 
 実行可能ファイルの入口は `cmd/skr/main.go` に置き、CLI のコマンド構成、IaaS の登録、出力処理などの実装とテストは `internal/cli/` にまとめます。各 IaaS リソースのコマンドと SDK クライアントはリソース専用パッケージに分け、別リソースを追加するときも Switch や EventBus のファイルを編集せずに登録できます。

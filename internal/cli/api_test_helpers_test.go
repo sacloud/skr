@@ -17,6 +17,7 @@ package cli
 import (
 	"github.com/sacloud/skr/internal/containerregistryapi"
 	"github.com/sacloud/skr/internal/iaas/archiveapi"
+	databaseapi "github.com/sacloud/skr/internal/iaas/databaseapi"
 	"github.com/sacloud/skr/internal/iaas/diskapi"
 	"github.com/sacloud/skr/internal/iaas/diskplanapi"
 	"github.com/sacloud/skr/internal/iaas/internetapi"
@@ -34,6 +35,12 @@ import (
 
 func setArchiveAPIFactory(commandLine *cli, factory archiveapi.APIFactory) {
 	commandLine.IaaSAPI.Archive = archiveapi.NewCommands(archiveapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, factory)
+}
+
+func setDatabaseAPIFactory(commandLine *cli, factory databaseapi.APIFactory) {
+	commandLine.IaaSAPI.Database = databaseapi.NewCommands(databaseapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 	}, factory)
 }
