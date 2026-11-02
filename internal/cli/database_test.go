@@ -20,14 +20,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/database"
 	"github.com/sacloud/skr/internal/apigen"
 	databaseapi "github.com/sacloud/skr/internal/iaas/databaseapi"
 	"github.com/stretchr/testify/require"
@@ -132,18 +130,16 @@ func TestIaaSDatabaseCommandsBuildSDKRequests(t *testing.T) {
 	_, stderr, code = run("find", "--zone", "test-zone", "--name", "db-01", "--tags", "production,managed", "--count", "10", "--from", "2")
 	require.Equal(t, 0, code, "find flags: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
-	if request := api.findRequest; request.Zone != "test-zone" || request.Count != 10 || request.From != 2 ||
-		!reflect.DeepEqual(request.Names, []string{"db-01"}) ||
-		!reflect.DeepEqual(request.Tags, []string{"production", "managed"}) {
-		t.Fatalf("Find request = %+v", request)
-	}
+	require.Equal(t, "test-zone", api.findRequest.Zone, "unexpected value")
+	require.Equal(t, 10, api.findRequest.Count, "unexpected value")
+	require.Equal(t, 2, api.findRequest.From, "unexpected value")
+	require.Equal(t, []string{"db-01"}, api.findRequest.Names, "unexpected value")
+	require.Equal(t, []string{"production", "managed"}, api.findRequest.Tags, "unexpected value")
 
 	_, stderr, code = run("find", "--request", `{"Zone":"test-zone","Names":["one","two"]}`)
 	require.Equal(t, 0, code, "find JSON: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
-	if request := api.findRequest; !reflect.DeepEqual(request.Names, []string{"one", "two"}) {
-		t.Fatalf("Find JSON request = %+v", request)
-	}
+	require.Equal(t, []string{"one", "two"}, api.findRequest.Names, "unexpected value")
 
 	updateFile := filepath.Join(t.TempDir(), "db-update.json")
 	require.NoError(t, os.WriteFile(updateFile, []byte(`{"Description":"updated","CommonSetting":{"DefaultUser":"dbuser"}}`), 0o600))
@@ -153,45 +149,45 @@ func TestIaaSDatabaseCommandsBuildSDKRequests(t *testing.T) {
 	// ゾーンと ID は api 層の操作の引数として渡される
 	require.Equal(t, "test-zone", api.updateZone, "unexpected value")
 	require.EqualValues(t, 123, api.updateID, "unexpected value")
-	if request := api.updateRequest; request.Description != "updated" || request.Name != "" || request.CommonSetting == nil {
-		t.Fatalf("Update request = %+v, want explicit Description and omitted Name", request)
-	}
+	require.NotNil(t, api.updateRequest, "update should call the SDK")
+	require.Equal(t, "updated", api.updateRequest.Description, "unexpected value")
+	require.Empty(t, api.updateRequest.Name, "omitted Name should stay empty")
+	require.NotNil(t, api.updateRequest.CommonSetting, "unexpected value")
 
 	_, stderr, code = run("delete", "--zone", "test-zone", "--id", "123", "--force", "--fail-if-not-found")
 	require.Equal(t, 0, code, "delete flags: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
-	if request := api.deleteRequest; request.Zone != "test-zone" || request.ID != 123 ||
-		!request.Force || !request.FailIfNotFound {
-		t.Fatalf("Delete request = %+v", request)
-	}
+	require.Equal(t, "test-zone", api.deleteRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, api.deleteRequest.ID, "unexpected value")
+	require.True(t, api.deleteRequest.Force, "unexpected value")
+	require.True(t, api.deleteRequest.FailIfNotFound, "unexpected value")
 
 	_, stderr, code = run("delete", "--request", `{"Zone":"test-zone","ID":123}`)
 	require.Equal(t, 0, code, "delete JSON: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
-	if request := api.deleteRequest; request.ID != 123 || request.Force || request.FailIfNotFound {
-		t.Fatalf("Delete JSON request = %+v", request)
-	}
+	require.EqualValues(t, 123, api.deleteRequest.ID, "unexpected value")
+	require.False(t, api.deleteRequest.Force, "unexpected value")
+	require.False(t, api.deleteRequest.FailIfNotFound, "unexpected value")
 
 	_, stderr, code = run("boot", "--zone", "test-zone", "--id", "123", "--no-wait")
 	require.Equal(t, 0, code, "boot: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
-	if request := api.bootRequest; request.Zone != "test-zone" || request.ID != 123 || !request.NoWait {
-		t.Fatalf("Boot request = %+v", request)
-	}
+	require.Equal(t, "test-zone", api.bootRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, api.bootRequest.ID, "unexpected value")
+	require.True(t, api.bootRequest.NoWait, "unexpected value")
 
 	_, stderr, code = run("shutdown", "--zone", "test-zone", "--id", "123", "--force")
 	require.Equal(t, 0, code, "shutdown: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
-	if request := api.shutdownRequest; request.Zone != "test-zone" || request.ID != 123 || !request.ForceShutdown {
-		t.Fatalf("Shutdown request = %+v", request)
-	}
+	require.Equal(t, "test-zone", api.shutdownRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, api.shutdownRequest.ID, "unexpected value")
+	require.True(t, api.shutdownRequest.ForceShutdown, "unexpected value")
 
 	_, stderr, code = run("reset", "--zone", "test-zone", "--id", "123")
 	require.Equal(t, 0, code, "reset: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
-	if request := api.resetRequest; request.Zone != "test-zone" || request.ID != 123 {
-		t.Fatalf("Reset request = %+v", request)
-	}
+	require.Equal(t, "test-zone", api.resetRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, api.resetRequest.ID, "unexpected value")
 
 	_, stderr, code = run("monitor-cpu", "--zone", "test-zone", "--id", "123",
 		"--start", "2026-10-14T00:00:00Z", "--end", "2026-10-15T00:00:00Z")
@@ -226,9 +222,8 @@ func TestIaaSDatabaseCommandsBuildSDKRequests(t *testing.T) {
 	_, stderr, code = run("list-parameter", "--zone", "test-zone", "--id", "123")
 	require.Equal(t, 0, code, "list-parameter: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
-	if request := api.listParameterRequest; request.Zone != "test-zone" || request.ID != 123 {
-		t.Fatalf("ListParameter request = %+v", request)
-	}
+	require.Equal(t, "test-zone", api.listParameterRequest.Zone, "unexpected value")
+	require.EqualValues(t, 123, api.listParameterRequest.ID, "unexpected value")
 }
 
 func TestIaaSDatabaseRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
@@ -270,11 +265,13 @@ func TestIaaSDatabaseRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 		require.EqualValues(t, 0, stdout.Len(), "unexpected value")
 		require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
 	}
-	if api.findRequest != nil || api.createRequest != nil || api.updateRequest != nil ||
-		api.deleteRequest != nil || api.bootRequest != nil || api.shutdownRequest != nil ||
-		api.monitorCPURequest != nil {
-		t.Fatalf("invalid request reached API: %+v", api)
-	}
+	require.Nil(t, api.findRequest, "invalid request reached API")
+	require.Nil(t, api.createRequest, "invalid request reached API")
+	require.Nil(t, api.updateRequest, "invalid request reached API")
+	require.Nil(t, api.deleteRequest, "invalid request reached API")
+	require.Nil(t, api.bootRequest, "invalid request reached API")
+	require.Nil(t, api.shutdownRequest, "invalid request reached API")
+	require.Nil(t, api.monitorCPURequest, "invalid request reached API")
 }
 
 func TestIaaSDatabasePropagatesAPIErrors(t *testing.T) {
@@ -300,30 +297,30 @@ func TestIaaSDatabasePropagatesAPIErrors(t *testing.T) {
 // databaseAPITestDouble は databaseapi.API の動作を置き換えるテスト用実装です。
 type databaseAPITestDouble struct {
 	databaseapi.API
-	findRequest             *database.FindRequest
+	findRequest             *databaseapi.FindRequest
 	createZone              string
 	createRequest           *iaas.DatabaseCreateRequest
 	updateZone              string
 	updateID                types.ID
 	updateRequest           *iaas.DatabaseUpdateRequest
-	deleteRequest           *database.DeleteRequest
-	bootRequest             *database.BootRequest
-	shutdownRequest         *database.ShutdownRequest
-	resetRequest            *database.ResetRequest
-	monitorCPURequest       *database.MonitorCPURequest
-	monitorDiskRequest      *database.MonitorDiskRequest
-	monitorInterfaceRequest *database.MonitorInterfaceRequest
-	monitorDatabaseRequest  *database.MonitorDatabaseRequest
-	listParameterRequest    *database.ListParameterRequest
+	deleteRequest           *databaseapi.DeleteRequest
+	bootRequest             *databaseapi.BootRequest
+	shutdownRequest         *databaseapi.ShutdownRequest
+	resetRequest            *databaseapi.ResetRequest
+	monitorCPURequest       *databaseapi.MonitorCPURequest
+	monitorDiskRequest      *databaseapi.MonitorDiskRequest
+	monitorInterfaceRequest *databaseapi.MonitorInterfaceRequest
+	monitorDatabaseRequest  *databaseapi.MonitorDatabaseRequest
+	listParameterRequest    *databaseapi.ListParameterRequest
 	createErr               error
 }
 
-func (api *databaseAPITestDouble) FindWithContext(_ context.Context, request *database.FindRequest) ([]*iaas.Database, error) {
+func (api *databaseAPITestDouble) FindWithContext(_ context.Context, request *databaseapi.FindRequest) ([]*iaas.Database, error) {
 	api.findRequest = request
 	return []*iaas.Database{}, nil
 }
 
-func (api *databaseAPITestDouble) ReadWithContext(context.Context, *database.ReadRequest) (*iaas.Database, error) {
+func (api *databaseAPITestDouble) ReadWithContext(context.Context, *databaseapi.ReadRequest) (*iaas.Database, error) {
 	return &iaas.Database{ID: 123}, nil
 }
 
@@ -343,47 +340,47 @@ func (api *databaseAPITestDouble) Update(_ context.Context, zone string, id type
 	return &iaas.Database{ID: 123, Name: request.Name}, nil
 }
 
-func (api *databaseAPITestDouble) DeleteWithContext(_ context.Context, request *database.DeleteRequest) error {
+func (api *databaseAPITestDouble) DeleteWithContext(_ context.Context, request *databaseapi.DeleteRequest) error {
 	api.deleteRequest = request
 	return nil
 }
 
-func (api *databaseAPITestDouble) BootWithContext(_ context.Context, request *database.BootRequest) error {
+func (api *databaseAPITestDouble) BootWithContext(_ context.Context, request *databaseapi.BootRequest) error {
 	api.bootRequest = request
 	return nil
 }
 
-func (api *databaseAPITestDouble) ShutdownWithContext(_ context.Context, request *database.ShutdownRequest) error {
+func (api *databaseAPITestDouble) ShutdownWithContext(_ context.Context, request *databaseapi.ShutdownRequest) error {
 	api.shutdownRequest = request
 	return nil
 }
 
-func (api *databaseAPITestDouble) ResetWithContext(_ context.Context, request *database.ResetRequest) error {
+func (api *databaseAPITestDouble) ResetWithContext(_ context.Context, request *databaseapi.ResetRequest) error {
 	api.resetRequest = request
 	return nil
 }
 
-func (api *databaseAPITestDouble) MonitorCPUWithContext(_ context.Context, request *database.MonitorCPURequest) ([]*iaas.MonitorCPUTimeValue, error) {
+func (api *databaseAPITestDouble) MonitorCPUWithContext(_ context.Context, request *databaseapi.MonitorCPURequest) ([]*iaas.MonitorCPUTimeValue, error) {
 	api.monitorCPURequest = request
 	return []*iaas.MonitorCPUTimeValue{}, nil
 }
 
-func (api *databaseAPITestDouble) MonitorDiskWithContext(_ context.Context, request *database.MonitorDiskRequest) ([]*iaas.MonitorDiskValue, error) {
+func (api *databaseAPITestDouble) MonitorDiskWithContext(_ context.Context, request *databaseapi.MonitorDiskRequest) ([]*iaas.MonitorDiskValue, error) {
 	api.monitorDiskRequest = request
 	return []*iaas.MonitorDiskValue{}, nil
 }
 
-func (api *databaseAPITestDouble) MonitorInterfaceWithContext(_ context.Context, request *database.MonitorInterfaceRequest) ([]*iaas.MonitorInterfaceValue, error) {
+func (api *databaseAPITestDouble) MonitorInterfaceWithContext(_ context.Context, request *databaseapi.MonitorInterfaceRequest) ([]*iaas.MonitorInterfaceValue, error) {
 	api.monitorInterfaceRequest = request
 	return []*iaas.MonitorInterfaceValue{}, nil
 }
 
-func (api *databaseAPITestDouble) MonitorDatabaseWithContext(_ context.Context, request *database.MonitorDatabaseRequest) ([]*iaas.MonitorDatabaseValue, error) {
+func (api *databaseAPITestDouble) MonitorDatabaseWithContext(_ context.Context, request *databaseapi.MonitorDatabaseRequest) ([]*iaas.MonitorDatabaseValue, error) {
 	api.monitorDatabaseRequest = request
 	return []*iaas.MonitorDatabaseValue{}, nil
 }
 
-func (api *databaseAPITestDouble) ListParameterWithContext(_ context.Context, request *database.ListParameterRequest) ([]*database.Parameter, error) {
+func (api *databaseAPITestDouble) ListParameterWithContext(_ context.Context, request *databaseapi.ListParameterRequest) ([]*databaseapi.Parameter, error) {
 	api.listParameterRequest = request
-	return []*database.Parameter{}, nil
+	return []*databaseapi.Parameter{}, nil
 }

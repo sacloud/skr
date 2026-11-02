@@ -77,14 +77,14 @@ $ SWITCH_ID=$(skr iaas-api switch find --zone is1b --query 'map(select(.Name == 
 
 ## Step 4: データベースを作成する
 
-パスワードをファイルに保存します。パスワードをコマンド引数の値として渡せないため、保護したファイルから読み込みます。末尾の改行は読み込み時に取り除かれます。
+パスワードをファイルに保存します。パスワードをコマンド引数の値として渡せないため、保護したファイルから読み込みます。末尾の改行は読み込み時に取り除かれます。`echo` でパスワードを書き込むと値がシェルの履歴に残るため、`read -s` で入力するかエディタで作成してください。
 
 ```console
 $ umask 077
-$ echo -n 'DB-PASSWORD' > db-password.txt
+$ read -rs -p "Password: " DB_PASSWORD && printf '%s' "$DB_PASSWORD" > db-password.txt && unset DB_PASSWORD
 ```
 
-`DB-PASSWORD` は、利用者の責任で十分な強度の値に置き換えてください。データベースを作成します。作成リクエストは作成を受け付けた時点で応答を返し、起動の完了は待ちません。起動には数分から十数分かかります。
+`read -s` で入力したパスワードは表示されず、シェルの履歴にも残りません。`DB_PASSWORD` は、利用者の責任で十分な強度の値に置き換えてください。エディタで作成する場合も、同じく保護したファイルに保存してください。データベースを作成します。作成リクエストは作成を受け付けた時点で応答を返し、起動の完了は待ちません。起動には数分から十数分かかります。
 
 ```console
 $ skr iaas-api database create --zone is1b --name DB-NAME \
@@ -116,8 +116,11 @@ $ skr iaas-api database create --zone is1b --name DB-NAME \
 出力例は `Instance` や `Settings` などの既存項目を除いて編集しています。作成結果の `ID` を控え、以降の `DB-ID` に指定してください。データベースを作成したら、ID をシェル変数に取り込みます。
 
 ```console
-$ DB_ID=$(skr iaas-api database find --zone is1b --name DB-NAME --query 'map({ID,Name}) | .[0].ID')
+$ DB_ID=$(skr iaas-api database find --zone is1b --name DB-NAME \
+    --query 'map(select(.Name == "DB-NAME")) | map({ID,Name}) | if length == 1 then .[0].ID else error("not unique") end')
 ```
+
+`--name` は部分一致検索のため、結果には名前の一部が一致する別のデータベースも含まれることがあります。名前の完全一致で絞り込み、結果が 1 件のときだけ ID を取り込みます。複数件ある場合は、コントロールパネルで対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
 
 ```json
 "DB-ID"
@@ -129,10 +132,10 @@ $ DB_ID=$(skr iaas-api database find --zone is1b --name DB-NAME --query 'map({ID
 $ rm db-password.txt
 ```
 
-作成したデータベースが起動するまで待ちます。`read` で `Instance.Status` が `up` になるまで再実行してください。以降の参照やモニタリングは起動後に行います。
+作成したデータベースが起動するまで待ちます。`read` でトップレベルの `InstanceStatus` が `up` になるまで再実行してください。以降の参照やモニタリングは起動後に行います。
 
 ```console
-$ skr iaas-api database read --zone is1b --id "$DB_ID" --query '{ID,Name,Status: .Instance.Status}'
+$ skr iaas-api database read --zone is1b --id "$DB_ID" --query '{ID,Name,Status: .InstanceStatus}'
 ```
 
 ```json
@@ -152,7 +155,7 @@ $ skr iaas-api database read --zone is1b --id "$DB_ID" --query '{ID,Name,Status:
 ## Step 5: 作成したデータベースを参照する
 
 ```console
-$ skr iaas-api database read --zone is1b --id "$DB_ID" --query '{ID,Name,Description,Tags,Availability,PlanID,SwitchID,NetworkMaskLen,IPAddresses,Status: .Instance.Status}'
+$ skr iaas-api database read --zone is1b --id "$DB_ID" --query '{ID,Name,Description,Tags,Availability,PlanID,SwitchID,NetworkMaskLen,IPAddresses,Status: .InstanceStatus}'
 ```
 
 ```json
@@ -175,7 +178,7 @@ $ skr iaas-api database read --zone is1b --id "$DB_ID" --query '{ID,Name,Descrip
 名前の部分一致検索でも同じデータベースが返ることを確認します。`--name` は部分一致で、1 要素の API `Names` に変換されます。
 
 ```console
-$ skr iaas-api database find --zone is1b --name DB-NAME --query 'map({ID,Name,Status: .Instance.Status})'
+$ skr iaas-api database find --zone is1b --name DB-NAME --query 'map({ID,Name,Status: .InstanceStatus})'
 ```
 
 ```json
@@ -285,7 +288,7 @@ $ skr iaas-api database shutdown --zone is1b --id "$DB_ID"
 $ skr iaas-api database boot --zone is1b --id "$DB_ID"
 ```
 
-電源操作の反映には時間を要することがあります。`read` で `Instance.Status` が期待する状態 (`up`、`down`) が返るまで再実行してください。
+電源操作の反映には時間を要することがあります。`read` でトップレベルの `InstanceStatus` が期待する状態 (`up`、`down`) が返るまで再実行してください。
 
 データベースを再起動する場合は `reset` を使います。再起動中もデータベースには接続できません。
 

@@ -41,7 +41,7 @@ api 層の操作を直接呼び出す理由は次のとおりです。
 
 ### create
 
-- `--request` は `@path.json` 形式または `-` (標準入力) のみを受け付けます。インラインの JSON は秘密情報を含み得るため拒否します。`--request` と個別フラグは併用できません。
+- `--request` は `@path.json` 形式または `-` (標準入力) のみを受け付けます。インラインの JSON は秘密情報を含み得るため拒否します。`--request` と個別フラグは併用できません。併用の検出は、Kong が明示的に指定されたときだけ値を設定するポインタ型のフラグで行います。明示的な false・空文字列も指定とみなします (service-endpoint-gateway-api に同じ規約)。
 - 個別フラグは次のとおりです。
 
 | フラグ | 内容 |
@@ -74,7 +74,7 @@ api 層の操作を直接呼び出す理由は次のとおりです。
 ### update
 
 - `--zone` と `--id` が必須で、更新内容は `--request` JSON (`@path.json` 形式または `-`) のみを受け付けます。
-- 送信した内容で設定が置き換わります。api 層の更新リクエストをそのまま送るため、既存の設定を維持したい項目は JSON に再指定してください。読み取った現在の設定 (read の出力) を基に JSON を組み立てるのが確実です。省略したトップレベルの項目は送信されません。
+- 送信した内容で設定が置き換わります。api 層の更新リクエストをそのまま送るため、既存の設定を維持したい項目は JSON に再指定してください。読み取った現在の設定 (read の出力) を基に JSON を組み立てるのが確実です。更新リクエストの空の `Name` は送信されませんが、`Description` と `Tags` は常に送信されます。ネストした設定 (`CommonSetting`、`BackupSetting`、`Backupv2Setting`、`ReplicationSetting`、`MonitoringSuite`) は nil のとき省略されます。
 - read の応答の `UserPassword` と `ReplicaPassword` はマスク済みの値で返ります。API はマスク済みの値を受け付けないため、設定を再指定する場合はパスワードに実値を指定してください。
 - 冗長化を有効にする変更など、一度の変更で複数の操作 (設定変更と反映) を行う場合、変更はデータベースの再起動を伴うことがあります。
 
@@ -87,7 +87,7 @@ api 層の操作を直接呼び出す理由は次のとおりです。
 
 - `monitor-cpu`、`monitor-disk`、`monitor-interface`、`monitor-database` は `--zone` と `--id` が必須で、期間を `--start` と `--end` (RFC3339) で指定できます。
 - `monitor-database` は未指定時に直近 1 時間の期間を秒精度で自動設定します (`SetMonitorDatabasePeriod`)。データベースのモニタリング API はナノ秒精度の時刻を受け付けないため、SDK 既定の `time.Now()` の値をそのまま送ると 400 エラーになります。`monitor-cpu` / `monitor-disk` / `monitor-interface` は SDK の既定値 (直近の期間) を使います。
-- `list-parameter` は設定パラメータの一覧を返します。パラメータの変更は update の JSON 経路で行います。
+- `list-parameter` は設定パラメータの一覧を返します。RDBMS 固有のパラメータの変更は、更新リクエスト (`DatabaseUpdateRequest`) に Parameters が含まれないため、この CLI の update では行えません。コントロールパネルで変更してください。
 
 ## 出力
 

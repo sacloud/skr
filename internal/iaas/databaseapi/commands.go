@@ -25,22 +25,204 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/helper/power"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/helper/wait"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/database"
 	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
 // databaseAPI は生成コマンドが使う API 実装です。
-// find/read などの薄い操作は SDK の Service に委譲します。
-// create/update は service 層の builder を経由させず、api 層の DatabaseOp を直接呼びます。
+// すべての操作で api 層の DatabaseOp を直接呼び出し、service 層は使いません。
+// 削除・起動・シャットダウンのワークフロー (強制終了と停止・起動待ち) もこの層で実装します。
 type databaseAPI struct {
-	*database.Service
 	op iaas.DatabaseAPI
 }
 
 // NewAPI は生成コマンドが使う API 実装を構築します。wiring の sdk_factory から呼ばれます。
 func NewAPI(caller iaas.APICaller) API {
-	return &databaseAPI{Service: database.New(caller), op: iaas.NewDatabaseOp(caller)}
+	return &databaseAPI{op: iaas.NewDatabaseOp(caller)}
+}
+
+// Find は api 層の DatabaseOp.Find を直接呼び出します。名前とタグの検索条件は
+// api 層の FindCondition に変換します。単一名の部分一致検索は Names の1要素に変換します。
+func (a *databaseAPI) FindWithContext(ctx context.Context, req *FindRequest) ([]*iaas.Database, error) {
+	condition := &iaas.FindCondition{
+		Filter: map[search.FilterKey]any{},
+	}
+	if len(req.Names) > 0 {
+		condition.Filter[search.Key("Name")] = search.AndEqual(req.Names...)
+	}
+	if len(req.Tags) > 0 {
+		condition.Filter[search.Key("Tags.Name")] = search.TagsAndEqual(req.Tags...)
+	}
+	condition.Sort = req.Sort
+	condition.Count = req.Count
+	condition.From = req.From
+	found, err := a.op.Find(ctx, req.Zone, condition)
+	if err != nil {
+		return nil, err
+	}
+	return found.Databases, nil
+}
+
+// Read は api 層の DatabaseOp.Read を直接呼び出します。
+func (a *databaseAPI) ReadWithContext(ctx context.Context, req *ReadRequest) (*iaas.Database, error) {
+	return a.op.Read(ctx, req.Zone, req.ID)
+}
+
+// Delete は削除のワークフローを含めて api 層の DatabaseOp を呼び出します。
+// 電源が起動中で Force が指定されていない場合はエラーにし、Force の場合は
+// 強制終了してから停止を待ち、その後削除します。FailIfNotFound を指定しない場合、
+// 対象が見つからないときはエラーにしません。
+func (a *databaseAPI) DeleteWithContext(ctx context.Context, req *DeleteRequest) error {
+	target, err := a.op.Read(ctx, req.Zone, req.ID)
+	if err != nil {
+		return handleNotFoundError(err, !req.FailIfNotFound)
+	}
+	if !req.Force && target.InstanceStatus.IsUp() {
+		return fmt.Errorf("target %s:%q has not yet shut down", req.Zone, req.ID)
+	}
+	if target.InstanceStatus.IsUp() {
+		if err := a.op.Shutdown(ctx, req.Zone, req.ID, &iaas.ShutdownOption{Force: true}); err != nil {
+			return err
+		}
+	}
+	// 元の状態が Unknown でなければ停止を待ちます
+	if target.InstanceStatus != types.ServerInstanceStatuses.Unknown {
+		if _, err := wait.UntilDatabaseIsDown(ctx, a.op, req.Zone, req.ID); err != nil {
+			return err
+		}
+	}
+	if err := a.op.Delete(ctx, req.Zone, req.ID); err != nil {
+		return handleNotFoundError(err, !req.FailIfNotFound)
+	}
+	return nil
+}
+
+// handleNotFoundError は対象が見つからない場合のエラーを、許可されているときは無視します。
+func handleNotFoundError(err error, ignore bool) error {
+	if ignore && iaas.IsNotFoundError(err) {
+		return nil
+	}
+	return err
+}
+
+// Boot は起動のワークフローを含めて api 層の DatabaseOp を呼び出します。
+// NoWait を指定しない場合は起動の完了を待ちます。
+func (a *databaseAPI) BootWithContext(ctx context.Context, req *BootRequest) error {
+	if req.NoWait {
+		return a.op.Boot(ctx, req.Zone, req.ID)
+	}
+	return power.BootDatabase(ctx, a.op, req.Zone, req.ID)
+}
+
+// Shutdown は停止のワークフローを含めて api 層の DatabaseOp を呼び出します。
+// NoWait を指定しない場合は停止の完了を待ちます。
+func (a *databaseAPI) ShutdownWithContext(ctx context.Context, req *ShutdownRequest) error {
+	if req.NoWait {
+		return a.op.Shutdown(ctx, req.Zone, req.ID, &iaas.ShutdownOption{Force: req.ForceShutdown})
+	}
+	return power.ShutdownDatabase(ctx, a.op, req.Zone, req.ID, req.ForceShutdown)
+}
+
+// Reset は api 層の DatabaseOp.Reset を直接呼び出します。
+func (a *databaseAPI) ResetWithContext(ctx context.Context, req *ResetRequest) error {
+	return a.op.Reset(ctx, req.Zone, req.ID)
+}
+
+// MonitorCPU は api 層の DatabaseOp.MonitorCPU を直接呼び出します。
+func (a *databaseAPI) MonitorCPUWithContext(ctx context.Context, req *MonitorCPURequest) ([]*iaas.MonitorCPUTimeValue, error) {
+	condition, err := monitorCondition(req.Start, req.End)
+	if err != nil {
+		return nil, err
+	}
+	values, err := a.op.MonitorCPU(ctx, req.Zone, req.ID, condition)
+	if err != nil {
+		return nil, err
+	}
+	return values.Values, nil
+}
+
+// MonitorDisk は api 層の DatabaseOp.MonitorDisk を直接呼び出します。
+func (a *databaseAPI) MonitorDiskWithContext(ctx context.Context, req *MonitorDiskRequest) ([]*iaas.MonitorDiskValue, error) {
+	condition, err := monitorCondition(req.Start, req.End)
+	if err != nil {
+		return nil, err
+	}
+	values, err := a.op.MonitorDisk(ctx, req.Zone, req.ID, condition)
+	if err != nil {
+		return nil, err
+	}
+	return values.Values, nil
+}
+
+// MonitorInterface は api 層の DatabaseOp.MonitorInterface を直接呼び出します。
+func (a *databaseAPI) MonitorInterfaceWithContext(ctx context.Context, req *MonitorInterfaceRequest) ([]*iaas.MonitorInterfaceValue, error) {
+	condition, err := monitorCondition(req.Start, req.End)
+	if err != nil {
+		return nil, err
+	}
+	values, err := a.op.MonitorInterface(ctx, req.Zone, req.ID, condition)
+	if err != nil {
+		return nil, err
+	}
+	return values.Values, nil
+}
+
+// MonitorDatabase は api 層の DatabaseOp.MonitorDatabase を直接呼び出します。
+func (a *databaseAPI) MonitorDatabaseWithContext(ctx context.Context, req *MonitorDatabaseRequest) ([]*iaas.MonitorDatabaseValue, error) {
+	condition, err := monitorCondition(req.Start, req.End)
+	if err != nil {
+		return nil, err
+	}
+	values, err := a.op.MonitorDatabase(ctx, req.Zone, req.ID, condition)
+	if err != nil {
+		return nil, err
+	}
+	return values.Values, nil
+}
+
+// monitorCondition は取得期間の未指定値を既定に補完し、開始と終了の整合を検証します。
+// 終了の未指定は現在時刻、開始の未指定は終了の 1 時間前です。
+func monitorCondition(start, end time.Time) (*iaas.MonitorCondition, error) {
+	e := end
+	if e.IsZero() {
+		e = time.Now()
+	}
+	s := start
+	if s.IsZero() {
+		s = e.Add(-1 * time.Hour)
+	}
+	if !(s.Unix() <= e.Unix()) {
+		return nil, fmt.Errorf("start(%s) or end(%s) is invalid", start.String(), end.String())
+	}
+	return &iaas.MonitorCondition{Start: s, End: e}, nil
+}
+
+// ListParameter は api 層の DatabaseOp.GetParameter を直接呼び出し、
+// パラメータのメタ情報と現在の設定値を対応付けて返します。
+func (a *databaseAPI) ListParameterWithContext(ctx context.Context, req *ListParameterRequest) ([]*Parameter, error) {
+	parameters, err := a.op.GetParameter(ctx, req.Zone, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	var results []*Parameter
+	for _, p := range parameters.MetaInfo {
+		var setting any
+		for k, v := range parameters.Settings {
+			if p.Name == k {
+				setting = v
+				break
+			}
+		}
+		results = append(results, &Parameter{
+			Key:   p.Label,
+			Value: setting,
+			Meta:  p,
+		})
+	}
+	return results, nil
 }
 
 // Create は api 層の DatabaseOp を直接呼びます。起動の完了待ちなどのワークフローは
@@ -63,42 +245,42 @@ type CreateCommand struct {
 	Request *string `help:"API リクエスト JSON を @path.json または - (標準入力) で指定します。個別フラグと併用できません。パスワードを含むため、JSON を直接書く方法は使えません。必須: Zone、Name、PlanID、SwitchID、IPAddresses、NetworkMaskLen、DatabaseType、Username、Password。任意: Description、Tags、IconID、DefaultRoute、Port、SourceNetwork、EnableReplication、ReplicaUserPassword、EnableWebUI、EnableBackup、BackupWeekdays、BackupStartTimeHour、BackupStartTimeMinute、EnableBackupv2、Backupv2Weekdays、Backupv2StartTimeHour、Backupv2StartTimeMinute、Backupv2Connect、EnableMonitoringSuite、DiskEncryptionAlgorithm、DiskEncryptionKMSKey。RDBMS 固有のパラメータは Parameters で指定します。起動の完了は待ちません。"`
 
 	Zone        string   `name:"zone" help:"必須: 作成先ゾーン名。例: --zone tk1v"`
-	Name        string   `name:"name" help:"必須: データベースアプライアンスの名前。"`
-	Description string   `name:"description" help:"任意: 説明 (最大512文字)。"`
+	Name        *string  `name:"name" help:"必須: データベースアプライアンスの名前。"`
+	Description *string  `name:"description" help:"任意: 説明 (最大512文字)。"`
 	Tags        []string `name:"tags" sep:"," help:"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。"`
-	IconID      int64    `name:"icon-id" help:"任意: アイコンの ID (数値)。"`
-	PlanID      int64    `name:"plan-id" help:"必須: データベースプランの ID (数値)。10: 10GB (1core-2gb)、30: 30GB (2core-4gb)、90: 90GB (4core-8gb)、240: 240GB (8core-16gb)、500: 500GB、1000: 1TB。例: --plan-id 10"`
-	SwitchID    int64    `name:"switch-id" help:"必須: 接続先スイッチの ID (数値)。スイッチ単体が対象で、ルータ＋スイッチでは利用できません。iaas-api switch list で確認できます。"`
+	IconID      *int64   `name:"icon-id" help:"任意: アイコンの ID (数値)。"`
+	PlanID      *int64   `name:"plan-id" help:"必須: データベースプランの ID (数値)。10: 10GB (1core-2gb)、30: 30GB (2core-4gb)、90: 90GB (4core-8gb)、240: 240GB (8core-16gb)、500: 500GB、1000: 1TB。例: --plan-id 10"`
+	SwitchID    *int64   `name:"switch-id" help:"必須: 接続先スイッチの ID (数値)。スイッチ単体が対象で、ルータ＋スイッチでは利用できません。iaas-api switch list で確認できます。"`
 
 	IPAddresses    []string `name:"ip-address" help:"必須: データベースアプライアンスに割り当てる IPv4 アドレス。1個または2個 (レプリケーション時) 指定します。例: --ip-address 192.168.0.11"`
-	NetworkMaskLen int      `name:"network-mask-len" help:"必須: ネットワークのサブネットマスク長。1 から 32 の整数。例: 24"`
-	DefaultRoute   string   `name:"default-route" help:"任意: デフォルトルート (IPv4 アドレス)。"`
-	Port           int      `name:"port" help:"任意: 接続用ポート番号。省略すると RDBMS の既定ポートを使います。1 から 65535 の整数。"`
+	NetworkMaskLen *int     `name:"network-mask-len" help:"必須: ネットワークのサブネットマスク長。1 から 32 の整数。例: 24"`
+	DefaultRoute   *string  `name:"default-route" help:"任意: デフォルトルート (IPv4 アドレス)。"`
+	Port           *int     `name:"port" help:"任意: 接続用ポート番号。省略すると RDBMS の既定ポートを使います。1 から 65535 の整数。"`
 	SourceNetwork  []string `name:"source-network" help:"任意: 接続を許可する送信元ネットワーク (CIDR 形式の IPv4)。例: --source-network 192.168.0.0/24"`
 
-	DatabaseType    string  `name:"database-type" help:"必須: RDBMS の種別。mariadb または postgres。"`
-	DatabaseVersion string  `name:"database-version" help:"任意: RDBMS のバージョン。省略時は提供中の既定バージョンになります。"`
-	Username        string  `name:"username" help:"必須: 既定ユーザーのユーザー名。"`
+	DatabaseType    *string `name:"database-type" help:"必須: RDBMS の種別。mariadb または postgres。"`
+	DatabaseVersion *string `name:"database-version" help:"任意: RDBMS のバージョン。省略時は提供中の既定バージョンになります。"`
+	Username        *string `name:"username" help:"必須: 既定ユーザーのユーザー名。"`
 	Password        *string `name:"password" help:"必須: 既定ユーザーのパスワード。@path でファイルから、- で標準入力から読み込みます。インライン値は指定できません。"`
 
-	EnableReplication   bool    `name:"enable-replication" help:"任意: レプリケーションを有効にします。有効時は --replica-user-password が必要で、--ip-address を2個指定します。"`
+	EnableReplication   *bool   `name:"enable-replication" help:"任意: レプリケーションを有効にします。有効時は --replica-user-password が必要で、--ip-address を2個指定します。"`
 	ReplicaUserPassword *string `name:"replica-user-password" help:"レプリケーション有効時に必須: レプリケーションユーザーのパスワード。@path でファイルから、- で標準入力から読み込みます。インライン値は指定できません。"`
-	EnableWebUI         bool    `name:"enable-web-ui" help:"任意: Web UI (Admin UI) を有効にします。"`
+	EnableWebUI         *bool   `name:"enable-web-ui" help:"任意: Web UI (Admin UI) を有効にします。"`
 
-	EnableBackup          bool     `name:"enable-backup" help:"任意: バックアップを有効にします。有効時は --backup-weekday の指定を推奨します。"`
+	EnableBackup          *bool    `name:"enable-backup" help:"任意: バックアップを有効にします。有効時は --backup-weekday の指定を推奨します。"`
 	BackupWeekdays        []string `name:"backup-weekday" sep:"," help:"任意: バックアップ取得日 (sun, mon, tue, wed, thu, fri, sat)。カンマ区切りで指定します。例: --backup-weekday mon,tue"`
-	BackupStartTimeHour   int      `name:"backup-start-time-hour" help:"任意: バックアップ開始時刻の時 (0-23)。分は 15 分単位です。"`
-	BackupStartTimeMinute int      `name:"backup-start-time-minute" help:"任意: バックアップ開始時刻の分 (0, 15, 30, 45)。"`
+	BackupStartTimeHour   *int     `name:"backup-start-time-hour" help:"任意: バックアップ開始時刻の時 (0-23)。分は 15 分単位です。"`
+	BackupStartTimeMinute *int     `name:"backup-start-time-minute" help:"任意: バックアップ開始時刻の分 (0, 15, 30, 45)。"`
 
-	EnableBackupv2          bool     `name:"enable-backup-v2" help:"任意: Backup v2 を有効にします。有効時は --backup-v2-weekday と --backup-v2-connect が必要です。"`
+	EnableBackupv2          *bool    `name:"enable-backup-v2" help:"任意: Backup v2 を有効にします。有効時は --backup-v2-weekday と --backup-v2-connect が必要です。"`
 	Backupv2Weekdays        []string `name:"backup-v2-weekday" sep:"," help:"Backup v2 有効時に必須: バックアップ取得日 (sun, mon, tue, wed, thu, fri, sat)。カンマ区切りで指定します。"`
-	Backupv2StartTimeHour   int      `name:"backup-v2-start-time-hour" help:"任意: Backup v2 開始時刻の時 (0-23)。"`
-	Backupv2StartTimeMinute int      `name:"backup-v2-start-time-minute" help:"任意: Backup v2 開始時刻の分 (0, 15, 30, 45)。"`
-	Backupv2Connect         string   `name:"backup-v2-connect" help:"Backup v2 有効時に必須: バックアップの接続方式。"`
+	Backupv2StartTimeHour   *int     `name:"backup-v2-start-time-hour" help:"任意: Backup v2 開始時刻の時 (0-23)。"`
+	Backupv2StartTimeMinute *int     `name:"backup-v2-start-time-minute" help:"任意: Backup v2 開始時刻の分 (0, 15, 30, 45)。"`
+	Backupv2Connect         *string  `name:"backup-v2-connect" help:"Backup v2 有効時に必須: バックアップの接続方式。"`
 
-	EnableMonitoringSuite   bool   `name:"enable-monitoring-suite" help:"任意: モニタリングスイート連携を有効にします (有償オプション)。"`
-	DiskEncryptionAlgorithm string `name:"disk-encryption-algorithm" help:"任意: ディスク暗号化のアルゴリズム。aes256_xts。KMS 鍵とともに指定します。"`
-	DiskEncryptionKMSKey    int64  `name:"disk-encryption-kms-key" help:"任意: 暗号化に使う KMS 鍵の ID (数値)。--disk-encryption-algorithm とともに指定します。"`
+	EnableMonitoringSuite   *bool   `name:"enable-monitoring-suite" help:"任意: モニタリングスイート連携を有効にします (有償オプション)。"`
+	DiskEncryptionAlgorithm *string `name:"disk-encryption-algorithm" help:"任意: ディスク暗号化のアルゴリズム。aes256_xts。KMS 鍵とともに指定します。"`
+	DiskEncryptionKMSKey    *int64  `name:"disk-encryption-kms-key" help:"任意: 暗号化に使う KMS 鍵の ID (数値)。--disk-encryption-algorithm とともに指定します。"`
 
 	factory APIFactory
 	runtime Runtime
@@ -122,8 +304,17 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 		if *c.Request != "-" && (len(*c.Request) == 0 || (*c.Request)[0] != '@') {
 			return fmt.Errorf("--request には @path.json または - (標準入力) を指定してください")
 		}
+		input := *c.Request
+		if input == "-" {
+			// 標準入力から JSON を読み込みます
+			data, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return fmt.Errorf("--request の標準入力読み込みに失敗しました: %w", err)
+			}
+			input = string(data)
+		}
 		request = &iaas.DatabaseCreateRequest{}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
+		if err := c.runtime.DecodeRequest(input, request); err != nil {
 			return err
 		}
 	} else {
@@ -153,49 +344,51 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	return c.runtime.WriteOutput(ctx, result)
 }
 
-// flagsSet は個別フラグが1つでも指定されたかを返します。
+// flagsSet は個別フラグが1つでも明示的に指定されたかを返します。
+// フラグはポインタ型で、Kong は明示的に指定されたときだけ値を設定するため、
+// false・0・空文字列の明示も検出できます。
 func (c *CreateCommand) flagsSet() bool {
-	return c.Name != "" ||
-		c.Description != "" ||
+	return c.Name != nil ||
+		c.Description != nil ||
 		len(c.Tags) != 0 ||
-		c.IconID != 0 ||
-		c.PlanID != 0 ||
-		c.SwitchID != 0 ||
+		c.IconID != nil ||
+		c.PlanID != nil ||
+		c.SwitchID != nil ||
 		len(c.IPAddresses) != 0 ||
-		c.NetworkMaskLen != 0 ||
-		c.DefaultRoute != "" ||
-		c.Port != 0 ||
+		c.NetworkMaskLen != nil ||
+		c.DefaultRoute != nil ||
+		c.Port != nil ||
 		len(c.SourceNetwork) != 0 ||
-		c.DatabaseType != "" ||
-		c.DatabaseVersion != "" ||
-		c.Username != "" ||
+		c.DatabaseType != nil ||
+		c.DatabaseVersion != nil ||
+		c.Username != nil ||
 		c.Password != nil ||
-		c.EnableReplication ||
+		c.EnableReplication != nil ||
 		c.ReplicaUserPassword != nil ||
-		c.EnableWebUI ||
-		c.EnableBackup ||
+		c.EnableWebUI != nil ||
+		c.EnableBackup != nil ||
 		len(c.BackupWeekdays) != 0 ||
-		c.BackupStartTimeHour != 0 ||
-		c.BackupStartTimeMinute != 0 ||
-		c.EnableBackupv2 ||
+		c.BackupStartTimeHour != nil ||
+		c.BackupStartTimeMinute != nil ||
+		c.EnableBackupv2 != nil ||
 		len(c.Backupv2Weekdays) != 0 ||
-		c.Backupv2StartTimeHour != 0 ||
-		c.Backupv2StartTimeMinute != 0 ||
-		c.Backupv2Connect != "" ||
-		c.EnableMonitoringSuite ||
-		c.DiskEncryptionAlgorithm != "" ||
-		c.DiskEncryptionKMSKey != 0
+		c.Backupv2StartTimeHour != nil ||
+		c.Backupv2StartTimeMinute != nil ||
+		c.Backupv2Connect != nil ||
+		c.EnableMonitoringSuite != nil ||
+		c.DiskEncryptionAlgorithm != nil ||
+		c.DiskEncryptionKMSKey != nil
 }
 
 // buildRequest は個別フラグから API の作成リクエストを組み立て、必須項目と制約を検証します。
 func (c *CreateCommand) buildRequest(stdin io.Reader) (*iaas.DatabaseCreateRequest, error) {
-	if c.Name == "" {
+	if c.Name == nil {
 		return nil, fmt.Errorf("--name が必要です")
 	}
-	if c.PlanID == 0 {
+	if c.PlanID == nil {
 		return nil, fmt.Errorf("--plan-id が必要です")
 	}
-	if c.SwitchID == 0 {
+	if c.SwitchID == nil {
 		return nil, fmt.Errorf("--switch-id が必要です")
 	}
 	if len(c.IPAddresses) == 0 {
@@ -210,19 +403,19 @@ func (c *CreateCommand) buildRequest(stdin io.Reader) (*iaas.DatabaseCreateReque
 			return nil, fmt.Errorf("--ip-address の %d 個目は IPv4 アドレスで指定してください: %s", i+1, ip)
 		}
 	}
-	if c.NetworkMaskLen == 0 {
+	if c.NetworkMaskLen == nil {
 		return nil, fmt.Errorf("--network-mask-len が必要です")
 	}
-	if c.NetworkMaskLen < 1 || c.NetworkMaskLen > 32 {
+	if *c.NetworkMaskLen < 1 || *c.NetworkMaskLen > 32 {
 		return nil, fmt.Errorf("--network-mask-len は 1 から 32 の範囲で指定してください")
 	}
-	if c.DatabaseType == "" {
+	if c.DatabaseType == nil {
 		return nil, fmt.Errorf("--database-type が必要です")
 	}
-	if typ := types.RDBMSTypeFromString(c.DatabaseType); typ != types.RDBMSTypesMariaDB && typ != types.RDBMSTypesPostgreSQL {
+	if typ := types.RDBMSTypeFromString(*c.DatabaseType); typ != types.RDBMSTypesMariaDB && typ != types.RDBMSTypesPostgreSQL {
 		return nil, fmt.Errorf("--database-type は mariadb または postgres で指定してください")
 	}
-	if c.Username == "" {
+	if c.Username == nil {
 		return nil, fmt.Errorf("--username が必要です")
 	}
 	if c.Password == nil {
@@ -235,21 +428,21 @@ func (c *CreateCommand) buildRequest(stdin io.Reader) (*iaas.DatabaseCreateReque
 	if strings.TrimSpace(password) == "" {
 		return nil, fmt.Errorf("--password が空です")
 	}
-	if c.Port < 0 || c.Port > 65535 {
+	if port := derefValue(c.Port); port < 0 || port > 65535 {
 		return nil, fmt.Errorf("--port は 1 から 65535 の範囲で指定してください")
 	}
 	backupWeekdays, err := parseWeekdays(c.BackupWeekdays, "--backup-weekday")
 	if err != nil {
 		return nil, err
 	}
-	if c.BackupStartTimeHour < 0 || c.BackupStartTimeHour > 23 {
+	if hour := derefValue(c.BackupStartTimeHour); hour < 0 || hour > 23 {
 		return nil, fmt.Errorf("--backup-start-time-hour は 0 から 23 の範囲で指定してください")
 	}
-	if c.BackupStartTimeMinute != 0 && c.BackupStartTimeMinute != 15 && c.BackupStartTimeMinute != 30 && c.BackupStartTimeMinute != 45 {
+	if minute := derefValue(c.BackupStartTimeMinute); minute != 0 && minute != 15 && minute != 30 && minute != 45 {
 		return nil, fmt.Errorf("--backup-start-time-minute は 0, 15, 30, 45 のいずれかで指定してください")
 	}
 	replicaPassword := ""
-	if c.EnableReplication {
+	if derefValue(c.EnableReplication) {
 		if c.ReplicaUserPassword == nil {
 			return nil, fmt.Errorf("--enable-replication を指定した場合は --replica-user-password が必要です")
 		}
@@ -267,28 +460,28 @@ func (c *CreateCommand) buildRequest(stdin io.Reader) (*iaas.DatabaseCreateReque
 	if err != nil {
 		return nil, err
 	}
-	if c.Backupv2StartTimeHour < 0 || c.Backupv2StartTimeHour > 23 {
+	if hour := derefValue(c.Backupv2StartTimeHour); hour < 0 || hour > 23 {
 		return nil, fmt.Errorf("--backup-v2-start-time-hour は 0 から 23 の範囲で指定してください")
 	}
-	if c.Backupv2StartTimeMinute != 0 && c.Backupv2StartTimeMinute != 15 && c.Backupv2StartTimeMinute != 30 && c.Backupv2StartTimeMinute != 45 {
+	if minute := derefValue(c.Backupv2StartTimeMinute); minute != 0 && minute != 15 && minute != 30 && minute != 45 {
 		return nil, fmt.Errorf("--backup-v2-start-time-minute は 0, 15, 30, 45 のいずれかで指定してください")
 	}
-	if c.EnableBackupv2 {
+	if derefValue(c.EnableBackupv2) {
 		if len(backupv2Weekdays) == 0 {
 			return nil, fmt.Errorf("--enable-backup-v2 を指定した場合は --backup-v2-weekday が必要です")
 		}
-		if c.Backupv2Connect == "" {
+		if c.Backupv2Connect == nil {
 			return nil, fmt.Errorf("--enable-backup-v2 を指定した場合は --backup-v2-connect が必要です")
 		}
 	}
 	// ディスク暗号化はアルゴリズムと KMS 鍵の両方が必要です
-	if (c.DiskEncryptionAlgorithm != "") != (c.DiskEncryptionKMSKey != 0) {
+	if (c.DiskEncryptionAlgorithm != nil) != (c.DiskEncryptionKMSKey != nil) {
 		return nil, fmt.Errorf("--disk-encryption-algorithm と --disk-encryption-kms-key は両方指定してください")
 	}
 	// API のディスク暗号化アルゴリズムは aes256_xts です。対応する値だけを受け付けます
 	var encryptionAlgorithm types.EDiskEncryptionAlgorithm
-	if c.DiskEncryptionAlgorithm != "" {
-		algorithm, ok := types.DiskEncryptionAlgorithmMap[c.DiskEncryptionAlgorithm]
+	if c.DiskEncryptionAlgorithm != nil {
+		algorithm, ok := types.DiskEncryptionAlgorithmMap[*c.DiskEncryptionAlgorithm]
 		if !ok || algorithm != types.DiskEncryptionAlgorithms.AES256XTS {
 			return nil, fmt.Errorf("--disk-encryption-algorithm は aes256_xts で指定してください")
 		}
@@ -298,57 +491,57 @@ func (c *CreateCommand) buildRequest(stdin io.Reader) (*iaas.DatabaseCreateReque
 	// 以下は API のリクエストフィールドへの対応です。RDBMS の種別は Conf.DatabaseName、
 	// ユーザー名とパスワードは CommonSetting の既定ユーザー (DefaultUser/UserPassword) に対応します。
 	commonSetting := &iaas.DatabaseSettingCommon{
-		WebUI:         types.ToWebUI(c.EnableWebUI),
-		ServicePort:   c.Port,
+		WebUI:         types.ToWebUI(derefValue(c.EnableWebUI)),
+		ServicePort:   derefValue(c.Port),
 		SourceNetwork: c.SourceNetwork,
-		DefaultUser:   c.Username,
+		DefaultUser:   *c.Username,
 		UserPassword:  password,
 	}
-	if c.EnableReplication {
+	if derefValue(c.EnableReplication) {
 		commonSetting.ReplicaUser = "replica"
 		commonSetting.ReplicaPassword = replicaPassword
 	}
 	request := &iaas.DatabaseCreateRequest{
-		Name:           c.Name,
-		Description:    c.Description,
+		Name:           *c.Name,
+		Description:    derefValue(c.Description),
 		Tags:           types.Tags(c.Tags),
-		IconID:         types.ID(c.IconID),
-		PlanID:         types.ID(c.PlanID),
-		SwitchID:       types.ID(c.SwitchID),
+		IconID:         types.ID(derefValue(c.IconID)),
+		PlanID:         types.ID(*c.PlanID),
+		SwitchID:       types.ID(*c.SwitchID),
 		IPAddresses:    c.IPAddresses,
-		NetworkMaskLen: c.NetworkMaskLen,
-		DefaultRoute:   c.DefaultRoute,
+		NetworkMaskLen: *c.NetworkMaskLen,
+		DefaultRoute:   derefValue(c.DefaultRoute),
 		Conf: &iaas.DatabaseRemarkDBConfCommon{
-			DatabaseName:    types.RDBMSTypeFromString(c.DatabaseType).String(),
-			DatabaseVersion: c.DatabaseVersion,
+			DatabaseName:    types.RDBMSTypeFromString(*c.DatabaseType).String(),
+			DatabaseVersion: derefValue(c.DatabaseVersion),
 		},
 		CommonSetting:   commonSetting,
-		MonitoringSuite: &iaas.MonitoringSuite{Enabled: c.EnableMonitoringSuite},
+		MonitoringSuite: &iaas.MonitoringSuite{Enabled: derefValue(c.EnableMonitoringSuite)},
 	}
-	if c.EnableBackup {
+	if derefValue(c.EnableBackup) {
 		request.BackupSetting = &iaas.DatabaseSettingBackup{
-			Time:      fmt.Sprintf("%02d:%02d", c.BackupStartTimeHour, c.BackupStartTimeMinute),
+			Time:      fmt.Sprintf("%02d:%02d", *c.BackupStartTimeHour, *c.BackupStartTimeMinute),
 			DayOfWeek: backupWeekdays,
 			Rotate:    8,
 		}
 	}
-	if c.EnableBackupv2 {
+	if derefValue(c.EnableBackupv2) {
 		request.Backupv2Setting = &iaas.DatabaseSettingBackupv2{
-			Time:      fmt.Sprintf("%02d:%02d", c.Backupv2StartTimeHour, c.Backupv2StartTimeMinute),
+			Time:      fmt.Sprintf("%02d:%02d", *c.Backupv2StartTimeHour, *c.Backupv2StartTimeMinute),
 			DayOfWeek: backupv2Weekdays,
-			Connect:   c.Backupv2Connect,
+			Connect:   *c.Backupv2Connect,
 			Rotate:    8,
 		}
 	}
-	if c.EnableReplication {
+	if derefValue(c.EnableReplication) {
 		request.ReplicationSetting = &iaas.DatabaseReplicationSetting{
 			Model: types.DatabaseReplicationModels.MasterSlave,
 		}
 	}
-	if c.DiskEncryptionAlgorithm != "" && c.DiskEncryptionKMSKey != 0 {
+	if c.DiskEncryptionAlgorithm != nil && c.DiskEncryptionKMSKey != nil {
 		request.Disk = &iaas.DatabaseDisk{
 			EncryptionAlgorithm: encryptionAlgorithm,
-			EncryptionKeyID:     types.ID(c.DiskEncryptionKMSKey),
+			EncryptionKeyID:     types.ID(*c.DiskEncryptionKMSKey),
 		}
 	}
 	return request, nil
@@ -394,8 +587,17 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if c.runtime.DecodeRequest == nil {
 		return fmt.Errorf("API リクエスト処理が設定されていません")
 	}
+	input := *c.Request
+	if input == "-" {
+		// 標準入力から JSON を読み込みます
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("--request の標準入力読み込みに失敗しました: %w", err)
+		}
+		input = string(data)
+	}
 	request := &iaas.DatabaseUpdateRequest{}
-	if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
+	if err := c.runtime.DecodeRequest(input, request); err != nil {
 		return err
 	}
 	if c.runtime.ValidateOutput == nil {
@@ -438,8 +640,8 @@ func parseWeekdays(input []string, flag string) ([]types.EDayOfTheWeek, error) {
 
 // SetMonitorDatabasePeriod は取得期間が未指定の場合に、秒精度の既定期間 (直近 1 時間) を設定します。
 // データベースのモニタリング API はナノ秒精度の時刻を受け付けないため、
-// 未指定時に SDK が設定する time.Now() の値を秒精度に丸めます。
-func SetMonitorDatabasePeriod(request *database.MonitorDatabaseRequest) error {
+// 未指定時に設定する現在時刻の値を秒精度に丸めます。
+func SetMonitorDatabasePeriod(request *MonitorDatabaseRequest) error {
 	if request.End.IsZero() {
 		request.End = time.Now().Truncate(time.Second)
 	}
@@ -447,6 +649,16 @@ func SetMonitorDatabasePeriod(request *database.MonitorDatabaseRequest) error {
 		request.Start = request.End.Add(-1 * time.Hour)
 	}
 	return nil
+}
+
+// derefValue は nil のときにゼロ値を返します。省略したフラグをリクエストに
+// 展開するときに使います。
+func derefValue[T any](v *T) T {
+	if v == nil {
+		var zero T
+		return zero
+	}
+	return *v
 }
 
 // readSecret は秘密情報を @path または標準入力から読み込みます。

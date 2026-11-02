@@ -11,7 +11,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	database "github.com/sacloud/sacloud-sdk-go/service/iaas/database"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -32,19 +31,19 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *database.FindRequest) ([]*iaas.Database, error)
-	ReadWithContext(context.Context, *database.ReadRequest) (*iaas.Database, error)
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.Database, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.Database, error)
 	Create(context.Context, string, *iaas.DatabaseCreateRequest) (*iaas.Database, error)
 	Update(context.Context, string, types.ID, *iaas.DatabaseUpdateRequest) (*iaas.Database, error)
-	DeleteWithContext(context.Context, *database.DeleteRequest) error
-	BootWithContext(context.Context, *database.BootRequest) error
-	ShutdownWithContext(context.Context, *database.ShutdownRequest) error
-	ResetWithContext(context.Context, *database.ResetRequest) error
-	MonitorCPUWithContext(context.Context, *database.MonitorCPURequest) ([]*iaas.MonitorCPUTimeValue, error)
-	MonitorDiskWithContext(context.Context, *database.MonitorDiskRequest) ([]*iaas.MonitorDiskValue, error)
-	MonitorInterfaceWithContext(context.Context, *database.MonitorInterfaceRequest) ([]*iaas.MonitorInterfaceValue, error)
-	MonitorDatabaseWithContext(context.Context, *database.MonitorDatabaseRequest) ([]*iaas.MonitorDatabaseValue, error)
-	ListParameterWithContext(context.Context, *database.ListParameterRequest) ([]*database.Parameter, error)
+	DeleteWithContext(context.Context, *DeleteRequest) error
+	BootWithContext(context.Context, *BootRequest) error
+	ShutdownWithContext(context.Context, *ShutdownRequest) error
+	ResetWithContext(context.Context, *ResetRequest) error
+	MonitorCPUWithContext(context.Context, *MonitorCPURequest) ([]*iaas.MonitorCPUTimeValue, error)
+	MonitorDiskWithContext(context.Context, *MonitorDiskRequest) ([]*iaas.MonitorDiskValue, error)
+	MonitorInterfaceWithContext(context.Context, *MonitorInterfaceRequest) ([]*iaas.MonitorInterfaceValue, error)
+	MonitorDatabaseWithContext(context.Context, *MonitorDatabaseRequest) ([]*iaas.MonitorDatabaseValue, error)
+	ListParameterWithContext(context.Context, *ListParameterRequest) ([]*Parameter, error)
 }
 
 type APIFactory func() (API, error)
@@ -107,7 +106,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -180,7 +179,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -251,7 +250,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.DeleteRequest{}
+	request := &DeleteRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -313,7 +312,7 @@ func (c *BootCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.BootRequest{}
+	request := &BootRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -374,7 +373,7 @@ func (c *ShutdownCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.ShutdownRequest{}
+	request := &ShutdownRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -434,7 +433,7 @@ func (c *ResetCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.ResetRequest{}
+	request := &ResetRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -492,7 +491,7 @@ func (c *MonitorCPUCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.MonitorCPURequest{}
+	request := &MonitorCPURequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -569,7 +568,7 @@ func (c *MonitorDiskCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.MonitorDiskRequest{}
+	request := &MonitorDiskRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -646,7 +645,7 @@ func (c *MonitorInterfaceCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.MonitorInterfaceRequest{}
+	request := &MonitorInterfaceRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -723,7 +722,7 @@ func (c *MonitorDatabaseCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.MonitorDatabaseRequest{}
+	request := &MonitorDatabaseRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -799,7 +798,7 @@ func (c *ListParameterCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &database.ListParameterRequest{}
+	request := &ListParameterRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

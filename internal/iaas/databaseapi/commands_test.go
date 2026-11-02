@@ -28,7 +28,6 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/database"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,18 +38,18 @@ type fakeDatabaseAPI struct {
 	createErr     error
 	readDatabase  *iaas.Database
 	readErr       error
-	readRequests  []*database.ReadRequest
+	readRequests  []*ReadRequest
 	updateZone    string
 	updateID      types.ID
 	updateRequest *iaas.DatabaseUpdateRequest
 	updateErr     error
 }
 
-func (f *fakeDatabaseAPI) FindWithContext(context.Context, *database.FindRequest) ([]*iaas.Database, error) {
+func (f *fakeDatabaseAPI) FindWithContext(context.Context, *FindRequest) ([]*iaas.Database, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) ReadWithContext(_ context.Context, request *database.ReadRequest) (*iaas.Database, error) {
+func (f *fakeDatabaseAPI) ReadWithContext(_ context.Context, request *ReadRequest) (*iaas.Database, error) {
 	f.readRequests = append(f.readRequests, request)
 	if f.readErr != nil {
 		return nil, f.readErr
@@ -77,39 +76,39 @@ func (f *fakeDatabaseAPI) Update(_ context.Context, zone string, id types.ID, re
 	return &iaas.Database{ID: 123, Name: "db-01"}, nil
 }
 
-func (f *fakeDatabaseAPI) DeleteWithContext(context.Context, *database.DeleteRequest) error {
+func (f *fakeDatabaseAPI) DeleteWithContext(context.Context, *DeleteRequest) error {
 	return errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) BootWithContext(context.Context, *database.BootRequest) error {
+func (f *fakeDatabaseAPI) BootWithContext(context.Context, *BootRequest) error {
 	return errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) ShutdownWithContext(context.Context, *database.ShutdownRequest) error {
+func (f *fakeDatabaseAPI) ShutdownWithContext(context.Context, *ShutdownRequest) error {
 	return errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) ResetWithContext(context.Context, *database.ResetRequest) error {
+func (f *fakeDatabaseAPI) ResetWithContext(context.Context, *ResetRequest) error {
 	return errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) MonitorCPUWithContext(context.Context, *database.MonitorCPURequest) ([]*iaas.MonitorCPUTimeValue, error) {
+func (f *fakeDatabaseAPI) MonitorCPUWithContext(context.Context, *MonitorCPURequest) ([]*iaas.MonitorCPUTimeValue, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) MonitorDiskWithContext(context.Context, *database.MonitorDiskRequest) ([]*iaas.MonitorDiskValue, error) {
+func (f *fakeDatabaseAPI) MonitorDiskWithContext(context.Context, *MonitorDiskRequest) ([]*iaas.MonitorDiskValue, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) MonitorInterfaceWithContext(context.Context, *database.MonitorInterfaceRequest) ([]*iaas.MonitorInterfaceValue, error) {
+func (f *fakeDatabaseAPI) MonitorInterfaceWithContext(context.Context, *MonitorInterfaceRequest) ([]*iaas.MonitorInterfaceValue, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) MonitorDatabaseWithContext(context.Context, *database.MonitorDatabaseRequest) ([]*iaas.MonitorDatabaseValue, error) {
+func (f *fakeDatabaseAPI) MonitorDatabaseWithContext(context.Context, *MonitorDatabaseRequest) ([]*iaas.MonitorDatabaseValue, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (f *fakeDatabaseAPI) ListParameterWithContext(context.Context, *database.ListParameterRequest) ([]*database.Parameter, error) {
+func (f *fakeDatabaseAPI) ListParameterWithContext(context.Context, *ListParameterRequest) ([]*Parameter, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -315,6 +314,30 @@ func TestDatabaseCreateCommandRequestJSON(t *testing.T) {
 		require.Equal(t, "json-password", request.CommonSetting.UserPassword)
 	})
 
+	t.Run("accepts request from standard input", func(t *testing.T) {
+		fake := &fakeDatabaseAPI{}
+		command := &CreateCommand{
+			factory: func() (API, error) { return fake, nil },
+			runtime: testRuntime(),
+		}
+		// 標準入力を差し替えて JSON を渡します
+		r, w, err := os.Pipe()
+		require.NoError(t, err)
+		_, err = w.WriteString(requestJSON)
+		require.NoError(t, err)
+		require.NoError(t, w.Close())
+		oldStdin := os.Stdin
+		os.Stdin = r
+		defer func() {
+			os.Stdin = oldStdin
+			require.NoError(t, r.Close())
+		}()
+		kongCtx := parseCommand(t, command, "--zone", "is1b", "--request", "-")
+		require.NoError(t, command.Run(kongCtx))
+		require.Equal(t, "is1b", fake.createZone)
+		require.Equal(t, "db-json", fake.createRequest.Name)
+	})
+
 	t.Run("rejects inline json because it may contain secrets", func(t *testing.T) {
 		fake := &fakeDatabaseAPI{}
 		command := &CreateCommand{
@@ -339,6 +362,22 @@ func TestDatabaseCreateCommandRequestJSON(t *testing.T) {
 		err := command.Run(kongCtx)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "--request と個別フラグは併用できません")
+	})
+
+	t.Run("request and explicit false flag are mutually exclusive", func(t *testing.T) {
+		// 値ベースの判定だと明示的な false・空文字列を見逃すため、フラグの指定状態で判定します
+		path := filepath.Join(t.TempDir(), "db-create.json")
+		require.NoError(t, os.WriteFile(path, []byte(requestJSON), 0o600))
+		fake := &fakeDatabaseAPI{}
+		command := &CreateCommand{
+			factory: func() (API, error) { return fake, nil },
+			runtime: testRuntime(),
+		}
+		kongCtx := parseCommand(t, command, "--zone", "is1b", "--request", "@"+path, "--enable-monitoring-suite=false")
+		err := command.Run(kongCtx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "--request と個別フラグは併用できません")
+		require.Nil(t, fake.createRequest, "input error should not reach API")
 	})
 
 	t.Run("no flags and no request", func(t *testing.T) {
@@ -422,13 +461,13 @@ func TestDatabaseCreateCommandSecretInput(t *testing.T) {
 	secretBase := func(t *testing.T) *CreateCommand {
 		t.Helper()
 		return &CreateCommand{
-			Name:           "db-01",
-			PlanID:         10,
-			SwitchID:       112900500001,
+			Name:           &[]string{"db-01"}[0],
+			PlanID:         &[]int64{10}[0],
+			SwitchID:       &[]int64{112900500001}[0],
 			IPAddresses:    []string{"192.168.0.11"},
-			NetworkMaskLen: 24,
-			DatabaseType:   "mariadb",
-			Username:       "dbuser",
+			NetworkMaskLen: &[]int{24}[0],
+			DatabaseType:   &[]string{"mariadb"}[0],
+			Username:       &[]string{"dbuser"}[0],
 		}
 	}
 
@@ -468,7 +507,7 @@ func TestDatabaseCreateCommandSecretInput(t *testing.T) {
 
 	t.Run("rejects missing replica password file", func(t *testing.T) {
 		command := secretBase(t)
-		command.EnableReplication = true
+		command.EnableReplication = &[]bool{true}[0]
 		command.ReplicaUserPassword = &[]string{"@/nonexistent/replica.txt"}[0]
 		command.Password = &[]string{"-"}[0]
 		_, err := command.buildRequest(strings.NewReader("secret\n"))
@@ -507,14 +546,14 @@ func TestDatabaseCreateCommandPropagatesAPIErrors(t *testing.T) {
 
 func TestSetMonitorDatabasePeriod(t *testing.T) {
 	t.Run("未指定の場合は秒精度の既定期間を設定する", func(t *testing.T) {
-		request := &database.MonitorDatabaseRequest{Zone: "is1b", ID: 123}
+		request := &MonitorDatabaseRequest{Zone: "is1b", ID: 123}
 		require.NoError(t, SetMonitorDatabasePeriod(request))
 		require.False(t, request.End.IsZero(), "End should be filled")
 		require.False(t, request.Start.IsZero(), "Start should be filled")
 	})
 
 	t.Run("未指定時の既定値は直近 1 時間で秒精度に丸められる", func(t *testing.T) {
-		request := &database.MonitorDatabaseRequest{Zone: "is1b", ID: 123}
+		request := &MonitorDatabaseRequest{Zone: "is1b", ID: 123}
 		require.NoError(t, SetMonitorDatabasePeriod(request))
 		require.Zero(t, request.End.Nanosecond(), "End should be truncated to seconds")
 		require.Equal(t, -1*time.Hour, request.Start.Sub(request.End))
@@ -522,7 +561,7 @@ func TestSetMonitorDatabasePeriod(t *testing.T) {
 
 	t.Run("End のみ指定時は Start を既定値で補完する", func(t *testing.T) {
 		end := time.Now().Truncate(time.Second)
-		request := &database.MonitorDatabaseRequest{Zone: "is1b", ID: 123, End: end}
+		request := &MonitorDatabaseRequest{Zone: "is1b", ID: 123, End: end}
 		require.NoError(t, SetMonitorDatabasePeriod(request))
 		require.Equal(t, end, request.End, "End should be kept")
 		require.Equal(t, end.Add(-1*time.Hour), request.Start, "Start should be filled")
@@ -530,7 +569,7 @@ func TestSetMonitorDatabasePeriod(t *testing.T) {
 
 	t.Run("Start のみ指定時は End を現在時刻で補完する", func(t *testing.T) {
 		start := time.Now().Add(-1 * time.Hour).Truncate(time.Second)
-		request := &database.MonitorDatabaseRequest{Zone: "is1b", ID: 123, Start: start}
+		request := &MonitorDatabaseRequest{Zone: "is1b", ID: 123, Start: start}
 		require.NoError(t, SetMonitorDatabasePeriod(request))
 		require.Equal(t, start, request.Start, "Start should be kept")
 		require.False(t, request.End.IsZero(), "End should be filled")
@@ -540,7 +579,7 @@ func TestSetMonitorDatabasePeriod(t *testing.T) {
 	t.Run("両方指定時は指定値を変更しない", func(t *testing.T) {
 		start := time.Now().Add(-2 * time.Hour).Truncate(time.Second)
 		end := time.Now().Add(-1 * time.Hour).Truncate(time.Second)
-		request := &database.MonitorDatabaseRequest{Zone: "is1b", ID: 123, Start: start, End: end}
+		request := &MonitorDatabaseRequest{Zone: "is1b", ID: 123, Start: start, End: end}
 		require.NoError(t, SetMonitorDatabasePeriod(request))
 		require.Equal(t, start, request.Start)
 		require.Equal(t, end, request.End)
@@ -586,6 +625,30 @@ func TestDatabaseUpdateCommandRun(t *testing.T) {
 		require.Empty(t, request.Name, "omitted Name should stay empty")
 		require.Nil(t, request.CommonSetting, "omitted CommonSetting should stay nil")
 		require.Nil(t, request.BackupSetting, "omitted BackupSetting should stay nil")
+	})
+
+	t.Run("accepts request from standard input", func(t *testing.T) {
+		fake := &fakeDatabaseAPI{}
+		command := newCommand(fake)
+		// 標準入力を差し替えて JSON を渡します
+		r, w, err := os.Pipe()
+		require.NoError(t, err)
+		_, err = w.WriteString(`{"Description":"updated"}`)
+		require.NoError(t, err)
+		require.NoError(t, w.Close())
+		oldStdin := os.Stdin
+		os.Stdin = r
+		defer func() {
+			os.Stdin = oldStdin
+			require.NoError(t, r.Close())
+		}()
+		kongCtx := parseCommand(t, command, "--zone", "is1b", "--id", "123", "--request", "-")
+		err = command.Run(kongCtx)
+		require.NoError(t, err)
+		require.Equal(t, "is1b", fake.updateZone)
+		require.EqualValues(t, 123, fake.updateID)
+		require.NotNil(t, fake.updateRequest)
+		require.Equal(t, "updated", fake.updateRequest.Description)
 	})
 
 	t.Run("--request が未指定の場合はエラー", func(t *testing.T) {
