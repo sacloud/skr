@@ -10,7 +10,7 @@ require (
 	github.com/sacloud/sacloud-sdk-go v0.3.1
 	github.com/sacloud/sakumock v0.13.0
 	github.com/stretchr/testify v1.12.1
-	github.com/yuin/goldmark v1.8.6
+	github.com/yuin/goldmark v1.8.7
 	golang.org/x/term v0.47.0
 )
 
