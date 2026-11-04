@@ -10,7 +10,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	region "github.com/sacloud/sacloud-sdk-go/service/iaas/region"
 )
 
 type Commands struct {
@@ -19,8 +18,8 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *region.FindRequest) ([]*iaas.Region, error)
-	ReadWithContext(context.Context, *region.ReadRequest) (*iaas.Region, error)
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.Region, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.Region, error)
 }
 
 type APIFactory func() (API, error)
@@ -53,7 +52,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &region.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

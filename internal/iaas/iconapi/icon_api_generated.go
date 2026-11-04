@@ -10,23 +10,22 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	icon "github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
 )
 
 type Commands struct {
 	Find   FindCommand   "cmd:\"\" help:\"アイコンを検索して出力します。Names、Tags、Scope、Sort は --request JSON で指定できます。条件を省略すると一覧を取得します。例: skr iaas-api icon find --request @icon-find.json\""
 	Read   ReadCommand   "cmd:\"\" help:\"ID を指定してアイコンを読み取って出力します。例: skr iaas-api icon read --id 123456789012\""
 	Create CreateCommand "cmd:\"\" help:\"画像ファイルからアイコンを作成して出力します。例: skr iaas-api icon create --name example --image-file ./icon.png\""
-	Update UpdateCommand "cmd:\"\" help:\"アイコンの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api icon update --id 123456789012 --name updated\""
+	Update UpdateCommand "cmd:\"\" help:\"アイコンを API リクエストの内容で更新して出力します。未指定項目は空の値として送信します。例: skr iaas-api icon update --id 123456789012 --name updated\""
 	Delete DeleteCommand "cmd:\"\" help:\"アイコンを削除します。成功時は出力しません。例: skr iaas-api icon delete --id 123456789012\""
 }
 
 type API interface {
-	FindWithContext(context.Context, *icon.FindRequest) ([]*iaas.Icon, error)
-	ReadWithContext(context.Context, *icon.ReadRequest) (*iaas.Icon, error)
-	CreateWithContext(context.Context, *icon.CreateRequest) (*iaas.Icon, error)
-	UpdateWithContext(context.Context, *icon.UpdateRequest) (*iaas.Icon, error)
-	DeleteWithContext(context.Context, *icon.DeleteRequest) error
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.Icon, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.Icon, error)
+	CreateWithContext(context.Context, *CreateRequest) (*iaas.Icon, error)
+	UpdateWithContext(context.Context, *UpdateRequest) (*iaas.Icon, error)
+	DeleteWithContext(context.Context, *DeleteRequest) error
 }
 
 type APIFactory func() (API, error)
@@ -65,7 +64,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &icon.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -123,7 +122,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &icon.DeleteRequest{}
+	request := &DeleteRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

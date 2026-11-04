@@ -21,11 +21,10 @@ import (
 	"strings"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 )
 
 // TransformCreateRequest は create 時の --expressions を API リクエストの Expression へ変換します (ADR 0042)。
-func TransformCreateRequest(command *CreateCommand, request *packetfilter.CreateRequest) error {
+func TransformCreateRequest(command *CreateCommand, request *CreateRequest) error {
 	expressions, err := decodeExpressions(command.Expression)
 	if err != nil {
 		return err
@@ -37,13 +36,13 @@ func TransformCreateRequest(command *CreateCommand, request *packetfilter.Create
 }
 
 // TransformUpdateRequest は update 時の --expressions を API リクエストの Expression へ変換します (ADR 0042)。
-func TransformUpdateRequest(command *UpdateCommand, request *packetfilter.UpdateRequest) error {
+func TransformUpdateRequest(command *UpdateCommand, request *UpdateRequest) error {
 	expressions, err := decodeExpressions(command.Expression)
 	if err != nil {
 		return err
 	}
 	if expressions != nil {
-		request.Expression = &expressions
+		request.Expression = expressions
 	}
 	return nil
 }

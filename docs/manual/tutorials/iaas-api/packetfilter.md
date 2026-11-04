@@ -94,12 +94,12 @@ $ skr iaas-api packetfilter read --zone is1b --id 123456789012
 読み取り結果の `ExpressionHash` を更新コマンドの `--original-expression-hash` に指定します。`UPDATED-PACKETFILTER-NAME` と ID は実際の値に置き換えてください。次の例ではルールの宛先ポートと説明を変更します。
 
 ```console
-$ skr iaas-api packetfilter update --zone is1b --id 123456789012 --name UPDATED-PACKETFILTER-NAME --original-expression-hash EXPRESSION-HASH-FROM-READ --expressions '[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","SourcePort":"","DestinationPort":"8443","Action":"allow","Description":"Updated rule"}]'
+$ skr iaas-api packetfilter update --zone is1b --id 123456789012 --name UPDATED-PACKETFILTER-NAME --description "test filter" --original-expression-hash EXPRESSION-HASH-FROM-READ --expressions '[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","SourcePort":"","DestinationPort":"8443","Action":"allow","Description":"Updated rule"}]'
 ```
 
-`--expressions` を指定するとルール配列全体を更新するため、残すルールも含めて指定してください。省略した更新では現在のルールを保ちます。`OriginalExpressionHash` を含む完全なリクエスト JSON を渡す方法もありますが、その場合は個別フラグを同時に指定できません。
+`--expressions` はルール配列全体を置き換えるため、残すルールも含めて指定してください。Update は API リクエストを直接送信します。保持する `Name` と `Description` も指定してください。`OriginalExpressionHash` を含む JSON 入力も使えますが、個別フラグとは併用できません。
 
-再度読み取り、`Name` が `UPDATED-PACKETFILTER-NAME`、ルールの `DestinationPort` が `"8443"`、ルールの `Description` が `"Updated rule"` に変わっていることを確認してください。フィルタ自体の `Description` は更新コマンドで指定していないため、作成時の値のままです。
+再度読み取り、`Name` が `UPDATED-PACKETFILTER-NAME`、`Description` が `"test filter"` になったことを確認してください。ルールの `DestinationPort` が `"8443"`、`Description` が `"Updated rule"` であることも確認してください。
 
 ```console
 $ skr iaas-api packetfilter read --zone is1b --id 123456789012

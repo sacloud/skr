@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/skr/internal/apigen"
@@ -120,7 +119,7 @@ func TestSingleNameSearchUsesSDKFilter(t *testing.T) {
 			commandLine := newCLI()
 			setInternetAPIFactory(commandLine, func() (internetapi.API, error) { return internet.New(caller), nil })
 			setServerAPIFactory(commandLine, func() (serverapi.API, error) { return server.New(caller), nil })
-			setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return disk.New(caller), nil })
+			setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return diskapi.NewAPI(caller), nil })
 			name := "router, 日本語 name"
 			var stdout, stderr bytes.Buffer
 			code := runCLI([]string{"iaas-api", resource, "find", "--zone", "is1b", "--name", name}, &stdout, &stderr, commandLine)

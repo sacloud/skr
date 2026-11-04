@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 )
 
 type FindCommand struct {
@@ -36,7 +35,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 
-	request := &zone.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

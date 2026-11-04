@@ -25,7 +25,6 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/region"
 	"github.com/sacloud/skr/internal/apigen"
 	regionapi "github.com/sacloud/skr/internal/iaas/regionapi"
 	"github.com/stretchr/testify/require"
@@ -147,14 +146,14 @@ func TestIaaSRegionPropagatesAPIErrors(t *testing.T) {
 }
 
 type regionAPITestDouble struct {
-	findRequest *region.FindRequest
-	readRequest *region.ReadRequest
+	findRequest *regionapi.FindRequest
+	readRequest *regionapi.ReadRequest
 	findErr     error
 	findCalls   int
 	readCalls   int
 }
 
-func (api *regionAPITestDouble) FindWithContext(_ context.Context, request *region.FindRequest) ([]*iaas.Region, error) {
+func (api *regionAPITestDouble) FindWithContext(_ context.Context, request *regionapi.FindRequest) ([]*iaas.Region, error) {
 	api.findCalls++
 	api.findRequest = request
 	if api.findErr != nil {
@@ -163,7 +162,7 @@ func (api *regionAPITestDouble) FindWithContext(_ context.Context, request *regi
 	return []*iaas.Region{{ID: 7, Name: "test-region", Description: "test description"}}, nil
 }
 
-func (api *regionAPITestDouble) ReadWithContext(_ context.Context, request *region.ReadRequest) (*iaas.Region, error) {
+func (api *regionAPITestDouble) ReadWithContext(_ context.Context, request *regionapi.ReadRequest) (*iaas.Region, error) {
 	api.readCalls++
 	api.readRequest = request
 	return &iaas.Region{ID: request.ID, Name: "test-region", Description: "test description"}, nil

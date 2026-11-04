@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	"github.com/sacloud/skr/internal/apigen"
 	zoneapi "github.com/sacloud/skr/internal/iaas/zoneapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
@@ -68,7 +67,7 @@ func TestIaaSZoneFindWithLocalMockAndQuery(t *testing.T) {
 
 	commandLine := newCLI()
 	setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
-		return zone.New(server), nil
+		return zoneapi.NewAPI(server), nil
 	})
 	runCommand := func(args ...string) string {
 		t.Helper()
@@ -98,7 +97,7 @@ func TestIaaSZoneReadWithLocalMock(t *testing.T) {
 
 	commandLine := newCLI()
 	setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
-		return zone.New(server), nil
+		return zoneapi.NewAPI(server), nil
 	})
 	runCommand := func(args ...string) string {
 		t.Helper()
@@ -142,7 +141,7 @@ func TestIaaSZoneRejectsInvalidReadRequestsBeforeCallingAPI(t *testing.T) {
 	} {
 		commandLine := newCLI()
 		setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
-			return zone.New(server), nil
+			return zoneapi.NewAPI(server), nil
 		})
 		var stdout, stderr bytes.Buffer
 		code := runCLI(append([]string{"iaas-api", "zone"}, args...), &stdout, &stderr, commandLine)
@@ -159,7 +158,7 @@ func TestIaaSZoneReadPropagatesAPIErrors(t *testing.T) {
 
 	commandLine := newCLI()
 	setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
-		return zone.New(server), nil
+		return zoneapi.NewAPI(server), nil
 	})
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "zone", "read", "--id", "99"}, &stdout, &stderr, commandLine)

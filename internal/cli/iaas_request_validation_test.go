@@ -25,11 +25,7 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/ostype"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	"github.com/sacloud/skr/internal/apigen"
 	"github.com/sacloud/skr/internal/iaas/archiveapi"
 	"github.com/sacloud/skr/internal/iaas/diskapi"
@@ -92,18 +88,17 @@ func TestIaaSRequestBodyValidationIsDelegated(t *testing.T) {
 }
 
 func TestIaaSSDKValidationErrorsAreReturned(t *testing.T) {
-	for _, resource := range []string{"archive", "disk", "product disk", "packetfilter", "server", "product server", "switch"} {
+	for _, resource := range []string{"disk", "product disk", "packetfilter", "server", "product server", "switch"} {
 		for _, input := range []string{"JSON", "flags"} {
 			t.Run(resource+"/"+input, func(t *testing.T) {
 				commandLine := newCLI()
 				caller := &serverAPICaller{}
-				setArchiveAPIFactory(commandLine, func() (archiveapi.API, error) { return archive.New(caller), nil })
-				setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return disk.New(caller), nil })
+				setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return diskapi.NewAPI(caller), nil })
 				setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return diskplanapi.NewSDKAPI(caller), nil })
-				setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) { return packetfilter.New(caller), nil })
+				setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) { return packetfilterapi.NewAPI(caller), nil })
 				setServerAPIFactory(commandLine, func() (serverapi.API, error) { return server.New(caller), nil })
 				setServerPlanAPIFactory(commandLine, func() (serverplanapi.API, error) { return serverplanapi.NewSDKAPI(caller), nil })
-				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return swytch.New(caller), nil })
+				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return switchapi.NewAPI(caller), nil })
 				args := append([]string{"iaas-api"}, strings.Fields(resource)...)
 				args = append(args, "read")
 				if input == "JSON" {
@@ -231,20 +226,20 @@ func TestPacketFilterMissingHashIsForwardedAndAPIErrorsAreReturned(t *testing.T)
 			if code != 1 || stdout.Len() != 0 || stderr.String() != api.err.Error()+"\n" {
 				t.Fatalf("code=%d stdout=%q stderr=%q; want API error", code, stdout.String(), stderr.String())
 			}
-			if req := api.request; req == nil || req.Expression == nil || len(*req.Expression) != 0 || req.OriginalExpressionHash != "" {
-				t.Fatalf("unexpected request: %+v", req)
-			}
+			require.NotNil(t, api.request)
+			require.Empty(t, api.request.Expression)
+			require.Empty(t, api.request.OriginalExpressionHash)
 		})
 	}
 }
 
 type packetFilterUpdateRecorder struct {
 	packetfilterapi.API
-	request *packetfilter.UpdateRequest
+	request *packetfilterapi.UpdateRequest
 	err     error
 }
 
-func (api *packetFilterUpdateRecorder) UpdateWithContext(_ context.Context, request *packetfilter.UpdateRequest) (*iaas.PacketFilter, error) {
+func (api *packetFilterUpdateRecorder) UpdateWithContext(_ context.Context, request *packetfilterapi.UpdateRequest) (*iaas.PacketFilter, error) {
 	api.request = request
 	if api.err != nil {
 		return nil, api.err

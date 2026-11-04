@@ -18,23 +18,21 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTransformCreateRequestDecodesExpressions(t *testing.T) {
-	request := &packetfilter.CreateRequest{}
+	request := &CreateRequest{}
 	command := &CreateCommand{Expression: []string{`[{"Protocol":"tcp","DestinationPort":"443","Action":"allow"}]`}}
 	require.NoError(t, TransformCreateRequest(command, request))
 	require.Len(t, request.Expression, 1)
 }
 
 func TestTransformUpdateRequestDecodesExpressions(t *testing.T) {
-	request := &packetfilter.UpdateRequest{}
+	request := &UpdateRequest{}
 	command := &UpdateCommand{Expression: []string{`[{"Protocol":"udp","DestinationPort":"53","Action":"allow"}]`}}
 	require.NoError(t, TransformUpdateRequest(command, request))
-	require.NotNil(t, request.Expression)
-	require.Len(t, *request.Expression, 1)
+	require.Len(t, request.Expression, 1)
 }
 
 func TestDecodeExpressions(t *testing.T) {

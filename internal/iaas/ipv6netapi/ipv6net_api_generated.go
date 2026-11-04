@@ -10,7 +10,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	ipv6net "github.com/sacloud/sacloud-sdk-go/service/iaas/ipv6net"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -20,8 +19,8 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *ipv6net.FindRequest) ([]*iaas.IPv6Net, error)
-	ReadWithContext(context.Context, *ipv6net.ReadRequest) (*iaas.IPv6Net, error)
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.IPv6Net, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.IPv6Net, error)
 }
 
 type APIFactory func() (API, error)
@@ -58,7 +57,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipv6net.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -124,7 +123,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipv6net.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

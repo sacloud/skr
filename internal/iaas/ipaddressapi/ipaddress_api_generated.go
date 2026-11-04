@@ -9,7 +9,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
-	ipaddress "github.com/sacloud/sacloud-sdk-go/service/iaas/ipaddress"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -20,9 +19,9 @@ type Commands struct {
 }
 
 type API interface {
-	ListWithContext(context.Context, *ipaddress.ListRequest) ([]*iaas.IPAddress, error)
-	ReadWithContext(context.Context, *ipaddress.ReadRequest) (*iaas.IPAddress, error)
-	UpdateHostNameWithContext(context.Context, *ipaddress.UpdateHostNameRequest) error
+	ListWithContext(context.Context, *ListRequest) ([]*iaas.IPAddress, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.IPAddress, error)
+	UpdateHostNameWithContext(context.Context, *UpdateHostNameRequest) error
 }
 
 type APIFactory func() (API, error)
@@ -57,7 +56,7 @@ func (c *ListCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipaddress.ListRequest{}
+	request := &ListRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -117,7 +116,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipaddress.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -185,7 +184,7 @@ func (c *UpdateHostNameCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipaddress.UpdateHostNameRequest{}
+	request := &UpdateHostNameRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

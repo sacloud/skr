@@ -22,7 +22,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
 )
 
 type CreateCommand struct {
@@ -46,7 +45,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 
-	request := &icon.CreateRequest{}
+	request := &CreateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

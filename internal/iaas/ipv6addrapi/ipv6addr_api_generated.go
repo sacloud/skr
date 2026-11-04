@@ -9,7 +9,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
-	ipv6addr "github.com/sacloud/sacloud-sdk-go/service/iaas/ipv6addr"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -22,11 +21,11 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *ipv6addr.FindRequest) ([]*iaas.IPv6Addr, error)
-	CreateWithContext(context.Context, *ipv6addr.CreateRequest) (*iaas.IPv6Addr, error)
-	ReadWithContext(context.Context, *ipv6addr.ReadRequest) (*iaas.IPv6Addr, error)
-	UpdateWithContext(context.Context, *ipv6addr.UpdateRequest) (*iaas.IPv6Addr, error)
-	DeleteWithContext(context.Context, *ipv6addr.DeleteRequest) error
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.IPv6Addr, error)
+	CreateWithContext(context.Context, *CreateRequest) (*iaas.IPv6Addr, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.IPv6Addr, error)
+	UpdateWithContext(context.Context, *UpdateRequest) (*iaas.IPv6Addr, error)
+	DeleteWithContext(context.Context, *DeleteRequest) error
 }
 
 type APIFactory func() (API, error)
@@ -69,7 +68,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipv6addr.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -137,7 +136,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipv6addr.CreateRequest{}
+	request := &CreateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -209,7 +208,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipv6addr.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -277,7 +276,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipv6addr.UpdateRequest{}
+	request := &UpdateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -349,7 +348,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &ipv6addr.DeleteRequest{}
+	request := &DeleteRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

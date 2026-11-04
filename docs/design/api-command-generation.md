@@ -7,7 +7,7 @@
 
 `cmd/apigen-iaas` は、明示した IaaS SDK 操作のコマンド登録、型付き API インターフェース、操作ハンドラー、標準的なリクエスト入力と出力を Go ソースに生成します。IaaS 以外の Ogen 系 API には共通入口 `cmd/apigen-api` を使います。`cmd/apigen-wiring` は同じ設定 JSON から `internal/cli` 配下の配線コードを生成します (ADR 0068)。生成コードはリポジトリに含め、実行時や通常のビルド時に生成器を必要としません。設定解析と共有可能な生成処理は `internal/apigen` にあります。IaaS と Ogen 系 API は別の CLI 入口を保ち、共通化できる範囲で実装を共有します。
 
-生成器は SDK の操作を探索して公開範囲や入力の意味を決めません。対象操作、SDK メソッド名、リクエスト／レスポンス型、個別フラグ、ヘルプは設定で明示します。設定内容は SDK の公開インターフェースとリクエスト型に照らして確認します。
+生成器は SDK の操作を探索して公開範囲や入力の意味を決めません。対象操作、SDK メソッド名、リクエスト／レスポンス型、個別フラグ、ヘルプは設定で明示します。IaaS API コマンドは [ADR 0071](../adr/0071-iaas-api-uses-api-layer.md) に従い、`sacloud-sdk-go/api/iaas` の API 操作を直接呼び出します。IaaS の操作入力型は各 `internal/iaas/<resource>api/` package が定義し、API 層の操作引数へ変換します。設定内容は SDK の公開 API interface と API 用リクエスト型に照らして確認します。
 
 ## 設定と実行
 
@@ -126,7 +126,7 @@ $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=int
 
 [ADR 0068](../adr/0068-generate-cli-wiring.md) に従い、`cmd/apigen-wiring` は同じ設定 JSON から `internal/cli` 配下の配線コードを生成します。配線対象の設定には、代入先を表す `wiring_target` (例: `"IaaSAPI.Archive"`) と、API クライアント生成式を表す `sdk_factory` (例: `"archive.New"`) を記述します。IaaS の設定では、共有クライアント生成式を `client_factory` (例: `"iaasclient.New"`) にも記述し、2 段階のクロージャで `client, err := client_factory(c.Trace)` から `sdk_factory(client)` を組み立てます。IaaS 以外の設定では `sdk_factory` を `c.Trace` で直接呼び出します。
 
-ドメイン固有の decoder を使う操作には `decoder` (例: `"eventbusapi.DecodeRequest"`) を記述します。省略時は共有の入力処理 `decodeRequest` を接続します。`request_transform` を指定した操作は、transform 関数をドメイン package に置き、配線は `packetfilterapi.TransformCreateRequest` の形で接続します。`factory_arguments` を持つ設定は、`factory_arguments` を引数に取る factory クロージャを生成します。`sdk_factory` は `c.Trace` に続けて `factory_arguments` を受け取る必要があります (例: `iamapi.NewUser2FAAPI(c.Trace, UserID)`)。`factory_arguments` と `client_factory` の併用は設定検証で拒否します。標準パターンに合わない設定には `"wiring": "handwritten"` を指定して配線対象から外し、手書き init に残します (例: 認証機構が別の simplemq-message)。
+ドメイン固有の decoder を使う操作には `decoder` (例: `"eventbusapi.DecodeRequest"`) を記述します。省略時は共有の入力処理 `decodeRequest` を接続します。`request_transform` を指定した操作は、transform 関数をドメイン package に置き、配線は `packetfilterapi.TransformCreateRequest` の形で接続します。`factory_arguments` を持つ設定は、`factory_arguments` を引数に取る factory クロージャを生成します。`sdk_factory` は `c.Trace` に続けて `factory_arguments` を受け取る必要があります (例: `iamapi.NewUser2FAAPI(c.Trace, UserID)`)。IaaS API は `client_factory` で共有 `api/iaas.Client` を構築し、`sdk_factory` にはコマンド package の `NewAPI` を指定して API 層操作を注入します。IaaS API 用の配線とコマンド package は `sacloud-sdk-go/service/iaas` を import しません (ADR 0071)。`factory_arguments` と `client_factory` の併用は設定検証で拒否します。標準パターンに合わない設定には `"wiring": "handwritten"` を指定して配線対象から外し、手書き init に残します (例: 認証機構が別の simplemq-message)。
 
 配線コードはドメインごとに 1 ファイルへまとめます。`initIaaSAPI` のように、`wiring_target` の最初の要素を関数名の一部にします。同一ファイルに含まれる設定の `wiring_target` は同じ最初の要素を持つ必要があり、異なる最初の要素の混在は検証で拒否します。ルート構造体、フラグ定義、`newCLI()` からの init 呼び出しは手書きのままにします。
 
@@ -181,7 +181,7 @@ Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー�
 
 Boot は Zone と ID を必須とし、任意の user-data を `--user-data @path` または `--user-data -` で読み込みます。省略時は通常どおり起動し、インラインの user-data は拒否します。更新では単純なスカラーと `--tags` を任意フラグにし、未指定値を保持します。指定項目がない更新リクエストも SDK へ渡します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。本文の検証は SDK と API に委ね、手書きハンドラーと CLI 独自の入力処理は `internal/iaas/serverapi/` に置きます。各パッケージの単体テストと `internal/cli/server_test.go` で検証します。
 
-Disk では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-disk.json`](../../api/commands/iaas-disk.json)、生成先は `internal/iaas/diskapi/` です。各検索では対象ゾーンを明示し、`--tags` でタグ条件をカンマ区切り指定できます。Create は Zone、Name、DiskPlanID、Connection、SizeGB と独立した単純値および Tags を個別フラグで指定でき、DistantFrom と EditParameter は JSON に残します。SDK の CreateRequest にある OSType は API に送るフィールドではなく、SDK が OS 種別からコピー元アーカイブを解決する補助入力のため、個別フラグにはしません。Update は Zone と ID を必須とし、変更する Name、Description、Tags、IconID、Connection を個別フラグで指定できます。更新フラグは pointer 値として生成し、省略時の未指定を維持します。両操作とも `--request` JSON を維持し、個別フラグとの併用を拒否します。本文の検証は SDK と API に委ねます。
+Disk では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-disk.json`](../../api/commands/iaas-disk.json)、生成先は `internal/iaas/diskapi/` です。各検索では対象ゾーンを明示し、`--tags` でタグ条件をカンマ区切り指定できます。Create は Zone、Name、DiskPlanID、Connection、SizeGB と API 操作の引数である KMSKeyID、DedicatedStorageContractID、DistantFrom を受け付けます。Update は Zone と ID を必須とし、Name、Description、Tags、IconID、Connection を API 更新リクエストへ変換します。サービス層固有の EditParameter、OSType、NoWait、削除待機は公開しません。個別フラグと `--request` JSON は併用できず、SDK の API 操作へ入力を直接渡します。
 
 PacketFilter では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-packetfilter.json`](../../api/commands/iaas-packetfilter.json)、生成先は `internal/iaas/packetfilterapi/` です。`Expression` はルールの複雑な配列なので、各ルールを個別の CLI フラグにはせず、`--expressions` に JSON 配列を直接または `@path.json` で渡せる入力変換 callback を接続します。`--request` の完全な JSON 入力も維持し、両経路は併用できません。更新時の `OriginalExpressionHash` は読み取り結果の `ExpressionHash` を受け取るスカラー値です。単一ゾーンは共通処理で検証し、ID や更新内容の検証は SDK と API に委ねます。ライブ E2E はフィルタの作成・ルール更新・削除を確認しますが、NIC への適用と通信の許可／拒否は行いません。
 

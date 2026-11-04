@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/region"
 )
 
 type FindCommand struct {
@@ -31,7 +30,7 @@ type FindCommand struct {
 }
 
 func (c *FindCommand) Run(ctx *kong.Context) error {
-	request := &region.FindRequest{}
+	request := &FindRequest{}
 	flagsSet := c.Count != nil || c.From != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")

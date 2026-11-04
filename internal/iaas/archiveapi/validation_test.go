@@ -15,11 +15,10 @@
 package archiveapi
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/ostype"
-	archiveSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTypedRequestValidators(t *testing.T) {
@@ -28,34 +27,30 @@ func TestTypedRequestValidators(t *testing.T) {
 		validate func() error
 		wantErr  string
 	}{
-		{testName: "find valid", validate: func() error { return ValidateFindRequest(&archiveSDK.FindRequest{Zone: "is1b"}) }},
+		{testName: "find valid", validate: func() error { return ValidateFindRequest(&FindRequest{Zone: "is1b"}) }},
 		{testName: "find os type", validate: func() error {
-			return ValidateFindRequest(&archiveSDK.FindRequest{Zone: "is1b", OSType: ostype.Ubuntu2404})
+			return ValidateFindRequest(&FindRequest{Zone: "is1b", OSType: ostype.Ubuntu2404})
 		}},
 		{testName: "invalid os type", validate: func() error {
-			return ValidateFindRequest(&archiveSDK.FindRequest{Zone: "is1b", OSType: -1})
+			return ValidateFindRequest(&FindRequest{Zone: "is1b", OSType: -1})
 		}, wantErr: "OSType が不正"},
 		{testName: "unknown os type number", validate: func() error {
-			return ValidateFindRequest(&archiveSDK.FindRequest{Zone: "is1b", OSType: 1000})
+			return ValidateFindRequest(&FindRequest{Zone: "is1b", OSType: 1000})
 		}, wantErr: "OSType が不正"},
 		{testName: "os type and names", validate: func() error {
-			return ValidateFindRequest(&archiveSDK.FindRequest{Zone: "is1b", OSType: ostype.Ubuntu2404, Names: []string{"image"}})
+			return ValidateFindRequest(&FindRequest{Zone: "is1b", OSType: ostype.Ubuntu2404, Names: []string{"image"}})
 		}},
 		{testName: "os type and tags", validate: func() error {
-			return ValidateFindRequest(&archiveSDK.FindRequest{Zone: "is1b", OSType: ostype.Ubuntu2404, Tags: []string{"stable"}})
+			return ValidateFindRequest(&FindRequest{Zone: "is1b", OSType: ostype.Ubuntu2404, Tags: []string{"stable"}})
 		}},
 	} {
 		t.Run(test.testName, func(t *testing.T) {
 			err := test.validate()
 			if test.wantErr == "" {
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return
 			}
-			if err == nil || !strings.Contains(err.Error(), test.wantErr) {
-				t.Fatalf("validator() error = %v, want %q", err, test.wantErr)
-			}
+			require.ErrorContains(t, err, test.wantErr)
 		})
 	}
 }
