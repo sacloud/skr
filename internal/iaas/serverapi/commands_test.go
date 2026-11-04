@@ -26,7 +26,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 )
 
 func TestParseDevices(t *testing.T) {
@@ -90,10 +89,10 @@ func TestParseDevicesRejectInvalidInputsWithoutEcho(t *testing.T) {
 
 type createTestAPI struct {
 	API
-	request *server.CreateRequest
+	request *CreateRequest
 }
 
-func (a *createTestAPI) CreateWithContext(_ context.Context, request *server.CreateRequest) (*iaas.Server, error) {
+func (a *createTestAPI) CreateWithContext(_ context.Context, request *CreateRequest) (*iaas.Server, error) {
 	a.request = request
 	return &iaas.Server{Name: request.Name}, nil
 }
@@ -207,7 +206,7 @@ func TestCreateCommandRequestTransformLifecycle(t *testing.T) {
 				WriteOutput:    func(*kong.Context, any) error { return nil },
 			}
 			if test.mode != "missing" {
-				command.runtime.TransformCreateRequest = func(c *CreateCommand, request *server.CreateRequest) error {
+				command.runtime.TransformCreateRequest = func(c *CreateCommand, request *CreateRequest) error {
 					transformed = true
 					if request.Name != "server" || request.Zone == "" || request.CPU != 1 || request.MemoryGB != 1 {
 						t.Fatalf("scalars were not assigned before transformation: %+v", request)
@@ -243,10 +242,10 @@ func TestCreateCommandRequestTransformLifecycle(t *testing.T) {
 
 type bootTestAPI struct {
 	API
-	request *server.BootRequest
+	request *BootRequest
 }
 
-func (a *bootTestAPI) BootWithContext(_ context.Context, request *server.BootRequest) error {
+func (a *bootTestAPI) BootWithContext(_ context.Context, request *BootRequest) error {
 	a.request = request
 	return nil
 }

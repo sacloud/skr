@@ -11,7 +11,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	internet "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -19,7 +18,7 @@ type Commands struct {
 	Find          FindCommand          "cmd:\"\" name:\"find\" help:\"ルータ＋スイッチを指定したゾーンで検索して出力します。例: skr iaas-api internet find --zone is1b\""
 	Read          ReadCommand          "cmd:\"\" name:\"read\" help:\"ルータ＋スイッチを読み取って出力します。\""
 	Create        CreateCommand        "cmd:\"\" name:\"create\" help:\"ルータ＋スイッチを作成して出力します。課金対象になる場合があります。例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100\""
-	Update        UpdateCommand        "cmd:\"\" name:\"update\" help:\"ルータ＋スイッチの設定を更新して出力します。例: skr iaas-api internet update --zone is1b --id 123456789012 --name UPDATED-NAME\""
+	Update        UpdateCommand        "cmd:\"\" name:\"update\" help:\"ルータ＋スイッチの更新リクエストを送信して出力します。例: skr iaas-api internet update --zone is1b --id 123456789012 --name UPDATED-NAME\""
 	Delete        DeleteCommand        "cmd:\"\" name:\"delete\" help:\"ルータ＋スイッチを削除します。--force は IPv6 の無効化と NextHop が設定された追加サブネットの削除も行います。例: skr iaas-api internet delete --zone is1b --id 123456789012\""
 	ListSubnet    ListSubnetCommand    "cmd:\"\" name:\"list-subnet\" help:\"ルータ＋スイッチに設定された IP アドレスブロックを一覧表示します。\""
 	AddSubnet     AddSubnetCommand     "cmd:\"\" name:\"add-subnet\" help:\"ルータ＋スイッチに IP アドレスブロックを追加します。ネクストホップとなるサーバを先に用意してください。\""
@@ -32,19 +31,19 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *internet.FindRequest) ([]*iaas.Internet, error)
-	ReadWithContext(context.Context, *internet.ReadRequest) (*iaas.Internet, error)
-	CreateWithContext(context.Context, *internet.CreateRequest) (*iaas.Internet, error)
-	UpdateWithContext(context.Context, *internet.UpdateRequest) (*iaas.Internet, error)
-	DeleteWithContext(context.Context, *internet.DeleteRequest) error
-	ListSubnetWithContext(context.Context, *internet.ListSubnetRequest) ([]*iaas.Subnet, error)
-	AddSubnetWithContext(context.Context, *internet.AddSubnetRequest) (*iaas.Subnet, error)
-	UpdateSubnetWithContext(context.Context, *internet.UpdateSubnetRequest) (*iaas.Subnet, error)
-	DeleteSubnetWithContext(context.Context, *internet.DeleteSubnetRequest) error
-	ReadIPv6WithContext(context.Context, *internet.ReadIPv6Request) (*iaas.IPv6Net, error)
-	EnableIPv6WithContext(context.Context, *internet.EnableIPv6Request) (*iaas.IPv6Net, error)
-	DisableIPv6WithContext(context.Context, *internet.DisableIPv6Request) error
-	MonitorRouterWithContext(context.Context, *internet.MonitorRouterRequest) ([]*iaas.MonitorRouterValue, error)
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.Internet, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.Internet, error)
+	CreateWithContext(context.Context, *CreateRequest) (*iaas.Internet, error)
+	UpdateWithContext(context.Context, *UpdateRequest) (*iaas.Internet, error)
+	DeleteWithContext(context.Context, *DeleteRequest) error
+	ListSubnetWithContext(context.Context, *ListSubnetRequest) ([]*iaas.Subnet, error)
+	AddSubnetWithContext(context.Context, *AddSubnetRequest) (*iaas.InternetSubnetOperationResult, error)
+	UpdateSubnetWithContext(context.Context, *UpdateSubnetRequest) (*iaas.InternetSubnetOperationResult, error)
+	DeleteSubnetWithContext(context.Context, *DeleteSubnetRequest) error
+	ReadIPv6WithContext(context.Context, *ReadIPv6Request) (*iaas.IPv6NetInfo, error)
+	EnableIPv6WithContext(context.Context, *EnableIPv6Request) (*iaas.IPv6NetInfo, error)
+	DisableIPv6WithContext(context.Context, *DisableIPv6Request) error
+	MonitorRouterWithContext(context.Context, *MonitorRouterRequest) ([]*iaas.MonitorRouterValue, error)
 }
 
 type APIFactory func() (API, error)
@@ -107,7 +106,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -180,7 +179,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -233,7 +232,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request        *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (作成先ゾーン)、Name (名前)、NetworkMaskLen (プレフィクス長)、BandWidthMbps (帯域幅)。任意: Description (最大512文字)、Tags (文字列配列)、IconID (数値)。EnableIPv6 は作成時に IPv6 アドレス割り当てを有効にする設定です。料金と利用条件を確認してから実行してください。NoWait と NotFoundRetry は JSON でのみ指定できます。フラグ例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100。ゾーンと名前は実際の値に置き換えます。\""
+	Request        *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (作成先ゾーン)、Name (名前)、NetworkMaskLen (プレフィクス長)、BandWidthMbps (帯域幅)。任意: Description (最大512文字)、Tags (文字列配列)、IconID (数値)、EnableIPv6 (作成後に IPv6 を有効化)。IPv6 を有効にすると IPv6 アドレス割り当てを行います。料金と利用条件を確認してから実行してください。フラグ例: skr iaas-api internet create --zone is1b --name ROUTER-SWITCH-NAME --network-mask-len 28 --band-width-mbps 100。ゾーンと名前は実際の値に置き換えます。\""
 	Zone           *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
 	Name           *string   "name:\"name\" help:\"必須: ルータ＋スイッチの名前。\""
 	Tags           *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
@@ -257,7 +256,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.CreateRequest{}
+	request := &CreateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -332,13 +331,13 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。Name、Description、Tags、IconID は API フィールドです。BandWidthMbps と EnableIPv6 は JSON のみで指定でき、帯域または IPv6 の設定も変更します。省略した項目は変更しません。帯域変更の制約と IPv6 利用料を確認してください。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-NAME\\\"}'。ゾーン、ID、名前は実際の値に置き換えます。\""
+	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。Name、Description、Tags、IconID は API フィールドです。更新リクエストで省略した項目は現在値を維持します。BandWidthMbps と EnableIPv6 は JSON のみで指定でき、帯域または IPv6 の設定も変更します。更新する項目と値を確認してから実行してください。帯域変更の制約と IPv6 利用料も確認してください。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-NAME\\\"}'。ゾーン、ID、名前は実際の値に置き換えます。\""
 	Zone        *string   "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID          *int64    "name:\"id\" help:\"必須: 更新対象の ID (数値)。\""
-	Tags        *[]string "name:\"tags\" help:\"任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。\" sep:\",\""
-	Name        *string   "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
-	Description *string   "name:\"description\" help:\"任意: 新しい説明。未指定なら変更しません。\""
-	IconID      *int64    "name:\"icon-id\" help:\"任意: アイコン ID (数値)。未指定なら変更しません。\""
+	Tags        *[]string "name:\"tags\" help:\"任意: 更新リクエストのタグ配列。カンマ区切りで指定します。\" sep:\",\""
+	Name        *string   "name:\"name\" help:\"任意: 更新リクエストの名前。\""
+	Description *string   "name:\"description\" help:\"任意: 更新リクエストの説明。\""
+	IconID      *int64    "name:\"icon-id\" help:\"任意: 更新リクエストのアイコン ID (数値)。\""
 	factory     APIFactory
 	runtime     Runtime
 }
@@ -354,7 +353,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.UpdateRequest{}
+	request := &UpdateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -439,7 +438,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.DeleteRequest{}
+	request := &DeleteRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -499,7 +498,7 @@ func (c *ListSubnetCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.ListSubnetRequest{}
+	request := &ListSubnetRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -570,7 +569,7 @@ func (c *AddSubnetCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.AddSubnetRequest{}
+	request := &AddSubnetRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -653,7 +652,7 @@ func (c *UpdateSubnetCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.UpdateSubnetRequest{}
+	request := &UpdateSubnetRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -735,7 +734,7 @@ func (c *DeleteSubnetCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.DeleteSubnetRequest{}
+	request := &DeleteSubnetRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -796,7 +795,7 @@ func (c *ReadIpv6Command) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.ReadIPv6Request{}
+	request := &ReadIPv6Request{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -863,7 +862,7 @@ func (c *EnableIpv6Command) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.EnableIPv6Request{}
+	request := &EnableIPv6Request{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -930,7 +929,7 @@ func (c *DisableIpv6Command) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.DisableIPv6Request{}
+	request := &DisableIPv6Request{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -988,7 +987,7 @@ func (c *MonitorRouterCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &internet.MonitorRouterRequest{}
+	request := &MonitorRouterRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

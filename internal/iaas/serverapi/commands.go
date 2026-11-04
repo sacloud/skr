@@ -23,11 +23,10 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/skr/internal/iaas/zones"
 )
 
-func TransformCreateRequest(c *CreateCommand, request *server.CreateRequest) error {
+func TransformCreateRequest(c *CreateCommand, request *CreateRequest) error {
 	for i, input := range c.Disks {
 		value, err := parseDisk(input, request.Name)
 		if err != nil {
@@ -36,7 +35,7 @@ func TransformCreateRequest(c *CreateCommand, request *server.CreateRequest) err
 		if value.SourceArchiveID != 0 && request.BootAfterCreate {
 			return fmt.Errorf("アーカイブから作成するディスクでは --boot-after-create=true を指定できません。user-data は server boot で渡してください")
 		}
-		request.Disks = append(request.Disks, value)
+		request.Disks = append(request.Disks, *value)
 	}
 	for i, input := range c.NICs {
 		value, err := parseNIC(input)
@@ -46,7 +45,7 @@ func TransformCreateRequest(c *CreateCommand, request *server.CreateRequest) err
 		if i > 0 && value.Upstream == "shared" {
 			return fmt.Errorf("--nic の %d 個目: shared は先頭の NIC にだけ指定できます", i+1)
 		}
-		request.NetworkInterfaces = append(request.NetworkInterfaces, value)
+		request.NetworkInterfaces = append(request.NetworkInterfaces, *value)
 	}
 	return nil
 }
@@ -71,7 +70,7 @@ func (c *BootCommand) Run(_ *kong.Context) error {
 			return err
 		}
 	}
-	request := &server.BootRequest{
+	request := &BootRequest{
 		Zone:     c.Zone,
 		ID:       types.ID(c.ID),
 		UserData: userData,

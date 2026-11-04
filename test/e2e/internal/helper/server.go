@@ -48,6 +48,8 @@ const (
 	ServerSSHWaitTimeout = 20 * time.Minute
 	// ServerSSHPolling は SSH ログインと起動・停止の再確認間隔です。
 	ServerSSHPolling = 10 * time.Second
+	// ServerDiskReadyTimeout は cloud-init Disk が利用可能になるまでの期限です。
+	ServerDiskReadyTimeout = 20 * time.Minute
 	// BootAcceptWaitTimeout は起動 API のエラー後に起動の受理を確認する期限です。
 	BootAcceptWaitTimeout = 3 * time.Minute
 	// findPageSize は SDK の一括検索で使う1ページの件数です。
@@ -74,6 +76,7 @@ type ServerItem struct {
 type DiskItem struct {
 	ID              types.ID `json:"ID"`
 	Name            string   `json:"Name"`
+	Availability    string   `json:"Availability"`
 	ServerID        types.ID `json:"ServerID"`
 	DiskPlanID      types.ID `json:"DiskPlanID"`
 	SourceArchiveID types.ID `json:"SourceArchiveID"`
@@ -215,6 +218,27 @@ func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name
 		"the created Disk should match the requested settings")
 	require.Equal(t, item.ID, diskMatches[0].ServerID,
 		"the created Disk should be attached to the created Server")
+
+	ctx, cancel := context.WithTimeout(t.Context(), ServerDiskReadyTimeout)
+	defer cancel()
+	require.NoError(t, disks.WaitReadyWithContext(ctx, &diskSDK.WaitReadyRequest{
+		Zone: ServerZone,
+		ID:   diskMatches[0].ID,
+	}), "wait for the created Disk to become available")
+	data, _, err = h.CallAllowingFailure(t, "作成したディスクが利用可能で所属と内容を保っていることを確認する",
+		"iaas-api", "disk", "read",
+		"--zone", ServerZone, "--id", diskMatches[0].ID.String(),
+		"--query", "{ID,Name,Availability,ServerID,DiskPlanID,SourceArchiveID,SizeMB}",
+	)
+	require.NoError(t, err, "read the created Disk after it becomes available")
+	var readyDisk DiskItem
+	require.NoError(t, json.Unmarshal(data, &readyDisk), "decode the created Disk")
+	require.Equal(t, diskMatches[0].ID, readyDisk.ID)
+	require.Equal(t, "available", readyDisk.Availability, "the created Disk should be available before boot")
+	require.True(t, MatchesDiskSettings(readyDisk, name, params),
+		"the created Disk settings should remain unchanged while it becomes available")
+	require.Equal(t, item.ID, readyDisk.ServerID,
+		"the created Disk should remain attached to the created Server")
 	return item
 }
 

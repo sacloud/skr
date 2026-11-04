@@ -3,7 +3,6 @@
   "resource": "IaaS Server",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
-    "server": "github.com/sacloud/sacloud-sdk-go/service/iaas/server",
     "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
   },
   "operations": [
@@ -11,7 +10,7 @@
       "name": "Find",
       "help": "サーバを指定したゾーンで検索して出力します。例: skr iaas-api server find --zone tk1v",
       "method": "FindWithContext",
-      "request_type": "server.FindRequest",
+      "request_type": "FindRequest",
       "response_type": "[]*iaas.Server",
       "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: 単一名の部分一致検索は --name、複数名の Names と Sort は JSON で指定します。Tags は --tags のカンマ区切りまたは JSON 配列、Count と From は個別フラグでも指定できます。例: skr iaas-api server find --zone is1b --name example",
@@ -56,7 +55,7 @@
       "name": "Read",
       "help": "サーバを読み取って出力します。例: skr iaas-api server read --zone ZONE --id 123456789012",
       "method": "ReadWithContext",
-      "request_type": "server.ReadRequest",
+      "request_type": "ReadRequest",
       "response_type": "*iaas.Server",
       "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (作成結果の数値)。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
@@ -82,11 +81,11 @@
       "name": "Create",
       "help": "サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'",
       "method": "CreateWithContext",
-      "request_type": "server.CreateRequest",
+      "request_type": "CreateRequest",
       "response_type": "*iaas.Server",
       "validate_zone": true,
       "request_transform": "TransformCreateRequest",
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、Name、CPU、MemoryGB。CPU と MemoryGB は対象ゾーンで利用可能なプランを指定します。Tags は文字列配列です。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドも指定できます。NoWait=true と BootAfterCreate=true は併用できません。NoWait=true の場合は各ディスクも NoWait=true にします。例: --request='{\"Zone\":\"is1b\",\"Name\":\"example\",\"CPU\":1,\"MemoryGB\":1,\"Tags\":[\"tutorial\"]}'",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、Name、CPU、MemoryGB。CPU と MemoryGB は対象ゾーンで利用可能なプランを指定します。Tags は文字列配列です。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドも指定できます。BootAfterCreate=true の場合は作成後に起動します。例: --request='{\"Zone\":\"is1b\",\"Name\":\"example\",\"CPU\":1,\"MemoryGB\":1,\"Tags\":[\"tutorial\"]}'",
       "flags": [
         {
           "name": "zone",
@@ -186,14 +185,7 @@
           "name": "boot-after-create",
           "field": "BootAfterCreate",
           "type": "bool",
-          "help": "任意: true の場合、作成後にサーバを起動します。NoWait=true とは併用できません。cloud-init user-data を使う場合は省略してください。"
-        },
-        {
-          "name": "cdrom-id",
-          "field": "CDROMID",
-          "type": "int64",
-          "conversion": "types.ID",
-          "help": "任意: 作成時に挿入する CD-ROM イメージの ID (数値)。"
+          "help": "任意: true の場合、作成後にサーバを起動します。cloud-init user-data を使う場合は省略してください。"
         },
         {
           "name": "private-host-id",
@@ -220,17 +212,17 @@
       "name": "Boot",
       "help": "サーバを起動します。cloud-init の user-data は任意で、--user-data @path.yaml または --user-data - で指定します。例: skr iaas-api server boot --zone ZONE --id 123456789012",
       "method": "BootWithContext",
-      "request_type": "server.BootRequest",
+      "request_type": "BootRequest",
       "handwritten": true
     },
     {
       "name": "Update",
-      "help": "サーバの指定項目を更新して出力します。省略した項目は変更しません。CPU または MemoryGB の変更はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated",
+      "help": "サーバの API 更新リクエストを送信して出力します。更新リクエストで省略した項目は現在値を維持します。CPU または MemoryGB の指定はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated",
       "method": "UpdateWithContext",
-      "request_type": "server.UpdateRequest",
+      "request_type": "UpdateRequest",
       "response_type": "*iaas.Server",
       "validate_zone": true,
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意フラグは Name、Description、Tags (--tags でカンマ区切り)、CPU、MemoryGB、GPU、GPUModel、CPUModel です。JSON 経路では Tags を文字列配列で指定できます。IconID、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID、Disks、NetworkInterfaces など、フラグのない API フィールドや ID の設定・クリアには JSON を使用します。省略した項目は変更しません。CPU または MemoryGB を指定するとプランを変更します。例: skr iaas-api server update --zone ZONE --id 123456789012 --tags production,web。ID は実際の値に置き換えます。",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意フラグは Name、Description、Tags (--tags でカンマ区切り)、CPU、MemoryGB、GPU、GPUModel、CPUModel です。更新リクエストで省略した項目は現在値を維持します。JSON 経路では Tags を文字列配列で指定できます。IconID、PrivateHostID、InterfaceDriver など、フラグのない API フィールドは JSON で指定します。CPU、MemoryGB、GPU、GPUModel、CPUModel の指定はプラン変更です。例: skr iaas-api server update --zone ZONE --id 123456789012 --tags production,web。ID は実際の値に置き換えます。",
       "flags": [
         {
           "name": "zone",
@@ -251,7 +243,7 @@
           "name": "tags",
           "field": "Tags",
           "type": "[]string",
-          "help": "任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。",
+          "help": "任意: 更新リクエストのタグ配列。カンマ区切りで指定します。",
           "pointer": true,
           "conversion": "types.Tags",
           "separator": ","
@@ -260,49 +252,49 @@
           "name": "name",
           "field": "Name",
           "type": "string",
-          "help": "任意: 新しい名前。未指定なら変更しません。",
+          "help": "任意: 更新リクエストのサーバ名。",
           "pointer": true
         },
         {
           "name": "description",
           "field": "Description",
           "type": "string",
-          "help": "任意: 新しい説明。未指定なら変更しません。",
+          "help": "任意: 更新リクエストの説明。",
           "pointer": true
         },
         {
           "name": "cpu",
           "field": "CPU",
           "type": "int",
-          "help": "任意: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。",
+          "help": "任意: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。指定するとプラン変更になります。",
           "pointer": true
         },
         {
           "name": "memory-gb",
           "field": "MemoryGB",
           "type": "int",
-          "help": "任意: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。",
+          "help": "任意: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。指定するとプラン変更になります。",
           "pointer": true
         },
         {
           "name": "gpu",
           "field": "GPU",
           "type": "int",
-          "help": "任意: GPU 数。未指定なら変更しません。",
+          "help": "任意: プラン変更後の GPU 数。",
           "pointer": true
         },
         {
           "name": "gpu-model",
           "field": "GPUModel",
           "type": "string",
-          "help": "任意: GPU モデル。未指定なら変更しません。",
+          "help": "任意: プラン変更後の GPU モデル。",
           "pointer": true
         },
         {
           "name": "cpu-model",
           "field": "CPUModel",
           "type": "string",
-          "help": "任意: CPU モデル。未指定なら変更しません。",
+          "help": "任意: プラン変更後の CPU モデル。",
           "pointer": true
         }
       ]
@@ -311,7 +303,7 @@
       "name": "Delete",
       "help": "サーバを削除します。成功時は出力しません。ディスクも削除する場合は --with-disks を指定します。例: skr iaas-api server delete --zone ZONE --id 123456789012",
       "method": "DeleteWithContext",
-      "request_type": "server.DeleteRequest",
+      "request_type": "DeleteRequest",
       "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: WithDisks (true の場合は接続中のディスクも削除)、FailIfNotFound (true の場合は対象がないとエラー。省略時はエラーにしない)、Force (起動中サーバを強制停止してから削除)。ディスクを残す場合は WithDisks を省略または false にします。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
       "flags": [
@@ -352,6 +344,6 @@
     }
   ],
   "wiring_target": "IaaSAPI.Server",
-  "sdk_factory": "server.New",
+  "sdk_factory": "serverapi.NewAPI",
   "client_factory": "iaasclient.New"
 }

@@ -25,7 +25,6 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/ostype"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/skr/internal/apigen"
 	"github.com/sacloud/skr/internal/iaas/archiveapi"
 	"github.com/sacloud/skr/internal/iaas/diskapi"
@@ -96,7 +95,7 @@ func TestIaaSSDKValidationErrorsAreReturned(t *testing.T) {
 				setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return diskapi.NewAPI(caller), nil })
 				setDiskPlanAPIFactory(commandLine, func() (diskplanapi.API, error) { return diskplanapi.NewSDKAPI(caller), nil })
 				setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) { return packetfilterapi.NewAPI(caller), nil })
-				setServerAPIFactory(commandLine, func() (serverapi.API, error) { return server.New(caller), nil })
+				setServerAPIFactory(commandLine, func() (serverapi.API, error) { return serverapi.NewAPI(caller), nil })
 				setServerPlanAPIFactory(commandLine, func() (serverplanapi.API, error) { return serverplanapi.NewSDKAPI(caller), nil })
 				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return switchapi.NewAPI(caller), nil })
 				args := append([]string{"iaas-api"}, strings.Fields(resource)...)
@@ -199,7 +198,7 @@ func TestArchiveOSTypeCanBeCombinedWithNamesAndTags(t *testing.T) {
 func TestServerBootSDKValidationErrorIsReturned(t *testing.T) {
 	commandLine := newCLI()
 	caller := &serverAPICaller{}
-	setServerAPIFactory(commandLine, func() (serverapi.API, error) { return server.New(caller), nil })
+	setServerAPIFactory(commandLine, func() (serverapi.API, error) { return serverapi.NewAPI(caller), nil })
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "server", "boot", "--zone", "test-zone", "--id", "0"}, &stdout, &stderr, commandLine)
 	require.EqualValues(t, 1, code, "code=%d stdout=%q stderr=%q calls=%+v; want SDK validation error", code, stdout.String(), stderr.String(), caller.calls)

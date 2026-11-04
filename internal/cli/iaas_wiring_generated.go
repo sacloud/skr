@@ -25,8 +25,6 @@
 package cli
 
 import (
-	internet "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
-	server "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	archiveapi "github.com/sacloud/skr/internal/iaas/archiveapi"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	databaseapi "github.com/sacloud/skr/internal/iaas/databaseapi"
@@ -103,7 +101,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return internet.New(client), nil
+		return internetapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.IPAddress = ipaddressapi.NewCommands(ipaddressapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -227,7 +225,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return server.New(client), nil
+		return serverapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.ServiceClass = serviceclassapi.NewCommands(serviceclassapi.Runtime{
 		DecodeRequest:  decodeRequest,

@@ -15,6 +15,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -152,12 +153,24 @@ func TestScenarioInternet(t *testing.T) {
 func readInternet(t *testing.T, h *helper.Helper, description string, id types.ID) internetItem {
 	t.Helper()
 
-	data := h.Call(t, description,
-		"iaas-api", "internet", "read", "--zone", internetZone, "--id", id.String(),
-		"--query", "{ID,Name,Description,NetworkMaskLen,BandWidthMbps,Switch}")
-	item, err := parseInternet(data)
-	require.NoError(t, err, "%s: decode Internet", description)
-	return item
+	deadline := time.Now().Add(5 * time.Minute)
+	for {
+		data, stderr, err := h.CallAllowingFailure(t, description,
+			"iaas-api", "internet", "read", "--zone", internetZone, "--id", id.String(),
+			"--query", "{ID,Name,Description,NetworkMaskLen,BandWidthMbps,Switch}")
+		if err == nil {
+			item, err := parseInternet(data)
+			require.NoError(t, err, "%s: decode Internet", description)
+			return item
+		}
+		if !strings.Contains(stderr, `ErrorCode:"not_found"`) {
+			require.NoError(t, err, "%s: %s", description, stderr)
+		}
+		if time.Now().Add(2 * time.Second).After(deadline) {
+			require.NoError(t, err, "%s timed out waiting for Internet %s: %s", description, id, stderr)
+		}
+		h.Sleep(t, "ルータ＋スイッチの参照可能化を待つ", 2*time.Second)
+	}
 }
 
 // findInternetByCLI は skr CLI の名前検索でルータ＋スイッチを検索します。

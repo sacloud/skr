@@ -185,4 +185,4 @@ $ rmdir "$WORK_DIR"
 - [サーバの作成と削除](https://manual.sakura.ad.jp/cloud/server/create-delete.html)
 - [共有セグメントを利用する](https://manual.sakura.ad.jp/cloud/design-pattern/ex01.html)
 - [公開鍵認証の設定](https://manual.sakura.ad.jp/cloud/controlpanel/settings/public-key.html)
-- [sacloud-sdk-go v0.3.0 Server API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/server)
+- [sacloud-sdk-go v0.3.1 Server API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.1/api/iaas#ServerAPI)

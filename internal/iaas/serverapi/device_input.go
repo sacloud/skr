@@ -20,8 +20,6 @@ import (
 	"strings"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 )
 
 func parseDeviceFields(input string, allowed ...string) (map[string]string, error) {
@@ -63,7 +61,7 @@ func positiveDeviceInteger(fields map[string]string, key string, bits int) (int6
 	return number, nil
 }
 
-func parseDisk(input, name string) (*disk.ApplyRequest, error) {
+func parseDisk(input, name string) (*DiskRequest, error) {
 	fields, err := parseDeviceFields(input, "archive-id", "plan-id", "size-gb")
 	if err != nil {
 		return nil, err
@@ -83,13 +81,13 @@ func parseDisk(input, name string) (*disk.ApplyRequest, error) {
 			return nil, err
 		}
 	}
-	return &disk.ApplyRequest{
+	return &DiskRequest{
 		Name: name, DiskPlanID: types.ID(plan), SizeGB: int(size),
 		SourceArchiveID: types.ID(archive), Connection: types.DiskConnections.VirtIO,
 	}, nil
 }
 
-func parseNIC(input string) (*server.NetworkInterface, error) {
+func parseNIC(input string) (*NetworkInterface, error) {
 	fields, err := parseDeviceFields(input, "upstream")
 	if err != nil {
 		return nil, err
@@ -103,5 +101,5 @@ func parseNIC(input string) (*server.NetworkInterface, error) {
 			return nil, fmt.Errorf("upstream は shared、disconnected、または正の整数のスイッチ ID で指定してください")
 		}
 	}
-	return &server.NetworkInterface{Upstream: upstream}, nil
+	return &NetworkInterface{Upstream: upstream}, nil
 }

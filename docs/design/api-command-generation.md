@@ -7,7 +7,7 @@
 
 `cmd/apigen-iaas` は、明示した IaaS SDK 操作のコマンド登録、型付き API インターフェース、操作ハンドラー、標準的なリクエスト入力と出力を Go ソースに生成します。IaaS 以外の Ogen 系 API には共通入口 `cmd/apigen-api` を使います。`cmd/apigen-wiring` は同じ設定 JSON から `internal/cli` 配下の配線コードを生成します (ADR 0068)。生成コードはリポジトリに含め、実行時や通常のビルド時に生成器を必要としません。設定解析と共有可能な生成処理は `internal/apigen` にあります。IaaS と Ogen 系 API は別の CLI 入口を保ち、共通化できる範囲で実装を共有します。
 
-生成器は SDK の操作を探索して公開範囲や入力の意味を決めません。対象操作、SDK メソッド名、リクエスト／レスポンス型、個別フラグ、ヘルプは設定で明示します。IaaS API コマンドは [ADR 0071](../adr/0071-iaas-api-uses-api-layer.md) に従い、`sacloud-sdk-go/api/iaas` の API 操作を直接呼び出します。IaaS の操作入力型は各 `internal/iaas/<resource>api/` package が定義し、API 層の操作引数へ変換します。設定内容は SDK の公開 API interface と API 用リクエスト型に照らして確認します。
+生成器は SDK の操作を探索して公開範囲や入力の意味を決めません。対象操作、SDK メソッド名、リクエスト／レスポンス型、個別フラグ、ヘルプは設定で明示します。IaaS API コマンドは [ADR 0071](../adr/0071-iaas-api-uses-api-layer.md) に従い、`sacloud-sdk-go/api/iaas` の API 操作を直接呼び出します。IaaS の操作入力型は各 `internal/iaas/<resource>api/` package が定義し、API 層の操作引数へ変換します。設定内容は SDK の公開 API interface と API 用リクエスト型に照らして確認します。一部の更新リクエスト型は未指定値とゼロ値を区別できず、SDK がすべてのフィールドを送信するため、Internet と Server の手書き adapter は現在値を読み、未指定フィールドを保持してから API 操作を呼び出します。
 
 ## 設定と実行
 
@@ -177,9 +177,9 @@ Switch では `find`、`read`、`create`、`update`、`delete` を生成しま�
 
 Server では `find`、`read`、`create`、`update`、`delete` を生成します。`create` のディスク／NIC 入力は型付き変換 callback に接続し、`boot` は `handwritten: true` で登録した手書きハンドラーとして実装します。設定は [`api/commands/iaas-server.json`](../../api/commands/iaas-server.json)、生成先は `internal/iaas/serverapi/` です。各操作では対象ゾーンを明示し、対応するフラグと JSON のどちらでも `Zone: "all"` を SDK 呼び出し前に拒否します。
 
-Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー値をフラグで指定できます。IaaS のトップレベル `Tags` は `--tags` にカンマ区切りで指定できます。[ADR 0041](../adr/0041-server-repeatable-disk-and-nic-options.md) の限定例外として、反復可能な `--disk` と `--nic` でディスクと NIC を指定順に構築します。ディスクは plan-id と size-gb が必須で、任意の archive-id を受け付け、virtio 接続にします。NIC は upstream=shared または upstream=disconnected を受け付け、shared は先頭に限定します。それ以外の複雑な構成は JSON リクエストで渡し、JSON と個別フラグの併用を拒否します。ディスク作成の待機設定 `NoWait` はディスク構成や `BootAfterCreate` と関係するため JSON 経路に残します。
+Server 作成では Zone、Name、CPU、MemoryGB と単純な独立スカラー値をフラグで指定できます。IaaS のトップレベル `Tags` は `--tags` にカンマ区切りで指定できます。[ADR 0041](../adr/0041-server-repeatable-disk-and-nic-options.md) の限定例外として、反復可能な `--disk` と `--nic` でディスクと NIC を指定順に構築します。ディスクは Server 作成後に Disk API で作成・接続し、plan-id と size-gb が必須で、任意の archive-id を受け付け、virtio 接続にします。NIC は Server API の接続スイッチ入力へ変換し、upstream=shared、upstream=disconnected、または正のスイッチ ID を受け付けます。`BootAfterCreate` は Server API の Boot 操作を追加で呼び出します。service 層固有の `NoWait` は公開しません。それ以外の複雑な構成は JSON リクエストで渡し、JSON と個別フラグの併用を拒否します。
 
-Boot は Zone と ID を必須とし、任意の user-data を `--user-data @path` または `--user-data -` で読み込みます。省略時は通常どおり起動し、インラインの user-data は拒否します。更新では単純なスカラーと `--tags` を任意フラグにし、未指定値を保持します。指定項目がない更新リクエストも SDK へ渡します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。本文の検証は SDK と API に委ね、手書きハンドラーと CLI 独自の入力処理は `internal/iaas/serverapi/` に置きます。各パッケージの単体テストと `internal/cli/server_test.go` で検証します。
+Boot は Zone と ID を必須とし、任意の user-data を `--user-data @path` または `--user-data -` で読み込みます。省略時は通常どおり起動し、インラインの user-data は拒否します。更新では単純なスカラーと `--tags` を任意フラグにし、未指定値を保持します。指定項目がない更新リクエストも SDK へ渡します。削除はディスクを既定で残し、`WithDisks` と `Force` を明示した場合だけ、それぞれ接続ディスクの削除と起動中サーバの強制停止を許可します。`Force` では起動中サーバに停止 API を送り、その後停止状態を API で確認し、停止を確認できない場合は削除しません。本文の検証は SDK と API に委ね、手書きハンドラーと CLI 独自の入力処理は `internal/iaas/serverapi/` に置きます。各パッケージの単体テストと `internal/cli/server_test.go` で検証します。
 
 Disk では `find`、`read`、`create`、`update`、`delete` を生成します。設定は [`api/commands/iaas-disk.json`](../../api/commands/iaas-disk.json)、生成先は `internal/iaas/diskapi/` です。各検索では対象ゾーンを明示し、`--tags` でタグ条件をカンマ区切り指定できます。Create は Zone、Name、DiskPlanID、Connection、SizeGB と API 操作の引数である KMSKeyID、DedicatedStorageContractID、DistantFrom を受け付けます。Update は Zone と ID を必須とし、Name、Description、Tags、IconID、Connection を API 更新リクエストへ変換します。サービス層固有の EditParameter、OSType、NoWait、削除待機は公開しません。個別フラグと `--request` JSON は併用できず、SDK の API 操作へ入力を直接渡します。
 
