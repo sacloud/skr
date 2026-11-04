@@ -33,6 +33,8 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
 
 チェックは列挙した操作の CLI 実装状況を示します。SDK にある未対応操作、ライブ E2E、チュートリアルの状況も併記します。
 
+2026-11-04 に API 層移行後の Archive、Disk、Icon、IPAddress、IPv6Addr、IPv6Net、PacketFilter、Region、ServiceClass、Switch、Zone のライブ E2E を直列で再実行し、すべて成功しました。IPv6 のシナリオは作成した Internet が API から参照可能になるまで待ってから実行します。
+
 - [x] `archive`
     - `iaas-api archive` の Find / Read を実装済みです。Find はゾーン、タグ、公開アーカイブの OS 種別で検索できます。
     - SDK の Create / Update / Delete / Upload / Download / OpenFTP / CloseFTP / WaitReady は未対応です。

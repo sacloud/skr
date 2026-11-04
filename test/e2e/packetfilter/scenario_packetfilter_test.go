@@ -102,9 +102,14 @@ func TestScenarioPacketFilter(t *testing.T) {
 	require.Equal(t, firstExpression, created.Expression[0])
 
 	defer func() {
-		// 削除前に保持した ID と説明を再確認する
+		// 削除前に保持した ID と作成時または更新後の内容を再確認する
 		current := readPacketFilter(t, h, "削除前にパケットフィルタを再確認する", created.ID)
-		require.Equal(t, description, current.Description, "packet filter identity changed before cleanup")
+		require.Equal(t, created.ID, current.ID, "packet filter ID changed before cleanup")
+		createdState := current.Name == name && current.Description == description &&
+			len(current.Expression) == 1 && current.Expression[0] == firstExpression
+		updatedState := current.Name == updatedName && current.Description == description &&
+			len(current.Expression) == 1 && current.Expression[0] == updatedExpression
+		require.True(t, createdState || updatedState, "packet filter contents changed before cleanup")
 		// パケットフィルタを削除し、作成時と更新後の名前のどちらでも残っていないことを確認する
 		_ = h.Call(t, "パケットフィルタを削除する", "iaas-api", "packetfilter", "delete", "--zone", zone, "--id", created.ID.String(), "--fail-if-not-found")
 		require.Empty(t, findPacketFilters(t, h, "削除後に作成時の名前が残っていないことを確認する", name), "packet filter %s should not remain after deletion", created.ID)
@@ -132,15 +137,18 @@ func TestScenarioPacketFilter(t *testing.T) {
 		"iaas-api", "packetfilter", "update",
 		"--zone", zone, "--id", created.ID.String(),
 		"--name", updatedName,
+		"--description", description,
 		"--original-expression-hash", read.ExpressionHash,
 		"--expressions", expressionsJSON(t, updatedExpression))
 	updated := parsePacketFilter(t, data)
 	require.Equal(t, updatedName, updated.Name)
+	require.Equal(t, description, updated.Description)
 	require.Equal(t, []packetFilterExpression{updatedExpression}, updated.Expression)
 
 	// 更新後のパケットフィルタを参照する
 	readUpdated := readPacketFilter(t, h, "更新後のパケットフィルタを参照する", created.ID)
 	require.Equal(t, updatedName, readUpdated.Name)
+	require.Equal(t, description, readUpdated.Description)
 	require.Equal(t, []packetFilterExpression{updatedExpression}, readUpdated.Expression)
 }
 
