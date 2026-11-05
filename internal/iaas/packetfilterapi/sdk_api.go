@@ -35,7 +35,11 @@ func NewAPI(caller iaas.APICaller) API {
 }
 
 func (api *sdkAPI) FindWithContext(ctx context.Context, request *FindRequest) ([]*iaas.PacketFilter, error) {
-	condition := &iaas.FindCondition{Count: request.Count, From: request.From}
+	condition := &iaas.FindCondition{
+		Count: request.Count,
+		From:  request.From,
+		Sort:  request.Sort,
+	}
 	if len(request.Names) > 0 {
 		condition.Filter = search.Filter{search.Key("Name"): search.AndEqual(request.Names...)}
 	}

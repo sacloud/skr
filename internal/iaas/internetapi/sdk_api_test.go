@@ -17,8 +17,11 @@ package internetapi
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
@@ -128,19 +131,85 @@ func TestCreateRejectsServiceOnlyOptions(t *testing.T) {
 	require.ErrorContains(t, err, "NoWait")
 }
 
+func TestCreateWaitsForInternetToBecomeReadableBeforeEnablingIPv6(t *testing.T) {
+	notFound := iaas.NewAPIError(http.MethodGet, &url.URL{Path: "/internet/123"}, http.StatusNotFound, &iaas.APIErrorResponse{})
+	op := &internetAPIFake{
+		createResult: &iaas.Internet{ID: 123},
+		readResults: []internetReadResult{
+			{err: notFound},
+			{internet: &iaas.Internet{ID: 123}},
+		},
+	}
+	sdk := &sdkAPI{op: op}
+
+	result, err := sdk.CreateWithContext(context.Background(), &CreateRequest{
+		Zone:       "is1b",
+		Name:       "router",
+		EnableIPv6: true,
+	})
+
+	require.NoError(t, err)
+	require.EqualValues(t, 123, result.ID)
+	require.Equal(t, []string{"create", "read", "read", "enable-ipv6"}, op.calls)
+}
+
+func TestMonitorRouterUsesOneHourWindowWhenOnlyEndIsSpecified(t *testing.T) {
+	end := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
+	op := &internetAPIFake{routerActivity: &iaas.RouterActivity{}}
+	sdk := &sdkAPI{op: op}
+
+	_, err := sdk.MonitorRouterWithContext(context.Background(), &MonitorRouterRequest{
+		Zone: "is1b",
+		ID:   123,
+		End:  end,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, op.monitorCondition)
+	require.Equal(t, end, op.monitorCondition.End)
+	require.Equal(t, end.Add(-time.Hour), op.monitorCondition.Start)
+}
+
+func TestMonitorRouterDefaultsBothTimes(t *testing.T) {
+	op := &internetAPIFake{routerActivity: &iaas.RouterActivity{}}
+	sdk := &sdkAPI{op: op}
+	before := time.Now()
+
+	_, err := sdk.MonitorRouterWithContext(context.Background(), &MonitorRouterRequest{
+		Zone: "is1b",
+		ID:   123,
+	})
+
+	after := time.Now()
+	require.NoError(t, err)
+	require.NotNil(t, op.monitorCondition)
+	require.False(t, op.monitorCondition.End.Before(before))
+	require.False(t, op.monitorCondition.End.After(after))
+	require.Equal(t, time.Hour, op.monitorCondition.End.Sub(op.monitorCondition.Start))
+}
+
 func intPointer(value int) *int {
 	return &value
 }
 
+type internetReadResult struct {
+	internet *iaas.Internet
+	err      error
+}
+
 type internetAPIFake struct {
 	iaas.InternetAPI
-	readResult      *iaas.Internet
-	bandwidthResult *iaas.Internet
-	calls           []string
-	ipv6ID          types.ID
-	subnetID        types.ID
-	updateCalls     int
-	bandwidthCalls  int
+	createResult     *iaas.Internet
+	readResult       *iaas.Internet
+	readResults      []internetReadResult
+	bandwidthResult  *iaas.Internet
+	routerActivity   *iaas.RouterActivity
+	monitorCondition *iaas.MonitorCondition
+	calls            []string
+	ipv6ID           types.ID
+	subnetID         types.ID
+	updateCalls      int
+	bandwidthCalls   int
 }
 
 type internetAPICallerFake struct {
@@ -170,9 +239,29 @@ func (caller *internetAPICallerFake) Do(_ context.Context, _, _ string, body any
 	return []byte(`{"Internet":{"ID":123,"Name":"current","Description":"preserve me","Tags":["keep"],"Icon":{"ID":42}}}`), nil
 }
 
+func (api *internetAPIFake) Create(_ context.Context, _ string, _ *iaas.InternetCreateRequest) (*iaas.Internet, error) {
+	api.calls = append(api.calls, "create")
+	return api.createResult, nil
+}
+
 func (api *internetAPIFake) Read(ctx context.Context, zone string, id types.ID) (*iaas.Internet, error) {
 	api.calls = append(api.calls, "read")
+	if len(api.readResults) > 0 {
+		result := api.readResults[0]
+		api.readResults = api.readResults[1:]
+		return result.internet, result.err
+	}
 	return api.readResult, nil
+}
+
+func (api *internetAPIFake) EnableIPv6(_ context.Context, _ string, _ types.ID) (*iaas.IPv6NetInfo, error) {
+	api.calls = append(api.calls, "enable-ipv6")
+	return &iaas.IPv6NetInfo{}, nil
+}
+
+func (api *internetAPIFake) MonitorRouter(_ context.Context, _ string, _ types.ID, condition *iaas.MonitorCondition) (*iaas.RouterActivity, error) {
+	api.monitorCondition = condition
+	return api.routerActivity, nil
 }
 
 func (api *internetAPIFake) DisableIPv6(ctx context.Context, zone string, id, ipv6ID types.ID) error {

@@ -17,10 +17,16 @@ package internetapi
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+)
+
+const (
+	internetReadyTimeout  = 35 * time.Minute
+	internetReadyInterval = 2 * time.Second
 )
 
 type sdkAPI struct {
@@ -87,11 +93,44 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 		return nil, err
 	}
 	if request.EnableIPv6 {
+		if result == nil || result.ID.IsEmpty() {
+			return nil, fmt.Errorf("ルータ＋スイッチ作成 API の応答に ID がありません")
+		}
+		if err := api.waitForInternetReady(ctx, request.Zone, result.ID); err != nil {
+			return nil, fmt.Errorf("ルータ＋スイッチ %d は作成されましたが、参照可能になるまで待機できませんでした: %w", result.ID, err)
+		}
 		if _, err := api.op.EnableIPv6(ctx, request.Zone, result.ID); err != nil {
 			return nil, fmt.Errorf("ルータ＋スイッチ %d は作成されましたが、IPv6 の有効化に失敗しました: %w", result.ID, err)
 		}
 	}
 	return result, nil
+}
+
+func (api *sdkAPI) waitForInternetReady(ctx context.Context, zone string, id types.ID) error {
+	waitCtx, cancel := context.WithTimeout(ctx, internetReadyTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(internetReadyInterval)
+	defer ticker.Stop()
+
+	for {
+		internet, err := api.op.Read(waitCtx, zone, id)
+		if err == nil {
+			if internet == nil || internet.ID != id {
+				return fmt.Errorf("ルータ＋スイッチ %d の読み込み応答が不正です", id)
+			}
+			return nil
+		}
+		if !iaas.IsNotFoundError(err) {
+			return fmt.Errorf("ルータ＋スイッチ %d の状態を確認できません: %w", id, err)
+		}
+
+		select {
+		case <-waitCtx.Done():
+			return fmt.Errorf("ルータ＋スイッチ %d が %s 以内に参照可能になりませんでした: %w", id, internetReadyTimeout, waitCtx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 func (api *sdkAPI) UpdateWithContext(ctx context.Context, request *UpdateRequest) (*iaas.Internet, error) {
@@ -319,9 +358,17 @@ func (api *sdkAPI) MonitorRouterWithContext(ctx context.Context, request *Monito
 	if err := requireID(request.ID); err != nil {
 		return nil, err
 	}
+	end := request.End
+	if end.IsZero() {
+		end = time.Now()
+	}
+	start := request.Start
+	if start.IsZero() {
+		start = end.Add(-time.Hour)
+	}
 	result, err := api.op.MonitorRouter(ctx, request.Zone, request.ID, &iaas.MonitorCondition{
-		Start: request.Start,
-		End:   request.End,
+		Start: start,
+		End:   end,
 	})
 	if err != nil {
 		return nil, err

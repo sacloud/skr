@@ -20,13 +20,19 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCreateUsesServerAndDiskAPIs(t *testing.T) {
-	serverOp := &serverAPIFake{createResult: &iaas.Server{ID: 123}}
-	diskOp := &diskAPIFake{createResult: &iaas.Disk{ID: 456}}
+	events := []string{}
+	serverOp := &serverAPIFake{createResult: &iaas.Server{ID: 123}, events: &events}
+	diskOp := &diskAPIFake{
+		createResult: &iaas.Disk{ID: 456},
+		readResults:  []*iaas.Disk{{ID: 456, ServerID: 123, Availability: types.Availabilities.Available}},
+		events:       &events,
+	}
 	sdk := &sdkAPI{op: serverOp, diskOp: diskOp}
 
 	result, err := sdk.CreateWithContext(context.Background(), &CreateRequest{
@@ -51,6 +57,8 @@ func TestCreateUsesServerAndDiskAPIs(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 123, result.ID)
 	require.Equal(t, []string{"create", "boot"}, serverOp.calls)
+	require.Equal(t, []string{"create", "read"}, diskOp.calls)
+	require.Equal(t, []string{"server-create", "disk-create", "disk-read", "server-boot"}, events)
 	require.EqualValues(t, 4096, serverOp.createRequest.MemoryMB)
 	require.Len(t, serverOp.createRequest.ConnectedSwitches, 3)
 	require.Equal(t, types.Scopes.Shared, serverOp.createRequest.ConnectedSwitches[0].Scope)
@@ -62,6 +70,77 @@ func TestCreateUsesServerAndDiskAPIs(t *testing.T) {
 	require.EqualValues(t, 123, diskOp.createRequest.ServerID)
 	require.EqualValues(t, 99, diskOp.createRequest.SourceArchiveID)
 	require.EqualValues(t, 20480, diskOp.createRequest.SizeMB)
+}
+
+func TestFindPassesSortToAPI(t *testing.T) {
+	serverOp := &serverAPIFake{}
+	sdk := &sdkAPI{op: serverOp}
+	sort := search.SortKeys{search.SortKeyDesc("CreatedAt")}
+	var request FindRequest
+	require.NoError(t, json.Unmarshal([]byte(`{"Zone":"is1b","Sort":[{"Key":"CreatedAt","Order":1}],"Count":10,"From":20}`), &request))
+
+	_, err := sdk.FindWithContext(context.Background(), &request)
+
+	require.NoError(t, err)
+	require.NotNil(t, serverOp.findCondition)
+	require.Equal(t, sort, serverOp.findCondition.Sort)
+	require.Equal(t, 10, serverOp.findCondition.Count)
+	require.Equal(t, 20, serverOp.findCondition.From)
+}
+
+func TestCreateWaitsForArchiveDiskBeforeBoot(t *testing.T) {
+	events := []string{}
+	serverOp := &serverAPIFake{createResult: &iaas.Server{ID: 123}, events: &events}
+	diskOp := &diskAPIFake{
+		createResult: &iaas.Disk{ID: 456},
+		readResults: []*iaas.Disk{
+			{ID: 456, ServerID: 123, Availability: types.Availabilities.Transferring},
+			{ID: 456, ServerID: 123, Availability: types.Availabilities.Available},
+		},
+		events: &events,
+	}
+	sdk := &sdkAPI{op: serverOp, diskOp: diskOp}
+
+	_, err := sdk.CreateWithContext(context.Background(), &CreateRequest{
+		Zone:            "is1b",
+		Name:            "test-server",
+		CPU:             2,
+		MemoryGB:        4,
+		BootAfterCreate: true,
+		Disks: []DiskRequest{{
+			Name:            "test-disk",
+			DiskPlanID:      7,
+			SizeGB:          20,
+			SourceArchiveID: 99,
+			Connection:      types.DiskConnections.VirtIO,
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"server-create", "disk-create", "disk-read", "disk-read", "server-boot"}, events)
+}
+
+func TestCreateDoesNotBootWhenDiskCannotBecomeAvailable(t *testing.T) {
+	serverOp := &serverAPIFake{createResult: &iaas.Server{ID: 123}}
+	diskOp := &diskAPIFake{
+		createResult: &iaas.Disk{ID: 456},
+		readResults: []*iaas.Disk{
+			{ID: 456, ServerID: 123, Availability: types.Availabilities.Failed},
+		},
+	}
+	sdk := &sdkAPI{op: serverOp, diskOp: diskOp}
+
+	_, err := sdk.CreateWithContext(context.Background(), &CreateRequest{
+		Zone:            "is1b",
+		Name:            "test-server",
+		CPU:             2,
+		MemoryGB:        4,
+		BootAfterCreate: true,
+		Disks:           []DiskRequest{{DiskPlanID: 7, SizeGB: 20}},
+	})
+
+	require.ErrorContains(t, err, "利用可能化に失敗")
+	require.Equal(t, []string{"create"}, serverOp.calls)
 }
 
 func TestCreateSerializesNICsAsServerAPIRequests(t *testing.T) {
@@ -238,6 +317,7 @@ func TestDeleteRejectsRunningServerWithoutForce(t *testing.T) {
 type serverAPIFake struct {
 	iaas.ServerAPI
 	calls                  []string
+	findCondition          *iaas.FindCondition
 	createRequest          *iaas.ServerCreateRequest
 	createResult           *iaas.Server
 	readResult             *iaas.Server
@@ -246,16 +326,28 @@ type serverAPIFake struct {
 	deleteWithDisksRequest *iaas.ServerDeleteWithDisksRequest
 	updateCalls            int
 	changePlanCalls        int
+	events                 *[]string
 }
 
 func (api *serverAPIFake) Create(_ context.Context, _ string, request *iaas.ServerCreateRequest) (*iaas.Server, error) {
 	api.calls = append(api.calls, "create")
+	if api.events != nil {
+		*api.events = append(*api.events, "server-create")
+	}
 	api.createRequest = request
 	return api.createResult, nil
 }
 
+func (api *serverAPIFake) Find(_ context.Context, _ string, condition *iaas.FindCondition) (*iaas.ServerFindResult, error) {
+	api.findCondition = condition
+	return &iaas.ServerFindResult{}, nil
+}
+
 func (api *serverAPIFake) Boot(_ context.Context, _ string, _ types.ID) error {
 	api.calls = append(api.calls, "boot")
+	if api.events != nil {
+		*api.events = append(*api.events, "server-boot")
+	}
 	return nil
 }
 
@@ -293,13 +385,33 @@ func (api *serverAPIFake) DeleteWithDisks(_ context.Context, _ string, _ types.I
 
 type diskAPIFake struct {
 	iaas.DiskAPI
+	calls         []string
 	createRequest *iaas.DiskCreateRequest
 	createResult  *iaas.Disk
+	readResults   []*iaas.Disk
+	events        *[]string
 }
 
 func (api *diskAPIFake) Create(_ context.Context, _ string, request *iaas.DiskCreateRequest, _ []types.ID, _ types.ID) (*iaas.Disk, error) {
+	api.calls = append(api.calls, "create")
+	if api.events != nil {
+		*api.events = append(*api.events, "disk-create")
+	}
 	api.createRequest = request
 	return api.createResult, nil
+}
+
+func (api *diskAPIFake) Read(_ context.Context, _ string, _ types.ID) (*iaas.Disk, error) {
+	api.calls = append(api.calls, "read")
+	if api.events != nil {
+		*api.events = append(*api.events, "disk-read")
+	}
+	if len(api.readResults) == 0 {
+		return nil, nil
+	}
+	result := api.readResults[0]
+	api.readResults = api.readResults[1:]
+	return result, nil
 }
 
 type serverAPICallerFake struct {

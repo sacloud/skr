@@ -14,12 +14,16 @@
 
 package serverapi
 
-import "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+import (
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+)
 
 type FindRequest struct {
 	Zone  string
 	Names []string
 	Tags  types.Tags
+	Sort  search.SortKeys
 	Count int
 	From  int
 }

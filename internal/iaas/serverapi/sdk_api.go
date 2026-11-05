@@ -27,8 +27,10 @@ import (
 )
 
 const (
-	serverShutdownTimeout  = 20 * time.Minute
-	serverShutdownInterval = 5 * time.Second
+	serverShutdownTimeout   = 20 * time.Minute
+	serverShutdownInterval  = 5 * time.Second
+	serverDiskReadyTimeout  = 20 * time.Minute
+	serverDiskReadyInterval = 5 * time.Second
 )
 
 type sdkAPI struct {
@@ -47,6 +49,7 @@ func (api *sdkAPI) FindWithContext(ctx context.Context, request *FindRequest) ([
 	condition := &iaas.FindCondition{
 		Count: request.Count,
 		From:  request.From,
+		Sort:  request.Sort,
 	}
 	filter := search.Filter{}
 	if len(request.Names) != 0 {
@@ -107,6 +110,9 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 	if err != nil {
 		return nil, err
 	}
+	if server == nil || server.ID.IsEmpty() {
+		return nil, fmt.Errorf("サーバ作成 API の応答に ID がありません")
+	}
 	createdDisks := make([]types.ID, 0, len(request.Disks))
 	for _, disk := range request.Disks {
 		diskParams := &iaas.DiskCreateRequest{
@@ -125,11 +131,49 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 		createdDisks = append(createdDisks, createdDisk.ID)
 	}
 	if request.BootAfterCreate {
+		waitCtx, cancel := context.WithTimeout(ctx, serverDiskReadyTimeout)
+		defer cancel()
+		for _, diskID := range createdDisks {
+			if err := api.waitForDiskReady(waitCtx, request.Zone, server.ID, diskID); err != nil {
+				return nil, fmt.Errorf("サーバ %d は作成されましたが、ディスク %d の起動準備完了を確認できませんでした: %w", server.ID, diskID, err)
+			}
+		}
 		if err := api.op.Boot(ctx, request.Zone, server.ID); err != nil {
 			return nil, fmt.Errorf("サーバ %d は作成されましたが、起動に失敗しました: %w", server.ID, err)
 		}
 	}
 	return server, nil
+}
+
+func (api *sdkAPI) waitForDiskReady(ctx context.Context, zone string, serverID, diskID types.ID) error {
+	ticker := time.NewTicker(serverDiskReadyInterval)
+	defer ticker.Stop()
+
+	for {
+		disk, err := api.diskOp.Read(ctx, zone, diskID)
+		if err == nil {
+			if disk == nil {
+				return fmt.Errorf("ディスク %d の読み込み結果が空です", diskID)
+			}
+			if disk.ID != diskID || disk.ServerID != serverID {
+				return fmt.Errorf("ディスク %d の所属確認に失敗しました", diskID)
+			}
+			if disk.Availability.IsAvailable() {
+				return nil
+			}
+			if disk.Availability.IsFailed() || disk.Availability.IsDiscontinued() {
+				return fmt.Errorf("ディスク %d の利用可能化に失敗しました: %s", diskID, disk.Availability)
+			}
+		} else if !iaas.IsNotFoundError(err) {
+			return fmt.Errorf("ディスク %d の状態を確認できません: %w", diskID, err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("ディスク %d が %s 以内に利用可能になりませんでした: %w", diskID, serverDiskReadyTimeout, ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 func connectedSwitch(upstream string) (*iaas.ConnectedSwitch, error) {

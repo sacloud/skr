@@ -16,12 +16,14 @@ package packetfilterapi
 
 import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 )
 
 type FindRequest struct {
 	Zone  string
 	Names []string
+	Sort  search.SortKeys
 	Count int
 	From  int
 }
