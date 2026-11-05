@@ -226,10 +226,10 @@ $ skr proxylb-api set-certificates --id "$PROXYLB_ID" \
     --primary-cert "@$WORK_DIR/proxylb-server.crt" \
     --primary-key "@$WORK_DIR/proxylb-server.key"
 $ skr proxylb-api get-certificates --id "$PROXYLB_ID" --query '.PrimaryCert.CertificateCommonName'
-"123456789002.proxylb.jp"
+"proxylb.example.test"
 ```
 
-出力例は文書用の共通名に置き換えています。`CertificateCommonName` が生成時に指定した CN と一致することを確認してください。
+`CertificateCommonName` が `openssl` で生成時に指定した CN と一致することを確認してください。
 
 設定した証明書を削除します。
 
