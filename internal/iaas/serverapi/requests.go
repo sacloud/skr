@@ -60,6 +60,7 @@ type DiskRequest struct {
 	Name                string
 	DiskPlanID          types.ID
 	SizeGB              int
+	SourceDiskID        types.ID
 	SourceArchiveID     types.ID
 	Connection          types.EDiskConnection
 	EncryptionAlgorithm types.EDiskEncryptionAlgorithm
@@ -67,7 +68,8 @@ type DiskRequest struct {
 }
 
 type NetworkInterface struct {
-	Upstream string
+	Upstream       string
+	PacketFilterID types.ID
 }
 
 type BootRequest struct {

@@ -34,14 +34,16 @@ const (
 )
 
 type sdkAPI struct {
-	op     iaas.ServerAPI
-	diskOp iaas.DiskAPI
+	op          iaas.ServerAPI
+	diskOp      iaas.DiskAPI
+	interfaceOp iaas.InterfaceAPI
 }
 
 func NewAPI(caller iaas.APICaller) API {
 	return &sdkAPI{
-		op:     iaas.NewServerOp(caller),
-		diskOp: iaas.NewDiskOp(caller),
+		op:          iaas.NewServerOp(caller),
+		diskOp:      iaas.NewDiskOp(caller),
+		interfaceOp: iaas.NewInterfaceOp(caller),
 	}
 }
 
@@ -113,12 +115,17 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 	if server == nil || server.ID.IsEmpty() {
 		return nil, fmt.Errorf("サーバ作成 API の応答に ID がありません")
 	}
+	if err := api.connectPacketFilters(ctx, request.Zone, server.ID, request.NetworkInterfaces); err != nil {
+		cleanupErr := api.cleanupCreatedServer(ctx, request.Zone, server.ID, nil)
+		return nil, errors.Join(fmt.Errorf("サーバ %d のパケットフィルター設定に失敗しました: %w", server.ID, err), cleanupErr)
+	}
 	createdDisks := make([]types.ID, 0, len(request.Disks))
 	for _, disk := range request.Disks {
 		diskParams := &iaas.DiskCreateRequest{
 			DiskPlanID:          disk.DiskPlanID,
 			Connection:          disk.Connection,
 			EncryptionAlgorithm: disk.EncryptionAlgorithm,
+			SourceDiskID:        disk.SourceDiskID,
 			SourceArchiveID:     disk.SourceArchiveID,
 			ServerID:            server.ID,
 			Name:                disk.Name,
@@ -144,6 +151,73 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 		}
 	}
 	return server, nil
+}
+
+func (api *sdkAPI) connectPacketFilters(ctx context.Context, zone string, serverID types.ID, networkInterfaces []NetworkInterface) error {
+	lastIndex := -1
+	for index, networkInterface := range networkInterfaces {
+		if !networkInterface.PacketFilterID.IsEmpty() {
+			lastIndex = index
+		}
+	}
+	if lastIndex == -1 {
+		return nil
+	}
+
+	server, err := api.op.Read(ctx, zone, serverID)
+	if err != nil {
+		return fmt.Errorf("サーバ %d の NIC を読み取れません: %w", serverID, err)
+	}
+	if server == nil {
+		return fmt.Errorf("サーバ %d の読み込み結果が空です", serverID)
+	}
+	if len(server.Interfaces) <= lastIndex {
+		return fmt.Errorf("サーバ %d の NIC 一覧に指定位置の NIC がありません", serverID)
+	}
+
+	for index, networkInterface := range networkInterfaces {
+		if networkInterface.PacketFilterID.IsEmpty() {
+			continue
+		}
+		view := server.Interfaces[index]
+		if view == nil || view.ID.IsEmpty() {
+			return fmt.Errorf("サーバ %d の NIC %d の応答に ID がありません", serverID, index)
+		}
+		if !interfaceMatchesUpstream(view, networkInterface.Upstream) {
+			return fmt.Errorf("サーバ %d の NIC %d が指定した接続先と一致しません", serverID, index)
+		}
+		if api.interfaceOp == nil {
+			return fmt.Errorf("NIC のパケットフィルター設定 API が初期化されていません")
+		}
+		current, err := api.interfaceOp.Read(ctx, zone, view.ID)
+		if err != nil {
+			return fmt.Errorf("サーバ %d の NIC %d を読み取れません: %w", serverID, index, err)
+		}
+		if current == nil || current.ID != view.ID || current.ServerID != serverID {
+			return fmt.Errorf("サーバ %d の NIC %d の所属確認に失敗しました", serverID, index)
+		}
+		if !current.PacketFilterID.IsEmpty() {
+			return fmt.Errorf("サーバ %d の NIC %d には既にパケットフィルターが設定されています", serverID, index)
+		}
+		if err := api.interfaceOp.ConnectToPacketFilter(ctx, zone, view.ID, networkInterface.PacketFilterID); err != nil {
+			return fmt.Errorf("サーバ %d の NIC %d にパケットフィルターを接続できません: %w", serverID, index, err)
+		}
+	}
+	return nil
+}
+
+func interfaceMatchesUpstream(view *iaas.InterfaceView, upstream string) bool {
+	expected, err := connectedSwitch(upstream)
+	if err != nil {
+		return false
+	}
+	if expected == nil {
+		return view.SwitchID.IsEmpty() && view.SwitchScope == ""
+	}
+	if expected.ID.IsEmpty() {
+		return view.SwitchID.IsEmpty() && view.SwitchScope == expected.Scope
+	}
+	return view.SwitchID == expected.ID
 }
 
 func (api *sdkAPI) waitForDiskReady(ctx context.Context, zone string, serverID, diskID types.ID) error {

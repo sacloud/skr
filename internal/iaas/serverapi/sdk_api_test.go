@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
@@ -144,9 +145,9 @@ func TestCreateDoesNotBootWhenDiskCannotBecomeAvailable(t *testing.T) {
 	require.Equal(t, []string{"create"}, serverOp.calls)
 }
 
-func TestCreatePassesDiskEncryptionFieldsFromJSON(t *testing.T) {
+func TestCreatePassesDiskSourceAndEncryptionFieldsFromJSON(t *testing.T) {
 	var request CreateRequest
-	require.NoError(t, json.Unmarshal([]byte(`{"Zone":"is1b","Name":"test-server","CPU":2,"MemoryGB":4,"Disks":[{"Name":"test-disk","DiskPlanID":7,"SizeGB":20,"EncryptionAlgorithm":"aes256_xts","KMSKeyID":789}]}`), &request))
+	require.NoError(t, json.Unmarshal([]byte(`{"Zone":"is1b","Name":"test-server","CPU":2,"MemoryGB":4,"Disks":[{"Name":"test-disk","DiskPlanID":7,"SizeGB":20,"SourceDiskID":321,"EncryptionAlgorithm":"aes256_xts","KMSKeyID":789}]}`), &request))
 	caller := &serverDiskCreateAPICallerFake{}
 	sdk := &sdkAPI{op: iaas.NewServerOp(caller), diskOp: iaas.NewDiskOp(caller)}
 
@@ -157,6 +158,9 @@ func TestCreatePassesDiskEncryptionFieldsFromJSON(t *testing.T) {
 	var body struct {
 		Disk struct {
 			EncryptionAlgorithm types.EDiskEncryptionAlgorithm
+			SourceDisk          struct {
+				ID types.ID
+			}
 		}
 		KMSKey struct {
 			ID types.ID
@@ -164,7 +168,45 @@ func TestCreatePassesDiskEncryptionFieldsFromJSON(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(caller.diskRequest, &body))
 	require.Equal(t, types.EDiskEncryptionAlgorithm("aes256_xts"), body.Disk.EncryptionAlgorithm)
+	require.EqualValues(t, 321, body.Disk.SourceDisk.ID)
 	require.EqualValues(t, 789, body.KMSKey.ID)
+}
+
+func TestCreateConnectsPacketFilterFromJSON(t *testing.T) {
+	var request CreateRequest
+	require.NoError(t, json.Unmarshal([]byte(`{"Zone":"is1b","Name":"test-server","CPU":2,"MemoryGB":4,"BootAfterCreate":true,"NetworkInterfaces":[{"Upstream":"shared","PacketFilterID":789}]}`), &request))
+	caller := &serverPacketFilterAPICallerFake{}
+	sdk := NewAPI(caller)
+
+	_, err := sdk.CreateWithContext(context.Background(), &request)
+
+	require.NoError(t, err)
+	require.Len(t, caller.calls, 5)
+	require.Equal(t, "POST", caller.calls[0].method)
+	require.Contains(t, caller.calls[0].path, "/server")
+	require.Equal(t, "GET", caller.calls[1].method)
+	require.Contains(t, caller.calls[1].path, "/server/123")
+	require.Equal(t, "GET", caller.calls[2].method)
+	require.Contains(t, caller.calls[2].path, "/interface/456")
+	require.Equal(t, "PUT", caller.calls[3].method)
+	require.Contains(t, caller.calls[3].path, "/interface/456/to/packetfilter/789")
+	require.Equal(t, "PUT", caller.calls[4].method)
+	require.Contains(t, caller.calls[4].path, "/server/123/power")
+}
+
+func TestCreateDoesNotBootAndCleansUpWhenPacketFilterConnectionFails(t *testing.T) {
+	var request CreateRequest
+	require.NoError(t, json.Unmarshal([]byte(`{"Zone":"is1b","Name":"test-server","CPU":2,"MemoryGB":4,"BootAfterCreate":true,"NetworkInterfaces":[{"Upstream":"shared","PacketFilterID":789}]}`), &request))
+	caller := &serverPacketFilterAPICallerFake{failPacketFilter: true}
+	sdk := NewAPI(caller)
+
+	_, err := sdk.CreateWithContext(context.Background(), &request)
+
+	require.ErrorContains(t, err, "パケットフィルター")
+	require.Len(t, caller.calls, 5)
+	require.Contains(t, caller.calls[3].path, "/interface/456/to/packetfilter/789")
+	require.Equal(t, "DELETE", caller.calls[4].method)
+	require.Contains(t, caller.calls[4].path, "/server/123")
 }
 
 func TestCreateSerializesNICsAsServerAPIRequests(t *testing.T) {
@@ -445,6 +487,40 @@ type serverAPICallerFake struct {
 type serverDiskCreateAPICallerFake struct {
 	calls       int
 	diskRequest []byte
+}
+
+type serverPacketFilterAPICallerFake struct {
+	calls []struct {
+		method string
+		path   string
+	}
+	failPacketFilter bool
+}
+
+func (caller *serverPacketFilterAPICallerFake) Do(_ context.Context, method, path string, _ any) ([]byte, error) {
+	caller.calls = append(caller.calls, struct {
+		method string
+		path   string
+	}{method: method, path: path})
+	switch {
+	case method == "POST" && strings.HasSuffix(path, "/server"):
+		return []byte(`{"Server":{"ID":123}}`), nil
+	case method == "GET" && strings.HasSuffix(path, "/server/123"):
+		return []byte(`{"Server":{"ID":123,"Interfaces":[{"ID":456,"Switch":{"Scope":"shared"}}]}}`), nil
+	case method == "GET" && strings.HasSuffix(path, "/interface/456"):
+		return []byte(`{"Interface":{"ID":456,"Server":{"ID":123}}}`), nil
+	case method == "PUT" && strings.HasSuffix(path, "/interface/456/to/packetfilter/789"):
+		if caller.failPacketFilter {
+			return nil, fmt.Errorf("packet filter rejected")
+		}
+		return []byte(`{}`), nil
+	case method == "PUT" && strings.HasSuffix(path, "/server/123/power"):
+		return []byte(`{}`), nil
+	case method == "DELETE" && strings.HasSuffix(path, "/server/123"):
+		return []byte(`{}`), nil
+	default:
+		return nil, fmt.Errorf("unexpected API call: %s %s", method, path)
+	}
 }
 
 func (caller *serverDiskCreateAPICallerFake) Do(_ context.Context, _, _ string, body any) ([]byte, error) {
