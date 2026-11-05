@@ -15,7 +15,6 @@
 package commandcoverage
 
 import (
-	"fmt"
 	"os"
 	"slices"
 	"testing"
@@ -69,7 +68,6 @@ func TestReportEvidenceCoverage(t *testing.T) {
 	}
 	t.Logf("末端コマンド: %d (live %d, implemented %d, deferred %d, todo %d)",
 		len(entries), counts[StatusLive], counts[StatusImplemented], counts[StatusDeferred], counts[StatusTodo])
-
 	leaves, err := cli.LeafCommandPaths()
 	require.NoError(t, err)
 	evidence, err := EvidenceCommands("..", leaves)
@@ -79,11 +77,34 @@ func TestReportEvidenceCoverage(t *testing.T) {
 		t.Logf("末端コマンドに対応しない記録行 (古い実行記録の可能性): %s", line)
 	}
 
-	var stale []string
-	for path := range evidence.Commands {
-		if entries[path].Status != StatusLive {
-			stale = append(stale, fmt.Sprintf("%s (baseline: %s)", path, entries[path].Status))
-		}
-	}
+	var stale = staleEvidenceCommands(evidence.Commands, entries)
 	require.Empty(t, stale, "実行記録に現れた末端コマンドが baseline で live になっていません。baseline を更新してください: %v", stale)
+}
+
+// TestStaleEvidenceCommands は、実行記録と baseline の組み合わせに対する更新の促し方を確認する。
+func TestStaleEvidenceCommands(t *testing.T) {
+	entries := map[string]Entry{
+		"iaas-api server create":    {Path: "iaas-api server create", Status: StatusLive},
+		"iam-api sso link":          {Path: "iam-api sso link", Status: StatusDeferred, Issue: "#144"},
+		"http":                      {Path: "http", Status: StatusImplemented},
+		"object-storage-api bucket": {Path: "object-storage-api bucket", Status: StatusTodo},
+	}
+	evidence := map[string]struct{}{
+		"iaas-api server create":    {},
+		"iam-api sso link":          {},
+		"http":                      {},
+		"object-storage-api bucket": {},
+	}
+	// live は促さず、implemented と todo は baseline の更新を促す
+	require.Equal(t, []string{"http (baseline: implemented)", "object-storage-api bucket (baseline: todo)"},
+		staleEvidenceCommands(evidence, entries))
+
+	// deferred は追跡 Issue 付きで意図的にライブ未実施とした状態のため、
+	// 異常系の実行記録があっても baseline の更新を促さない
+	evidence2 := map[string]struct{}{"iam-api sso link": {}}
+	require.Empty(t, staleEvidenceCommands(evidence2, entries))
+
+	// 実行記録に対応する baseline がない場合は更新を促す
+	evidence3 := map[string]struct{}{"unknown command": {}}
+	require.Equal(t, []string{"unknown command (baseline: )"}, staleEvidenceCommands(evidence3, entries))
 }

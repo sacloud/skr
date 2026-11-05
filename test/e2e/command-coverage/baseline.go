@@ -85,3 +85,23 @@ func statusToken(fields []string) string {
 	}
 	return ""
 }
+
+// staleEvidenceCommands は、実行記録に現れた末端コマンドのうち baseline の更新を促すものを返します。
+// live は検証済みのため促さず、implemented と todo は実行記録があれば baseline の更新を促します。
+// baseline にない実行記録も更新を促します。deferred は追跡 Issue 付きで意図的にライブ未実施とした状態で、
+// 異常系の確認を含む実行記録があっても意図した状態のため促しません。正常系の検証は追跡 Issue で行います。
+func staleEvidenceCommands(evidence map[string]struct{}, entries map[string]Entry) []string {
+	var stale []string
+	for path := range evidence {
+		entry, ok := entries[path]
+		if !ok {
+			stale = append(stale, fmt.Sprintf("%s (baseline: )", path))
+			continue
+		}
+		if entry.Status != StatusLive && entry.Status != StatusDeferred {
+			stale = append(stale, fmt.Sprintf("%s (baseline: %s)", path, entry.Status))
+		}
+	}
+	slices.Sort(stale)
+	return stale
+}

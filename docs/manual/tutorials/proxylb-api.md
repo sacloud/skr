@@ -225,12 +225,8 @@ $ openssl req -x509 -newkey rsa:2048 -sha256 -days 1 -nodes \
 $ skr proxylb-api set-certificates --id "$PROXYLB_ID" \
     --primary-cert "@$WORK_DIR/proxylb-server.crt" \
     --primary-key "@$WORK_DIR/proxylb-server.key"
-$ skr proxylb-api get-certificates --id "$PROXYLB_ID" --query 'map(.PrimaryCert | {CertificateCommonName})'
-[
-  {
-    "CertificateCommonName": "123456789002.proxylb.jp"
-  }
-]
+$ skr proxylb-api get-certificates --id "$PROXYLB_ID" --query '.PrimaryCert.CertificateCommonName'
+"123456789002.proxylb.jp"
 ```
 
 出力例は文書用の共通名に置き換えています。`CertificateCommonName` が生成時に指定した CN と一致することを確認してください。
@@ -238,14 +234,14 @@ $ skr proxylb-api get-certificates --id "$PROXYLB_ID" --query 'map(.PrimaryCert 
 設定した証明書を削除します。
 
 ```console
-$ skr proxylb-api delete-certificates --id "$PROXYLB_ID" --fail-if-not-found
+$ skr proxylb-api delete-certificates --id "$PROXYLB_ID"
 ```
 
 Let's Encrypt による自動更新を使う場合、Create または Update で `--lets-encrypt-enabled true --lets-encrypt-common-name example.jp` を指定します。設定済みの Let's Encrypt 証明書は `renew-lets-encrypt-cert` で更新できます。Let's Encrypt が未設定の ProxyLB に対する `renew-lets-encrypt-cert` は API エラーになります。
 
 ## Step 8: 設定を更新する
 
-監視間隔と説明を変更し、Read で反映を確認します。API がヘルスチェックの設定を常に要求するため、Update でも `--health-check-*` の再指定が必要です。`--health-check-*` を指定すると監視設定全体を置き換えるため、保持したい `--health-check-path` もプロトコルと併せて再指定してください。`--bind-port` と `--server` を指定すると追加ではなく一覧全体の置換になります。`--plan` を指定するとプラン変更 API が呼ばれます。
+監視間隔と説明を変更し、Read で反映を確認します。Update の未指定の項目は既存の設定が引き継がれるため、監視間隔だけを変更する場合は他の設定の再指定は不要です。`--health-check-*` を指定すると監視設定全体を置き換えるため、保持したい `--health-check-path` もプロトコルと併せて再指定してください。`--bind-port` と `--server` を指定すると追加ではなく一覧全体の置換になります。`--plan` を指定するとプラン変更 API が呼ばれます。
 
 ```console
 $ skr proxylb-api update --id "$PROXYLB_ID" \
