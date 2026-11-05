@@ -17,6 +17,7 @@ package serverapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
@@ -141,6 +142,29 @@ func TestCreateDoesNotBootWhenDiskCannotBecomeAvailable(t *testing.T) {
 
 	require.ErrorContains(t, err, "利用可能化に失敗")
 	require.Equal(t, []string{"create"}, serverOp.calls)
+}
+
+func TestCreatePassesDiskEncryptionFieldsFromJSON(t *testing.T) {
+	var request CreateRequest
+	require.NoError(t, json.Unmarshal([]byte(`{"Zone":"is1b","Name":"test-server","CPU":2,"MemoryGB":4,"Disks":[{"Name":"test-disk","DiskPlanID":7,"SizeGB":20,"EncryptionAlgorithm":"aes256_xts","KMSKeyID":789}]}`), &request))
+	caller := &serverDiskCreateAPICallerFake{}
+	sdk := &sdkAPI{op: iaas.NewServerOp(caller), diskOp: iaas.NewDiskOp(caller)}
+
+	_, err := sdk.CreateWithContext(context.Background(), &request)
+
+	require.NoError(t, err)
+	require.Equal(t, 2, caller.calls)
+	var body struct {
+		Disk struct {
+			EncryptionAlgorithm types.EDiskEncryptionAlgorithm
+		}
+		KMSKey struct {
+			ID types.ID
+		}
+	}
+	require.NoError(t, json.Unmarshal(caller.diskRequest, &body))
+	require.Equal(t, types.EDiskEncryptionAlgorithm("aes256_xts"), body.Disk.EncryptionAlgorithm)
+	require.EqualValues(t, 789, body.KMSKey.ID)
 }
 
 func TestCreateSerializesNICsAsServerAPIRequests(t *testing.T) {
@@ -416,6 +440,28 @@ func (api *diskAPIFake) Read(_ context.Context, _ string, _ types.ID) (*iaas.Dis
 
 type serverAPICallerFake struct {
 	body []byte
+}
+
+type serverDiskCreateAPICallerFake struct {
+	calls       int
+	diskRequest []byte
+}
+
+func (caller *serverDiskCreateAPICallerFake) Do(_ context.Context, _, _ string, body any) ([]byte, error) {
+	caller.calls++
+	switch caller.calls {
+	case 1:
+		return []byte(`{"Server":{"ID":123}}`), nil
+	case 2:
+		var err error
+		caller.diskRequest, err = json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		return []byte(`{"Disk":{"ID":456}}`), nil
+	default:
+		return nil, fmt.Errorf("unexpected API call %d", caller.calls)
+	}
 }
 
 func (caller *serverAPICallerFake) Do(_ context.Context, _, _ string, body any) ([]byte, error) {

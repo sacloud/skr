@@ -116,14 +116,15 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 	createdDisks := make([]types.ID, 0, len(request.Disks))
 	for _, disk := range request.Disks {
 		diskParams := &iaas.DiskCreateRequest{
-			DiskPlanID:      disk.DiskPlanID,
-			Connection:      disk.Connection,
-			SourceArchiveID: disk.SourceArchiveID,
-			ServerID:        server.ID,
-			Name:            disk.Name,
+			DiskPlanID:          disk.DiskPlanID,
+			Connection:          disk.Connection,
+			EncryptionAlgorithm: disk.EncryptionAlgorithm,
+			SourceArchiveID:     disk.SourceArchiveID,
+			ServerID:            server.ID,
+			Name:                disk.Name,
 		}
 		diskParams.SetSizeGB(disk.SizeGB)
-		createdDisk, err := api.diskOp.Create(ctx, request.Zone, diskParams, nil, 0)
+		createdDisk, err := api.diskOp.Create(ctx, request.Zone, diskParams, nil, disk.KMSKeyID)
 		if err != nil {
 			cleanupErr := api.cleanupCreatedServer(ctx, request.Zone, server.ID, createdDisks)
 			return nil, errors.Join(fmt.Errorf("サーバ %d のディスク作成に失敗しました: %w", server.ID, err), cleanupErr)

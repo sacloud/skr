@@ -199,7 +199,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request                    *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて API のスカラー値と Tags を指定できます。DistantFrom (ID 配列) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。例: --request @disk-create.json。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"DISK-NAME\\\",\\\"DiskPlanID\\\":4,\\\"Connection\\\":\\\"virtio\\\",\\\"SizeGB\\\":20,\\\"Tags\\\":[\\\"production\\\",\\\"web\\\"]}。\""
+	Request                    *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて API のスカラー値と Tags を指定できます。DistantFrom (ID 配列) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。OSType、EditParameter、NoWait は指定できません。コピー元アーカイブは SourceArchiveID で指定してください。例: --request @disk-create.json。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"DISK-NAME\\\",\\\"DiskPlanID\\\":4,\\\"Connection\\\":\\\"virtio\\\",\\\"SizeGB\\\":20,\\\"Tags\\\":[\\\"production\\\",\\\"web\\\"]}。\""
 	Zone                       *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
 	Name                       *string   "name:\"name\" help:\"必須: ディスク名。\""
 	DiskPlanID                 *int64    "name:\"disk-plan-id\" help:\"必須: 対象ゾーンで利用できるディスクプラン ID (数値)。\""
@@ -344,7 +344,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description、Tags、IconID、Connection は個別フラグまたは JSON で指定します。省略した項目は API の更新リクエストどおりに扱われます。JSON 例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-DISK-NAME\\\"}'。Zone と ID は実際の値に置き換えます。\""
+	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description、Tags、IconID、Connection は個別フラグまたは JSON で指定します。省略した項目は API の更新リクエストどおりに扱われます。EditParameter と NoWait は指定できません。JSON 例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-DISK-NAME\\\"}'。Zone と ID は実際の値に置き換えます。\""
 	Zone        *string   "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID          *int64    "name:\"id\" help:\"必須: 更新対象のディスク ID (数値)。\""
 	Name        *string   "name:\"name\" help:\"任意: 新しい名前。未指定時は空の値を API リクエストへ送信します。\""

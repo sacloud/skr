@@ -204,7 +204,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、Name、CPU、MemoryGB。CPU と MemoryGB は対象ゾーンで利用可能なプランを指定します。Tags は文字列配列です。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドも指定できます。BootAfterCreate=true の場合は作成後に起動します。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"Name\\\":\\\"example\\\",\\\"CPU\\\":1,\\\"MemoryGB\\\":1,\\\"Tags\\\":[\\\"tutorial\\\"]}'\""
+	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、Name、CPU、MemoryGB。CPU と MemoryGB は対象ゾーンで利用可能なプランを指定します。Tags は文字列配列です。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドも指定できます。Disks の EncryptionAlgorithm と KMSKeyID も JSON で指定できます。BootAfterCreate=true の場合は作成後に起動します。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"Name\\\":\\\"example\\\",\\\"CPU\\\":1,\\\"MemoryGB\\\":1,\\\"Tags\\\":[\\\"tutorial\\\"]}'\""
 	Zone            *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
 	Name            *string   "name:\"name\" help:\"必須: サーバ名。\""
 	CPU             *int      "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""

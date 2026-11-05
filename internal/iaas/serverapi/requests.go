@@ -57,11 +57,13 @@ type CreateRequest struct {
 }
 
 type DiskRequest struct {
-	Name            string
-	DiskPlanID      types.ID
-	SizeGB          int
-	SourceArchiveID types.ID
-	Connection      types.EDiskConnection
+	Name                string
+	DiskPlanID          types.ID
+	SizeGB              int
+	SourceArchiveID     types.ID
+	Connection          types.EDiskConnection
+	EncryptionAlgorithm types.EDiskEncryptionAlgorithm
+	KMSKeyID            types.ID
 }
 
 type NetworkInterface struct {
