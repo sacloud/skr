@@ -102,10 +102,12 @@ func TestScenarioProxyLB(t *testing.T) {
 	// 後片付け: Server と ProxyLB を識別情報の再照合つきで削除する。
 	// defer の呼び出し順 (LIFO) により、ProxyLB の削除が先に実行されます
 	var serverID, proxylbID types.ID
+	// knownDisks には作成直後に確認した Disk の ID を保持し、後片付けの --with-disks 前の再照合に使います
+	var knownDisks []types.ID
 	defer func() {
 		if err := helper.CleanupServerResources(t, h, servers, disks, params, serverID, []helper.ServerIdentity{
 			{Name: serverName, Description: serverDescription},
-		}); err != nil {
+		}, knownDisks...); err != nil {
 			t.Errorf("server cleanup failed: %v", err)
 		}
 	}()
@@ -118,6 +120,11 @@ func TestScenarioProxyLB(t *testing.T) {
 	// 配下サーバーを cloud-init ディスク付きで作成し、user-data を指定して起動して SSH ログインを確認します
 	server := helper.CreateCloudInitServer(t, h, disks, serverName, serverDescription, params, "shared")
 	serverID = server.ID
+	// 作成した Disk の ID を保持します。ヘルパーが作成直後に所属と指定内容を確認済みです
+	createdServer, err := helper.FetchServer(t, servers, serverID)
+	require.NoError(t, err, "read the created Server to keep the created Disk ID")
+	require.Len(t, createdServer.Disks, 1, "the created Server should have the created Disk")
+	knownDisks = []types.ID{createdServer.Disks[0].ID}
 	helper.BootServerWithUserData(t, h, servers, serverID, material.UserDataPath)
 	helper.WaitForServerSSH(t, h, servers, serverID, serverName, serverDescription, material)
 	serverIP := sharedIPOfRunningServer(t, servers, serverID)
@@ -173,9 +180,9 @@ func TestScenarioProxyLB(t *testing.T) {
 		"--primary-key", "@"+cert.KeyPath,
 	)
 	require.NoError(t, err, "set self-signed certificate")
-	certificates := getCertificates(t, h, proxylbID)
-	require.NotNil(t, certificates.PrimaryCert, "the ProxyLB should have a primary certificate")
-	require.Equal(t, proxylbCertCN, certificates.PrimaryCert.CertificateCommonName,
+	// 証明書モデルには秘密鍵も含まれるため、応答を共通名だけに絞り込み、実行記録に秘密鍵が残らないようにします
+	cn := getCertificateCommonName(t, h, proxylbID)
+	require.Equal(t, proxylbCertCN, cn,
 		"the certificate common name should match the requested CN")
 	waitForProxyLBHTTPS(t, h, created.VirtualIP, backendResponse)
 
@@ -291,17 +298,20 @@ func checkMonitorConnectionValues(output []byte) error {
 	return nil
 }
 
-// getCertificates は skr CLI で証明書を取得します。
-func getCertificates(t *testing.T, h *helper.Helper, id types.ID) certificateItem {
+// getCertificateCommonName は skr CLI で証明書の共通名を取得します。
+// get-certificates の応答には主証明書・追加証明書の秘密鍵も含まれるため、
+// 応答全体を実行記録に残さず、--query で共通名だけに絞り込みます。
+func getCertificateCommonName(t *testing.T, h *helper.Helper, id types.ID) string {
 	t.Helper()
 
-	data, _, err := h.CallAllowingFailure(t, "ProxyLB の証明書を取得する",
+	data, _, err := h.CallAllowingFailure(t, "ProxyLB の証明書の共通名を取得する",
 		"proxylb-api", "get-certificates", "--id", id.String(),
+		"--query", ".PrimaryCert.CertificateCommonName",
 	)
-	require.NoError(t, err, "get ProxyLB certificates")
-	var item certificateItem
-	require.NoError(t, json.Unmarshal(data, &item), "decode certificates")
-	return item
+	require.NoError(t, err, "get ProxyLB certificate common name")
+	var cn string
+	require.NoError(t, json.Unmarshal(data, &cn), "decode certificate common name")
+	return cn
 }
 
 // requestProxyLBContent は curl でエンハンスドロードバランサの宛先 (VIP または FQDN) にリクエストし、応答本文を返します。

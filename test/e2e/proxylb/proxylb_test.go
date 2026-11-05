@@ -23,7 +23,6 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	proxylbSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/proxylb"
-	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
@@ -55,11 +54,6 @@ type healthStatusItem struct {
 	IPAddress string
 	Port      types.StringNumber
 	Status    types.EServerInstanceStatus
-}
-
-// certificateItem は get-certificates の応答です。
-type certificateItem struct {
-	PrimaryCert *iaas.ProxyLBPrimaryCert
 }
 
 // decodeProxylbList は ProxyLB の一括検索の応答を解析します。
@@ -178,8 +172,9 @@ func healthStatus(t *testing.T, h *helper.Helper, id types.ID) []healthStatusIte
 	return items
 }
 
-// cleanupProxylb は後片付けです。作成に成功した ProxyLB の ID を優して SDK で再照合し、
-// ID がない場合は名前検索で回収を試みます。識別できない場合は削除しません。
+// cleanupProxylb は後片付けです。作成直後に確認した ProxyLB の ID を優して SDK で再照合し、
+// ID と許容する識別情報が一致する場合だけ削除します。保持した ID がないのに同名リソースが
+// 見つかった場合は、今回の作成物と確定できないため自動削除せず手動確認を要求します。
 // 削除は skr CLI で行い、削除後は SDK で不在を確認します。
 // 更新確認は説明を元に戻さないため、更新後の説明も許容します。
 func cleanupProxylb(t *testing.T, h *helper.Helper, proxylbs *proxylbSDK.Service, name string, knownID types.ID) error {
@@ -194,11 +189,9 @@ func cleanupProxylb(t *testing.T, h *helper.Helper, proxylbs *proxylbSDK.Service
 		if len(matches) == 0 {
 			return nil
 		}
-		if len(matches) != 1 || matches[0].ID.IsEmpty() ||
-			(matches[0].Description != proxylbDescription && matches[0].Description != updatedProxylbDescription) {
-			return errors.New("cannot safely identify created ProxyLB; manual cleanup required")
-		}
-		id = matches[0].ID
+		// 保持した作成 ID がないのに同名リソースが見つかった場合は、
+		// 今回の作成物と確定できないため削除せず手動確認を要求します
+		return errors.New("cannot confirm the created ProxyLB ID; manual cleanup required")
 	}
 
 	// 削除前に SDK で再照合し、保持した ID と許容する識別情報が一致する場合だけ削除する
@@ -210,6 +203,7 @@ func cleanupProxylb(t *testing.T, h *helper.Helper, proxylbs *proxylbSDK.Service
 		(current.Description != proxylbDescription && current.Description != updatedProxylbDescription) {
 		return errors.New("cleanup refused: ProxyLB identity changed; manual cleanup required")
 	}
+	// 削除などリソースを実際に変更する操作は、実行記録に残る skr CLI で行います
 	if _, _, err := h.CallAllowingFailure(t, "テスト用の ProxyLB を削除する",
 		"proxylb-api", "delete", "--id", id.String(), "--fail-if-not-found",
 	); err != nil {
@@ -223,15 +217,4 @@ func cleanupProxylb(t *testing.T, h *helper.Helper, proxylbs *proxylbSDK.Service
 		return fmt.Errorf("ProxyLB %q remains after cleanup; manual cleanup required", name)
 	}
 	return nil
-}
-
-// newProxylbVerificationClient は事前確認と後片付けの安全確認に使う SDK クライアントを返します。
-// skr CLI と同じ認証設定 (プロファイル) を使い、確認の実行は証跡に残りません。
-func newProxylbVerificationClient(t *testing.T) (*proxylbSDK.Service, helper.ServerDiskParams) {
-	t.Helper()
-
-	client, err := iaasclient.New(false)
-	require.NoError(t, err, "create IaaS API client for verification")
-	params := helper.RequireServerDiskParams(t, client)
-	return proxylbSDK.New(client), params
 }
