@@ -3,7 +3,6 @@
   "resource": "IaaS Region",
   "imports": {
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
-    "region": "github.com/sacloud/sacloud-sdk-go/service/iaas/region",
     "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
   },
   "operations": [
@@ -11,7 +10,7 @@
       "name": "Find",
       "help": "リージョン一覧を取得します。必要な項目だけを表示する例: skr iaas-api region find --query 'map({ID,Name,Description})'",
       "method": "FindWithContext",
-      "request_type": "region.FindRequest",
+      "request_type": "FindRequest",
       "response_type": "[]*iaas.Region",
       "request_help": "任意: FindRequest JSON を直接または @path.json で指定します。Names と Sort は JSON、Count と From は個別フラグで指定できます。省略時は一覧を取得します。--request と個別フラグは併用できません。",
       "handwritten": true
@@ -20,7 +19,7 @@
       "name": "Read",
       "help": "指定した ID のリージョン情報を取得します。例: skr iaas-api region read --id REGION-ID",
       "method": "ReadWithContext",
-      "request_type": "region.ReadRequest",
+      "request_type": "ReadRequest",
       "response_type": "*iaas.Region",
       "request_help": "必須: ID (数値)。--id または ReadRequest JSON を直接／@path.json で指定します。個別フラグと --request は併用できません。",
       "flags": [
@@ -36,6 +35,6 @@
     }
   ],
   "wiring_target": "IaaSAPI.Region",
-  "sdk_factory": "region.New",
+  "sdk_factory": "regionapi.NewAPI",
   "client_factory": "iaasclient.New"
 }

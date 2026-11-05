@@ -23,7 +23,6 @@ import (
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	"github.com/sacloud/skr/internal/apigen"
 	packetfilterapi "github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
@@ -50,7 +49,7 @@ func TestRunIaaSPacketFilterHelp(t *testing.T) {
 		{args: []string{"iaas-api", "--help"}, want: []string{"packetfilter"}},
 		{args: []string{"iaas-api", "packetfilter", "--help"}, want: []string{"find", "read", "create", "update", "delete", "--expressions", "--request"}},
 		{args: []string{"iaas-api", "packetfilter", "create", "--help"}, want: []string{"--zone", "--name", "--description", "Expression", "tcp", "allow", "--expressions", "@path.json", "併用不可"}},
-		{args: []string{"iaas-api", "packetfilter", "update", "--help"}, want: []string{"--zone", "--id", "--name", "--description", "Expression", "OriginalExpressionHash", "変更する項目", "併用不可"}},
+		{args: []string{"iaas-api", "packetfilter", "update", "--help"}, want: []string{"--zone", "--id", "--name", "--description", "Expression", "OriginalExpressionHash", "API リクエスト", "併用不可"}},
 		{args: []string{"iaas-api", "packetfilter", "find", "--help"}, want: []string{"Names", "--count", "--from", "単一のゾーン"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -74,7 +73,7 @@ func TestIaaSPacketFilterAPIWithLocalMock(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
 		setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) {
-			return packetfilter.New(server), nil
+			return packetfilterapi.NewAPI(server), nil
 		})
 		require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
 		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr = %q", args, stderr.String())
@@ -115,7 +114,7 @@ func TestIaaSPacketFilterAPIWithLocalMock(t *testing.T) {
 	err4 := os.WriteFile(rulesPath, []byte(updatedExpressions), 0o600)
 	require.NoError(t, err4)
 	var updated iaas.PacketFilter
-	err5 := json.Unmarshal(runCommand("iaas-api", "packetfilter", "update", "--zone", "test-zone", "--id", created.ID.String(), "--name", "updated-filter", "--expressions", "@"+rulesPath, "--original-expression-hash", created.ExpressionHash), &updated)
+	err5 := json.Unmarshal(runCommand("iaas-api", "packetfilter", "update", "--zone", "test-zone", "--id", created.ID.String(), "--name", "updated-filter", "--description", "test filter", "--expressions", "@"+rulesPath, "--original-expression-hash", created.ExpressionHash), &updated)
 	require.NoError(t, err5)
 	if updated.ID != created.ID || updated.Name != "updated-filter" || updated.Description != "test filter" ||
 		len(updated.Expression) != 1 || updated.Expression[0].DestinationPort != "8443" {
@@ -144,7 +143,7 @@ func TestPacketFilterRejectsInvalidRequestsBeforeFactory(t *testing.T) {
 			commandLine := newCLI()
 			setPacketFilterAPIFactory(commandLine, func() (packetfilterapi.API, error) {
 				factoryCalled = true
-				return packetfilter.New(iaasmock.NewTestServer(iaasmock.Config{})), nil
+				return packetfilterapi.NewAPI(iaasmock.NewTestServer(iaasmock.Config{})), nil
 			})
 			var stdout, stderr bytes.Buffer
 			args := append([]string{"iaas-api", "packetfilter"}, test.args...)
@@ -158,7 +157,7 @@ func TestPacketFilterRejectsInvalidRequestsBeforeFactory(t *testing.T) {
 }
 
 func TestPacketFilterHelpExampleDecodes(t *testing.T) {
-	var request packetfilter.CreateRequest
+	var request packetfilterapi.CreateRequest
 	err := decodeRequest(`{"Zone":"is1b","Name":"example","Expression":[{"Protocol":"tcp","SourceNetwork":"192.0.2.0/24","DestinationPort":"443","Action":"allow","Description":"Allow HTTPS"}]}`, &request)
 	require.NoError(t, err)
 	if request.Zone != "is1b" || request.Name != "example" || len(request.Expression) != 1 ||

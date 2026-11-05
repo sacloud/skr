@@ -10,7 +10,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	disk "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -18,16 +17,16 @@ type Commands struct {
 	Find   FindCommand   "cmd:\"\" help:\"ディスクを指定したゾーンで検索して出力します。例: skr iaas-api disk find --zone is1b\""
 	Read   ReadCommand   "cmd:\"\" help:\"ディスクを読み取って出力します。例: skr iaas-api disk read --zone ZONE --id 123456789012\""
 	Create CreateCommand "cmd:\"\" help:\"ディスクを作成して出力します。基本項目はフラグ、複雑な値は --request JSON で指定します。例: skr iaas-api disk create --zone is1b --name DISK-NAME --disk-plan-id 4 --connection virtio --size-gb 20\""
-	Update UpdateCommand "cmd:\"\" help:\"ディスクの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api disk update --zone ZONE --id 123456789012 --name UPDATED-DISK-NAME\""
+	Update UpdateCommand "cmd:\"\" help:\"ディスクを API リクエストで指定した値に更新して出力します。未指定項目は空の値として送信します。例: skr iaas-api disk update --zone ZONE --id 123456789012 --name UPDATED-DISK-NAME\""
 	Delete DeleteCommand "cmd:\"\" help:\"ディスクを削除します。サーバに接続中のディスクは削除できません。削除後は復旧できません。成功時は出力しません。例: skr iaas-api disk delete --zone ZONE --id 123456789012 --fail-if-not-found\""
 }
 
 type API interface {
-	FindWithContext(context.Context, *disk.FindRequest) ([]*iaas.Disk, error)
-	ReadWithContext(context.Context, *disk.ReadRequest) (*iaas.Disk, error)
-	CreateWithContext(context.Context, *disk.CreateRequest) (*iaas.Disk, error)
-	UpdateWithContext(context.Context, *disk.UpdateRequest) (*iaas.Disk, error)
-	DeleteWithContext(context.Context, *disk.DeleteRequest) error
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.Disk, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.Disk, error)
+	CreateWithContext(context.Context, *CreateRequest) (*iaas.Disk, error)
+	UpdateWithContext(context.Context, *UpdateRequest) (*iaas.Disk, error)
+	DeleteWithContext(context.Context, *DeleteRequest) error
 }
 
 type APIFactory func() (API, error)
@@ -74,7 +73,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &disk.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -147,7 +146,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &disk.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -200,7 +199,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request                    *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて単純なスカラー値と Tags を指定できます。DistantFrom (ID 配列)、EditParameter (複雑な設定)、OSType (SDK の補助入力で、API フィールドではありません) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。例: --request @disk-create.json。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"DISK-NAME\\\",\\\"DiskPlanID\\\":4,\\\"Connection\\\":\\\"virtio\\\",\\\"SizeGB\\\":20,\\\"Tags\\\":[\\\"production\\\",\\\"web\\\"]}。\""
+	Request                    *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて API のスカラー値と Tags を指定できます。DistantFrom (ID 配列) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。OSType、EditParameter、NoWait は指定できません。コピー元アーカイブは SourceArchiveID で指定してください。例: --request @disk-create.json。JSON 例: {\\\"Zone\\\":\\\"ZONE\\\",\\\"Name\\\":\\\"DISK-NAME\\\",\\\"DiskPlanID\\\":4,\\\"Connection\\\":\\\"virtio\\\",\\\"SizeGB\\\":20,\\\"Tags\\\":[\\\"production\\\",\\\"web\\\"]}。\""
 	Zone                       *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
 	Name                       *string   "name:\"name\" help:\"必須: ディスク名。\""
 	DiskPlanID                 *int64    "name:\"disk-plan-id\" help:\"必須: 対象ゾーンで利用できるディスクプラン ID (数値)。\""
@@ -215,7 +214,6 @@ type CreateCommand struct {
 	SourceDiskID               *int64    "name:\"source-disk-id\" help:\"任意: コピー元ディスクの ID (数値)。\""
 	SourceArchiveID            *int64    "name:\"source-archive-id\" help:\"任意: コピー元アーカイブの ID (数値)。\""
 	ServerID                   *int64    "name:\"server-id\" help:\"任意: 接続先サーバの ID (数値)。\""
-	NoWait                     *bool     "name:\"no-wait\" help:\"任意: ディスクの作成完了を待たずに戻ります。\""
 	factory                    APIFactory
 	runtime                    Runtime
 }
@@ -236,11 +234,10 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	flagsSet = flagsSet || c.SourceDiskID != nil
 	flagsSet = flagsSet || c.SourceArchiveID != nil
 	flagsSet = flagsSet || c.ServerID != nil
-	flagsSet = flagsSet || c.NoWait != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &disk.CreateRequest{}
+	request := &CreateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -319,9 +316,6 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 			value := types.ID(*c.ServerID)
 			request.ServerID = value
 		}
-		if c.NoWait != nil {
-			request.NoWait = *c.NoWait
-		}
 	}
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
@@ -350,15 +344,14 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description、Tags、IconID、Connection、NoWait は個別フラグまたは JSON で指定できます。EditParameter は JSON で指定します。省略した項目は変更しません。JSON 例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-DISK-NAME\\\"}'。Zone と ID は実際の値に置き換えます。\""
+	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description、Tags、IconID、Connection は個別フラグまたは JSON で指定します。省略した項目は API の更新リクエストどおりに扱われます。EditParameter と NoWait は指定できません。JSON 例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"UPDATED-DISK-NAME\\\"}'。Zone と ID は実際の値に置き換えます。\""
 	Zone        *string   "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID          *int64    "name:\"id\" help:\"必須: 更新対象のディスク ID (数値)。\""
-	Name        *string   "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
-	Description *string   "name:\"description\" help:\"任意: 新しい説明 (最大512文字)。空文字列も指定できます。未指定なら変更しません。\""
-	Tags        *[]string "name:\"tags\" help:\"任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。\" sep:\",\""
-	IconID      *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。未指定なら変更しません。\""
-	Connection  *string   "name:\"connection\" help:\"任意: 接続インターフェース。virtio または ide を指定します。未指定なら変更しません。\""
-	NoWait      *bool     "name:\"no-wait\" help:\"任意: ディスクの更新完了を待たずに戻ります。\""
+	Name        *string   "name:\"name\" help:\"任意: 新しい名前。未指定時は空の値を API リクエストへ送信します。\""
+	Description *string   "name:\"description\" help:\"任意: 新しい説明 (最大512文字)。未指定時は空の値を API リクエストへ送信します。\""
+	Tags        *[]string "name:\"tags\" help:\"任意: 更新後のタグ配列。カンマ区切りで指定します。未指定時は空配列を API リクエストへ送信します。\" sep:\",\""
+	IconID      *int64    "name:\"icon-id\" help:\"任意: アイコンの ID (数値)。未指定時は 0 を API リクエストへ送信します。\""
+	Connection  *string   "name:\"connection\" help:\"任意: 接続インターフェース。virtio または ide を指定します。未指定時は空の値を API リクエストへ送信します。\""
 	factory     APIFactory
 	runtime     Runtime
 }
@@ -372,11 +365,10 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	flagsSet = flagsSet || c.Tags != nil
 	flagsSet = flagsSet || c.IconID != nil
 	flagsSet = flagsSet || c.Connection != nil
-	flagsSet = flagsSet || c.NoWait != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &disk.UpdateRequest{}
+	request := &UpdateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -419,9 +411,6 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 			value := types.EDiskConnection(*c.Connection)
 			request.Connection = &value
 		}
-		if c.NoWait != nil {
-			request.NoWait = *c.NoWait
-		}
 	}
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {
 		return err
@@ -450,15 +439,12 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 }
 
 type DeleteCommand struct {
-	Request               *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: FailIfNotFound (対象がない場合にエラー)、WaitForRelease (他リソースから参照されている間の削除待機)、WaitForReleaseTimeout (秒)、WaitForReleaseTick (秒)。サーバ接続中のディスクは削除できません。削除後は復旧できないため、対象 ID と接続状態を確認してください。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"FailIfNotFound\\\":true}'。ID は実際の値に置き換えます。\""
-	Zone                  *string "name:\"zone\" help:\"必須: 対象ゾーン名。\""
-	ID                    *int64  "name:\"id\" help:\"必須: 削除対象のディスク ID (数値)。\""
-	FailIfNotFound        *bool   "name:\"fail-if-not-found\" help:\"任意: 対象ディスクが見つからない場合にエラーにします。\""
-	WaitForRelease        *bool   "name:\"wait-for-release\" help:\"任意: 他リソースから参照されている間は削除を待ちます。\""
-	WaitForReleaseTimeout *int    "name:\"wait-for-release-timeout\" help:\"任意: 削除待機のタイムアウト (秒)。\""
-	WaitForReleaseTick    *int    "name:\"wait-for-release-tick\" help:\"任意: 削除待機中の確認間隔 (秒)。\""
-	factory               APIFactory
-	runtime               Runtime
+	Request        *string "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。FailIfNotFound は任意です。サーバ接続中のディスクは削除できません。削除後は復旧できないため、対象 ID と接続状態を確認してください。例: --request='{\\\"Zone\\\":\\\"ZONE\\\",\\\"ID\\\":123456789012,\\\"FailIfNotFound\\\":true}'。ID は実際の値に置き換えます。\""
+	Zone           *string "name:\"zone\" help:\"必須: 対象ゾーン名。\""
+	ID             *int64  "name:\"id\" help:\"必須: 削除対象のディスク ID (数値)。\""
+	FailIfNotFound *bool   "name:\"fail-if-not-found\" help:\"任意: 対象ディスクが見つからない場合にエラーにします。\""
+	factory        APIFactory
+	runtime        Runtime
 }
 
 func (c *DeleteCommand) Run(ctx *kong.Context) error {
@@ -466,13 +452,10 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 	flagsSet = flagsSet || c.Zone != nil
 	flagsSet = flagsSet || c.ID != nil
 	flagsSet = flagsSet || c.FailIfNotFound != nil
-	flagsSet = flagsSet || c.WaitForRelease != nil
-	flagsSet = flagsSet || c.WaitForReleaseTimeout != nil
-	flagsSet = flagsSet || c.WaitForReleaseTick != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &disk.DeleteRequest{}
+	request := &DeleteRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -499,15 +482,6 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 		}
 		if c.FailIfNotFound != nil {
 			request.FailIfNotFound = *c.FailIfNotFound
-		}
-		if c.WaitForRelease != nil {
-			request.WaitForRelease = *c.WaitForRelease
-		}
-		if c.WaitForReleaseTimeout != nil {
-			request.WaitForReleaseTimeout = *c.WaitForReleaseTimeout
-		}
-		if c.WaitForReleaseTick != nil {
-			request.WaitForReleaseTick = *c.WaitForReleaseTick
 		}
 	}
 	if err := zones.ValidateSingleZone(request.Zone); err != nil {

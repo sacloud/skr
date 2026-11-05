@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	iconSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
 	"github.com/sacloud/skr/internal/apigen"
 	"github.com/sacloud/skr/internal/iaas/iconapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
@@ -56,7 +55,7 @@ func TestRunIaaSIconHelp(t *testing.T) {
 		{args: []string{"iaas-api", "icon", "find", "--help"}, want: []string{"Names", "Tags", "Scope", "Sort", "--count", "--from", "省略"}},
 		{args: []string{"iaas-api", "icon", "read", "--help"}, want: []string{"--id", "--request", "@path.json"}},
 		{args: []string{"iaas-api", "icon", "create", "--help"}, want: []string{"--name", "--image-file", "PNG", "JPEG", "Base64", "--request", "併用できません"}},
-		{args: []string{"iaas-api", "icon", "update", "--help"}, want: []string{"--id", "--name", "--tags", "省略した項目"}},
+		{args: []string{"iaas-api", "icon", "update", "--help"}, want: []string{"--id", "--name", "--tags", "API リクエスト"}},
 		{args: []string{"iaas-api", "icon", "delete", "--help"}, want: []string{"--id", "--fail-if-not-found", "出力しません"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -82,7 +81,7 @@ func TestIaaSIconAPIWithLocalMock(t *testing.T) {
 		commandLine.IaaSAPI.Icon = iconapi.NewCommands(iconapi.Runtime{
 			DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 		}, func() (iconapi.API, error) {
-			return iconSDK.New(server), nil
+			return iconapi.NewAPI(server), nil
 		})
 		require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
 		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr = %q, want empty", args, stderr.String())
@@ -156,14 +155,13 @@ func TestIaaSIconAPIWithLocalMock(t *testing.T) {
 	if updated.Name != "UPDATED-ICON-NAME" || len(updated.Tags) != 2 || !containsString(updated.Tags, "updated") || !containsString(updated.Tags, "tutorial") {
 		t.Fatalf("update returned %+v, want updated name and tags", updated)
 	}
-
 	output := runCommand("iaas-api", "icon", "delete", "--id", created.ID.String(), "--fail-if-not-found")
 	require.Len(t, output, 0, "delete output = %s, want empty", output)
 	runCommand("iaas-api", "icon", "delete", "--id", created.ID.String())
 	commandLine := newCLI()
 	commandLine.IaaSAPI.Icon = iconapi.NewCommands(iconapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
-	}, func() (iconapi.API, error) { return iconSDK.New(server), nil })
+	}, func() (iconapi.API, error) { return iconapi.NewAPI(server), nil })
 	var stdout, stderr bytes.Buffer
 	if code := runCLI([]string{"iaas-api", "icon", "delete", "--id", created.ID.String(), "--fail-if-not-found"},
 		&stdout, &stderr, commandLine); code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "not_found") {
@@ -188,7 +186,7 @@ func TestIaaSIconCreateRequestFile(t *testing.T) {
 	commandLine := newCLI()
 	commandLine.IaaSAPI.Icon = iconapi.NewCommands(iconapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
-	}, func() (iconapi.API, error) { return iconSDK.New(server), nil })
+	}, func() (iconapi.API, error) { return iconapi.NewAPI(server), nil })
 	var stdout, stderr bytes.Buffer
 	require.Equal(t, 0, runCLI([]string{"iaas-api", "icon", "create", "--request", "@" + requestFile}, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
 	var created iaas.Icon
@@ -199,19 +197,18 @@ func TestIaaSIconCreateRequestFile(t *testing.T) {
 	require.Equal(t, "json", created.Tags[0], "unexpected value")
 }
 
-func TestIaaSIconReturnsSDKCreateValidationErrors(t *testing.T) {
+func TestIaaSIconReturnsAPICreateErrors(t *testing.T) {
 	caller := &iconAPICaller{}
 	commandLine := newCLI()
 	commandLine.IaaSAPI.Icon = iconapi.NewCommands(iconapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
-	}, func() (iconapi.API, error) { return iconSDK.New(caller), nil })
+	}, func() (iconapi.API, error) { return iconapi.NewAPI(caller), nil })
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "icon", "create", "--request", `{"Name":"missing-image"}`}, &stdout, &stderr, commandLine)
 	require.EqualValues(t, 1, code, "code=%d stdout=%q stderr=%q; want SDK Image validation error", code, stdout.String(), stderr.String())
 	require.EqualValues(t, 0, stdout.Len(), "unexpected value")
-	require.Contains(t, stderr.String(), "Image", "missing expected text %q", "Image")
-	require.Contains(t, stderr.String(), "required", "missing expected text %q", "required")
-	require.EqualValues(t, 0, caller.calls, "API calls = %d, want SDK validation before transport", caller.calls)
+	require.Contains(t, stderr.String(), "unexpected Icon API request")
+	require.EqualValues(t, 1, caller.calls, "API calls = %d, want one API request", caller.calls)
 }
 
 func containsString(values []string, target string) bool {

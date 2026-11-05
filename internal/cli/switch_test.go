@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	"github.com/sacloud/skr/internal/apigen"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
@@ -103,7 +102,7 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
 		setSwitchAPIFactory(commandLine, func() (switchapi.API, error) {
-			return swytch.New(server), nil
+			return switchapi.NewAPI(server), nil
 		})
 		require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
 		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr = %q, want empty", args, stderr.String())
@@ -164,10 +163,10 @@ func TestIaaSSwitchAPIWithLocalSakumock(t *testing.T) {
 
 type switchFindRecordAPI struct {
 	switchapi.API
-	requests []swytch.FindRequest
+	requests []switchapi.FindRequest
 }
 
-func (api *switchFindRecordAPI) FindWithContext(_ context.Context, request *swytch.FindRequest) ([]*iaas.Switch, error) {
+func (api *switchFindRecordAPI) FindWithContext(_ context.Context, request *switchapi.FindRequest) ([]*iaas.Switch, error) {
 	api.requests = append(api.requests, *request)
 	return []*iaas.Switch{{Name: request.Zone}}, nil
 }
@@ -212,7 +211,7 @@ func TestSwitchFlagInputs(t *testing.T) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
 		commandLine := newCLI()
-		setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return swytch.New(server), nil })
+		setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return switchapi.NewAPI(server), nil })
 		code := runCLI(append([]string{"iaas-api", "switch"}, args...), &stdout, &stderr, commandLine)
 		return stdout.Bytes(), stderr.String(), code
 	}
@@ -306,21 +305,21 @@ func TestSwitchCreateRequiresZoneAndName(t *testing.T) {
 }
 
 func TestSwitchHelpJSONExamplesDecode(t *testing.T) {
-	var find swytch.FindRequest
+	var find switchapi.FindRequest
 	err := decodeRequest(`{"Zone":"tk1v","Names":["example"],"Sort":[{"Key":"Name","Order":0}]}`, &find)
 	require.NoError(t, err)
 	if find.Zone != "tk1v" || len(find.Names) != 1 || find.Names[0] != "example" ||
 		len(find.Sort) != 1 || find.Sort[0].Key != "Name" || find.Sort[0].Order != 0 {
 		t.Fatalf("unexpected find request: %+v", find)
 	}
-	var create swytch.CreateRequest
+	var create switchapi.CreateRequest
 	err2 := decodeRequest(`{"Zone":"tk1v","Name":"example","Tags":["test"]}`, &create)
 	require.NoError(t, err2)
 	require.Equal(t, "tk1v", create.Zone, "unexpected create request: %+v", create)
 	require.Equal(t, "example", create.Name, "unexpected value")
 	require.Len(t, create.Tags, 1, "unexpected length")
 	require.Equal(t, "test", create.Tags[0], "unexpected value")
-	var update swytch.UpdateRequest
+	var update switchapi.UpdateRequest
 	err3 := decodeRequest(`{"Zone":"tk1v","ID":123456789012,"Tags":["test"]}`, &update)
 	require.NoError(t, err3)
 	if update.Zone != "tk1v" || update.ID != 123456789012 || update.Tags == nil ||

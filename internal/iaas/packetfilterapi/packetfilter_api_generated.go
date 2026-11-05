@@ -10,7 +10,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	packetfilter "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -18,16 +17,16 @@ type Commands struct {
 	Find   FindCommand   "cmd:\"\" help:\"パケットフィルタを指定したゾーンで検索して出力します。例: skr iaas-api packetfilter find --zone is1b\""
 	Read   ReadCommand   "cmd:\"\" help:\"パケットフィルタを読み取って出力します。例: skr iaas-api packetfilter read --zone ZONE --id 123456789012\""
 	Create CreateCommand "cmd:\"\" help:\"パケットフィルタを作成して出力します。基本項目はフラグ、ルールは --expressions JSON で指定できます。例: skr iaas-api packetfilter create --zone is1b --name example --expressions '[{\\\"Protocol\\\":\\\"tcp\\\",\\\"DestinationPort\\\":\\\"443\\\",\\\"Action\\\":\\\"allow\\\"}]'\""
-	Update UpdateCommand "cmd:\"\" help:\"パケットフィルタの指定項目を更新して出力します。ルール配列は --expressions JSON で指定できます。\""
+	Update UpdateCommand "cmd:\"\" help:\"パケットフィルタを API リクエストの内容で更新して出力します。ルール配列は --expressions JSON で指定できます。\""
 	Delete DeleteCommand "cmd:\"\" help:\"パケットフィルタを削除します。成功時は出力しません。例: skr iaas-api packetfilter delete --zone ZONE --id 123456789012\""
 }
 
 type API interface {
-	FindWithContext(context.Context, *packetfilter.FindRequest) ([]*iaas.PacketFilter, error)
-	ReadWithContext(context.Context, *packetfilter.ReadRequest) (*iaas.PacketFilter, error)
-	CreateWithContext(context.Context, *packetfilter.CreateRequest) (*iaas.PacketFilter, error)
-	UpdateWithContext(context.Context, *packetfilter.UpdateRequest) (*iaas.PacketFilter, error)
-	DeleteWithContext(context.Context, *packetfilter.DeleteRequest) error
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.PacketFilter, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.PacketFilter, error)
+	CreateWithContext(context.Context, *CreateRequest) (*iaas.PacketFilter, error)
+	UpdateWithContext(context.Context, *UpdateRequest) (*iaas.PacketFilter, error)
+	DeleteWithContext(context.Context, *DeleteRequest) error
 }
 
 type APIFactory func() (API, error)
@@ -36,8 +35,8 @@ type Runtime struct {
 	DecodeRequest          func(string, any) error
 	ValidateOutput         func(*kong.Context) error
 	WriteOutput            func(*kong.Context, any) error
-	TransformCreateRequest func(*CreateCommand, *packetfilter.CreateRequest) error
-	TransformUpdateRequest func(*UpdateCommand, *packetfilter.UpdateRequest) error
+	TransformCreateRequest func(*CreateCommand, *CreateRequest) error
+	TransformUpdateRequest func(*UpdateCommand, *UpdateRequest) error
 }
 
 func NewCommands(runtime Runtime, factory APIFactory) Commands {
@@ -72,7 +71,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &packetfilter.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -138,7 +137,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &packetfilter.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -209,7 +208,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &packetfilter.CreateRequest{}
+	request := &CreateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -270,11 +269,11 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request                *string  "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。変更する項目は Name、Description を個別フラグまたは JSON で指定できます。Expression はルール配列で、個別フラグ経路では --expressions に JSON 配列を直接、または @path.json で指定できます。Expression を更新する場合は OriginalExpressionHash (文字列) に read で得た ExpressionHash を必ず指定してください。JSON または --original-expression-hash で指定します。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"updated\\\"}'。ID は実際の値に置き換えます。\""
+	Request                *string  "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description は個別フラグまたは JSON で指定できます。Expression はルール配列で、個別フラグ経路では --expressions に JSON 配列を直接、または @path.json で指定できます。Expression を更新する場合は OriginalExpressionHash (文字列) に read で得た ExpressionHash を必ず指定してください。JSON または --original-expression-hash で指定します。省略した項目は API リクエストの既定値で送信します。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"ID\\\":123456789012,\\\"Name\\\":\\\"updated\\\",\\\"Description\\\":\\\"example\\\"}'。ID は実際の値に置き換えます。\""
 	Zone                   *string  "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID                     *int64   "name:\"id\" help:\"必須: 更新対象の ID (数値)。\""
-	Name                   *string  "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
-	Description            *string  "name:\"description\" help:\"任意: 新しい説明 (最大512文字)。未指定なら変更しません。\""
+	Name                   *string  "name:\"name\" help:\"任意: 新しい名前。未指定時は空の値を API リクエストへ送信します。\""
+	Description            *string  "name:\"description\" help:\"任意: 新しい説明 (最大512文字)。未指定時は空の値を API リクエストへ送信します。\""
 	OriginalExpressionHash *string  "name:\"original-expression-hash\" help:\"任意: ルール更新時に read で取得した ExpressionHash。\""
 	Expression             []string "name:\"expressions\" help:\"任意: ルールの JSON 配列を直接、または @path.json で指定します。1回だけ指定できます。\" sep:\"none\""
 	factory                APIFactory
@@ -292,7 +291,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &packetfilter.UpdateRequest{}
+	request := &UpdateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -382,7 +381,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &packetfilter.DeleteRequest{}
+	request := &DeleteRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

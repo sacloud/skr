@@ -18,10 +18,9 @@ import (
 	"fmt"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/ostype"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 )
 
-func ValidateFindRequest(request *archive.FindRequest) error {
+func ValidateFindRequest(request *FindRequest) error {
 	if request.OSType < 0 || !validOSType(request.OSType) {
 		return fmt.Errorf("OSType が不正です")
 	}

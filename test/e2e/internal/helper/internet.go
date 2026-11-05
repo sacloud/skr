@@ -15,6 +15,7 @@
 package helper
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
 	internetSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
 	"github.com/stretchr/testify/require"
@@ -146,6 +148,47 @@ func CreateInternet(t *testing.T, h *Helper, zone, name, description string) Int
 	require.NoError(t, CheckInternetIdentity(router, router.ID, name, description, router.Switch.ID),
 		"the create response should contain the created Internet")
 	return router
+}
+
+// WaitForInternetReady は作成したルータ＋スイッチを API から参照できるまで待ちます。
+func WaitForInternetReady(t *testing.T, client iaas.APICaller, zone string, expected InternetItem) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(t.Context(), InternetCreateTimeout)
+	defer cancel()
+
+	op := iaas.NewInternetOp(client)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		current, err := op.Read(ctx, zone, expected.ID)
+		if err == nil {
+			require.NotNil(t, current, "Internet read should return the created resource")
+			item := InternetItem{
+				ID:             current.ID,
+				Name:           current.Name,
+				Description:    current.Description,
+				NetworkMaskLen: current.NetworkMaskLen,
+				BandWidthMbps:  current.BandWidthMbps,
+			}
+			if current.Switch != nil {
+				item.Switch.ID = current.Switch.ID
+			}
+			require.NoError(t, CheckInternetIdentity(item, expected.ID, expected.Name, expected.Description, expected.Switch.ID),
+				"the readable Internet should match the create response")
+			return
+		}
+		if !iaas.IsNotFoundError(err) {
+			require.NoError(t, err, "read Internet while waiting for it to become available")
+		}
+
+		select {
+		case <-ctx.Done():
+			require.NoError(t, ctx.Err(), "wait for Internet %s to become readable", expected.ID)
+		case <-ticker.C:
+		}
+	}
 }
 
 // EnableIPv6 は skr CLI でルータ＋スイッチの IPv6 アドレス割り当てを有効化します。

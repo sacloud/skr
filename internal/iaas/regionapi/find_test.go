@@ -22,7 +22,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/region"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFindCommandSupportsNoInputAndOptionalFlags(t *testing.T) {
@@ -30,23 +30,21 @@ func TestFindCommandSupportsNoInputAndOptionalFlags(t *testing.T) {
 		name  string
 		count *int
 		from  *int
-		want  region.FindRequest
+		want  FindRequest
 	}{
-		{name: "no input", want: region.FindRequest{}},
-		{name: "explicit zero count", count: intPointer(0), want: region.FindRequest{Count: 0}},
-		{name: "optional flags", count: intPointer(10), from: intPointer(2), want: region.FindRequest{Count: 10, From: 2}},
+		{name: "no input", want: FindRequest{}},
+		{name: "explicit zero count", count: intPointer(0), want: FindRequest{Count: 0}},
+		{name: "optional flags", count: intPointer(10), from: intPointer(2), want: FindRequest{Count: 10, From: 2}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			api := &findAPITestDouble{}
 			command := newFindCommand(api)
 			command.Count = test.count
 			command.From = test.from
-			if err := command.Run(&kong.Context{}); err != nil {
-				t.Fatal(err)
-			}
-			if api.request == nil || api.request.Count != test.want.Count || api.request.From != test.want.From {
-				t.Fatalf("Find request = %+v, want %+v", api.request, test.want)
-			}
+			require.NoError(t, command.Run(&kong.Context{}))
+			require.NotNil(t, api.request)
+			require.Equal(t, test.want.Count, api.request.Count)
+			require.Equal(t, test.want.From, api.request.From)
 		})
 	}
 }
@@ -56,23 +54,17 @@ func TestFindCommandDecodesJSONWithoutMergingAndRejectsFlagCombination(t *testin
 	command := newFindCommand(api)
 	requestJSON := `{"Names":["region"],"Sort":[{"Key":"Name"}]}`
 	command.Request = &requestJSON
-	if err := command.Run(&kong.Context{}); err != nil {
-		t.Fatal(err)
-	}
-	if api.request == nil || len(api.request.Names) != 1 || api.request.Names[0] != "region" ||
-		len(api.request.Sort) != 1 || api.request.Sort[0].Key != "Name" {
-		t.Fatalf("JSON Find request = %+v", api.request)
-	}
+	require.NoError(t, command.Run(&kong.Context{}))
+	require.NotNil(t, api.request)
+	require.Equal(t, []string{"region"}, api.request.Names)
+	require.Len(t, api.request.Sort, 1)
+	require.Equal(t, "Name", api.request.Sort[0].Key)
 
 	command = newFindCommand(api)
 	command.Request = &requestJSON
 	command.Count = intPointer(0)
-	if err := command.Run(&kong.Context{}); err == nil {
-		t.Fatal("expected --request and --count combination to fail")
-	}
-	if api.calls != 1 {
-		t.Fatalf("API call count = %d, want 1", api.calls)
-	}
+	require.Error(t, command.Run(&kong.Context{}))
+	require.Equal(t, 1, api.calls)
 }
 
 func TestFindCommandReturnsDecodeAndOutputValidationErrors(t *testing.T) {
@@ -81,16 +73,12 @@ func TestFindCommandReturnsDecodeAndOutputValidationErrors(t *testing.T) {
 	command.runtime.DecodeRequest = func(string, any) error { return decodeErr }
 	input := "invalid"
 	command.Request = &input
-	if err := command.Run(&kong.Context{}); !errors.Is(err, decodeErr) {
-		t.Fatalf("decode error = %v, want %v", err, decodeErr)
-	}
+	require.ErrorIs(t, command.Run(&kong.Context{}), decodeErr)
 
 	validateErr := errors.New("query validation failure")
 	command = newFindCommand(&findAPITestDouble{})
 	command.runtime.ValidateOutput = func(*kong.Context) error { return validateErr }
-	if err := command.Run(&kong.Context{}); !errors.Is(err, validateErr) {
-		t.Fatalf("output validation error = %v, want %v", err, validateErr)
-	}
+	require.ErrorIs(t, command.Run(&kong.Context{}), validateErr)
 }
 
 func intPointer(value int) *int {
@@ -111,16 +99,16 @@ func newFindCommand(api *findAPITestDouble) *FindCommand {
 }
 
 type findAPITestDouble struct {
-	request *region.FindRequest
+	request *FindRequest
 	calls   int
 }
 
-func (api *findAPITestDouble) FindWithContext(_ context.Context, request *region.FindRequest) ([]*iaas.Region, error) {
+func (api *findAPITestDouble) FindWithContext(_ context.Context, request *FindRequest) ([]*iaas.Region, error) {
 	api.calls++
 	api.request = request
 	return nil, nil
 }
 
-func (*findAPITestDouble) ReadWithContext(context.Context, *region.ReadRequest) (*iaas.Region, error) {
+func (*findAPITestDouble) ReadWithContext(context.Context, *ReadRequest) (*iaas.Region, error) {
 	return nil, nil
 }

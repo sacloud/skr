@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/skr/internal/apigen"
 	serverapi "github.com/sacloud/skr/internal/iaas/serverapi"
 	"github.com/stretchr/testify/require"
@@ -55,9 +54,9 @@ func TestRunIaaSServerHelp(t *testing.T) {
 		{args: []string{"iaas-api", "server", "--help"}, want: []string{"find", "read", "create", "boot", "update", "delete"}},
 		{args: []string{"iaas-api", "server", "find", "--help"}, want: []string{"--zone", "--tags", "カンマ区切り", "Count", "From", "Names", "併用不可"}, notWant: []string{"--zone all"}},
 		{args: []string{"iaas-api", "server", "read", "--help"}, want: []string{"--zone", "--id", "@path.json"}},
-		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "--disk", "--nic", "archive-id", "plan-id", "size-gb", "繰り返し", "shared", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可", "必須: Zone", "文字列配列", "NoWait=true", "BootAfterCreate=true", "NoWait=true とは併用できません", `"Tags":["tutorial"]`}, notWant: []string{"--cloudimg-archive-id", "--disk-plan-id", "--disk-size-gb", "--network-interface"}},
+		{args: []string{"iaas-api", "server", "create", "--help"}, want: []string{"--zone", "--name", "--cpu", "--memory-gb", "--tags", "--request", "--disk", "--nic", "archive-id", "plan-id", "size-gb", "繰り返し", "shared", "CPU", "MemoryGB", "Disks", "NetworkInterfaces", "併用不可", "必須: Zone", "文字列配列", "BootAfterCreate=true", `"Tags":["tutorial"]`}, notWant: []string{"NoWait", "--cloudimg-archive-id", "--disk-plan-id", "--disk-size-gb", "--network-interface"}},
 		{args: []string{"iaas-api", "server", "boot", "--help"}, want: []string{"--zone", "--id", "--user-data", "@path.yaml", "標準入力", "インライン値は指定できません"}},
-		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--tags", "--cpu", "--memory-gb", "省略", "併用不可", "任意フラグは Name、Description、Tags", "CPUModel です。JSON 経路", "IconID、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID、Disks、NetworkInterfaces", "ID の設定・クリアには JSON"}, notWant: []string{"--icon-id", "--commitment", "--generation", "--interface-driver", "--cdrom-id", "--private-host-id"}},
+		{args: []string{"iaas-api", "server", "update", "--help"}, want: []string{"--name", "--description", "--tags", "--cpu", "--memory-gb", "併用不可", "任意フラグは Name、Description、Tags", "CPUModel", "IconID、PrivateHostID、InterfaceDriver", "プラン変更"}, notWant: []string{"CDROMID", "Disks、NetworkInterfaces", "--icon-id", "--commitment", "--generation", "--interface-driver", "--cdrom-id", "--private-host-id"}},
 		{args: []string{"iaas-api", "server", "delete", "--help"}, want: []string{"--with-disks", "--force", "ディスク", "強制停止", "併用不可"}},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -87,7 +86,7 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 	}
 
 	requestPath := filepath.Join(t.TempDir(), "server-create.json")
-	createRequestJSON := `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1,"Description":"test description","IconID":41,"GPU":0,"GPUModel":"gpu-model","CPUModel":"cpu-model","Commitment":"standard","Generation":100,"ConfidentialVM":false,"InterfaceDriver":"virtio","BootAfterCreate":false,"CDROMID":42,"PrivateHostID":43,"Tags":["tutorial"]}`
+	createRequestJSON := `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1,"Description":"test description","IconID":41,"GPU":0,"GPUModel":"gpu-model","CPUModel":"cpu-model","Commitment":"standard","Generation":100,"ConfidentialVM":false,"InterfaceDriver":"virtio","BootAfterCreate":false,"PrivateHostID":43,"Tags":["tutorial"]}`
 	err := os.WriteFile(requestPath, []byte(createRequestJSON), 0o600)
 	require.NoError(t, err)
 	output, stderr, code := run("create", "--request", "@"+requestPath)
@@ -119,7 +118,6 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 		"--confidential-vm=false",
 		"--interface-driver", "virtio",
 		"--boot-after-create=false",
-		"--cdrom-id", "42",
 		"--private-host-id", "43",
 	)
 	require.Equal(t, 0, code, "create flags: code %d, stderr %q", code, stderr)
@@ -183,7 +181,7 @@ func TestIaaSServerCommandsBuildSDKRequests(t *testing.T) {
 	require.Empty(t, stderr, "should be empty")
 	require.Len(t, api.findRequests, 1, "Find called %d times, want one zone", len(api.findRequests))
 	if request := api.findRequests[0]; request.Zone != "test-zone" || request.Count != 4 || request.From != 2 ||
-		!reflect.DeepEqual(request.Tags, wantTags) {
+		!reflect.DeepEqual([]string(request.Tags), wantTags) {
 		t.Errorf("Find request = %+v, want test-zone, Count 4, From 2", request)
 	}
 
@@ -244,7 +242,7 @@ func TestIaaSServerRejectsInvalidInputBeforeCallingAPI(t *testing.T) {
 	}
 }
 
-func TestIaaSServerPassesNoWaitWithBootAfterCreateToSDK(t *testing.T) {
+func TestIaaSServerPassesBootAfterCreateToAPI(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	factoryCalled := false
 	commandLine := newCLI()
@@ -254,7 +252,7 @@ func TestIaaSServerPassesNoWaitWithBootAfterCreateToSDK(t *testing.T) {
 		return api, nil
 	})
 	code := runCLI(
-		[]string{"iaas-api", "server", "create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1,"NoWait":true,"BootAfterCreate":true}`},
+		[]string{"iaas-api", "server", "create", "--request", `{"Zone":"test-zone","Name":"server","CPU":1,"MemoryGB":1,"BootAfterCreate":true}`},
 		&stdout,
 		&stderr,
 		commandLine,
@@ -263,13 +261,12 @@ func TestIaaSServerPassesNoWaitWithBootAfterCreateToSDK(t *testing.T) {
 	require.EqualValues(t, 0, stderr.Len(), "unexpected value")
 	require.True(t, factoryCalled, "request was not forwarded unchanged: %+v", api.createRequest)
 	require.NotNil(t, api.createRequest, "should not be nil")
-	require.True(t, api.createRequest.NoWait, "unexpected value")
 	require.True(t, api.createRequest.BootAfterCreate, "unexpected value")
 }
 
 func TestServerSwitchNICFlagsMatchJSON(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
-	var requests []*server.CreateRequest
+	var requests []*serverapi.CreateRequest
 	for _, args := range [][]string{
 		{"--zone", "is1b", "--name", "router-server", "--cpu", "1", "--memory-gb", "1",
 			"--disk", "archive-id=123,plan-id=4,size-gb=20", "--nic", "upstream=456"},
@@ -292,7 +289,7 @@ func TestIaaSServerFindUsesSDKCaller(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	commandLine := newCLI()
 	setServerAPIFactory(commandLine, func() (serverapi.API, error) {
-		return server.New(caller), nil
+		return serverapi.NewAPI(caller), nil
 	})
 	code := runCLI([]string{"iaas-api", "server", "find", "--zone", "test-zone"}, &stdout, &stderr, commandLine)
 	require.Equal(t, 0, code, "find: code %d, stderr %q", code, stderr.String())
@@ -306,40 +303,40 @@ func TestIaaSServerFindUsesSDKCaller(t *testing.T) {
 }
 
 type serverAPITestDouble struct {
-	findRequests  []server.FindRequest
-	readRequest   *server.ReadRequest
-	createRequest *server.CreateRequest
-	bootRequest   *server.BootRequest
-	updateRequest *server.UpdateRequest
-	deleteRequest *server.DeleteRequest
+	findRequests  []serverapi.FindRequest
+	readRequest   *serverapi.ReadRequest
+	createRequest *serverapi.CreateRequest
+	bootRequest   *serverapi.BootRequest
+	updateRequest *serverapi.UpdateRequest
+	deleteRequest *serverapi.DeleteRequest
 }
 
-func (api *serverAPITestDouble) FindWithContext(_ context.Context, request *server.FindRequest) ([]*iaas.Server, error) {
+func (api *serverAPITestDouble) FindWithContext(_ context.Context, request *serverapi.FindRequest) ([]*iaas.Server, error) {
 	api.findRequests = append(api.findRequests, *request)
 	return []*iaas.Server{{ID: 123, Name: request.Zone}}, nil
 }
 
-func (api *serverAPITestDouble) ReadWithContext(_ context.Context, request *server.ReadRequest) (*iaas.Server, error) {
+func (api *serverAPITestDouble) ReadWithContext(_ context.Context, request *serverapi.ReadRequest) (*iaas.Server, error) {
 	api.readRequest = request
 	return &iaas.Server{ID: request.ID, Name: "server"}, nil
 }
 
-func (api *serverAPITestDouble) CreateWithContext(_ context.Context, request *server.CreateRequest) (*iaas.Server, error) {
+func (api *serverAPITestDouble) CreateWithContext(_ context.Context, request *serverapi.CreateRequest) (*iaas.Server, error) {
 	api.createRequest = request
 	return &iaas.Server{ID: 123, Name: request.Name}, nil
 }
 
-func (api *serverAPITestDouble) BootWithContext(_ context.Context, request *server.BootRequest) error {
+func (api *serverAPITestDouble) BootWithContext(_ context.Context, request *serverapi.BootRequest) error {
 	api.bootRequest = request
 	return nil
 }
 
-func (api *serverAPITestDouble) UpdateWithContext(_ context.Context, request *server.UpdateRequest) (*iaas.Server, error) {
+func (api *serverAPITestDouble) UpdateWithContext(_ context.Context, request *serverapi.UpdateRequest) (*iaas.Server, error) {
 	api.updateRequest = request
 	return &iaas.Server{ID: request.ID, Name: "renamed"}, nil
 }
 
-func (api *serverAPITestDouble) DeleteWithContext(_ context.Context, request *server.DeleteRequest) error {
+func (api *serverAPITestDouble) DeleteWithContext(_ context.Context, request *serverapi.DeleteRequest) error {
 	api.deleteRequest = request
 	return nil
 }

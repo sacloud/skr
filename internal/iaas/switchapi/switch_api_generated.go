@@ -10,7 +10,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	swytch "github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -23,11 +22,11 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *swytch.FindRequest) ([]*iaas.Switch, error)
-	ReadWithContext(context.Context, *swytch.ReadRequest) (*iaas.Switch, error)
-	CreateWithContext(context.Context, *swytch.CreateRequest) (*iaas.Switch, error)
-	UpdateWithContext(context.Context, *swytch.UpdateRequest) (*iaas.Switch, error)
-	DeleteWithContext(context.Context, *swytch.DeleteRequest) error
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.Switch, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.Switch, error)
+	CreateWithContext(context.Context, *CreateRequest) (*iaas.Switch, error)
+	UpdateWithContext(context.Context, *UpdateRequest) (*iaas.Switch, error)
+	DeleteWithContext(context.Context, *DeleteRequest) error
 }
 
 type APIFactory func() (API, error)
@@ -72,7 +71,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &swytch.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -142,7 +141,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &swytch.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -219,7 +218,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &swytch.CreateRequest{}
+	request := &CreateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -314,7 +313,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &swytch.UpdateRequest{}
+	request := &UpdateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -409,7 +408,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &swytch.DeleteRequest{}
+	request := &DeleteRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

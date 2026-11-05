@@ -59,6 +59,7 @@ func TestScenarioIPv6AddrHostName(t *testing.T) {
 
 	// ルータ＋スイッチを作成して IPv6 アドレス割り当てを有効化します
 	created = helper.CreateInternet(t, h, helper.InternetZone, name, ipv6AddrInternetDesc)
+	helper.WaitForInternetReady(t, client, helper.InternetZone, created)
 	net, err := helper.EnableIPv6(t, h, helper.InternetZone, created.ID)
 	require.NoError(t, err, "enable-ipv6 should succeed")
 	require.NoError(t, helper.CheckIPv6NetItem(net, created.ID),

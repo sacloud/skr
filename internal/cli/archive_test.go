@@ -26,7 +26,6 @@ import (
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/ostype"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 	"github.com/sacloud/skr/internal/apigen"
 	archiveapi "github.com/sacloud/skr/internal/iaas/archiveapi"
 	"github.com/stretchr/testify/require"
@@ -196,12 +195,12 @@ func TestIaaSArchivePropagatesAPIErrors(t *testing.T) {
 }
 
 type archiveAPITestDouble struct {
-	findRequests []*archive.FindRequest
-	readRequest  *archive.ReadRequest
+	findRequests []*archiveapi.FindRequest
+	readRequest  *archiveapi.ReadRequest
 	findErr      error
 }
 
-func (api *archiveAPITestDouble) FindWithContext(_ context.Context, request *archive.FindRequest) ([]*iaas.Archive, error) {
+func (api *archiveAPITestDouble) FindWithContext(_ context.Context, request *archiveapi.FindRequest) ([]*iaas.Archive, error) {
 	api.findRequests = append(api.findRequests, request)
 	if api.findErr != nil {
 		return nil, api.findErr
@@ -212,7 +211,7 @@ func (api *archiveAPITestDouble) FindWithContext(_ context.Context, request *arc
 	}}, nil
 }
 
-func (api *archiveAPITestDouble) ReadWithContext(_ context.Context, request *archive.ReadRequest) (*iaas.Archive, error) {
+func (api *archiveAPITestDouble) ReadWithContext(_ context.Context, request *archiveapi.ReadRequest) (*iaas.Archive, error) {
 	api.readRequest = request
 	return &iaas.Archive{ID: request.ID, Name: "sample-archive", DiskPlanID: 4, DiskPlanName: "ssd", SizeMB: 20480}, nil
 }

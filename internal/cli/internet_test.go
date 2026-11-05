@@ -28,9 +28,6 @@ import (
 	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/sacloud/skr/internal/apigen"
 	diskapi "github.com/sacloud/skr/internal/iaas/diskapi"
 	internetapi "github.com/sacloud/skr/internal/iaas/internetapi"
@@ -118,9 +115,9 @@ func TestSingleNameSearchUsesSDKFilter(t *testing.T) {
 		t.Run(resource, func(t *testing.T) {
 			caller := &nameSearchCaller{resource: resource}
 			commandLine := newCLI()
-			setInternetAPIFactory(commandLine, func() (internetapi.API, error) { return internet.New(caller), nil })
-			setServerAPIFactory(commandLine, func() (serverapi.API, error) { return server.New(caller), nil })
-			setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return disk.New(caller), nil })
+			setInternetAPIFactory(commandLine, func() (internetapi.API, error) { return internetapi.NewAPI(caller), nil })
+			setServerAPIFactory(commandLine, func() (serverapi.API, error) { return serverapi.NewAPI(caller), nil })
+			setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return diskapi.NewAPI(caller), nil })
 			name := "router, 日本語 name"
 			var stdout, stderr bytes.Buffer
 			code := runCLI([]string{"iaas-api", resource, "find", "--zone", "is1b", "--name", name}, &stdout, &stderr, commandLine)
@@ -172,22 +169,22 @@ func TestInternetDeleteFlags(t *testing.T) {
 
 type internetAPITestDouble struct {
 	internetapi.API
-	findRequest          *internet.FindRequest
-	createRequest        *internet.CreateRequest
-	updateRequest        *internet.UpdateRequest
-	deleteRequest        *internet.DeleteRequest
-	addSubnetRequest     *internet.AddSubnetRequest
-	deleteSubnetRequest  *internet.DeleteSubnetRequest
-	monitorRouterRequest *internet.MonitorRouterRequest
+	findRequest          *internetapi.FindRequest
+	createRequest        *internetapi.CreateRequest
+	updateRequest        *internetapi.UpdateRequest
+	deleteRequest        *internetapi.DeleteRequest
+	addSubnetRequest     *internetapi.AddSubnetRequest
+	deleteSubnetRequest  *internetapi.DeleteSubnetRequest
+	monitorRouterRequest *internetapi.MonitorRouterRequest
 	createErr            error
 }
 
-func (api *internetAPITestDouble) FindWithContext(_ context.Context, request *internet.FindRequest) ([]*iaas.Internet, error) {
+func (api *internetAPITestDouble) FindWithContext(_ context.Context, request *internetapi.FindRequest) ([]*iaas.Internet, error) {
 	api.findRequest = request
 	return []*iaas.Internet{}, nil
 }
 
-func (api *internetAPITestDouble) CreateWithContext(_ context.Context, request *internet.CreateRequest) (*iaas.Internet, error) {
+func (api *internetAPITestDouble) CreateWithContext(_ context.Context, request *internetapi.CreateRequest) (*iaas.Internet, error) {
 	api.createRequest = request
 	if api.createErr != nil {
 		return nil, api.createErr
@@ -202,27 +199,27 @@ func (api *internetAPITestDouble) CreateWithContext(_ context.Context, request *
 	}, nil
 }
 
-func (api *internetAPITestDouble) UpdateWithContext(_ context.Context, request *internet.UpdateRequest) (*iaas.Internet, error) {
+func (api *internetAPITestDouble) UpdateWithContext(_ context.Context, request *internetapi.UpdateRequest) (*iaas.Internet, error) {
 	api.updateRequest = request
 	return &iaas.Internet{ID: request.ID}, nil
 }
 
-func (api *internetAPITestDouble) DeleteWithContext(_ context.Context, request *internet.DeleteRequest) error {
+func (api *internetAPITestDouble) DeleteWithContext(_ context.Context, request *internetapi.DeleteRequest) error {
 	api.deleteRequest = request
 	return nil
 }
 
-func (api *internetAPITestDouble) AddSubnetWithContext(_ context.Context, request *internet.AddSubnetRequest) (*iaas.Subnet, error) {
+func (api *internetAPITestDouble) AddSubnetWithContext(_ context.Context, request *internetapi.AddSubnetRequest) (*iaas.InternetSubnetOperationResult, error) {
 	api.addSubnetRequest = request
-	return &iaas.Subnet{ID: 456}, nil
+	return &iaas.InternetSubnetOperationResult{ID: 456}, nil
 }
 
-func (api *internetAPITestDouble) DeleteSubnetWithContext(_ context.Context, request *internet.DeleteSubnetRequest) error {
+func (api *internetAPITestDouble) DeleteSubnetWithContext(_ context.Context, request *internetapi.DeleteSubnetRequest) error {
 	api.deleteSubnetRequest = request
 	return nil
 }
 
-func (api *internetAPITestDouble) MonitorRouterWithContext(_ context.Context, request *internet.MonitorRouterRequest) ([]*iaas.MonitorRouterValue, error) {
+func (api *internetAPITestDouble) MonitorRouterWithContext(_ context.Context, request *internetapi.MonitorRouterRequest) ([]*iaas.MonitorRouterValue, error) {
 	api.monitorRouterRequest = request
 	return []*iaas.MonitorRouterValue{}, nil
 }
@@ -247,7 +244,7 @@ func TestIaaSInternetHelp(t *testing.T) {
 		{args: []string{"iaas-api", "--help"}, want: []string{"internet"}},
 		{args: []string{"iaas-api", "internet", "--help"}, want: []string{"find", "read", "create", "update", "delete", "list-subnet", "add-subnet", "update-subnet", "delete-subnet", "read-ipv6", "enable-ipv6", "disable-ipv6", "monitor-router"}},
 		{args: []string{"iaas-api", "internet", "create", "--help"}, want: []string{"--zone", "--name", "--tags", "--network-mask-len", "--band-width-mbps", "課金", "EnableIPv6", "併用不可"}},
-		{args: []string{"iaas-api", "internet", "update", "--help"}, want: []string{"--zone", "--id", "--name", "--tags", "BandWidthMbps", "EnableIPv6", "省略した項目"}},
+		{args: []string{"iaas-api", "internet", "update", "--help"}, want: []string{"--zone", "--id", "--name", "--tags", "BandWidthMbps", "EnableIPv6", "更新する項目"}},
 		{args: []string{"iaas-api", "internet", "find", "--help"}, want: []string{"--name", "部分一致", "Names", "併用不可"}},
 		{args: []string{"iaas-api", "internet", "delete", "--help"}, want: []string{"--force", "--fail-if-not-found", "NextHop", "サブネット", "IPv6", "--request"}},
 		{args: []string{"iaas-api", "internet", "add-subnet", "--help"}, want: []string{"--network-mask-len", "--next-hop", "ネクストホップ", "@path.json"}},
@@ -297,7 +294,7 @@ func TestIaaSInternetCommandsBuildSDKRequests(t *testing.T) {
 	require.Equal(t, 0, code, "find flags: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
 	if request := api.findRequest; request.Zone != "test-zone" || request.Count != 10 || request.From != 2 ||
-		!reflect.DeepEqual(request.Tags, []string{"edge", "managed"}) {
+		!reflect.DeepEqual([]string(request.Tags), []string{"edge", "managed"}) {
 		t.Fatalf("Find request = %+v", request)
 	}
 

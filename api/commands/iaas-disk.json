@@ -2,7 +2,6 @@
   "package": "diskapi",
   "resource": "IaaS Disk",
   "imports": {
-    "disk": "github.com/sacloud/sacloud-sdk-go/service/iaas/disk",
     "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
     "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
   },
@@ -11,7 +10,7 @@
       "name": "Find",
       "help": "ディスクを指定したゾーンで検索して出力します。例: skr iaas-api disk find --zone is1b",
       "method": "FindWithContext",
-      "request_type": "disk.FindRequest",
+      "request_type": "FindRequest",
       "response_type": "[]*iaas.Disk",
       "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)。任意: 単一名の部分一致検索は --name、複数名の Names と Sort は JSON で指定します。Tags は --tags のカンマ区切りまたは JSON 配列、Count と From は個別フラグでも指定できます。例: skr iaas-api disk find --zone is1b --name example",
@@ -56,7 +55,7 @@
       "name": "Read",
       "help": "ディスクを読み取って出力します。例: skr iaas-api disk read --zone ZONE --id 123456789012",
       "method": "ReadWithContext",
-      "request_type": "disk.ReadRequest",
+      "request_type": "ReadRequest",
       "response_type": "*iaas.Disk",
       "validate_zone": true,
       "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
@@ -82,10 +81,10 @@
       "name": "Create",
       "help": "ディスクを作成して出力します。基本項目はフラグ、複雑な値は --request JSON で指定します。例: skr iaas-api disk create --zone is1b --name DISK-NAME --disk-plan-id 4 --connection virtio --size-gb 20",
       "method": "CreateWithContext",
-      "request_type": "disk.CreateRequest",
+      "request_type": "CreateRequest",
       "response_type": "*iaas.Disk",
       "validate_zone": true,
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて単純なスカラー値と Tags を指定できます。DistantFrom (ID 配列)、EditParameter (複雑な設定)、OSType (SDK の補助入力で、API フィールドではありません) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。例: --request @disk-create.json。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"DISK-NAME\",\"DiskPlanID\":4,\"Connection\":\"virtio\",\"SizeGB\":20,\"Tags\":[\"production\",\"web\"]}。",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、DiskPlanID、Connection、SizeGB。個別フラグではこれらに加えて API のスカラー値と Tags を指定できます。DistantFrom (ID 配列) は JSON で指定します。Tags は JSON では文字列配列です。DiskPlanID、Connection、SizeGB は対象ゾーンで利用できる値を指定してください。OSType、EditParameter、NoWait は指定できません。コピー元アーカイブは SourceArchiveID で指定してください。例: --request @disk-create.json。JSON 例: {\"Zone\":\"ZONE\",\"Name\":\"DISK-NAME\",\"DiskPlanID\":4,\"Connection\":\"virtio\",\"SizeGB\":20,\"Tags\":[\"production\",\"web\"]}。",
       "flags": [
         {
           "name": "zone",
@@ -186,23 +185,17 @@
           "type": "int64",
           "help": "任意: 接続先サーバの ID (数値)。",
           "conversion": "types.ID"
-        },
-        {
-          "name": "no-wait",
-          "field": "NoWait",
-          "type": "bool",
-          "help": "任意: ディスクの作成完了を待たずに戻ります。"
         }
       ]
     },
     {
       "name": "Update",
-      "help": "ディスクの指定項目を更新して出力します。省略した項目は変更しません。例: skr iaas-api disk update --zone ZONE --id 123456789012 --name UPDATED-DISK-NAME",
+      "help": "ディスクを API リクエストで指定した値に更新して出力します。未指定項目は空の値として送信します。例: skr iaas-api disk update --zone ZONE --id 123456789012 --name UPDATED-DISK-NAME",
       "method": "UpdateWithContext",
-      "request_type": "disk.UpdateRequest",
+      "request_type": "UpdateRequest",
       "response_type": "*iaas.Disk",
       "validate_zone": true,
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description、Tags、IconID、Connection、NoWait は個別フラグまたは JSON で指定できます。EditParameter は JSON で指定します。省略した項目は変更しません。JSON 例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"Name\":\"UPDATED-DISK-NAME\"}'。Zone と ID は実際の値に置き換えます。",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description、Tags、IconID、Connection は個別フラグまたは JSON で指定します。省略した項目は API の更新リクエストどおりに扱われます。EditParameter と NoWait は指定できません。JSON 例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"Name\":\"UPDATED-DISK-NAME\"}'。Zone と ID は実際の値に置き換えます。",
       "flags": [
         {
           "name": "zone",
@@ -223,21 +216,21 @@
           "name": "name",
           "field": "Name",
           "type": "string",
-          "help": "任意: 新しい名前。未指定なら変更しません。",
+          "help": "任意: 新しい名前。未指定時は空の値を API リクエストへ送信します。",
           "pointer": true
         },
         {
           "name": "description",
           "field": "Description",
           "type": "string",
-          "help": "任意: 新しい説明 (最大512文字)。空文字列も指定できます。未指定なら変更しません。",
+          "help": "任意: 新しい説明 (最大512文字)。未指定時は空の値を API リクエストへ送信します。",
           "pointer": true
         },
         {
           "name": "tags",
           "field": "Tags",
           "type": "[]string",
-          "help": "任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。",
+          "help": "任意: 更新後のタグ配列。カンマ区切りで指定します。未指定時は空配列を API リクエストへ送信します。",
           "pointer": true,
           "conversion": "types.Tags",
           "separator": ","
@@ -246,7 +239,7 @@
           "name": "icon-id",
           "field": "IconID",
           "type": "int64",
-          "help": "任意: アイコンの ID (数値)。未指定なら変更しません。",
+          "help": "任意: アイコンの ID (数値)。未指定時は 0 を API リクエストへ送信します。",
           "pointer": true,
           "conversion": "types.ID"
         },
@@ -254,15 +247,9 @@
           "name": "connection",
           "field": "Connection",
           "type": "string",
-          "help": "任意: 接続インターフェース。virtio または ide を指定します。未指定なら変更しません。",
+          "help": "任意: 接続インターフェース。virtio または ide を指定します。未指定時は空の値を API リクエストへ送信します。",
           "pointer": true,
           "conversion": "types.EDiskConnection"
-        },
-        {
-          "name": "no-wait",
-          "field": "NoWait",
-          "type": "bool",
-          "help": "任意: ディスクの更新完了を待たずに戻ります。"
         }
       ]
     },
@@ -270,9 +257,9 @@
       "name": "Delete",
       "help": "ディスクを削除します。サーバに接続中のディスクは削除できません。削除後は復旧できません。成功時は出力しません。例: skr iaas-api disk delete --zone ZONE --id 123456789012 --fail-if-not-found",
       "method": "DeleteWithContext",
-      "request_type": "disk.DeleteRequest",
+      "request_type": "DeleteRequest",
       "validate_zone": true,
-      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: FailIfNotFound (対象がない場合にエラー)、WaitForRelease (他リソースから参照されている間の削除待機)、WaitForReleaseTimeout (秒)、WaitForReleaseTick (秒)。サーバ接続中のディスクは削除できません。削除後は復旧できないため、対象 ID と接続状態を確認してください。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。FailIfNotFound は任意です。サーバ接続中のディスクは削除できません。削除後は復旧できないため、対象 ID と接続状態を確認してください。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
       "flags": [
         {
           "name": "zone",
@@ -294,29 +281,11 @@
           "field": "FailIfNotFound",
           "type": "bool",
           "help": "任意: 対象ディスクが見つからない場合にエラーにします。"
-        },
-        {
-          "name": "wait-for-release",
-          "field": "WaitForRelease",
-          "type": "bool",
-          "help": "任意: 他リソースから参照されている間は削除を待ちます。"
-        },
-        {
-          "name": "wait-for-release-timeout",
-          "field": "WaitForReleaseTimeout",
-          "type": "int",
-          "help": "任意: 削除待機のタイムアウト (秒)。"
-        },
-        {
-          "name": "wait-for-release-tick",
-          "field": "WaitForReleaseTick",
-          "type": "int",
-          "help": "任意: 削除待機中の確認間隔 (秒)。"
         }
       ]
     }
   ],
   "wiring_target": "IaaSAPI.Disk",
-  "sdk_factory": "disk.New",
+  "sdk_factory": "diskapi.NewAPI",
   "client_factory": "iaasclient.New"
 }

@@ -2,15 +2,14 @@
   "package": "serviceclassapi",
   "resource": "IaaS ServiceClass",
   "imports": {
-    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
-    "serviceclass": "github.com/sacloud/sacloud-sdk-go/service/iaas/serviceclass"
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas"
   },
   "operations": [
     {
       "name": "Find",
       "help": "指定したゾーンのサービスクラスを検索します。例: skr iaas-api service-class find --zone is1b",
       "method": "FindWithContext",
-      "request_type": "serviceclass.FindRequest",
+      "request_type": "FindRequest",
       "response_type": "[]*iaas.ServiceClass",
       "validate_zone": true,
       "request_help": "必須: Zone (単一ゾーン名)。Count と From は個別フラグ、Sort は JSON で指定します。JSON は直接または @path.json で渡せます。--request と個別フラグは併用できません。",
@@ -38,6 +37,6 @@
     }
   ],
   "wiring_target": "IaaSAPI.ServiceClass",
-  "sdk_factory": "serviceclass.New",
+  "sdk_factory": "serviceclassapi.NewAPI",
   "client_factory": "iaasclient.New"
 }

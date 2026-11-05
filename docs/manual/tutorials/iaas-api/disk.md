@@ -29,7 +29,7 @@ $ skr iaas-api disk update --help
 $ skr iaas-api disk delete --help
 ```
 
-意図したプロファイル、プロジェクト、認証情報を確認します。作成と更新では単純な値を個別フラグで指定でき、複雑な値は `--request` にインライン JSON または `@ファイル名` で指定できます。両方の入力経路は併用できません。作成の `DistantFrom` と `EditParameter`、更新の `EditParameter` は JSON で指定します。タグは個別フラグではカンマ区切り、JSON では `Tags` の文字列配列で指定できます。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
+意図したプロファイル、プロジェクト、認証情報を確認します。作成と更新では単純な値を個別フラグで指定でき、複雑な値は `--request` にインライン JSON または `@ファイル名` で指定できます。両方の入力経路は併用できません。作成時の `DistantFrom` は JSON で指定します。タグは個別フラグではカンマ区切り、JSON では `Tags` の文字列配列で指定できます。API の結果は JSON で出力し、`--query` で必要な項目を抽出できます。
 
 検索では対象のゾーンを明示してください。
 
@@ -63,7 +63,7 @@ $ skr iaas-api disk create \
 }
 ```
 
-この例ではディスクの内容のコピー元やサーバ ID を指定していないため、サーバ未接続のディスクを作成します。個別フラグと JSON は同じリクエストを組み立てますが、1回のコマンドでは併用できません。作成時の `DistantFrom` と `EditParameter` は JSON で指定します。既存ディスクやアーカイブからコピーする場合は、`disk create --help` にある `SourceDiskID` または `SourceArchiveID` などを指定してください。コピー元、サイズ、プランの組み合わせは作成前に確認してください。
+この例ではディスクの内容のコピー元やサーバ ID を指定していないため、サーバ未接続のディスクを作成します。個別フラグと JSON は同じリクエストを組み立てますが、1回のコマンドでは併用できません。`DistantFrom` を指定する場合は JSON で指定します。既存ディスクやアーカイブからコピーする場合は、`disk create --help` にある `SourceDiskID` または `SourceArchiveID` などを指定してください。コピー元、サイズ、プランの組み合わせは作成前に確認してください。
 
 ## Step 3: ディスクを作成し、検索・参照する
 
@@ -101,10 +101,15 @@ $ skr iaas-api disk read --zone is1b --id 123456789012
 
 ## Step 4: 名前を更新する
 
-ID と `UPDATED-TEST-DISK-NAME` を実際の値に置き換えて、名前をフラグで更新します。更新する項目だけを指定し、省略した項目は変更しません。
+ID と `UPDATED-TEST-DISK-NAME` を実際の値に置き換えます。Update は API 更新リクエストを直接送信するため、保持する項目も指定してください。
 
 ```console
-$ skr iaas-api disk update --zone is1b --id 123456789012 --name UPDATED-TEST-DISK-NAME
+$ skr iaas-api disk update --zone is1b --id 123456789012 \
+    --name UPDATED-TEST-DISK-NAME \
+    --description "test description" \
+    --tags tutorial \
+    --icon-id 0 \
+    --connection virtio
 ```
 
 JSON を使う場合は、次の内容を `disk-update.json` として保存します。タグなどの配列を更新する場合も JSON を利用できます。
@@ -113,7 +118,11 @@ JSON を使う場合は、次の内容を `disk-update.json` として保存し�
 {
   "Zone": "is1b",
   "ID": 123456789012,
-  "Name": "UPDATED-TEST-DISK-NAME"
+  "Name": "UPDATED-TEST-DISK-NAME",
+  "Description": "test description",
+  "Tags": ["tutorial"],
+  "IconID": 0,
+  "Connection": "virtio"
 }
 ```
 
@@ -147,5 +156,4 @@ $ skr iaas-api disk find --zone is1b --name UPDATED-TEST-DISK-NAME --query 'map(
 ## 参考情報
 
 - [さくらのクラウドマニュアル: ディスクの作成/削除/変更](https://manual.sakura.ad.jp/cloud/storage/disk.html)
-- [sacloud-sdk-go v0.3.0: Disk サービスとリクエスト型](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/disk)
-- [sacloud-sdk-go v0.3.0: DiskPlan サービス](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/diskplan)
+- [sacloud-sdk-go v0.3.0: IaaS API 操作](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/api/iaas)

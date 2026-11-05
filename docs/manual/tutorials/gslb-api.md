@@ -323,4 +323,4 @@ GSLB を継続利用する場合は、利用したいホスト名の CNAME に�
 - [サーバーの電源操作](https://manual.sakura.ad.jp/cloud/server/power.html)
 - [ディスクのプランとサイズ](https://manual.sakura.ad.jp/cloud/storage/disk.html)
 - [sacloud-sdk-go v0.3.1: GSLB service](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1/service/iaas/gslb)
-- [sacloud-sdk-go v0.3.1: Server service](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1/service/iaas/server)
+- [sacloud-sdk-go v0.3.1 Server API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.1/api/iaas#ServerAPI)

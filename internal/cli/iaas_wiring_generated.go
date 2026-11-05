@@ -25,19 +25,6 @@
 package cli
 
 import (
-	archive "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
-	disk "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
-	icon "github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
-	internet "github.com/sacloud/sacloud-sdk-go/service/iaas/internet"
-	ipaddress "github.com/sacloud/sacloud-sdk-go/service/iaas/ipaddress"
-	ipv6addr "github.com/sacloud/sacloud-sdk-go/service/iaas/ipv6addr"
-	ipv6net "github.com/sacloud/sacloud-sdk-go/service/iaas/ipv6net"
-	packetfilter "github.com/sacloud/sacloud-sdk-go/service/iaas/packetfilter"
-	region "github.com/sacloud/sacloud-sdk-go/service/iaas/region"
-	server "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
-	serviceclass "github.com/sacloud/sacloud-sdk-go/service/iaas/serviceclass"
-	swytch "github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
-	zone "github.com/sacloud/sacloud-sdk-go/service/iaas/zone"
 	archiveapi "github.com/sacloud/skr/internal/iaas/archiveapi"
 	iaasclient "github.com/sacloud/skr/internal/iaas/client"
 	databaseapi "github.com/sacloud/skr/internal/iaas/databaseapi"
@@ -70,7 +57,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return archive.New(client), nil
+		return archiveapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.Database = databaseapi.NewCommands(databaseapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -92,7 +79,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return disk.New(client), nil
+		return diskapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.Icon = iconapi.NewCommands(iconapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -103,7 +90,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return icon.New(client), nil
+		return iconapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.Internet = internetapi.NewCommands(internetapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -114,7 +101,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return internet.New(client), nil
+		return internetapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.IPAddress = ipaddressapi.NewCommands(ipaddressapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -125,7 +112,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return ipaddress.New(client), nil
+		return ipaddressapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.IPv6Addr = ipv6addrapi.NewCommands(ipv6addrapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -136,7 +123,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return ipv6addr.New(client), nil
+		return ipv6addrapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.IPv6Net = ipv6netapi.NewCommands(ipv6netapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -147,7 +134,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return ipv6net.New(client), nil
+		return ipv6netapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.PacketFilter = packetfilterapi.NewCommands(packetfilterapi.Runtime{
 		DecodeRequest:          decodeRequest,
@@ -160,7 +147,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return packetfilter.New(client), nil
+		return packetfilterapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.Product.Disk = diskplanapi.NewCommands(diskplanapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -226,7 +213,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return region.New(client), nil
+		return regionapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.Server = serverapi.NewCommands(serverapi.Runtime{
 		DecodeRequest:          decodeRequest,
@@ -238,7 +225,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return server.New(client), nil
+		return serverapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.ServiceClass = serviceclassapi.NewCommands(serviceclassapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -249,7 +236,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return serviceclass.New(client), nil
+		return serviceclassapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.Switch = switchapi.NewCommands(switchapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -260,7 +247,7 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return swytch.New(client), nil
+		return switchapi.NewAPI(client), nil
 	})
 	c.IaaSAPI.Zone = zoneapi.NewCommands(zoneapi.Runtime{
 		DecodeRequest:  decodeRequest,
@@ -271,6 +258,6 @@ func (c *cli) initIaaSAPI() {
 		if err != nil {
 			return nil, err
 		}
-		return zone.New(client), nil
+		return zoneapi.NewAPI(client), nil
 	})
 }

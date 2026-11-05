@@ -238,5 +238,5 @@ $ rmdir "$WORK_DIR"
 - [NIC の作成・削除・接続先編集](https://manual.sakura.ad.jp/cloud/server/nic.html)
 - [スタティックルート機能](https://manual.sakura.ad.jp/cloud/network/switch/static-routing.html)
 - [cloud-init を利用したサーバ作成](https://manual.sakura.ad.jp/cloud/server/cloud-init.html)
-- [sacloud-sdk-go v0.3.0 Internet API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/internet)
-- [sacloud-sdk-go v0.3.0 Server API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/server)
+- [sacloud-sdk-go v0.3.1 Internet API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.1/api/iaas#InternetAPI)
+- [sacloud-sdk-go v0.3.1 Server API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.1/api/iaas#ServerAPI)

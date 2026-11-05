@@ -10,7 +10,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	server "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -19,17 +18,17 @@ type Commands struct {
 	Read   ReadCommand   "cmd:\"\" help:\"サーバを読み取って出力します。例: skr iaas-api server read --zone ZONE --id 123456789012\""
 	Create CreateCommand "cmd:\"\" help:\"サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'\""
 	Boot   BootCommand   "cmd:\"\" help:\"サーバを起動します。cloud-init の user-data は任意で、--user-data @path.yaml または --user-data - で指定します。例: skr iaas-api server boot --zone ZONE --id 123456789012\""
-	Update UpdateCommand "cmd:\"\" help:\"サーバの指定項目を更新して出力します。省略した項目は変更しません。CPU または MemoryGB の変更はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated\""
+	Update UpdateCommand "cmd:\"\" help:\"サーバの API 更新リクエストを送信して出力します。更新リクエストで省略した項目は現在値を維持します。CPU または MemoryGB の指定はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated\""
 	Delete DeleteCommand "cmd:\"\" help:\"サーバを削除します。成功時は出力しません。ディスクも削除する場合は --with-disks を指定します。例: skr iaas-api server delete --zone ZONE --id 123456789012\""
 }
 
 type API interface {
-	FindWithContext(context.Context, *server.FindRequest) ([]*iaas.Server, error)
-	ReadWithContext(context.Context, *server.ReadRequest) (*iaas.Server, error)
-	CreateWithContext(context.Context, *server.CreateRequest) (*iaas.Server, error)
-	BootWithContext(context.Context, *server.BootRequest) error
-	UpdateWithContext(context.Context, *server.UpdateRequest) (*iaas.Server, error)
-	DeleteWithContext(context.Context, *server.DeleteRequest) error
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.Server, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.Server, error)
+	CreateWithContext(context.Context, *CreateRequest) (*iaas.Server, error)
+	BootWithContext(context.Context, *BootRequest) error
+	UpdateWithContext(context.Context, *UpdateRequest) (*iaas.Server, error)
+	DeleteWithContext(context.Context, *DeleteRequest) error
 }
 
 type APIFactory func() (API, error)
@@ -38,7 +37,7 @@ type Runtime struct {
 	DecodeRequest          func(string, any) error
 	ValidateOutput         func(*kong.Context) error
 	WriteOutput            func(*kong.Context, any) error
-	TransformCreateRequest func(*CreateCommand, *server.CreateRequest) error
+	TransformCreateRequest func(*CreateCommand, *CreateRequest) error
 }
 
 func NewCommands(runtime Runtime, factory APIFactory) Commands {
@@ -79,7 +78,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &server.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -152,7 +151,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &server.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -205,7 +204,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、Name、CPU、MemoryGB。CPU と MemoryGB は対象ゾーンで利用可能なプランを指定します。Tags は文字列配列です。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドも指定できます。NoWait=true と BootAfterCreate=true は併用できません。NoWait=true の場合は各ディスクも NoWait=true にします。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"Name\\\":\\\"example\\\",\\\"CPU\\\":1,\\\"MemoryGB\\\":1,\\\"Tags\\\":[\\\"tutorial\\\"]}'\""
+	Request         *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一ゾーン名)、Name、CPU、MemoryGB。CPU と MemoryGB は対象ゾーンで利用可能なプランを指定します。Tags は文字列配列です。Disks、NetworkInterfaces などの複雑な構成や、その他の API フィールドも指定できます。Disks の SourceDiskID、SourceArchiveID、EncryptionAlgorithm、KMSKeyID と、NetworkInterfaces の PacketFilterID も JSON で指定できます。PacketFilterID は作成した NIC に適用します。BootAfterCreate=true の場合は作成後に起動します。例: --request='{\\\"Zone\\\":\\\"is1b\\\",\\\"Name\\\":\\\"example\\\",\\\"CPU\\\":1,\\\"MemoryGB\\\":1,\\\"Tags\\\":[\\\"tutorial\\\"]}'\""
 	Zone            *string   "name:\"zone\" help:\"必須: 作成先のゾーン名。\""
 	Name            *string   "name:\"name\" help:\"必須: サーバ名。\""
 	CPU             *int      "name:\"cpu\" help:\"必須: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。\""
@@ -220,8 +219,7 @@ type CreateCommand struct {
 	Generation      *int      "name:\"generation\" help:\"任意: サーバプラン世代 (0: 既定、100、200)。\""
 	ConfidentialVM  *bool     "name:\"confidential-vm\" help:\"任意: Confidential VM プランを有効にします。利用条件と提供ゾーンを確認してください。\""
 	InterfaceDriver *string   "name:\"interface-driver\" help:\"任意: 仮想 NIC ドライバ。virtio または e1000 を指定します。\""
-	BootAfterCreate *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。NoWait=true とは併用できません。cloud-init user-data を使う場合は省略してください。\""
-	CDROMID         *int64    "name:\"cdrom-id\" help:\"任意: 作成時に挿入する CD-ROM イメージの ID (数値)。\""
+	BootAfterCreate *bool     "name:\"boot-after-create\" help:\"任意: true の場合、作成後にサーバを起動します。cloud-init user-data を使う場合は省略してください。\""
 	PrivateHostID   *int64    "name:\"private-host-id\" help:\"任意: 接続先の専有ホスト ID (数値)。\""
 	Disks           []string  "name:\"disk\" help:\"任意: ディスク1個を key=value のカンマ区切りで指定します。必須キー: plan-id、size-gb (GB)。任意キー: archive-id。すべて正の整数です。例: --disk 'archive-id=123,plan-id=4,size-gb=20'。繰り返し指定でき、指定順に API の Disks 配列を組み立てます。接続は virtio です。archive-id 省略時は空のディスクを作成します。\" sep:\"none\""
 	NICs            []string  "name:\"nic\" help:\"任意: NIC 1個を upstream=shared、upstream=disconnected、または upstream=SWITCH_ID で指定します。共有セグメント、未接続、指定スイッチへの接続です。SWITCH_ID は正の整数です。繰り返し指定でき、指定順に API の NetworkInterfaces 配列を組み立てます。shared は先頭の NIC にだけ指定できます。ルータ＋スイッチに接続する場合も先頭の NIC を指定してください。OS の IP アドレスは設定しません。\" sep:\"none\""
@@ -246,14 +244,13 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 	flagsSet = flagsSet || c.ConfidentialVM != nil
 	flagsSet = flagsSet || c.InterfaceDriver != nil
 	flagsSet = flagsSet || c.BootAfterCreate != nil
-	flagsSet = flagsSet || c.CDROMID != nil
 	flagsSet = flagsSet || c.PrivateHostID != nil
 	flagsSet = flagsSet || len(c.Disks) != 0
 	flagsSet = flagsSet || len(c.NICs) != 0
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &server.CreateRequest{}
+	request := &CreateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -327,10 +324,6 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 		if c.BootAfterCreate != nil {
 			request.BootAfterCreate = *c.BootAfterCreate
 		}
-		if c.CDROMID != nil {
-			value := types.ID(*c.CDROMID)
-			request.CDROMID = value
-		}
 		if c.PrivateHostID != nil {
 			value := types.ID(*c.PrivateHostID)
 			request.PrivateHostID = value
@@ -369,17 +362,17 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意フラグは Name、Description、Tags (--tags でカンマ区切り)、CPU、MemoryGB、GPU、GPUModel、CPUModel です。JSON 経路では Tags を文字列配列で指定できます。IconID、Commitment、Generation、InterfaceDriver、CDROMID、PrivateHostID、Disks、NetworkInterfaces など、フラグのない API フィールドや ID の設定・クリアには JSON を使用します。省略した項目は変更しません。CPU または MemoryGB を指定するとプランを変更します。例: skr iaas-api server update --zone ZONE --id 123456789012 --tags production,web。ID は実際の値に置き換えます。\""
+	Request     *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意フラグは Name、Description、Tags (--tags でカンマ区切り)、CPU、MemoryGB、GPU、GPUModel、CPUModel です。更新リクエストで省略した項目は現在値を維持します。JSON 経路では Tags を文字列配列で指定できます。IconID、PrivateHostID、InterfaceDriver など、フラグのない API フィールドは JSON で指定します。CPU、MemoryGB、GPU、GPUModel、CPUModel の指定はプラン変更です。例: skr iaas-api server update --zone ZONE --id 123456789012 --tags production,web。ID は実際の値に置き換えます。\""
 	Zone        *string   "name:\"zone\" help:\"必須: 対象ゾーン名。\""
 	ID          *int64    "name:\"id\" help:\"必須: 更新対象のサーバ ID (数値)。\""
-	Tags        *[]string "name:\"tags\" help:\"任意: 更新後のタグ配列。カンマ区切りで指定します。未指定なら変更しません。\" sep:\",\""
-	Name        *string   "name:\"name\" help:\"任意: 新しい名前。未指定なら変更しません。\""
-	Description *string   "name:\"description\" help:\"任意: 新しい説明。未指定なら変更しません。\""
-	CPU         *int      "name:\"cpu\" help:\"任意: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。\""
-	MemoryGB    *int      "name:\"memory-gb\" help:\"任意: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。変更時はプラン変更になります。\""
-	GPU         *int      "name:\"gpu\" help:\"任意: GPU 数。未指定なら変更しません。\""
-	GPUModel    *string   "name:\"gpu-model\" help:\"任意: GPU モデル。未指定なら変更しません。\""
-	CPUModel    *string   "name:\"cpu-model\" help:\"任意: CPU モデル。未指定なら変更しません。\""
+	Tags        *[]string "name:\"tags\" help:\"任意: 更新リクエストのタグ配列。カンマ区切りで指定します。\" sep:\",\""
+	Name        *string   "name:\"name\" help:\"任意: 更新リクエストのサーバ名。\""
+	Description *string   "name:\"description\" help:\"任意: 更新リクエストの説明。\""
+	CPU         *int      "name:\"cpu\" help:\"任意: 仮想コア数。MemoryGB と対象ゾーンで利用可能なプランの組み合わせを指定してください。指定するとプラン変更になります。\""
+	MemoryGB    *int      "name:\"memory-gb\" help:\"任意: メモリ容量 (GB)。CPU と対象ゾーンで利用可能なプランの組み合わせを指定してください。指定するとプラン変更になります。\""
+	GPU         *int      "name:\"gpu\" help:\"任意: プラン変更後の GPU 数。\""
+	GPUModel    *string   "name:\"gpu-model\" help:\"任意: プラン変更後の GPU モデル。\""
+	CPUModel    *string   "name:\"cpu-model\" help:\"任意: プラン変更後の CPU モデル。\""
 	factory     APIFactory
 	runtime     Runtime
 }
@@ -399,7 +392,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &server.UpdateRequest{}
+	request := &UpdateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -497,7 +490,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &server.DeleteRequest{}
+	request := &DeleteRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

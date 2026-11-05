@@ -20,14 +20,13 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
 )
 
 type UpdateCommand struct {
-	Request *string   `name:"request" help:"UpdateRequest JSON を直接または @path.json で指定します。必須: ID。任意: Name、Tags。省略した項目は変更しません。個別フラグとは併用できません。例: --request='{\"ID\":123456789012,\"Name\":\"updated\"}'"`
+	Request *string   `name:"request" help:"UpdateRequest JSON を直接または @path.json で指定します。必須: ID。Name、Tags は API リクエストのフィールドです。省略した項目は空の既定値で送信します。個別フラグとは併用できません。例: --request='{\"ID\":123456789012,\"Name\":\"updated\",\"Tags\":[\"example\"]}'"`
 	ID      *int64    `name:"id" help:"必須: 更新するアイコンの ID (数値)。"`
-	Name    *string   `name:"name" help:"任意: 新しい名前。未指定なら変更しません。"`
-	Tags    *[]string `name:"tags" sep:"," help:"任意: タグ。カンマ区切りで指定します。未指定なら変更しません。"`
+	Name    *string   `name:"name" help:"任意: 新しい名前。未指定時は空の値を API リクエストへ送信します。"`
+	Tags    *[]string `name:"tags" sep:"," help:"任意: タグ。カンマ区切りで指定します。未指定時は空配列を API リクエストへ送信します。"`
 	factory APIFactory
 	runtime Runtime
 }
@@ -37,7 +36,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &icon.UpdateRequest{}
+	request := &UpdateRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

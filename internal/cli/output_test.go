@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/swytch"
 	switchapi "github.com/sacloud/skr/internal/iaas/switchapi"
 	iaasmock "github.com/sacloud/skr/internal/sakumock/iaas"
 	"github.com/stretchr/testify/require"
@@ -73,7 +72,7 @@ func TestJSONOutputIgnoresLegacyProfileFormat(t *testing.T) {
 			runCommand := func(args ...string) []byte {
 				t.Helper()
 				commandLine := newCLI()
-				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return swytch.New(server), nil })
+				setSwitchAPIFactory(commandLine, func() (switchapi.API, error) { return switchapi.NewAPI(server), nil })
 				var stdout, stderr bytes.Buffer
 				require.Equal(t, 0, runCLI(args, &stdout, &stderr, commandLine), "stderr: %s", stderr.String())
 				return stdout.Bytes()

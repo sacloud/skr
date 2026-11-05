@@ -97,7 +97,7 @@ $ skr iaas-api icon find --request @icon-find.json --query 'map({ID,Name,Tags})'
 $ skr iaas-api icon read --id 123456789012
 ```
 
-名前とタグを更新します。`UPDATED-TEST-ICON-NAME` を一意なテスト用の名前に置き換えてください。更新で指定できるのは名前とタグです。省略した項目は変更されません。
+名前とタグを更新します。`UPDATED-TEST-ICON-NAME` を一意なテスト用の名前に置き換えてください。Update は API リクエストを直接送信するため、保持する値も指定してください。
 
 ```console
 $ skr iaas-api icon update --id 123456789012 --name UPDATED-TEST-ICON-NAME --tags tutorial,updated

@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/serviceclass"
 	"github.com/sacloud/skr/internal/apigen"
 	serviceclassapi "github.com/sacloud/skr/internal/iaas/serviceclassapi"
 	"github.com/stretchr/testify/require"
@@ -133,7 +132,7 @@ func TestIaaSServiceClassFindUsesSDKCaller(t *testing.T) {
 			caller := &serviceClassAPICaller{}
 			commandLine := newCLI()
 			setServiceClassAPIFactory(commandLine, func() (serviceclassapi.API, error) {
-				return serviceclass.New(caller), nil
+				return serviceclassapi.NewAPI(caller), nil
 			})
 
 			var stdout, stderr bytes.Buffer
@@ -205,12 +204,12 @@ func TestIaaSServiceClassPropagatesAPIErrors(t *testing.T) {
 }
 
 type serviceClassAPITestDouble struct {
-	findRequest *serviceclass.FindRequest
+	findRequest *serviceclassapi.FindRequest
 	findErr     error
 	findCalls   int
 }
 
-func (api *serviceClassAPITestDouble) FindWithContext(_ context.Context, request *serviceclass.FindRequest) ([]*iaas.ServiceClass, error) {
+func (api *serviceClassAPITestDouble) FindWithContext(_ context.Context, request *serviceclassapi.FindRequest) ([]*iaas.ServiceClass, error) {
 	api.findCalls++
 	api.findRequest = request
 	if api.findErr != nil {

@@ -26,16 +26,15 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
-	"github.com/sacloud/sacloud-sdk-go/service/iaas/icon"
 )
 
 type createAPITestDouble struct {
 	API
-	request *icon.CreateRequest
+	request *CreateRequest
 	err     error
 }
 
-func (api *createAPITestDouble) CreateWithContext(_ context.Context, request *icon.CreateRequest) (*iaas.Icon, error) {
+func (api *createAPITestDouble) CreateWithContext(_ context.Context, request *CreateRequest) (*iaas.Icon, error) {
 	api.request = request
 	if api.err != nil {
 		return nil, api.err
@@ -162,8 +161,8 @@ func TestReadImageFileEncodesExactFileBytes(t *testing.T) {
 }
 
 func TestFindCommandAllowsUnfilteredList(t *testing.T) {
-	var got *icon.FindRequest
-	api := &findAPITestDouble{find: func(request *icon.FindRequest) ([]*iaas.Icon, error) {
+	var got *FindRequest
+	api := &findAPITestDouble{find: func(request *FindRequest) ([]*iaas.Icon, error) {
 		got = request
 		return []*iaas.Icon{}, nil
 	}}
@@ -224,20 +223,20 @@ func TestUpdateCommandPreservesIDInSDKResponse(t *testing.T) {
 
 type findAPITestDouble struct {
 	API
-	find func(*icon.FindRequest) ([]*iaas.Icon, error)
+	find func(*FindRequest) ([]*iaas.Icon, error)
 }
 
-func (api *findAPITestDouble) FindWithContext(_ context.Context, request *icon.FindRequest) ([]*iaas.Icon, error) {
+func (api *findAPITestDouble) FindWithContext(_ context.Context, request *FindRequest) ([]*iaas.Icon, error) {
 	return api.find(request)
 }
 
 type updateAPITestDouble struct {
 	API
-	request *icon.UpdateRequest
+	request *UpdateRequest
 	result  *iaas.Icon
 }
 
-func (api *updateAPITestDouble) UpdateWithContext(_ context.Context, request *icon.UpdateRequest) (*iaas.Icon, error) {
+func (api *updateAPITestDouble) UpdateWithContext(_ context.Context, request *UpdateRequest) (*iaas.Icon, error) {
 	api.request = request
 	return api.result, nil
 }

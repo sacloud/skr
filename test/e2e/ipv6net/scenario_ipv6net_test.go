@@ -57,6 +57,7 @@ func TestScenarioIPv6Net(t *testing.T) {
 
 	// ルータ＋スイッチを作成します
 	created = helper.CreateInternet(t, h, helper.InternetZone, name, ipv6NetDesc)
+	helper.WaitForInternetReady(t, client, helper.InternetZone, created)
 
 	// IPv6 アドレス割り当てを有効化します
 	enabled, err := helper.EnableIPv6(t, h, helper.InternetZone, created.ID)

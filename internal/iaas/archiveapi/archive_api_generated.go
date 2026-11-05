@@ -10,7 +10,6 @@ import (
 	"github.com/alecthomas/kong"
 	iaas "github.com/sacloud/sacloud-sdk-go/api/iaas"
 	types "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
-	archive "github.com/sacloud/sacloud-sdk-go/service/iaas/archive"
 	zones "github.com/sacloud/skr/internal/iaas/zones"
 )
 
@@ -20,8 +19,8 @@ type Commands struct {
 }
 
 type API interface {
-	FindWithContext(context.Context, *archive.FindRequest) ([]*iaas.Archive, error)
-	ReadWithContext(context.Context, *archive.ReadRequest) (*iaas.Archive, error)
+	FindWithContext(context.Context, *FindRequest) ([]*iaas.Archive, error)
+	ReadWithContext(context.Context, *ReadRequest) (*iaas.Archive, error)
 }
 
 type APIFactory func() (API, error)
@@ -62,7 +61,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &archive.FindRequest{}
+	request := &FindRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
@@ -138,7 +137,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &archive.ReadRequest{}
+	request := &ReadRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
