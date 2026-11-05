@@ -71,7 +71,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 - [ ] `dns`
 - [x] `gslb` — `gslb-api` で Find / Read / Create / Update / Delete を実装済みです。単純値、ヘルスチェックのフラットなフラグ、反復可能な `--destination-server` と JSON 入力に対応します。[testing.T ベースのライブ E2E](test/e2e/gslb/) で実サーバーとソーリーサーバーを各1台作成し、ping 監視による停止・復帰時の応答先切り替えを `NOERROR` と期待 IP の完全一致で確認済みです。GSLB の CRUD、両サーバーのディスク込み削除、各リソースの不在も確認済みです。以前の単一宛先・空応答による停止確認は不十分なため、この構成で置き換えました。[チュートリアル](docs/manual/tutorials/gslb-api.md)では両サーバーの準備、ソーリーサーバーへの切り替えと復帰、更新、ディスクの個別削除を説明します
 - [ ] `localrouter`
-- [ ] `proxylb`
+- [x] `proxylb` — `proxylb-api` で Find / Read / Create / Update / Delete を実装済みです。証明書の GetCertificates / SetCertificates / DeleteCertificates、`renew-lets-encrypt-cert`、`health-status`、`monitor-connection` も実装済みです。単純値、リッスンポートの反復可能な `--bind-port`、配下サーバーの反復可能な `--server`、ヘルスチェックのフラットなフラグ、`--name` 部分一致検索、JSON 入力に対応します。API がヘルスチェックの設定を常に要求するため、Create と Update でヘルスチェックの再指定が必要です。未指定のタイムアウトは 10 が設定されます ([ADR 0072](docs/adr/0072-proxylb-api-command-options.md))。[testing.T ベースのライブ E2E](test/e2e/proxylb/) では cloud-init で起動した一時サーバーを配下サーバーとし、plan 100 の ProxyLB を作成します。作成直後に割り当てられる VIP 宛ての HTTP GET と HTTPS GET、`health-status` の稼働状態、接続数モニタリングを確認済みです。自己署名証明書の設定・取得・削除、更新、Let's Encrypt 未設定時の `renew-lets-encrypt-cert` のエラーも確認済みです。FQDN は API が非同期に割り当てるため、作成直後の応答には含まれません。トラフィックの確認は VIP で行いました。作成したリソースの ID と識別情報を照合して削除し、不在も確認済みです。[チュートリアル](docs/manual/tutorials/proxylb-api.md)では配下サーバーの準備、リッスンポートと配下サーバーの登録、稼働状態と証明書の確認、更新と後片付けを説明します
 - [ ] `simplemonitor`
 
 ## IaaS の補助・プラン系サービス候補
