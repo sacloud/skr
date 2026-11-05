@@ -226,7 +226,9 @@ func updateRequestFromFlags(command *UpdateCommand) (*proxylb.UpdateRequest, err
 }
 
 // finalizeCreateRequest は API に送る前にヘルスチェックの必須項目を検証し、
-// 未指定のタイムアウトに既定値を適用する。flags が true の場合はエラーメッセージに個別フラグ名を含める。
+// 未指定のタイムアウトに既定値を適用する。Create には Read による現在値の引き継ぎがないため、
+// 未指定の Timeout は空のオブジェクトになり API に拒否される。flags が true の場合は
+// エラーメッセージに個別フラグ名を含める。Update の検証は finalizeUpdateRequest を使う。
 func finalizeCreateRequest(request *proxylb.CreateRequest, flags bool) error {
 	if err := requireHealthCheck(request.HealthCheck, flags); err != nil {
 		return err
@@ -235,17 +237,21 @@ func finalizeCreateRequest(request *proxylb.CreateRequest, flags bool) error {
 	return nil
 }
 
-// finalizeUpdateRequest は API に送る前にヘルスチェックの必須項目を検証し、
-// 未指定のタイムアウトに既定値を適用する。flags が true の場合はエラーメッセージに個別フラグ名を含める。
+// finalizeUpdateRequest は API に送る前に、指定されたヘルスチェックの内容を検証する。
+// SDK の Update は現在の値を Read して未指定の項目を引き継ぐため、未指定時の検証も
+// タイムアウトの既定値補完も行わない。既存のタイムアウトを未指定の更新で下げないため、
+// 未指定の Timeout はそのまま渡す。flags が true の場合はエラーメッセージに個別フラグ名を含める。
 func finalizeUpdateRequest(request *proxylb.UpdateRequest, flags bool) error {
-	if err := requireHealthCheck(request.HealthCheck, flags); err != nil {
-		return err
+	if request.HealthCheck != nil {
+		if err := requireHealthCheck(request.HealthCheck, flags); err != nil {
+			return err
+		}
 	}
-	request.Timeout = normalizeTimeout(request.Timeout)
 	return nil
 }
 
 // requireHealthCheck は API が必須とするヘルスチェックの設定を検証する。
+// Create では常に呼び、Update では設定を指定した場合だけ呼び出す。
 // プロトコルと監視間隔は常に必須で、プロトコルが http の場合は監視パスも必要。
 func requireHealthCheck(hc *iaas.ProxyLBHealthCheck, flags bool) error {
 	hint := " (API の HealthCheck: Protocol、DelayLoop、http の場合は Path)"
@@ -271,7 +277,8 @@ func requireHealthCheck(hc *iaas.ProxyLBHealthCheck, flags bool) error {
 }
 
 // normalizeTimeout は未指定のタイムアウトに InactiveSec 10 を適用する。
-// 空の Timeout オブジェクトは API に拒否されるため、常に有効な値を送る。
+// Create では空の Timeout オブジェクトが API に拒否されるため、常に有効な値を送る。
+// Update では未指定の Timeout を現在値で引き継ぐため、この関数は呼び出さない。
 // 10 は SDK の ProxyLBTimeout.GetInactiveSec() が未指定時に返す値。
 func normalizeTimeout(t *iaas.ProxyLBTimeout) *iaas.ProxyLBTimeout {
 	if t == nil {

@@ -265,8 +265,8 @@ func TestProxyLBCommandOperations(t *testing.T) {
 	require.Nil(t, api.updateRequest.SorryServer, "omitted update fields were populated: %+v", api.updateRequest)
 	require.Nil(t, api.updateRequest.LetsEncrypt, "omitted update fields were populated: %+v", api.updateRequest)
 	require.Nil(t, api.updateRequest.Syslog, "omitted update fields were populated: %+v", api.updateRequest)
-	// 未指定のタイムアウトは空オブジェクトを避けるために既定値が設定される
-	require.Equal(t, &iaas.ProxyLBTimeout{InactiveSec: 10}, api.updateRequest.Timeout, "omitted update fields were populated: %+v", api.updateRequest)
+	// Update の未指定項目は SDK が現在値を Read して引き継ぐため、タイムアウトの既定値補完は行わない
+	require.Nil(t, api.updateRequest.Timeout, "omitted update fields were populated: %+v", api.updateRequest)
 	require.Nil(t, api.updateRequest.OriginGuard, "omitted update fields were populated: %+v", api.updateRequest)
 
 	run("proxylb-api", "delete", "--id", "123", "--fail-if-not-found")
@@ -325,8 +325,27 @@ func TestProxyLBJSONInputAndMutualExclusion(t *testing.T) {
 		code := runCLI(args, &stdout, &stderr, commandLine)
 		return code, stderr.String()
 	}
+
+	// Create と Update の JSON は OriginGuard.Token など秘密情報を受け取れるため、
+	// 保護したファイルまたは標準入力のみを受け付け、直接指定は拒否します
 	code, stderr := run("proxylb-api", "create", "--request",
 		`{"Name":"json-proxylb","Plan":100,"Region":"tk1","HealthCheck":{"Protocol":"http","DelayLoop":10,"Path":"/"},"BindPorts":[{"ProxyMode":"http","Port":80}]}`)
+	require.EqualValues(t, 1, code, "inline JSON create code=%d stderr=%q", code, stderr)
+	require.Contains(t, stderr, "--request は @path.json または -", "missing expected text in %q", stderr)
+	// エラーには指定した値を含めない
+	require.NotContains(t, stderr, "json-proxylb", "error must not echo the request value")
+	require.Nil(t, api.createRequest, "inline JSON must not reach the API")
+
+	code, stderr = run("proxylb-api", "update", "--request", `{"ID":123}`)
+	require.EqualValues(t, 1, code, "inline JSON update code=%d stderr=%q", code, stderr)
+	require.Contains(t, stderr, "--request は @path.json または -", "missing expected text in %q", stderr)
+	require.Nil(t, api.updateRequest, "inline JSON must not reach the API")
+
+	dir := t.TempDir()
+	createPath := filepath.Join(dir, "create.json")
+	createJSON := `{"Name":"json-proxylb","Plan":100,"Region":"tk1","HealthCheck":{"Protocol":"http","DelayLoop":10,"Path":"/"},"BindPorts":[{"ProxyMode":"http","Port":80}]}`
+	require.NoError(t, os.WriteFile(createPath, []byte(createJSON), 0o600))
+	code, stderr = run("proxylb-api", "create", "--request", "@"+createPath)
 	require.Equal(t, 0, code, "JSON create code=%d stderr=%q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
 	if api.createRequest == nil || api.createRequest.Name != "json-proxylb" ||
@@ -337,18 +356,20 @@ func TestProxyLBJSONInputAndMutualExclusion(t *testing.T) {
 	// 未指定のタイムアウトは既定値が設定される
 	require.Equal(t, &iaas.ProxyLBTimeout{InactiveSec: 10}, api.createRequest.Timeout, "JSON create request = %+v", api.createRequest)
 
-	code, stderr = run("proxylb-api", "update", "--request",
-		`{"ID":123,"Description":"json-updated","HealthCheck":{"Protocol":"tcp","DelayLoop":20},"Rules":[]}`)
+	updatePath := filepath.Join(dir, "update.json")
+	require.NoError(t, os.WriteFile(updatePath, []byte(`{"ID":123,"Description":"json-updated","HealthCheck":{"Protocol":"tcp","DelayLoop":20},"Rules":[]}`), 0o600))
+	code, stderr = run("proxylb-api", "update", "--request", "@"+updatePath)
 	require.Equal(t, 0, code, "JSON update code=%d stderr=%q", code, stderr)
 	if api.updateRequest == nil || api.updateRequest.ID != 123 || api.updateRequest.Description == nil ||
 		*api.updateRequest.Description != "json-updated" || api.updateRequest.Rules == nil {
 		t.Fatalf("JSON update request = %+v", api.updateRequest)
 	}
-	require.Equal(t, &iaas.ProxyLBTimeout{InactiveSec: 10}, api.updateRequest.Timeout, "JSON update request = %+v", api.updateRequest)
+	// Update の未指定項目は SDK が現在値を引き継ぐため、タイムアウトの既定値補完は行わない
+	require.Nil(t, api.updateRequest.Timeout, "JSON update request = %+v", api.updateRequest)
 
 	for _, args := range [][]string{
-		{"proxylb-api", "create", "--request", `{"Name":"x"}`, "--name", "x"},
-		{"proxylb-api", "update", "--request", `{"ID":123}`, "--description", "d"},
+		{"proxylb-api", "create", "--request", "@" + createPath, "--name", "x"},
+		{"proxylb-api", "update", "--request", "@" + updatePath, "--description", "d"},
 		{"proxylb-api", "delete", "--request", `{"ID":123}`, "--fail-if-not-found=false"},
 		{"proxylb-api", "monitor-connection", "--request", `{"ID":123}`, "--start", "2026-01-01T00:00:00Z"},
 	} {
@@ -363,14 +384,25 @@ func TestProxyLBJSONInputAndMutualExclusion(t *testing.T) {
 	require.EqualValues(t, 1, code, "code=%d stderr=%q", code, stderr)
 	require.Contains(t, stderr, "--request は @path.json または -", "missing expected text in %q", stderr)
 
-	dir := t.TempDir()
-	requestPath := filepath.Join(dir, "certs.json")
+	certsPath := filepath.Join(dir, "certs.json")
 	certPath := filepath.Join(dir, "cert.pem")
-	require.NoError(t, os.WriteFile(requestPath, []byte(`{"PrimaryCerts":{"ServerCertificate":"c","PrivateKey":"k"}}`), 0o600))
+	require.NoError(t, os.WriteFile(certsPath, []byte(`{"PrimaryCerts":{"ServerCertificate":"c","PrivateKey":"k"}}`), 0o600))
 	require.NoError(t, os.WriteFile(certPath, []byte("cert"), 0o600))
-	code, stderr = run("proxylb-api", "set-certificates", "--request", "@"+requestPath, "--primary-cert", "@"+certPath)
+	code, stderr = run("proxylb-api", "set-certificates", "--request", "@"+certsPath, "--primary-cert", "@"+certPath)
 	require.EqualValues(t, 1, code, "code=%d stderr=%q", code, stderr)
 	require.Contains(t, stderr, "--request と個別フラグ", "missing expected text %q in %q", "--request と個別フラグ", stderr)
+
+	// set-certificates の --request と --id も併用できません。--id を黙って無視しない
+	code, stderr = run("proxylb-api", "set-certificates", "--request", "@"+certsPath, "--id", "123")
+	require.EqualValues(t, 1, code, "code=%d stderr=%q", code, stderr)
+	require.Contains(t, stderr, "--request と個別フラグ", "missing expected text %q in %q", "--request と個別フラグ", stderr)
+	require.Nil(t, api.setCertificatesRequest, "--request with --id must not reach the API")
+
+	// 検索条件はすべて任意です。条件なしの find は空の FindRequest を渡して全件検索できます
+	code, stderr = run("proxylb-api", "find")
+	require.Equal(t, 0, code, "find without conditions code=%d stderr=%q", code, stderr)
+	require.NotNil(t, api.findRequest, "find without conditions must reach the API")
+	require.Empty(t, api.findRequest.Names, "find without conditions should pass an empty FindRequest")
 }
 
 func TestProxyLBCommandErrorsAreReturned(t *testing.T) {
@@ -522,9 +554,12 @@ func TestProxyLBSetCertificatesStdin(t *testing.T) {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stdin = r
-	fmt.Fprintln(w, "-----BEGIN CERTIFICATE-----")
-	fmt.Fprintln(w, "stdin-cert")
-	fmt.Fprintln(w, "-----END CERTIFICATE-----")
+	_, err = fmt.Fprintln(w, "-----BEGIN CERTIFICATE-----")
+	require.NoError(t, err)
+	_, err = fmt.Fprintln(w, "stdin-cert")
+	require.NoError(t, err)
+	_, err = fmt.Fprintln(w, "-----END CERTIFICATE-----")
+	require.NoError(t, err)
 	require.NoError(t, w.Close())
 
 	dir := t.TempDir()

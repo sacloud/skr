@@ -276,18 +276,52 @@ func TestFinalizeCreateRequest(t *testing.T) {
 }
 
 func TestFinalizeUpdateRequest(t *testing.T) {
-	// ヘルスチェックは必須 (API がヘルスチェックの設定を常に要求するため)
+	// 未指定の HealthCheck と Timeout はそのまま渡す (SDK の Update が現在値を Read して引き継ぐ)
 	request := &proxylb.UpdateRequest{ID: types.ID(123)}
+	require.NoError(t, finalizeUpdateRequest(request, true))
+	require.Nil(t, request.HealthCheck, "update must not require a health check; the SDK inherits the current settings")
+	require.Nil(t, request.Timeout, "update must not apply the default timeout")
+
+	// 指定した HealthCheck は検証される (http はパスが必要)
+	request = &proxylb.UpdateRequest{
+		ID:          types.ID(123),
+		HealthCheck: &iaas.ProxyLBHealthCheck{Protocol: types.ProxyLBProtocols.HTTP, DelayLoop: 20},
+	}
 	err := finalizeUpdateRequest(request, true)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "--health-check-protocol")
+	require.Contains(t, err.Error(), "--health-check-path")
 
+	// 完全な HealthCheck はそのまま渡し、Timeout は既定値に変わらない
 	request = &proxylb.UpdateRequest{
 		ID:          types.ID(123),
 		HealthCheck: &iaas.ProxyLBHealthCheck{Protocol: types.ProxyLBProtocols.TCP, DelayLoop: 20},
+		Timeout:     &iaas.ProxyLBTimeout{InactiveSec: 600},
 	}
 	require.NoError(t, finalizeUpdateRequest(request, true))
-	require.Equal(t, &iaas.ProxyLBTimeout{InactiveSec: 10}, request.Timeout, "unexpected timeout")
+	require.Equal(t, &iaas.ProxyLBTimeout{InactiveSec: 600}, request.Timeout, "existing timeout must be kept")
+}
+
+// TestUpdateRequestInheritsCurrentSettings は SDK の Update 変換が未指定の項目を現在値で補完することを確認する。
+// 既存のタイムアウトを持つ対象を未指定の更新で変えないことを、SDK の変換経路で確認します。
+func TestUpdateRequestInheritsCurrentSettings(t *testing.T) {
+	current := &iaas.ProxyLB{
+		ID:          types.ID(113802702954),
+		Name:        "proxylb",
+		Description: "existing",
+		HealthCheck: &iaas.ProxyLBHealthCheck{Protocol: types.ProxyLBProtocols.HTTP, DelayLoop: 10, Path: "/"},
+		Timeout:     &iaas.ProxyLBTimeout{InactiveSec: 600},
+		Servers:     []*iaas.ProxyLBServer{{IPAddress: "192.0.2.10", Port: 80}},
+	}
+	description := "updated"
+	request := &proxylb.UpdateRequest{ID: types.ID(113802702954), Description: &description}
+	params, err := request.ToRequestParameter(current)
+	require.NoError(t, err)
+	// 未指定の HealthCheck と Timeout は現在値で補完され、説明だけが変わる
+	require.Equal(t, current.HealthCheck, params.HealthCheck)
+	require.Equal(t, current.Timeout, params.Timeout)
+	require.Equal(t, current.Servers, params.Servers)
+	require.Equal(t, description, params.Description)
+	require.Equal(t, current.Name, params.Name)
 }
 
 func TestRequireHealthCheck(t *testing.T) {

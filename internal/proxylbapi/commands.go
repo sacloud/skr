@@ -101,9 +101,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 			return fmt.Errorf("--request と個別フラグは併用できません")
 		}
 	} else {
-		if !c.hasFlags() {
-			return fmt.Errorf("--request または個別フラグが必要です")
-		}
+		// 検索条件はすべて任意です。空の FindRequest は有効で、条件なしの全件検索を受け付けます
 		if c.Name != nil {
 			request.Names = []string{*c.Name}
 		}
@@ -170,7 +168,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CreateCommand struct {
-	Request                    *string   `help:"個別フラグと併用できません。CreateRequest JSON を直接または @path.json で指定します。Rules、OriginGuard など、専用フラグのない API フィールドは JSON で指定します。"`
+	Request                    *string   `help:"個別フラグと併用できません。CreateRequest JSON を @path.json または -（標準入力）で指定します。OriginGuard.Token など秘密情報を受け取れる API フィールドがあるため直接指定は受け付けません。Rules など、専用フラグのない API フィールドは JSON で指定します。"`
 	Name                       *string   `name:"name" help:"必須: エンハンスドロードバランサ名。"`
 	Description                *string   `name:"description" help:"任意: エンハンスドロードバランサの説明。"`
 	Tags                       *[]string `name:"tags" sep:"," help:"任意: API の Tags 配列。カンマ区切りで指定します。"`
@@ -197,7 +195,7 @@ type CreateCommand struct {
 	SyslogPort                 *int      `name:"syslog-port" help:"任意: syslog のポート番号。syslog のフラグを指定した場合は必須です。"`
 	TimeoutInactiveSec         *int      `name:"timeout-inactive-sec" help:"任意: アイドル接続のタイムアウト (秒)。未指定時は 10 が設定されます。"`
 	MonitoringSuiteLogEnabled  *bool     `name:"monitoring-suite-log-enabled" help:"任意: モニタリングスイートへのログ連携を有効にします。"`
-	StrictRule                 *bool     `name:"strict-rule" help:"任意: Strict ルールを有効にします。有効にすると Rules の許可されていないリクエストを拒否します。"`
+	StrictRule                 *bool     `name:"strict-rule" help:"任意: Strict ルールを有効にします。有効にすると振り分けルールを指定した順序で適用します。"`
 	factory                    APIFactory
 	runtime                    Runtime
 }
@@ -216,7 +214,8 @@ func (c *CreateCommand) hasFlags() bool {
 func (c *CreateCommand) Run(ctx *kong.Context) error {
 	request := &proxylb.CreateRequest{}
 	if c.Request != nil {
-		if err := decodeRequest(c.runtime, *c.Request, request); err != nil {
+		// OriginGuard.Token など秘密情報を受け取れるため、保護したファイルまたは標準入力に限定します
+		if err := decodeProtectedRequest(c.runtime, *c.Request, request); err != nil {
 			return err
 		}
 		if c.hasFlags() {
@@ -257,14 +256,14 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateCommand struct {
-	Request                    *string   `help:"個別フラグと併用できません。UpdateRequest JSON を直接または @path.json で指定します。Rules、OriginGuard など、専用フラグのない API フィールドは JSON で指定します。"`
+	Request                    *string   `help:"個別フラグと併用できません。UpdateRequest JSON を @path.json または -（標準入力）で指定します。OriginGuard.Token など秘密情報を受け取れる API フィールドがあるため直接指定は受け付けません。Rules など、専用フラグのない API フィールドは JSON で指定します。"`
 	ID                         *int64    `name:"id" help:"必須: 更新するエンハンスドロードバランサ ID。"`
 	Name                       *string   `name:"name" help:"任意: エンハンスドロードバランサ名。"`
 	Description                *string   `name:"description" help:"任意: エンハンスドロードバランサの説明。空文字列を指定すると説明を空にします。"`
 	Tags                       *[]string `name:"tags" sep:"," help:"任意: API の Tags 配列。カンマ区切りで指定します。"`
 	IconID                     *int64    `name:"icon-id" help:"任意: アイコン ID。"`
 	Plan                       *int      `name:"plan" help:"任意: プラン (CPS)。変更するとプラン変更 API が呼ばれます。100, 500, 1000, 5000, 10000, 50000, 100000, 400000 のいずれかです。"`
-	HealthCheckProtocol        *string   `name:"health-check-protocol" help:"必須: 監視プロトコル (http, tcp)。ヘルスチェック設定全体を置き換えます。API がヘルスチェックの設定を常に要求するため、更新時に再指定が必要です。"`
+	HealthCheckProtocol        *string   `name:"health-check-protocol" help:"任意: 監視プロトコル (http, tcp)。ヘルスチェックのフラグを指定するとヘルスチェック設定全体を置き換えます。未指定時は既存の設定が引き継がれます。"`
 	HealthCheckDelayLoop       *int      `name:"health-check-delay-loop" help:"必須: 監視間隔 (秒)。ヘルスチェックのフラグを指定した場合は必須です。"`
 	HealthCheckHost            *string   `name:"health-check-host" help:"任意: 監視の Host ヘッダー (http のみ)。"`
 	HealthCheckPath            *string   `name:"health-check-path" help:"必須 (http のみ): 監視パス。"`
@@ -281,9 +280,9 @@ type UpdateCommand struct {
 	ProxyProtocol              *bool     `name:"proxy-protocol" help:"任意: Proxy Protocol v2 の有効／無効。"`
 	SyslogServer               *string   `name:"syslog-server" help:"任意: ログの送信先 syslog サーバー。"`
 	SyslogPort                 *int      `name:"syslog-port" help:"任意: syslog のポート番号。syslog のフラグを指定した場合は必須です。"`
-	TimeoutInactiveSec         *int      `name:"timeout-inactive-sec" help:"任意: アイドル接続のタイムアウト (秒)。未指定時は 10 が設定されます。"`
+	TimeoutInactiveSec         *int      `name:"timeout-inactive-sec" help:"任意: アイドル接続のタイムアウト (秒)。未指定時は既存の値が引き継がれます。"`
 	MonitoringSuiteLogEnabled  *bool     `name:"monitoring-suite-log-enabled" help:"任意: モニタリングスイートへのログ連携の有効／無効。"`
-	StrictRule                 *bool     `name:"strict-rule" help:"任意: Strict ルールの有効／無効。有効にすると Rules の許可されていないリクエストを拒否します。"`
+	StrictRule                 *bool     `name:"strict-rule" help:"任意: Strict ルールの有効／無効。有効にすると振り分けルールを指定した順序で適用します。"`
 	factory                    APIFactory
 	runtime                    Runtime
 }
@@ -313,7 +312,8 @@ func (c *UpdateCommand) hasUpdateFields() bool {
 func (c *UpdateCommand) Run(ctx *kong.Context) error {
 	request := &proxylb.UpdateRequest{}
 	if c.Request != nil {
-		if err := decodeRequest(c.runtime, *c.Request, request); err != nil {
+		// OriginGuard.Token など秘密情報を受け取れるため、保護したファイルまたは標準入力に限定します
+		if err := decodeProtectedRequest(c.runtime, *c.Request, request); err != nil {
 			return err
 		}
 		if c.hasFlags() {
@@ -444,7 +444,7 @@ func (c *SetCertificatesCommand) Run(ctx *kong.Context) error {
 		if err := decodeProtectedRequest(c.runtime, *c.Request, request); err != nil {
 			return err
 		}
-		if c.hasFlags() {
+		if c.hasFlags() || c.ID != nil {
 			return fmt.Errorf("--request と個別フラグは併用できません")
 		}
 	} else {
