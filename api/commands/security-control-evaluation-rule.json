@@ -1,0 +1,74 @@
+{
+  "package": "securitycontrolapi",
+  "resource": "Security Control evaluation rule",
+  "command_prefix": "EvaluationRule",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/security-control/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "評価ルールの一覧を取得します。--page-size、--next、--prev でページングできます。",
+      "method": "List",
+      "request_type": "v1.EvaluationRulesListParams",
+      "request_by_value": true,
+      "request_optional": true,
+      "response_type": "*v1.EvaluationRulesListOK",
+      "flags": [
+        {
+          "name": "page-size",
+          "field": "PageSize",
+          "type": "int",
+          "conversion": "v1.NewOptInt",
+          "help": "任意: 1 ページの取得件数。"
+        },
+        {
+          "name": "next",
+          "field": "Next",
+          "type": "string",
+          "conversion": "v1.NewOptString",
+          "help": "任意: 前回の list 出力の nextPageToken。次ページを取得します。"
+        },
+        {
+          "name": "prev",
+          "field": "Prev",
+          "type": "string",
+          "conversion": "v1.NewOptString",
+          "help": "任意: 前回の list 出力の prevPageToken。前ページを取得します。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "評価ルール ID を指定してルール設定を読み取ります。rule、description、iamRolesRequired、isEnabled を出力します。",
+      "method": "Read",
+      "response_type": "*v1.EvaluationRule",
+      "arguments": [
+        {
+          "name": "rule-id",
+          "field": "ID",
+          "type": "string",
+          "help": "参照する評価ルール ID。list の出力にある evaluationRuleId。例: server-no-public-ip"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "help": "評価ルール ID を指定してルール設定を更新します。--request または個別フラグで入力します。--service-principal-id と --targets はルールのパラメータを構成し、--is-enabled はルールの有効状態です。--request では API の rule (evaluationRuleId と parameter) と isEnabled を含む JSON を指定します。",
+      "method": "Update",
+      "request_type": "v1.EvaluationRuleInput",
+      "response_type": "*v1.EvaluationRule",
+      "arguments": [
+        {
+          "name": "rule-id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新する評価ルール ID。例: server-no-public-ip"
+        }
+      ],
+      "handwritten": true
+    }
+  ],
+  "wiring_target": "SecurityControlAPI.EvaluationRule",
+  "sdk_factory": "securitycontrolapi.NewEvaluationRuleAPI"
+}
