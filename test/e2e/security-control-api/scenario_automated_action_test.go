@@ -72,9 +72,9 @@ func TestScenarioAutomatedAction(t *testing.T) {
 	require.False(t, created.IsEnabled, "created action should be disabled: %+v", created)
 	actionID := created.AutomatedActionId
 
-	// 後片付け: 残存していれば ID と名称を照合して削除し、一覧に残っていないことを確認する
+	// 後片付け: 残存していれば ID・名称・指定内容を照合して削除し、一覧に残っていないことを確認する
 	defer func() {
-		cleanupAutomatedAction(t, h, actionID, actionName)
+		cleanupAutomatedAction(t, h, actionID, actionName, automatedActionCondition, sp, groupID)
 		remaining := listAutomatedActions(t, h, "削除後にアクションが一覧に残っていないことを確認する")
 		for _, item := range remaining {
 			require.NotEqual(t, actionID, item.AutomatedActionId, "action %q should not remain after deletion", actionID)
@@ -99,12 +99,27 @@ func TestScenarioAutomatedAction(t *testing.T) {
 	}
 	require.True(t, found, "created action %q should be listed: %+v", actionID, listed)
 
-	// 有効化して update を確認する (評価ルールが無効のため通知は発生しない)
-	updated := updateAutomatedAction(t, h, actionID, actionName, automatedActionCondition, sp, groupID, true, "アクションを有効化して update を確認する")
+	// update でアクション全体を置き換えても無効状態を維持する。有効なルールの評価結果が
+	// 実行条件に一致しても通知が発生しないため、このシナリオでは有効化しない
+	updated := updateAutomatedAction(t, h, actionID, actionName, automatedActionCondition, sp, groupID, false, "update でアクション全体を置き換えても無効状態を維持する")
 	require.Equal(t, actionID, updated.AutomatedActionId, "update response should have the same action ID: %+v", updated)
-	require.True(t, updated.IsEnabled, "update should enable the action: %+v", updated)
+	require.False(t, updated.IsEnabled, "update should keep the action disabled: %+v", updated)
+	require.Equal(t, actionName, updated.Name, "update should keep the name: %+v", updated)
+	require.Equal(t, automatedActionCondition, updated.ExecutionCondition, "update should keep the execution condition: %+v", updated)
+	require.Equal(t, "simpleNotification", updated.Action.ActionType, "update should keep the action type: %+v", updated)
+	require.Equal(t, groupID, updated.Action.ActionParameter.NotificationGroupId, "update should keep the notification group: %+v", updated)
+	require.Equal(t, sp, updated.Action.ActionParameter.ServicePrincipalId, "update should keep the service principal: %+v", updated)
 
-	// 削除する
+	// 削除する前に読み取りで ID・名称・指定内容を再照合する
+	verified := readAutomatedAction(t, h, actionID, "削除前に ID・名称・指定内容を再照合する")
+	require.Equal(t, actionID, verified.AutomatedActionId, "read response should have the action ID: %+v", verified)
+	require.Equal(t, actionName, verified.Name, "read response should have the action name: %+v", verified)
+	require.Equal(t, automatedActionCondition, verified.ExecutionCondition, "read response should have the execution condition: %+v", verified)
+	require.Equal(t, "simpleNotification", verified.Action.ActionType, "read response should be simpleNotification: %+v", verified)
+	require.Equal(t, groupID, verified.Action.ActionParameter.NotificationGroupId, "read response should reference the notification group: %+v", verified)
+	require.Equal(t, sp, verified.Action.ActionParameter.ServicePrincipalId, "read response should reference the service principal: %+v", verified)
+	require.False(t, verified.IsEnabled, "read response should be disabled: %+v", verified)
+
 	deleteAutomatedAction(t, h, actionID, "作成したアクションを削除する")
 
 	// 一覧に残っていないことを確認する
@@ -195,9 +210,9 @@ func deleteAutomatedAction(t *testing.T, h *helper.Helper, actionID string, desc
 	h.Call(t, description, "security-control-api", "automated-action", "delete", actionID)
 }
 
-// cleanupAutomatedAction は後片付けでアクションを削除します。読み取りで ID と名称を
-// 照合してから削除し、不在なら変更せずに終了します。
-func cleanupAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName string) {
+// cleanupAutomatedAction は後片付けでアクションを削除します。読み取りで保持した ID・名称と
+// 作成時に指定した内容を照合してから削除し、不在なら変更せずに終了します。
+func cleanupAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName, condition, sp, groupID string) {
 	t.Helper()
 
 	data, stderr, err := h.CallAllowingFailure(t, "後片付け: アクションの残存を確認する",
@@ -211,7 +226,12 @@ func cleanupAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName
 	}
 	var read automatedActionItem
 	require.NoError(t, json.Unmarshal(data, &read), "cleanup: decode automated action read response: %s", string(data))
-	require.Equal(t, actionName, read.Name, "cleanup: action %q does not match the created action; refusing to delete it", actionID)
+	require.Equal(t, actionID, read.AutomatedActionId, "cleanup: read response should have the created action ID: %+v", read)
+	require.Equal(t, actionName, read.Name, "cleanup: action %q does not match the created action; refusing to delete it: %+v", actionID, read)
+	require.Equal(t, condition, read.ExecutionCondition, "cleanup: execution condition of action %q does not match the created one; refusing to delete it: %+v", actionID, read)
+	require.Equal(t, "simpleNotification", read.Action.ActionType, "cleanup: action %q does not match the created action; refusing to delete it: %+v", actionID, read)
+	require.Equal(t, sp, read.Action.ActionParameter.ServicePrincipalId, "cleanup: service principal of action %q does not match the created one; refusing to delete it: %+v", actionID, read)
+	require.Equal(t, groupID, read.Action.ActionParameter.NotificationGroupId, "cleanup: notification group of action %q does not match the created one; refusing to delete it: %+v", actionID, read)
 	deleteAutomatedAction(t, h, actionID, "後片付け: 残存したアクションを削除する")
 }
 

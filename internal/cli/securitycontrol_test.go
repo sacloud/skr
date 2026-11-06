@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -68,11 +70,11 @@ func TestRunSecurityControlAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"security-control-api", "automated-action", "create", "--help"},
-			want: []string{"--name", "--execution-condition", "--is-enabled", "--service-principal-id", "--notification-group-id", "--workflow-id", "--revision-id", "--revision-alias", "--workflow-name", "--args", "--request", "simpleNotification または workflows"},
+			want: []string{"--name", "--execution-condition", "--is-enabled", "--service-principal-id", "--notification-group-id", "--workflow-id", "--revision-id", "--revision-alias", "--workflow-name", "--args", "--request", "simpleNotification または workflows", "@path で保護したファイルから、- で標準入力から読み込みます", "JSON を直接指定することはできません"},
 		},
 		{
 			args: []string{"security-control-api", "automated-action", "update", "--help"},
-			want: []string{"--request", "全体を置き換える"},
+			want: []string{"--request", "@path.json または - (標準入力)", "全体を置き換える", "JSON を直接指定することはできません"},
 		},
 		{
 			args: []string{"security-control-api", "automated-action", "delete", "--help"},
@@ -134,6 +136,63 @@ func TestRunSecurityControlAPIRejectsAutomatedActionRequestAndFlags(t *testing.T
 	}
 	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "--request と個別フラグは併用できません", "error = %q", stderr.String())
+}
+
+func TestRunSecurityControlAPIRejectsInlineAutomatedActionRequest(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	require.NotEqual(t, 0, run([]string{"security-control-api", "automated-action", "create", "--request", `{"name":"my-action"}`}, &stdout, &stderr), "run should fail")
+	require.Contains(t, stderr.String(), "--request には @path または - (標準入力) を指定してください", "error = %q", stderr.String())
+	require.Contains(t, stderr.String(), "JSON を直接指定することはできません", "error = %q", stderr.String())
+}
+
+func TestRunSecurityControlAPIRejectsInlineAutomatedActionArgs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"security-control-api", "automated-action", "create",
+		"--name", "workflow-action", "--execution-condition", "condition",
+		"--is-enabled=false", "--service-principal-id", "112700012345",
+		"--workflow-id", "workflow-1", "--args", `{"server_id": 12345}`,
+	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	require.Contains(t, stderr.String(), "--args には @path または - (標準入力) を指定してください", "error = %q", stderr.String())
+	require.Contains(t, stderr.String(), "値を直接指定することはできません", "error = %q", stderr.String())
+}
+
+func TestRunSecurityControlAPIRejectsEvaluationRuleRequestWithEmptyTargets(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	args := []string{
+		"security-control-api", "evaluation-rule", "update", "server-no-public-ip",
+		"--request", `{"isEnabled":true}`, "--targets=",
+	}
+	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
+	require.Contains(t, stderr.String(), "--request と個別フラグは併用できません", "error = %q", stderr.String())
+}
+
+func TestRunSecurityControlAPIAutomatedActionCreateWithRequestFile(t *testing.T) {
+	var gotCreateBody map[string]any
+	setSecurityControlTestEndpoint(t, func(writer http.ResponseWriter, request *http.Request) {
+		require.Equal(t, securityControlAPIRootPath+"/automated_actions", request.URL.Path)
+		writer.Header().Set("Content-Type", "application/json")
+		if request.Method != http.MethodPost {
+			http.Error(writer, "unexpected method", http.StatusNotFound)
+			return
+		}
+		require.NoError(t, json.NewDecoder(request.Body).Decode(&gotCreateBody))
+		writer.WriteHeader(http.StatusCreated)
+		_, _ = writer.Write([]byte(`{"automatedActionId":"action-1","name":"my-action","action":{"actionType":"simpleNotification","actionParameter":{"servicePrincipalId":"112700012345","notificationGroupId":"112700056789"}},"executionCondition":"condition","isEnabled":false,"createdAt":"2026-01-01T00:00:00Z"}`))
+	})
+
+	requestFile := filepath.Join(t.TempDir(), "request.json")
+	requestJSON := `{"name":"my-action","action":{"actionType":"simpleNotification","actionParameter":{"servicePrincipalId":"112700012345","notificationGroupId":"112700056789"}},"executionCondition":"condition","isEnabled":false}`
+	require.NoError(t, os.WriteFile(requestFile, []byte(requestJSON), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	require.Equal(t, 0, run([]string{"security-control-api", "automated-action", "create", "--request", "@" + requestFile}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Contains(t, stdout.String(), `"automatedActionId": "action-1"`)
+
+	body, err := json.Marshal(gotCreateBody)
+	require.NoError(t, err)
+	require.JSONEq(t, requestJSON, string(body))
 }
 
 const securityControlAPIRootPath = "/cloud/zone/tk1b/api/securitycontrol/1.0"

@@ -24,17 +24,19 @@ sakumock v0.13.0 にはセキュリティコントロールのモックサーバ
 - `evaluation-rule update` は手書きとします。個別フラグ経路では SDK の `SetupEvaluationRuleInput` を呼び、`--request` JSON 経路では union をそのままデコードします。ルール ID は SDK が公開する 14 種類の `evaluationRuleId` に CLI で検証します。パラメータを持たないルールでの `--service-principal-id`、パラメータに `zones`/`sites` を持たないルールでの `--targets` はエラーにします。`--service-principal-id` を省略した場合、SDK の入力補完が設定する空文字列を省略状態に戻して送信します。
 - `automated-action` の `list`、`read`、`delete` は生成コードとします。`list` は評価ルールと同様に条件なしの実行を許可します。
 - `automated-action` の `create` と `update` は手書きとします。個別フラグでは `--name`、`--execution-condition`、`--is-enabled`、`--service-principal-id` と、実行先として `--notification-group-id` か `--workflow-id` のどちらか一方を必須にします。`--revision-id`、`--revision-alias`、`--workflow-name`、`--args` は `--workflow-id` と併用する場合だけ受け付けます。実行先の両指定と `--workflow-id` 用フラグの `--notification-group-id` との併用はエラーにします。
+- ワークフローの実行引数に秘密情報を含められるため、`automated-action` の `--args` と `--request` は `@path` または `-` (標準入力) のみを受け付け、インラインの値は拒否します。秘密情報をコマンドライン引数に含めない方針 ([AGENTS.md](../../AGENTS.md)) に基づきます。
 - 手書き操作でも API interface、factory、Runtime、`Commands` 型のフィールドは生成コードと共有し、型名全体の衝突は設定検証で拒否します。
 - 統合テストは sakumock の代わりに `httptest.NewServer` と `SAKURA_ENDPOINTS_SECURITY_CONTROL` 環境変数によるエンドポイント差し替えで実装します。作成系 API が 201 を返すこと、応答の必須フィールド (`iamRolesRequired`、`createdAt` など) を含めることをテストで固定します。
-- ライブ E2E は未実施です。`activation` と `evaluation-rule` の更新はプロジェクトの状態を変更するため、既存状態の取得と後片付けでの復元を含むシナリオを提示して承認を得てから実装します。
+- ライブ E2E では、`activation` と `evaluation-rule` の更新を伴うシナリオに、変更前の状態確認と、後片付けでの再照合付きの復元を含めます。ルールの有効化は有効な自動アクションが存在しない場合に限定し、自動アクションは無効状態のまま作成・更新して通知を発生させません。
 
 ## Consequences
 
-- よく使う操作は個別フラグで、評価ルールの union や自動アクションの実行先は意味を明確に表せるフラグの組合せで指定できます。`--request` JSON (`@path.json` または `-`) の経路も維持し、両経路は相互排他です。
+- よく使う操作は個別フラグで、評価ルールの union や自動アクションの実行先は意味を明確に表せるフラグの組合せで指定できます。`--request` JSON (`@path.json` または `-`) の経路も維持し、両経路は相互排他です。`evaluation-rule update` の `--targets` は、`--targets=` のような空配列の明示指定も Kong が非 nil のスライスとして設定するため、長さではなく nil で未指定を判定し、`--request` との併用を排他エラーにします。
+- ワークフロー引数に秘密情報を含める利用者は、`--args @args.json` か標準入力で値を渡します。プロセス一覧やシェル履歴に秘密情報が残る入力経路は CLI が拒否します。
 - SDK の入力補完が黙って無視する入力を CLI で明示的にエラーにするため、入力間の制約は CLI でも検証されます。検証のメンテナンスが必要です。
 - `evaluation-rule update` と `automated-action` の `create`/`update` は手書きのため、SDK のリクエスト型の変更時に個別に追従が必要です。
 - sakumock を使わないため、セキュリティコントロールの統合テストは他ドメインのテストと実装方式が異なります。
-- ライブ E2E が未実施の間、`activation` と `evaluation-rule` の実際の応答と状態遷移は未確認です。シナリオの承認後に実装します。
+- ライブ E2E は `test/e2e/security-control-api/` に実装済みです。詳細は [design doc](../design/security-control-api.md) を参照してください。
 
 ## Alternatives considered
 

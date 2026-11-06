@@ -17,6 +17,9 @@ package securitycontrolapi
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	securitycontrol "github.com/sacloud/sacloud-sdk-go/api/security-control"
@@ -153,7 +156,9 @@ func (c *EvaluationRuleUpdateCommand) Run(ctx *kong.Context) error {
 // 両経路は相互排他です。
 func (c *EvaluationRuleUpdateCommand) buildRequest() (*v1.EvaluationRuleInput, error) {
 	if c.Request != nil {
-		if c.ServicePrincipalID != nil || c.IsEnabled != nil || len(c.Targets) != 0 {
+		// --targets= のように空配列の明示指定も Kong は非 nil のスライスを設定するため、
+		// 長さではなく nil で「未指定」を判定する
+		if c.ServicePrincipalID != nil || c.IsEnabled != nil || c.Targets != nil {
 			return nil, fmt.Errorf("--request と個別フラグは併用できません")
 		}
 		if c.runtime.DecodeRequest == nil {
@@ -165,7 +170,7 @@ func (c *EvaluationRuleUpdateCommand) buildRequest() (*v1.EvaluationRuleInput, e
 		}
 		return &request, nil
 	}
-	if c.ServicePrincipalID == nil && c.IsEnabled == nil && len(c.Targets) == 0 {
+	if c.ServicePrincipalID == nil && c.IsEnabled == nil && c.Targets == nil {
 		return nil, fmt.Errorf("--request または個別フラグが必要です")
 	}
 	if c.IsEnabled == nil {
@@ -213,7 +218,7 @@ func validateEvaluationRuleFlags(command *EvaluationRuleUpdateCommand) error {
 	if command.ServicePrincipalID != nil && parameterlessRules[id] {
 		return fmt.Errorf("--service-principal-id は %s では指定できません。このルールにはパラメータがありません", id)
 	}
-	if len(command.Targets) != 0 && !targetAcceptingRules[id] {
+	if command.Targets != nil && !targetAcceptingRules[id] {
 		return fmt.Errorf("--targets は %s では指定できません。このルールのパラメータには zones や sites がありません", id)
 	}
 	return nil
@@ -265,14 +270,14 @@ type automatedActionFlags struct {
 	RevisionID          *int    `name:"revision-id" help:"任意: 実行するワークフローのリビジョン ID。--workflow-id と併用します。省略すると最新のリビジョンが使われます。"`
 	RevisionAlias       *string `name:"revision-alias" help:"任意: 実行するリビジョンのエイリアス。--workflow-id と併用します。省略すると最新のリビジョンが使われます。"`
 	WorkflowName        *string `name:"workflow-name" help:"任意: ワークフロー実行名。--workflow-id と併用します。"`
-	Args                *string `name:"args" help:"任意: 実行時にワークフローへ渡す引数の JSON 文字列。--workflow-id と併用します。引数を要求するワークフローでは必須です。例: '{\"server_id\": 12345}'"`
+	Args                *string `name:"args" help:"任意: 実行時にワークフローへ渡す引数の JSON。--workflow-id と併用します。引数を要求するワークフローでは必須です。引数に秘密情報を含められるため、値を直接指定することはできません。@path で保護したファイルから、- で標準入力から読み込みます。例: --args @args.json"`
 }
 
 // AutomatedActionCreateCommand は自動アクションの作成コマンドです。アクション定義の
 // 実行先種別を個別フラグから一意に組み立てるため、手書きで実装しています。
 type AutomatedActionCreateCommand struct {
 	automatedActionFlags
-	Request *string `help:"API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。action.actionType に simpleNotification または workflows を指定します。"`
+	Request *string `help:"API リクエスト JSON を @path.json または - (標準入力) で指定します。個別フラグと併用できません。workflows アクションの実行引数に秘密情報を含められるため、JSON を直接指定することはできません。action.actionType に simpleNotification または workflows を指定します。"`
 	factory AutomatedActionAPIFactory
 	runtime AutomatedActionRuntime
 }
@@ -281,7 +286,7 @@ func (c *AutomatedActionCreateCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
-	request, err := automatedActionRequest(c.Request, &c.automatedActionFlags, c.runtime.DecodeRequest)
+	request, err := automatedActionRequest(c.Request, &c.automatedActionFlags, c.runtime.DecodeRequest, os.Stdin)
 	if err != nil {
 		return err
 	}
@@ -305,7 +310,7 @@ func (c *AutomatedActionCreateCommand) Run(ctx *kong.Context) error {
 type AutomatedActionUpdateCommand struct {
 	ID string `arg:"" help:"更新する自動アクション ID。list の出力にある automatedActionId。"`
 	automatedActionFlags
-	Request *string `help:"API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。name、action、executionCondition、isEnabled は自動アクション全体を置き換えます。"`
+	Request *string `help:"API リクエスト JSON を @path.json または - (標準入力) で指定します。個別フラグと併用できません。workflows アクションの実行引数に秘密情報を含められるため、JSON を直接指定することはできません。name、action、executionCondition、isEnabled は自動アクション全体を置き換えます。"`
 	factory AutomatedActionAPIFactory
 	runtime AutomatedActionRuntime
 }
@@ -314,7 +319,7 @@ func (c *AutomatedActionUpdateCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
-	request, err := automatedActionRequest(c.Request, &c.automatedActionFlags, c.runtime.DecodeRequest)
+	request, err := automatedActionRequest(c.Request, &c.automatedActionFlags, c.runtime.DecodeRequest, os.Stdin)
 	if err != nil {
 		return err
 	}
@@ -335,16 +340,22 @@ func (c *AutomatedActionUpdateCommand) Run(ctx *kong.Context) error {
 
 // automatedActionRequest は --request と個別フラグのどちらの経路でも
 // API リクエストを組み立てます。両経路は相互排他です。
-func automatedActionRequest(requestJSON *string, flags *automatedActionFlags, decode func(string, any) error) (*v1.AutomatedActionInput, error) {
+// --request はワークフロー引数に秘密情報を含められるため、@path か - (標準入力) のみを
+// 受け付け、インラインの JSON は拒否します。
+func automatedActionRequest(requestJSON *string, flags *automatedActionFlags, decode func(string, any) error, stdin io.Reader) (*v1.AutomatedActionInput, error) {
 	if requestJSON != nil {
 		if flags.flagsSet() {
 			return nil, fmt.Errorf("--request と個別フラグは併用できません")
+		}
+		data, err := readProtectedInput(*requestJSON, stdin, "--request", "workflows アクションの実行引数に秘密情報を含められるため、JSON を直接指定することはできません")
+		if err != nil {
+			return nil, err
 		}
 		if decode == nil {
 			return nil, fmt.Errorf("API リクエスト処理が設定されていません")
 		}
 		var request v1.AutomatedActionInput
-		if err := decode(*requestJSON, &request); err != nil {
+		if err := decode(string(data), &request); err != nil {
 			return nil, err
 		}
 		return &request, nil
@@ -355,7 +366,31 @@ func automatedActionRequest(requestJSON *string, flags *automatedActionFlags, de
 	if err := flags.validateRequired(); err != nil {
 		return nil, err
 	}
-	return flags.buildInput()
+	return flags.buildInput(stdin)
+}
+
+// readProtectedInput は @path で始まる入力を保護したファイルから、- を標準入力から
+// 読み込みます。それ以外の形式は、秘密情報を含められる入力をコマンドライン引数に
+// 直接渡させないためのエラーにします。flag と reason はエラーメッセージの説明に使います。
+func readProtectedInput(input string, stdin io.Reader, flag string, reason string) ([]byte, error) {
+	switch {
+	case input == "-":
+		data, err := io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("%s の標準入力の読み込みに失敗しました: %w", flag, err)
+		}
+		return data, nil
+	case strings.HasPrefix(input, "@"):
+		path := strings.TrimPrefix(input, "@")
+		//nolint:gosec // パスは --request / --args でユーザーが明示的に指定したものです。
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("%s のファイル %q の読み込みに失敗しました: %w", flag, path, err)
+		}
+		return data, nil
+	default:
+		return nil, fmt.Errorf("%s には @path または - (標準入力) を指定してください。%s", flag, reason)
+	}
 }
 
 // flagsSet は --request 以外の個別フラグが指定されているかを返します。
@@ -389,7 +424,7 @@ func (f *automatedActionFlags) validateRequired() error {
 // buildInput は個別フラグから API リクエストを組み立てます。アクションの実行先は
 // --notification-group-id と --workflow-id のどちらが指定されたかで決まり、両方または
 // どちらも指定された場合はエラーにします。
-func (f *automatedActionFlags) buildInput() (*v1.AutomatedActionInput, error) {
+func (f *automatedActionFlags) buildInput(stdin io.Reader) (*v1.AutomatedActionInput, error) {
 	if f.NotificationGroupID != nil && f.WorkflowID != nil {
 		return nil, fmt.Errorf("--notification-group-id と --workflow-id は併用できません。どちらか一方を指定してください")
 	}
@@ -431,7 +466,11 @@ func (f *automatedActionFlags) buildInput() (*v1.AutomatedActionInput, error) {
 			workflows.RevisionAlias = v1.NewOptString(*f.RevisionAlias)
 		}
 		if f.Args != nil {
-			workflows.Args = v1.NewOptString(*f.Args)
+			argsValue, err := workflowArgsValue(*f.Args, stdin)
+			if err != nil {
+				return nil, err
+			}
+			workflows.Args = v1.NewOptString(argsValue)
 		}
 		if f.WorkflowName != nil {
 			workflows.Name = v1.NewOptString(*f.WorkflowName)
@@ -454,4 +493,15 @@ func (f *automatedActionFlags) buildInput() (*v1.AutomatedActionInput, error) {
 		}
 	}
 	return input, nil
+}
+
+// workflowArgsValue は --args の入力を読み込みます。ワークフロー引数に秘密情報を
+// 含められるため、@path で保護したファイルか - (標準入力) のみを受け付け、
+// インラインの値は拒否します。
+func workflowArgsValue(input string, stdin io.Reader) (string, error) {
+	data, err := readProtectedInput(input, stdin, "--args", "ワークフロー引数に秘密情報を含められるため、値を直接指定することはできません")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }

@@ -17,6 +17,8 @@ package securitycontrolapi
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -183,6 +185,18 @@ func TestEvaluationRuleUpdateRejectsFlagsForParameterlessRule(t *testing.T) {
 	err = command2.Run(&kong.Context{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "--targets")
+
+	// --targets= のように空配列の明示指定も指定とみなす
+	command3 := &EvaluationRuleUpdateCommand{
+		ID:        "addon-vulnerability-detections",
+		IsEnabled: testPtr(true),
+		Targets:   []string{},
+		factory:   func() (EvaluationRuleAPI, error) { return &stubEvaluationRuleAPI{}, nil },
+		runtime:   testEvaluationRuleRuntime(),
+	}
+	err = command3.Run(&kong.Context{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--targets")
 }
 
 func TestEvaluationRuleUpdateRejectsRequestAndFlags(t *testing.T) {
@@ -194,6 +208,19 @@ func TestEvaluationRuleUpdateRejectsRequestAndFlags(t *testing.T) {
 		runtime:   testEvaluationRuleRuntime(),
 	}
 	err := command.Run(&kong.Context{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--request と個別フラグは併用できません")
+
+	// --targets= のように空配列の明示指定も Kong は非 nil のスライスを設定するため、
+	// 長さではなく nil で未指定を判定する。空配列指定と --request の併用は排他エラーにする
+	command2 := &EvaluationRuleUpdateCommand{
+		ID:      "server-no-public-ip",
+		Request: testPtr(`{"isEnabled":true}`),
+		Targets: []string{},
+		factory: func() (EvaluationRuleAPI, error) { return &stubEvaluationRuleAPI{}, nil },
+		runtime: testEvaluationRuleRuntime(),
+	}
+	err = command2.Run(&kong.Context{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "--request と個別フラグは併用できません")
 }
@@ -261,6 +288,9 @@ func TestAutomatedActionCreateBuildsSimpleNotificationAction(t *testing.T) {
 }
 
 func TestAutomatedActionCreateBuildsWorkflowsAction(t *testing.T) {
+	argsFile := filepath.Join(t.TempDir(), "args.json")
+	require.NoError(t, os.WriteFile(argsFile, []byte(`{"server_id": 12345}`), 0o600))
+
 	stub := &stubAutomatedActionAPI{}
 	command := &AutomatedActionCreateCommand{
 		automatedActionFlags: automatedActionFlags{
@@ -272,7 +302,7 @@ func TestAutomatedActionCreateBuildsWorkflowsAction(t *testing.T) {
 			WorkflowID:         testPtr("workflow-1"),
 			RevisionID:         testPtr(3),
 			WorkflowName:       testPtr("run-name"),
-			Args:               testPtr(`{"server_id": 12345}`),
+			Args:               testPtr("@" + argsFile),
 		},
 		factory: func() (AutomatedActionAPI, error) { return stub, nil },
 		runtime: testAutomatedActionRuntime(),
@@ -379,6 +409,107 @@ func TestAutomatedActionCreateRejectsRequestAndFlags(t *testing.T) {
 	err := command.Run(&kong.Context{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "--request と個別フラグは併用できません")
+}
+
+func TestAutomatedActionCreateRejectsInlineArgs(t *testing.T) {
+	command := &AutomatedActionCreateCommand{
+		automatedActionFlags: automatedActionFlags{
+			Name:               testPtr("workflow-action"),
+			ExecutionCondition: testPtr("condition"),
+			IsEnabled:          testPtr(false),
+			ServicePrincipalID: testPtr(testServicePrincipalID),
+			WorkflowID:         testPtr("workflow-1"),
+			Args:               testPtr(`{"server_id": 12345}`),
+		},
+		factory: func() (AutomatedActionAPI, error) { return &stubAutomatedActionAPI{}, nil },
+		runtime: testAutomatedActionRuntime(),
+	}
+	err := command.Run(&kong.Context{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--args には @path または - (標準入力) を指定してください")
+	require.Contains(t, err.Error(), "秘密情報を含められるため、値を直接指定することはできません")
+}
+
+func TestAutomatedActionCreateReadsArgsFromFile(t *testing.T) {
+	argsFile := filepath.Join(t.TempDir(), "args.json")
+	require.NoError(t, os.WriteFile(argsFile, []byte(`{"server_id": 12345}`), 0o600))
+
+	stub := &stubAutomatedActionAPI{}
+	command := &AutomatedActionCreateCommand{
+		automatedActionFlags: automatedActionFlags{
+			Name:               testPtr("workflow-action"),
+			ExecutionCondition: testPtr("condition"),
+			IsEnabled:          testPtr(false),
+			ServicePrincipalID: testPtr(testServicePrincipalID),
+			WorkflowID:         testPtr("workflow-1"),
+			Args:               testPtr("@" + argsFile),
+		},
+		factory: func() (AutomatedActionAPI, error) { return stub, nil },
+		runtime: testAutomatedActionRuntime(),
+	}
+	require.NoError(t, command.Run(&kong.Context{}))
+
+	require.NotNil(t, stub.createRequest)
+	parameter := stub.createRequest.Action.OneOf.ActionDefinitionWorkflows.ActionParameter
+	require.True(t, parameter.Args.Set)
+	require.Equal(t, `{"server_id": 12345}`, parameter.Args.Value)
+}
+
+func TestAutomatedActionCreateRejectsInlineRequest(t *testing.T) {
+	command := &AutomatedActionCreateCommand{
+		Request: testPtr(`{"name":"name"}`),
+		factory: func() (AutomatedActionAPI, error) { return &stubAutomatedActionAPI{}, nil },
+		runtime: testAutomatedActionRuntime(),
+	}
+	err := command.Run(&kong.Context{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--request には @path または - (標準入力) を指定してください")
+	require.Contains(t, err.Error(), "JSON を直接指定することはできません")
+}
+
+func TestAutomatedActionCreateReadsRequestFromFile(t *testing.T) {
+	requestFile := filepath.Join(t.TempDir(), "request.json")
+	requestJSON := `{"name":"my-action","action":{"actionType":"simpleNotification","actionParameter":{"servicePrincipalId":"` + testServicePrincipalID + `","notificationGroupId":"` + testNotificationGroup + `"}},"executionCondition":"condition","isEnabled":false}`
+	require.NoError(t, os.WriteFile(requestFile, []byte(requestJSON), 0o600))
+
+	stub := &stubAutomatedActionAPI{}
+	runtime := testAutomatedActionRuntime()
+	runtime.DecodeRequest = func(input string, out any) error {
+		return json.Unmarshal([]byte(input), out)
+	}
+	command := &AutomatedActionCreateCommand{
+		Request: testPtr("@" + requestFile),
+		factory: func() (AutomatedActionAPI, error) { return stub, nil },
+		runtime: runtime,
+	}
+	require.NoError(t, command.Run(&kong.Context{}))
+
+	require.NotNil(t, stub.createRequest)
+	require.Equal(t, "my-action", stub.createRequest.Name)
+	require.False(t, stub.createRequest.IsEnabled)
+}
+
+func TestAutomatedActionCreateReadsRequestFromStdin(t *testing.T) {
+	requestJSON := `{"name":"my-action","action":{"actionType":"simpleNotification","actionParameter":{"servicePrincipalId":"` + testServicePrincipalID + `","notificationGroupId":"` + testNotificationGroup + `"}},"executionCondition":"condition","isEnabled":false}`
+
+	request, err := automatedActionRequest(testPtr("-"), &automatedActionFlags{}, func(_ string, out any) error {
+		return json.Unmarshal([]byte(requestJSON), out)
+	}, strings.NewReader(requestJSON))
+	require.NoError(t, err)
+	require.Equal(t, "my-action", request.Name)
+	require.False(t, request.IsEnabled)
+	require.Equal(t, "simpleNotification", string(request.Action.OneOf.Type))
+}
+
+func TestAutomatedActionCreateRejectsMissingRequestFile(t *testing.T) {
+	command := &AutomatedActionCreateCommand{
+		Request: testPtr("@" + filepath.Join(t.TempDir(), "missing.json")),
+		factory: func() (AutomatedActionAPI, error) { return &stubAutomatedActionAPI{}, nil },
+		runtime: testAutomatedActionRuntime(),
+	}
+	err := command.Run(&kong.Context{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "の読み込みに失敗しました")
 }
 
 func TestAutomatedActionUpdateCallsSDKWithID(t *testing.T) {

@@ -34,13 +34,13 @@ API エンドポイントは `https://secure.sakura.ad.jp/cloud/zone/tk1b/api/se
 - `evaluation-rule update` は `--request` JSON か個別フラグ (`--is-enabled` 必須、`--service-principal-id` と `--targets` 任意) を受け付けます。両経路は併用できません。
   - ルール ID は SDK が公開する 14 種類の `evaluationRuleId` であることを検証します。SDK の入力補完は未知のルール ID で panic するため、CLI で検証してから API を呼び出します。
   - `--service-principal-id` はパラメータを持たないルール (`addon-threat-detections`、`addon-vulnerability-detections`) では拒否します。SDK の入力補完は対応しない値を黙って無視するため、CLI で明示的なエラーにします。
-  - `--targets` はパラメータに `zones` または `sites` を持つ 7 ルールでのみ受け付けます。ゾーン対象のルールではゾーン、`objectstorage-bucket-encryption-enabled` ではオブジェクトストレージのサイトを指定します。反復可能なオプション (`--targets is1b --targets tk1b`) で、省略時は空配列 (全ゾーン・全サイト) を送ります。
+  - `--targets` はパラメータに `zones` または `sites` を持つ 7 ルールでのみ受け付けます。ゾーン対象のルールではゾーン、`objectstorage-bucket-encryption-enabled` ではオブジェクトストレージのサイトを指定します。反復可能なオプション (`--targets is1b --targets tk1b`) で、省略時は空配列 (全ゾーン・全サイト) を送ります。`--targets=` のような空配列の明示指定も、Kong が非 nil のスライスを設定するため指定とみなし、`--request` との併用は排他エラーにします。
   - `--service-principal-id` を省略した場合、SDK の入力補完は空文字列を設定します。API では `servicePrincipalId` を省略すると、有効化時に設定したサービスプリンシパルが使われるため、CLI は空文字列を省略状態に戻して送信します。
   - `--is-enabled` は必須です。ルールの有効状態は更新リクエストで常に送信されます。
 - `automated-action create` と `update` は `--request` JSON か個別フラグを受け付けます。両経路は併用できません。
   - 個別フラグでは `--name`、`--execution-condition`、`--is-enabled`、`--service-principal-id` が必須で、実行先として `--notification-group-id` か `--workflow-id` のどちらか一方が必須です。
   - `--revision-id`、`--revision-alias`、`--workflow-name`、`--args` は `--workflow-id` と併用する場合だけ受け付けます。`--notification-group-id` と組み合わせた場合はエラーにします。
-  - `--args` はワークフローの実行時に渡す引数の JSON 文字列です。インライン指定のみを受け付けます。複数行の引数や秘密情報を含む引数は `--request` JSON の `@path.json` で指定してください。
+  - `--args` はワークフローの実行時に渡す引数の JSON です。引数に秘密情報を含められるため、`@path` で保護したファイルか `-` (標準入力) のみを受け付け、インラインの値は拒否します。`--request` JSON も同様に `@path.json` か `-` のみを受け付けます。
   - `update` は `name`、`action`、`executionCondition`、`isEnabled` を自動アクション全体として置き換えます。維持したい項目は `read` の結果から再指定してください。
 - `evaluation-rule list` と `automated-action list` は `--page-size`、`--next`、`--prev` を受け付けます。すべて任意で、条件なしの `list` は空のパラメータで先頭ページを取得します。`--next` と `--prev` には前回の出力の `nextPageToken` と `prevPageToken` を指定します。
 
@@ -57,11 +57,10 @@ sakumock v0.13.0 にはセキュリティコントロールのモックサーバ
 2026-11-06 にライブ E2E を実施しました。シナリオは `test/e2e/security-control-api/` の testing.T ベースのテストで、共有 helper がビルド済みの skr を実行し、CLI 呼び出しごとに説明を付けて記録します。
 
 - `scenario_activation_test.go`: 有効化状態の読み取り、読み取った値をそのまま送り返す同一値の往復での update、アクティベート済みプロジェクトでの create が 409 で拒否されることと拒否後に状態が変わらないことを確認します。`create` の正常系は未アクティベートのプロジェクトが必要なため未検証で、追跡 Issue #200 で管理します。
-- `scenario_evaluation_rule_test.go`: 一覧で SDK が公開する全評価ルールの包含を確認し、`server-no-public-ip` の読み取りが一覧と一致することを確認します。
-  ルールを `--is-enabled` と `--targets is1b` で一時的に有効化して update と反映を確認した後、後片付けで `--request` JSON により元の状態 (無効・parameter なし) に戻し、読み取りで復元を確認します。
-- `scenario_automated_action_test.go`: 一覧を取得した後、無効状態の自動アクションを作成して読み取り・一覧・有効化する update を確認し、削除と不在確認まで行います。実行パラメータの通知先グループは環境変数 `SKR_E2E_SECURITY_CONTROL_NOTIFICATION_GROUP_ID` で指定した既存グループを参照のみで使い、未設定のときはスキップします。後片付けで作成したアクションを ID と名称の照合後に削除し、一覧に残っていないことを確認します。
+- `scenario_evaluation_rule_test.go`: 一覧で SDK が公開する全評価ルールの包含を確認し、`server-no-public-ip` の読み取りが一覧と一致することを確認します。変更前に対象ルールが無効で parameter を持たないこと、有効な自動アクションが存在しないことを確認してから、ルールを `--is-enabled` と `--targets is1b` で一時的に有効化して update と反映を確認します。後片付けでは現在値を再照合し、元の状態なら何もせず、今回設定した値 (有効状態・parameter のサービスプリンシパル ID・ゾーン) と一致する場合だけ `--request` JSON により元の状態 (無効・parameter なし) に戻します。不一致・不正応答では変更 API を呼ばずにテストを失敗させます。
+- `scenario_automated_action_test.go`: 一覧を取得した後、無効状態の自動アクションを作成して読み取り・一覧を確認し、update でも無効状態を維持して応答を検証します。削除の直前に読み取りで ID・名称・指定内容を再照合してから削除し、不在確認まで行います。実行パラメータの通知先グループは環境変数 `SKR_E2E_SECURITY_CONTROL_NOTIFICATION_GROUP_ID` で指定した既存グループを参照のみで使い、未設定のときはスキップします。後片付けで作成したアクションを ID・名称・指定内容の照合後に削除し、一覧に残っていないことを確認します。
 
-`baseline.txt` では `activation create` を `deferred #200` とし、他の 10 末端コマンドを `live` に更新しました。評価結果はイベントログへの記録のみで、課金対象リソースは作成しません。実行後、有効化状態・評価ルール・自動アクション一覧は実行前の状態に戻ることを確認しました。
+`baseline.txt` では `activation create` を `deferred #200` とし、他の 10 末端コマンドを `live` に更新しました。評価結果はイベントログへの記録のみで、課金対象リソースは作成しません。実行後、有効化状態・評価ルール・自動アクション一覧は実行前の状態に戻ることを確認しました。PR レビュー指摘を受けて追加した parameter なしの事前確認、有効な自動アクションの不在確認、update での無効維持、削除前再照合つきの復元を含めて 2026-11-06 に再実行し、3 シナリオとも成功しました。
 
 ## 参考資料
 
