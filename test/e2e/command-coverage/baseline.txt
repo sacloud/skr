@@ -313,6 +313,17 @@ object-storage-api site read live
 object-storage-api site status bucket-metering deferred #142 API がエラーを返すため
 object-storage-api site status quota live
 object-storage-api site status read live
+proxylb-api create live
+proxylb-api delete live
+proxylb-api delete-certificates live
+proxylb-api find live
+proxylb-api get-certificates live
+proxylb-api health-status live
+proxylb-api monitor-connection live
+proxylb-api read live
+proxylb-api renew-lets-encrypt-cert deferred #199 正常系には実在ドメインの DNS 検証が必要で、Let's Encrypt 未設定時の異常系のみ確認済み
+proxylb-api set-certificates live
+proxylb-api update live
 simple-notification-api destination create live
 simple-notification-api destination delete live
 simple-notification-api destination list live

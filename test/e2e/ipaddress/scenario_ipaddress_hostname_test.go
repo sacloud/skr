@@ -62,7 +62,7 @@ func TestScenarioIPAddressUpdateHostName(t *testing.T) {
 	}()
 
 	// 共有セグメントにテスト用のサーバーを作成します
-	server := helper.CreateCloudInitServer(t, h, disks, name, ipAddressServerDesc, params, "shared")
+	server, _ := helper.CreateCloudInitServer(t, h, disks, name, ipAddressServerDesc, params, "shared")
 	serverID = server.ID
 
 	// サーバーを起動して、起動の完了を待ちます

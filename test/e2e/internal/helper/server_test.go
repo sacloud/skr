@@ -18,10 +18,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	diskSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/disk"
+	serverSDK "github.com/sacloud/sacloud-sdk-go/service/iaas/server"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,6 +50,102 @@ func TestParseDiskSizeGB(t *testing.T) {
 			require.Error(t, err, "invalid disk size should be rejected")
 		})
 	}
+}
+
+// TestVerifyAttachedDisks は --with-disks の削除前の接続中 Disk の照合を確認する。
+func TestVerifyAttachedDisks(t *testing.T) {
+	params := ServerDiskParams{ArchiveID: 123, DiskPlanID: 4, SizeGB: 20}
+	disk := DiskItem{ID: 45, Name: "skr-e2e-server-test", DiskPlanID: 4, SizeMB: 20 * 1024}
+	server := ServerItem{ID: 111, Name: "skr-e2e-server-test", Description: "d", Disks: []DiskItem{disk}}
+
+	// 接続中の Disk が作成直後に確認した Disk だけなら受け付ける
+	require.NoError(t, verifyAttachedDisks(server, "skr-e2e-server-test", params, []types.ID{45}))
+	// 確認済みの Disk ID を持たない場合も、指定内容が一致していれば受け付ける
+	require.NoError(t, verifyAttachedDisks(server, "skr-e2e-server-test", params, nil))
+
+	for name, tc := range map[string]struct {
+		server ServerItem
+		known  []types.ID
+	}{
+		"same name and spec but different ID": {
+			server: ServerItem{ID: 111, Name: "skr-e2e-server-test", Description: "d",
+				Disks: []DiskItem{{ID: 46, Name: "skr-e2e-server-test", DiskPlanID: 4, SizeMB: 20 * 1024}}},
+			known: []types.ID{45},
+		},
+		"unexpected number of Disks": {
+			server: ServerItem{ID: 111, Name: "skr-e2e-server-test", Description: "d", Disks: []DiskItem{
+				{ID: 45, Name: "skr-e2e-server-test", DiskPlanID: 4, SizeMB: 20 * 1024},
+				{ID: 46, Name: "skr-e2e-server-test", DiskPlanID: 4, SizeMB: 20 * 1024},
+			}},
+			known: []types.ID{45},
+		},
+		"other name without known IDs": {
+			server: ServerItem{ID: 111, Name: "skr-e2e-server-test", Description: "d",
+				Disks: []DiskItem{{ID: 45, Name: "changed", DiskPlanID: 4, SizeMB: 20 * 1024}}},
+		},
+		"other plan": {
+			server: ServerItem{ID: 111, Name: "skr-e2e-server-test", Description: "d",
+				Disks: []DiskItem{{ID: 45, Name: "skr-e2e-server-test", DiskPlanID: 2, SizeMB: 20 * 1024}}},
+			known: []types.ID{45},
+		},
+		"other size": {
+			server: ServerItem{ID: 111, Name: "skr-e2e-server-test", Description: "d",
+				Disks: []DiskItem{{ID: 45, Name: "skr-e2e-server-test", DiskPlanID: 4, SizeMB: 40 * 1024}}},
+			known: []types.ID{45},
+		},
+		"fractional size": {
+			server: ServerItem{ID: 111, Name: "skr-e2e-server-test", Description: "d",
+				Disks: []DiskItem{{ID: 45, Name: "skr-e2e-server-test", DiskPlanID: 4, SizeMB: 20*1024 + 1}}},
+			known: []types.ID{45},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Error(t, verifyAttachedDisks(tc.server, "skr-e2e-server-test", params, tc.known),
+				"mismatched Disks should be refused")
+		})
+	}
+
+	// サイズが正の値でない指定は拒否する
+	require.Error(t, verifyAttachedDisks(server, "skr-e2e-server-test", ServerDiskParams{ArchiveID: 123, DiskPlanID: 4, SizeGB: 0}, nil))
+}
+
+// serverAPICallerStub は SDK の API 呼び出しに固定応答を返す APICaller のテストダブルです。
+// 後片付けの削除拒否の検証で使い、実際の通信は行いません。
+type serverAPICallerStub struct {
+	data    []byte
+	methods []string
+}
+
+func (s *serverAPICallerStub) Do(_ context.Context, method, _ string, _ any) ([]byte, error) {
+	s.methods = append(s.methods, method)
+	return s.data, nil
+}
+
+// TestCleanupServerResourcesRefusesUnknownDisks は、接続中の Disk に未知の Disk がある場合に
+// 後片付けが削除コマンドを実行しないことを確認する。
+func TestCleanupServerResourcesRefusesUnknownDisks(t *testing.T) {
+	response := []byte(`{"Server":{"ID":"123","Name":"skr-e2e-server-test","Description":"Temporary Server for skr cloud-init E2E","Disks":[{"ID":"45","Name":"skr-e2e-server-test","SizeMB":20481,"Plan":{"ID":"4"}}]}}`)
+	caller := &serverAPICallerStub{data: response}
+	servers, disks := serverSDK.New(caller), diskSDK.New(caller)
+	params := ServerDiskParams{ArchiveID: 123, DiskPlanID: 4, SizeGB: 20}
+
+	// 削除コマンドの実行を検出するため、マーカーファイルを作成するスクリプトを実行ファイルに設定する
+	marker := filepath.Join(t.TempDir(), "delete-marker")
+	script := filepath.Join(t.TempDir(), "record-delete.sh")
+	require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\ntouch "+marker+"\n"), 0o600))
+	h := &Helper{name: "test", description: "unit test", binary: script,
+		defaultTimeout: 10 * time.Second, startedAt: time.Now()}
+
+	err := CleanupServerResources(t, h, servers, disks, params, 123, []ServerIdentity{
+		{Name: "skr-e2e-server-test", Description: "Temporary Server for skr cloud-init E2E"},
+	}, 45)
+	require.Error(t, err, "a mismatched Disk should be refused")
+	require.Contains(t, err.Error(), "unexpected Disk attached", "the refusal should explain the mismatch")
+	// 拒否された場合は削除コマンドを実行しない
+	require.NoFileExists(t, marker, "the refused cleanup must not run the delete command")
+	require.Empty(t, h.results, "the refused cleanup must not record any command")
+	// SDK の参照だけが行われる
+	require.Equal(t, []string{"GET"}, caller.methods)
 }
 
 // TestCheckServerIdentity は参照結果の識別確認を確認する。

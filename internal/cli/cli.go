@@ -31,6 +31,7 @@ import (
 	"github.com/sacloud/skr/internal/kmsapi"
 	"github.com/sacloud/skr/internal/networkingsuiteapi"
 	"github.com/sacloud/skr/internal/objectstorageapi"
+	"github.com/sacloud/skr/internal/proxylbapi"
 	"github.com/sacloud/skr/internal/secretmanagerapi"
 	"github.com/sacloud/skr/internal/serviceendpointgatewayapi"
 	"github.com/sacloud/skr/internal/simplemqapi"
@@ -46,6 +47,7 @@ type cli struct {
 	Config                    configCommand                      `cmd:"" help:"Manage configuration profiles."`
 	IaaSAPI                   iaasAPICommand                     `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
 	GSLBAPI                   gslbapi.Commands                   `cmd:"" name:"gslb-api" help:"さくらのクラウド GSLB を操作します。実サーバーへのヘルスチェックを行い、DNS 応答先を制御します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/gslb/index.html"`
+	ProxyLBAPI                proxylbapi.Commands                `cmd:"" name:"proxylb-api" help:"さくらのクラウド エンハンスドロードバランサ (ProxyLB) を操作します。複数の配下サーバーへのロードバランス、HTTPS 対応、ソーリーサーバーなどを設定できます。エンハンスドロードバランサはグローバルリソースで、ゾーンの指定は不要です。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/enhanced-lb/index.html"`
 	EventbusAPI               eventbusapi.Commands               `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。実行先を process-configuration で定義し、schedule または trigger から参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。--query で必要な項目を抽出できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
 	SimpleMQAPI               simplemqapi.Commands               `cmd:"" name:"simplemq-api" help:"SimpleMQ のキュー管理 API とメッセージ API を操作します。キュー管理 API は SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。メッセージ API はキューの API キーを --api-key-file から読み込みます。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
 	SimpleNotificationAPI     simplenotificationapi.Commands     `cmd:"" name:"simple-notification-api" help:"さくらのクラウド シンプル通知の通知先、通知先グループ、ルーティング設定、通知履歴を操作します。グループへの通知送信は実際の通知を発生させます。通知の到達は保証されず、結果は通知履歴でも確認してください。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/simplenotification/about.html"`
@@ -106,6 +108,7 @@ func newCLI() *cli {
 	result := &cli{}
 	result.initIaaSAPI()
 	result.initGSLBAPI()
+	result.initProxyLBAPI()
 	result.initEventbusAPI()
 	result.initSimpleMQAPI()
 	result.initSimpleNotificationAPI()

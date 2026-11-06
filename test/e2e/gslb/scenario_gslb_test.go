@@ -91,14 +91,14 @@ func TestScenarioGSLB(t *testing.T) {
 	}()
 
 	// 実サーバーを cloud-init ディスク付きで作成し、user-data を指定して起動して SSH ログインを確認します
-	primary := helper.CreateCloudInitServer(t, h, disks, primaryName, serverDescription, params, "shared")
+	primary, _ := helper.CreateCloudInitServer(t, h, disks, primaryName, serverDescription, params, "shared")
 	primaryID = primary.ID
 	helper.BootServerWithUserData(t, h, servers, primaryID, material.UserDataPath)
 	helper.WaitForServerSSH(t, h, servers, primaryID, primaryName, serverDescription, material)
 	primaryIP := sharedIPOfRunningServer(t, servers, primaryID)
 
 	// ソーリーサーバーも同じ手順で作成して起動します。全実サーバー停止時の誘導先になります
-	sorry := helper.CreateCloudInitServer(t, h, disks, sorryName, serverDescription, params, "shared")
+	sorry, _ := helper.CreateCloudInitServer(t, h, disks, sorryName, serverDescription, params, "shared")
 	sorryID = sorry.ID
 	helper.BootServerWithUserData(t, h, servers, sorryID, material.UserDataPath)
 	helper.WaitForServerSSH(t, h, servers, sorryID, sorryName, serverDescription, material)

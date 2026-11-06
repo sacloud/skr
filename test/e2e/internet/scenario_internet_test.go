@@ -113,7 +113,7 @@ func TestScenarioInternet(t *testing.T) {
 	monitorRouter(t, h, internetID)
 
 	// スイッチに接続する Server を cloud-init ディスク付きで作成します
-	created := helper.CreateCloudInitServer(t, h, disks, name, serverDesc, params, switchID.String())
+	created, _ := helper.CreateCloudInitServer(t, h, disks, name, serverDesc, params, switchID.String())
 	serverID = created.ID
 
 	// 参照で NIC の接続先と MAC アドレスを確認します

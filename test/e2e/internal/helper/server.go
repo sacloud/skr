@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -192,8 +193,9 @@ func RequireNoServerNameCollision(t *testing.T, servers *serverSDK.Service, disk
 // CreateCloudInitServer は cloud-init ディスクと指定した接続先の NIC を持つテスト用 Server を
 // skr CLI で作成し、作成応答と作成した Disk が期待する内容と一致することを SDK で確認します。
 // upstream は NIC の接続先で、共有セグメントは "shared"、ルータ＋スイッチの Switch はその ID です。
-// 作成に成功した Server を返します。
-func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name, description string, params ServerDiskParams, upstream string) ServerItem {
+// 作成に成功した Server と、作成直後に所属と指定内容を照合した Disk の ID を返します。
+// 削除対象の Disk ID は接続先の再参照結果からではなく、ここで返した ID を採用します。
+func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name, description string, params ServerDiskParams, upstream string) (ServerItem, types.ID) {
 	t.Helper()
 
 	// 作成応答に作成結果が含まれる。ディスクと NIC は ADR 0041 の反復可能オプションで指定します
@@ -239,7 +241,7 @@ func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name
 		"the created Disk settings should remain unchanged while it becomes available")
 	require.Equal(t, item.ID, readyDisk.ServerID,
 		"the created Disk should remain attached to the created Server")
-	return item
+	return item, readyDisk.ID
 }
 
 // BootServer は Server を起動します。
@@ -383,8 +385,10 @@ func DeleteServerWithDisks(t *testing.T, h *Helper, id types.ID) error {
 // ID がない場合は許容する識別情報の名前で検索して回収を試みます。識別できない場合は削除しません。
 // 削除は skr CLI で --with-disks --force を付けて行い、削除後は SDK で不在を確認し、
 // 孤立した Disk の回収まで行います。identities は許容する識別情報で、最初の要素の名前は
-// Disk の名前にも使います。削除後の確認も含め、後片付けの失敗は結合したエラーで返します。
-func CleanupServerResources(t *testing.T, h *Helper, servers *serverSDK.Service, disks *diskSDK.Service, params ServerDiskParams, id types.ID, identities []ServerIdentity) error {
+// Disk の名前にも使います。knownDisks に作成直後に確認した Disk ID を渡すと、
+// --with-disks の削除対象が確認済みの Disk だけであることを ID で照合します。
+// 削除後の確認も含め、後片付けの失敗は結合したエラーで返します。
+func CleanupServerResources(t *testing.T, h *Helper, servers *serverSDK.Service, disks *diskSDK.Service, params ServerDiskParams, id types.ID, identities []ServerIdentity, knownDisks ...types.ID) error {
 	t.Helper()
 
 	if len(identities) == 0 {
@@ -430,6 +434,11 @@ func CleanupServerResources(t *testing.T, h *Helper, servers *serverSDK.Service,
 	if !allowed {
 		return errors.New("cleanup refused: Server identity changed; manual cleanup required")
 	}
+	// --with-disks で削除する前に、接続中の Disk が今回の実行で作成したクラウドディスクだけであることを確認する。
+	// 別の Disk が接続されている場合や ID・指定内容が一致しない場合は削除せず、手動確認を要求します。
+	if err := verifyAttachedDisks(current, primaryName, params, knownDisks); err != nil {
+		return err
+	}
 
 	deleteErr := DeleteServerWithDisks(t, h, serverID)
 
@@ -439,6 +448,29 @@ func CleanupServerResources(t *testing.T, h *Helper, servers *serverSDK.Service,
 	}
 	absentErr := requireServerAbsent(t, servers, names...)
 	return errors.Join(deleteErr, absentErr, cleanupOrphanDisks(t, h, disks, primaryName, params, current.Disks))
+}
+
+// verifyAttachedDisks は Server に接続中の Disk が、今回の実行で作成したクラウドディスクだけであることを確認します。
+// --with-disks は削除時に接続中の Disk すべてを削除するため、作成直後に確認した Disk ID を knownDisks に渡すと
+// ID も照合します。指定内容が一致しない Disk や未知の Disk が接続されている場合は、
+// 削除対象になるためエラーを返します。
+func verifyAttachedDisks(server ServerItem, name string, params ServerDiskParams, knownDisks []types.ID) error {
+	if params.SizeGB <= 0 {
+		return errors.New("cleanup requires positive Disk size")
+	}
+	if len(knownDisks) > 0 && len(server.Disks) != len(knownDisks) {
+		return errors.New("cleanup refused: unexpected number of Disks attached; manual cleanup required")
+	}
+	for _, disk := range server.Disks {
+		if disk.Name != name || disk.DiskPlanID != types.ID(params.DiskPlanID) ||
+			disk.SizeMB/1024 != params.SizeGB || disk.SizeMB%1024 != 0 {
+			return errors.New("cleanup refused: unexpected Disk attached; manual cleanup required")
+		}
+		if len(knownDisks) > 0 && !slices.Contains(knownDisks, disk.ID) {
+			return errors.New("cleanup refused: unexpected Disk attached; manual cleanup required")
+		}
+	}
+	return nil
 }
 
 // FetchServer は SDK で Server を参照します。起動待ちや後片付けの確認など、
