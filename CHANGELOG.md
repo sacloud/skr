@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.0.6](https://github.com/sacloud/skr/compare/v0.0.5...v0.0.6) - 2026-11-06
+
+### 🚀 Changes
+- kms-api コマンドを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/184
+- object-storage 暗号化シナリオをテスト専用 KMS キーで実行 (#141) by @tokuhirom in https://github.com/sacloud/skr/pull/186
+- secretmanager 対応を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/187
+- Server チュートリアルのアーカイブとディスクプラン選択を簡潔にする by @tokuhirom in https://github.com/sacloud/skr/pull/188
+- service-endpoint-gateway-api のコマンド、ライブ E2E とチュートリアルを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/190
+- iaas-api database コマンドを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/191
+- iaas-api database を api 層経由に変更し review 指摘に対応 by @tokuhirom in https://github.com/sacloud/skr/pull/192
+- iaas-api を API 層経由に移行する by @tokuhirom in https://github.com/sacloud/skr/pull/196
+- proxylb-api コマンドグループを追加する by @tokuhirom in https://github.com/sacloud/skr/pull/198
+- security-control-api コマンドグループを追加する by @tokuhirom in https://github.com/sacloud/skr/pull/201
+### 📦 Dependency Updates
+- go: bump github.com/itchyny/gojq from 0.12.19 to 0.12.20 by @dependabot[bot] in https://github.com/sacloud/skr/pull/197
+- go: bump github.com/yuin/goldmark from 1.8.6 to 1.8.7 by @dependabot[bot] in https://github.com/sacloud/skr/pull/195
+- go: bump github.com/alecthomas/kong from 1.16.1 to 1.17.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/194
+
 ## [v0.0.5](https://github.com/sacloud/skr/compare/v0.0.4...v0.0.5) - 2026-10-30
 
 ### 🚀 Changes
