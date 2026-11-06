@@ -44,6 +44,8 @@ $ skr proxylb-api set-certificates --id 123456789012 \
 
 `--primary-cert` と `--primary-key` は必須です。`--additional-certs` は追加証明書の JSON 配列を受け付け、各要素は `ServerCertificate`、`IntermediateCertificate`、`PrivateKey` を持ちます。秘密鍵を含むため、こちらも `@path` または `-` のみを受け付けます。
 
+`-`（標準入力）はこのコマンドの証明書入力のうち 1 項目にだけ指定できます。複数の項目に `-` を指定すると最初の読み込みが入力全体を消費し、後続の入力が空になるため、入力前に拒否します。証明書一式を標準入力で渡す場合は `--request -` を使ってください。
+
 ```console
 $ skr proxylb-api set-certificates --id 123456789012 \
     --primary-cert @server.crt --primary-key @server.key \
@@ -58,7 +60,7 @@ API は証明書一式を置き換えるため、追加証明書だけの差し�
 
 `test/e2e/proxylb/` は testing.T ベースのシナリオテストです（[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)）。`SKR_E2E=1` を設定して `go test` を実行すると `skr-e2e` プロファイルでライブ実行し、通常の `go test` では実行環境を変更しません。Server と Disk の作成・起動・SSH 待機・削除と後片付けは `test/e2e/internal/helper` の server 共有処理を使い、ProxyLB 固有の確認は `test/e2e/proxylb/` に置きます。
 
-シナリオは、SDK で自動選択した cloud-init アーカイブとディスクプランで 1 vCPU／1 GB メモリの一時サーバーを作成し、plan 100 の ProxyLB を作成してその IP を配下サーバーに登録します。テスト対象の操作は skr CLI で実行し、事前確認と後片付けの確認と起動待ちのポーリングは SDK で静かに実行します。FQDN は API が非同期に割り当てるため、作成直後の応答には含まれません。トラフィックの確認は作成直後に割り当てられる VIP 宛ての HTTP GET と HTTPS GET で行い、`health-status` の応答に配下サーバーが現れることも確認します。証明書は `openssl` で自己署名証明書を生成し、`set-certificates` → `get-certificates` → `delete-certificates` の順に確認します。Update で説明と監視間隔を変更します。`renew-lets-encrypt-cert` は Let's Encrypt 未設定の対象で API エラーになること (異常系) のみを確認し、正常系には実在ドメインの DNS 検証が必要なため Issue #199 で追跡します。失敗応答は異常系の確認であり、証跡に残します。
+シナリオは、SDK で自動選択した cloud-init アーカイブとディスクプランで 1 vCPU／1 GB メモリの一時サーバーを作成し、plan 100 の ProxyLB を作成してその IP を配下サーバーに登録します。テスト対象の操作は skr CLI で実行し、事前確認と後片付けの確認と起動待ちのポーリングは SDK で静かに実行します。削除対象の Disk ID はヘルパーが作成直後に所属と指定内容を照合した ID を採用し、接続先の再参照結果から採用しません。FQDN は API が非同期に割り当てるため、作成直後の応答には含まれません。トラフィックの確認は作成直後に割り当てられる VIP 宛ての HTTP GET と HTTPS GET で行い、`health-status` の応答に配下サーバーが現れることも確認します。`monitor-connection` は監視データの実測サンプルを期限付きで待ち、取得期間内の `Time` と接続数のフィールドを照合してから成功とします。証明書は `openssl` で自己署名証明書を生成し、`set-certificates` → `get-certificates` → `delete-certificates` の順に確認します。Update で説明と監視間隔を変更します。`renew-lets-encrypt-cert` は Let's Encrypt 未設定の対象で API エラーになること (異常系) のみを確認し、正常系には実在ドメインの DNS 検証が必要なため Issue #199 で追跡します。失敗応答は異常系の確認であり、証跡に残します。
 
 作成前に同名リソースが存在しないことを SDK で確認し、既存リソースとの名前衝突を拒否します。後片付けは、ProxyLB を識別情報の再照合つきで削除した後、server 共有の後片付けでサーバーをディスクとともに削除します。削除は skr CLI で行い、削除後は SDK で不在を確認します。識別できないリソースは削除せず、手動確認が必要なエラーをテストの失敗として報告します。
 

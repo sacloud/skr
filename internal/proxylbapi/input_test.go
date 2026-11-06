@@ -408,6 +408,11 @@ func TestSetCertificatesRequestFromFlagsErrors(t *testing.T) {
 		{name: "inline key", command: &SetCertificatesCommand{ID: ptrInt64(123), PrimaryCert: ptrString("@" + certPath), PrimaryKey: ptrString("inline")}},
 		{name: "empty @", command: &SetCertificatesCommand{ID: ptrInt64(123), PrimaryCert: ptrString("@"), PrimaryKey: ptrString("@" + keyPath)}},
 		{name: "missing file", command: &SetCertificatesCommand{ID: ptrInt64(123), PrimaryCert: ptrString("@/nonexistent/file.pem"), PrimaryKey: ptrString("@" + keyPath)}},
+		{name: "stdin for cert and key", command: &SetCertificatesCommand{ID: ptrInt64(123), PrimaryCert: ptrString("-"), PrimaryKey: ptrString("-")}},
+		{name: "stdin for key and intermediate", command: &SetCertificatesCommand{ID: ptrInt64(123),
+			PrimaryCert: ptrString("@" + certPath), PrimaryKey: ptrString("-"), PrimaryIntermediate: ptrString("-")}},
+		{name: "stdin for cert and additional certs", command: &SetCertificatesCommand{ID: ptrInt64(123),
+			PrimaryCert: ptrString("-"), PrimaryKey: ptrString("@" + keyPath), AdditionalCerts: ptrString("-")}},
 		{name: "invalid additional certs JSON", command: &SetCertificatesCommand{ID: ptrInt64(123),
 			PrimaryCert: ptrString("@" + certPath), PrimaryKey: ptrString("@" + keyPath), AdditionalCerts: ptrString("@" + badJSONPath)}},
 		{name: "inline additional certs", command: &SetCertificatesCommand{ID: ptrInt64(123),
@@ -416,6 +421,28 @@ func TestSetCertificatesRequestFromFlagsErrors(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := setCertificatesRequestFromFlags(test.command)
 			require.Error(t, err, "should fail")
+			// 秘密情報の値をエラーに含めないことを確認する
+			require.NotContains(t, err.Error(), "-----BEGIN", "error should not contain the secret value")
+		})
+	}
+}
+
+// TestSetCertificatesRequestFromFlagsSingleStdin は標準入力を1項目に制限することを確認する。
+// 複数の項目に - を指定した場合は最初の読み込みが入力全体を消費するため、読み込み前に拒否する。
+// 読み込み前に拒否されるため、標準入力は読まれない。
+func TestSetCertificatesRequestFromFlagsSingleStdin(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		command *SetCertificatesCommand
+	}{
+		{name: "cert and key", command: &SetCertificatesCommand{ID: ptrInt64(123), PrimaryCert: ptrString("-"), PrimaryKey: ptrString("-")}},
+		{name: "cert and additional certs", command: &SetCertificatesCommand{ID: ptrInt64(123),
+			PrimaryCert: ptrString("-"), PrimaryKey: ptrString("@/nonexistent/file.pem"), AdditionalCerts: ptrString("-")}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := setCertificatesRequestFromFlags(test.command)
+			require.Error(t, err, "multiple stdin inputs should be rejected")
+			require.Contains(t, err.Error(), "--request -", "the error should guide to --request -")
 		})
 	}
 }

@@ -193,8 +193,9 @@ func RequireNoServerNameCollision(t *testing.T, servers *serverSDK.Service, disk
 // CreateCloudInitServer は cloud-init ディスクと指定した接続先の NIC を持つテスト用 Server を
 // skr CLI で作成し、作成応答と作成した Disk が期待する内容と一致することを SDK で確認します。
 // upstream は NIC の接続先で、共有セグメントは "shared"、ルータ＋スイッチの Switch はその ID です。
-// 作成に成功した Server を返します。
-func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name, description string, params ServerDiskParams, upstream string) ServerItem {
+// 作成に成功した Server と、作成直後に所属と指定内容を照合した Disk の ID を返します。
+// 削除対象の Disk ID は接続先の再参照結果からではなく、ここで返した ID を採用します。
+func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name, description string, params ServerDiskParams, upstream string) (ServerItem, types.ID) {
 	t.Helper()
 
 	// 作成応答に作成結果が含まれる。ディスクと NIC は ADR 0041 の反復可能オプションで指定します
@@ -240,7 +241,7 @@ func CreateCloudInitServer(t *testing.T, h *Helper, disks *diskSDK.Service, name
 		"the created Disk settings should remain unchanged while it becomes available")
 	require.Equal(t, item.ID, readyDisk.ServerID,
 		"the created Disk should remain attached to the created Server")
-	return item
+	return item, readyDisk.ID
 }
 
 // BootServer は Server を起動します。

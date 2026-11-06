@@ -46,6 +46,10 @@ const (
 	proxylbPolling = 10 * time.Second
 	// curlCommandTimeout は curl 1回のタイムアウトです。
 	curlCommandTimeout = 20 * time.Second
+	// monitorSamplesTimeout は接続数モニタリングの実測サンプルの取得期限です。
+	monitorSamplesTimeout = 10 * time.Minute
+	// monitorSamplesInterval は接続数モニタリングの実測サンプルの再確認間隔です。
+	monitorSamplesInterval = 30 * time.Second
 )
 
 // backendResponse は配下サーバーの cloud-init で用意する応答本文です。
@@ -118,13 +122,11 @@ func TestScenarioProxyLB(t *testing.T) {
 	}()
 
 	// 配下サーバーを cloud-init ディスク付きで作成し、user-data を指定して起動して SSH ログインを確認します
-	server := helper.CreateCloudInitServer(t, h, disks, serverName, serverDescription, params, "shared")
+	server, createdDiskID := helper.CreateCloudInitServer(t, h, disks, serverName, serverDescription, params, "shared")
 	serverID = server.ID
-	// 作成した Disk の ID を保持します。ヘルパーが作成直後に所属と指定内容を確認済みです
-	createdServer, err := helper.FetchServer(t, servers, serverID)
-	require.NoError(t, err, "read the created Server to keep the created Disk ID")
-	require.Len(t, createdServer.Disks, 1, "the created Server should have the created Disk")
-	knownDisks = []types.ID{createdServer.Disks[0].ID}
+	// knownDisks にはヘルパーが作成直後に所属と指定内容を照合した Disk の ID を保持します。
+	// 接続先の再参照結果から採用しないため、接続の変更後でも作成済みの Disk だけが削除対象になります
+	knownDisks = []types.ID{createdDiskID}
 	helper.BootServerWithUserData(t, h, servers, serverID, material.UserDataPath)
 	helper.WaitForServerSSH(t, h, servers, serverID, serverName, serverDescription, material)
 	serverIP := sharedIPOfRunningServer(t, servers, serverID)
@@ -267,35 +269,68 @@ type monitorConnectionValue struct {
 }
 
 // getMonitorConnection は skr CLI で接続数モニタリングを取得します。
-// モニタリングは監視データの反映待ちを必要としないため、作成直後でも実行できます。
+// 監視データは作成直後には空配列になることがあるため、期限付きで実測サンプルを待ちます。
+// 空配列は反映待ちとして再試行し、期限を過ぎたらテストを失敗させます。
 // --start と --end は RFC3339 形式で、現在時刻を終端とする観測期間を指定します。
 func getMonitorConnection(t *testing.T, h *helper.Helper, id types.ID) {
 	t.Helper()
 
-	end := time.Now().UTC()
-	output := h.Call(t, "ProxyLB の接続数モニタリングを取得する",
-		"proxylb-api", "monitor-connection", "--id", id.String(),
-		"--start", end.Add(-proxylbMonitorWindow).Format(time.RFC3339),
-		"--end", end.Format(time.RFC3339))
-	require.NoError(t, checkMonitorConnectionValues(output),
-		"monitor-connection should return well-formed monitor values")
+	deadline := time.Now().Add(monitorSamplesTimeout)
+	for {
+		end := time.Now().UTC()
+		windowStart := end.Add(-proxylbMonitorWindow)
+		output := h.Call(t, "ProxyLB の接続数モニタリングを取得する",
+			"proxylb-api", "monitor-connection", "--id", id.String(),
+			"--start", windowStart.Format(time.RFC3339),
+			"--end", end.Format(time.RFC3339))
+		values, err := checkMonitorConnectionValues(output, windowStart, end)
+		require.NoError(t, err, "monitor-connection should return well-formed monitor values")
+		if len(values) > 0 {
+			return
+		}
+		if time.Now().Add(monitorSamplesInterval).After(deadline) {
+			t.Fatalf("monitor-connection returned no samples within %s", monitorSamplesTimeout)
+		}
+		h.Sleep(t, "接続数モニタリングの実測サンプルが蓄積されるのを待つ", monitorSamplesInterval)
+	}
 }
 
-// checkMonitorConnectionValues はモニタ値の応答が配列で、各要素が Time を持つことを確認します。
-func checkMonitorConnectionValues(output []byte) error {
-	var values []monitorConnectionValue
-	if err := json.Unmarshal(output, &values); err != nil {
-		return fmt.Errorf("decode monitor values: %w", err)
+// checkMonitorConnectionValues はモニタ値の応答が配列で、各要素が取得期間内の Time と
+// 接続数のフィールド (ActiveConnections、ConnectionsPerSec) を持つことを確認します。
+// 空配列は監視データの反映待ちとして扱います。
+func checkMonitorConnectionValues(output []byte, windowStart, windowEnd time.Time) ([]monitorConnectionValue, error) {
+	var elements []json.RawMessage
+	if err := json.Unmarshal(output, &elements); err != nil {
+		return nil, fmt.Errorf("decode monitor values: %w", err)
 	}
-	if values == nil {
-		return errors.New("expected a JSON array of monitor values")
+	if elements == nil {
+		return nil, errors.New("expected a JSON array of monitor values")
 	}
-	for i, value := range values {
-		if value.Time.IsZero() {
-			return fmt.Errorf("monitor values[%d] has no Time", i)
+	values := make([]monitorConnectionValue, 0, len(elements))
+	for i, element := range elements {
+		// 接続数の実測値のフィールドが応答に含まれることを確認する
+		var fields map[string]any
+		if err := json.Unmarshal(element, &fields); err != nil {
+			return nil, fmt.Errorf("decode monitor values[%d]: %w", i, err)
 		}
+		for _, field := range []string{"Time", "ActiveConnections", "ConnectionsPerSec"} {
+			if _, ok := fields[field]; !ok {
+				return nil, fmt.Errorf("monitor values[%d] has no %s", i, field)
+			}
+		}
+		var value monitorConnectionValue
+		if err := json.Unmarshal(element, &value); err != nil {
+			return nil, fmt.Errorf("decode monitor values[%d]: %w", i, err)
+		}
+		if value.Time.IsZero() {
+			return nil, fmt.Errorf("monitor values[%d] has no Time", i)
+		}
+		if value.Time.Before(windowStart) || value.Time.After(windowEnd) {
+			return nil, fmt.Errorf("monitor values[%d] Time %s is outside the requested window", i, value.Time)
+		}
+		values = append(values, value)
 	}
-	return nil
+	return values, nil
 }
 
 // getCertificateCommonName は skr CLI で証明書の共通名を取得します。
@@ -403,15 +438,37 @@ func TestRequestProxyLBContent(t *testing.T) {
 
 // TestCheckMonitorConnectionValues は接続数モニタリングの応答の内容確認を確かめる。
 func TestCheckMonitorConnectionValues(t *testing.T) {
-	require.NoError(t, checkMonitorConnectionValues([]byte(`[{"Time":"2026-01-01T00:00:00Z","ActiveConnections":0,"ConnectionsPerSec":0}]`)))
-	require.NoError(t, checkMonitorConnectionValues([]byte(`[]`)))
+	windowStart := time.Date(2026, 11, 6, 9, 0, 0, 0, time.UTC)
+	windowEnd := windowStart.Add(10 * time.Minute)
 
-	require.Error(t, checkMonitorConnectionValues([]byte(`[{"Time":"invalid"}]`)),
-		"an unparseable Time should be refused")
-	require.Error(t, checkMonitorConnectionValues([]byte(`[{"ActiveConnections":0}]`)),
-		"a missing Time should be refused")
-	require.Error(t, checkMonitorConnectionValues([]byte(`{"Time":"2026-01-01T00:00:00Z"}`)),
-		"a non-array response should be refused")
-	require.Error(t, checkMonitorConnectionValues([]byte("{")),
-		"invalid JSON should be refused")
+	// 実測サンプルは取得期間内の Time と接続数のフィールドを持つ
+	values, err := checkMonitorConnectionValues(
+		[]byte(`[{"Time":"2026-11-06T18:05:00+09:00","ActiveConnections":2,"ConnectionsPerSec":0.5}]`),
+		windowStart, windowEnd)
+	require.NoError(t, err)
+	require.Len(t, values, 1, "the sample should be collected")
+	require.Equal(t, 2.0, values[0].ActiveConnections, "unexpected ActiveConnections")
+	require.Equal(t, 0.5, values[0].ConnectionsPerSec, "unexpected ConnectionsPerSec")
+
+	// 空配列は監視データの反映待ちとして扱う
+	values, err = checkMonitorConnectionValues([]byte(`[]`), windowStart, windowEnd)
+	require.NoError(t, err)
+	require.Empty(t, values, "an empty response should be tolerated as pending samples")
+
+	for name, tc := range map[string][]byte{
+		"unparseable Time":          []byte(`[{"Time":"invalid","ActiveConnections":0,"ConnectionsPerSec":0}]`),
+		"missing Time":              []byte(`[{"ActiveConnections":0,"ConnectionsPerSec":0}]`),
+		"missing ActiveConnections": []byte(`[{"Time":"2026-11-06T18:05:00+09:00","ConnectionsPerSec":0}]`),
+		"missing ConnectionsPerSec": []byte(`[{"Time":"2026-11-06T18:05:00+09:00","ActiveConnections":0}]`),
+		"Time before window":        []byte(`[{"Time":"2026-11-06T09:05:00+09:00","ActiveConnections":0,"ConnectionsPerSec":0}]`),
+		"Time after window":         []byte(`[{"Time":"2026-11-06T20:05:00+09:00","ActiveConnections":0,"ConnectionsPerSec":0}]`),
+		"non-array response":        []byte(`{"Time":"2026-11-06T18:05:00+09:00"}`),
+		"null response":             []byte(`null`),
+		"invalid JSON":              []byte("{"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := checkMonitorConnectionValues(tc, windowStart, windowEnd)
+			require.Error(t, err, "a malformed response should be refused")
+		})
+	}
 }

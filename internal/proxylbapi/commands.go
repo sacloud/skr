@@ -426,10 +426,10 @@ func (c *GetCertificatesCommand) Run(ctx *kong.Context) error {
 type SetCertificatesCommand struct {
 	Request             *string `help:"--primary-cert、--primary-key と併用できません。SetCertificatesRequest JSON (PrimaryCerts、AdditionalCerts) を保護したファイルまたは -（標準入力）で指定します。秘密鍵を含むため直接指定は受け付けません。"`
 	ID                  *int64  `name:"id" help:"必須: エンハンスドロードバランサ ID。"`
-	PrimaryCert         *string `name:"primary-cert" help:"主証明書 (サーバー証明書) の PEM。--primary-key と併せて必須です。@path または -（標準入力）で指定します。"`
-	PrimaryIntermediate *string `name:"primary-intermediate" help:"主証明書の中間証明書の PEM。@path または -（標準入力）で指定します。"`
-	PrimaryKey          *string `name:"primary-key" help:"主証明書の秘密鍵の PEM。--primary-cert と併せて必須です。@path または -（標準入力）で指定します。"`
-	AdditionalCerts     *string `name:"additional-certs" help:"追加証明書の JSON 配列。各要素は ServerCertificate、IntermediateCertificate、PrivateKey を持ちます。@path または -（標準入力）で指定します。秘密鍵を含むため直接指定は受け付けません。"`
+	PrimaryCert         *string `name:"primary-cert" help:"主証明書 (サーバー証明書) の PEM。--primary-key と併せて必須です。@path または -（標準入力）で指定します。-（標準入力）はこのコマンドの1項目にだけ指定できます。"`
+	PrimaryIntermediate *string `name:"primary-intermediate" help:"主証明書の中間証明書の PEM。@path または -（標準入力）で指定します。-（標準入力）はこのコマンドの1項目にだけ指定できます。"`
+	PrimaryKey          *string `name:"primary-key" help:"主証明書の秘密鍵の PEM。--primary-cert と併せて必須です。@path または -（標準入力）で指定します。-（標準入力）はこのコマンドの1項目にだけ指定できます。"`
+	AdditionalCerts     *string `name:"additional-certs" help:"追加証明書の JSON 配列。各要素は ServerCertificate、IntermediateCertificate、PrivateKey を持ちます。@path または -（標準入力）で指定します。-（標準入力）はこのコマンドの1項目にだけ指定できます。秘密鍵を含むため直接指定は受け付けません。"`
 	factory             APIFactory
 	runtime             Runtime
 }

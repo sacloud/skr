@@ -517,6 +517,17 @@ func parseServer(input string) (*iaas.ProxyLBServer, error) {
 }
 
 func setCertificatesRequestFromFlags(command *SetCertificatesCommand) (*proxylb.SetCertificatesRequest, error) {
+	// 標準入力は1項目に制限します。複数の項目に - を指定すると最初の読み込みが
+	// 入力全体を消費し、後続の入力が空になるため、一式を渡す場合は --request - を案内します
+	stdinCount := 0
+	for _, input := range []*string{command.PrimaryCert, command.PrimaryKey, command.PrimaryIntermediate, command.AdditionalCerts} {
+		if input != nil && *input == "-" {
+			stdinCount++
+		}
+	}
+	if stdinCount > 1 {
+		return nil, fmt.Errorf("-（標準入力）は --primary-cert、--primary-key、--primary-intermediate、--additional-certs のいずれか1項目にだけ指定できます。証明書の一式を標準入力で渡す場合は --request - を使ってください")
+	}
 	if command.PrimaryCert == nil {
 		return nil, fmt.Errorf("--primary-cert と --primary-key が必要です")
 	}

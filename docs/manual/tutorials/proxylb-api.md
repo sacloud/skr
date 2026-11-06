@@ -216,7 +216,7 @@ $ skr proxylb-api monitor-connection --id "$PROXYLB_ID" \
 
 HTTPS のリッスンポートを使う場合、ProxyLB に証明書を設定します。この手順では `openssl` で自己署名証明書を生成して確認します。実運用では認証局が発行した証明書を使ってください。
 
-秘密鍵を含むファイルは引数に指定せず、`@path` 形式で渡します。`--primary-cert` と `--primary-key` は必須です。API は証明書一式を置き換えるため、追加証明書だけの差し替えでも主証明書の再指定が必要です。
+秘密鍵を含むファイルは引数に指定せず、`@path` 形式で渡します。`--primary-cert` と `--primary-key` は必須です。API は証明書一式を置き換えるため、追加証明書だけの差し替えでも主証明書の再指定が必要です。`-`（標準入力）は `--primary-cert`、`--primary-key`、`--primary-intermediate`、`--additional-certs` のいずれか 1 項目にだけ指定できます。証明書一式を標準入力で渡す場合は `--request -` を使ってください。
 
 ```console
 $ openssl req -x509 -newkey rsa:2048 -sha256 -days 1 -nodes \
