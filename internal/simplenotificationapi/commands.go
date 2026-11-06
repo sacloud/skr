@@ -73,27 +73,27 @@ func NewHistoryAPI(trace bool) (HistoryAPI, error) {
 // 保護するため、Settings を含むリクエストは @path.json 形式での入力を要求します。
 func DecodeDestinationRequest(input string, destination any) error {
 	return decodeDestinationRequest(input, destination,
-		v1.CommonServiceItemProviderClassSaknoticedestination,
-		v1.CommonServiceItemServiceClassCloudSaknoticedestination2)
+		string(v1.CommonServiceItemProviderClassSaknoticedestination),
+		string(v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticedestination2))
 }
 
 // DecodeGroupRequest は通知先グループのリクエストを読み込みます。作成リクエストには
 // Provider.Class と ServiceClass を自動設定します。
 func DecodeGroupRequest(input string, destination any) error {
 	return decodeResourceRequest(input, destination,
-		v1.CommonServiceItemProviderClassSaknoticegroup,
-		v1.CommonServiceItemServiceClassCloudSaknoticegroup2)
+		string(v1.CommonServiceItemProviderClassSaknoticegroup),
+		string(v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticegroup2))
 }
 
 // DecodeRoutingRequest は通知ルーティング設定のリクエストを読み込みます。作成リクエストには
 // Provider.Class と ServiceClass を自動設定します。
 func DecodeRoutingRequest(input string, destination any) error {
 	return decodeResourceRequest(input, destination,
-		v1.CommonServiceItemProviderClassSaknoticerouting,
-		v1.CommonServiceItemServiceClassCloudSaknoticerouting2)
+		string(v1.CommonServiceItemProviderClassSaknoticerouting),
+		string(v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticerouting2))
 }
 
-func decodeDestinationRequest(input string, destination any, provider v1.CommonServiceItemProviderClass, serviceClass v1.CommonServiceItemServiceClass) error {
+func decodeDestinationRequest(input string, destination any, provider string, serviceClass string) error {
 	requiresFile := false
 	switch destination.(type) {
 	case *v1.PostCommonServiceItemRequest:
@@ -120,7 +120,7 @@ func decodeDestinationRequest(input string, destination any, provider v1.CommonS
 		decodeResourceRequest(input, destination, provider, serviceClass))
 }
 
-func decodeResourceRequest(input string, destination any, provider v1.CommonServiceItemProviderClass, serviceClass v1.CommonServiceItemServiceClass) error {
+func decodeResourceRequest(input string, destination any, provider string, serviceClass string) error {
 	data, err := requestData(input)
 	if err != nil {
 		return err
@@ -139,7 +139,7 @@ func decodeResourceRequest(input string, destination any, provider v1.CommonServ
 	if item == nil {
 		return fmt.Errorf("decode CommonServiceItem: expected JSON object")
 	}
-	providerJSON, err := json.Marshal(map[string]string{"Class": string(provider)})
+	providerJSON, err := json.Marshal(map[string]string{"Class": provider})
 	if err != nil {
 		return fmt.Errorf("encode notification provider: %w", err)
 	}
@@ -189,20 +189,20 @@ func requestData(input string) ([]byte, error) {
 }
 
 func SetDestinationProvider(request *v1.PostCommonServiceItemRequest) error {
-	request.CommonServiceItem.Provider.Class = v1.CommonServiceItemProviderClassSaknoticedestination
-	request.CommonServiceItem.ServiceClass = v1.CommonServiceItemServiceClassCloudSaknoticedestination2
+	request.CommonServiceItem.Provider.Class = v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticedestination
+	request.CommonServiceItem.ServiceClass = v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticedestination2
 	return nil
 }
 
 func SetGroupProvider(request *v1.PostCommonServiceItemRequest) error {
-	request.CommonServiceItem.Provider.Class = v1.CommonServiceItemProviderClassSaknoticegroup
-	request.CommonServiceItem.ServiceClass = v1.CommonServiceItemServiceClassCloudSaknoticegroup2
+	request.CommonServiceItem.Provider.Class = v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticegroup
+	request.CommonServiceItem.ServiceClass = v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticegroup2
 	return nil
 }
 
 func SetRoutingProvider(request *v1.PostCommonServiceItemRequest) error {
-	request.CommonServiceItem.Provider.Class = v1.CommonServiceItemProviderClassSaknoticerouting
-	request.CommonServiceItem.ServiceClass = v1.CommonServiceItemServiceClassCloudSaknoticerouting2
+	request.CommonServiceItem.Provider.Class = v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticerouting
+	request.CommonServiceItem.ServiceClass = v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticerouting2
 	return nil
 }
 

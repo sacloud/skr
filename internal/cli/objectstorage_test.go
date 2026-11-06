@@ -238,7 +238,8 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 		"--from", "2026-09-01T00:00:00Z", "--to", "2026-10-01T00:00:00Z"))
 	require.Len(t, metering, 0, "sakumock returned unexpected usage history")
 
-	const keyID = "12345678-1234-4234-9234-123456789abc"
+	// kms_key_id は Object Storage API の ResourceID (数値) 形式に従う
+	const keyID = "123456789012"
 	runCommand("bucket", "encryption", "enable", "tky01", "skr-test-source", "--kms-key-id", keyID)
 	encryption := decodeObjectStorageResult[struct {
 		KeyID string `json:"kms_key_id"`

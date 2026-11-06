@@ -22,11 +22,11 @@ type GroupCommands struct {
 
 type GroupAPI interface {
 	List(context.Context) (*v1.ListCommonServiceItemsResponse, error)
-	Read(context.Context, string) (*v1.GetCommonServiceItemOK, error)
+	Read(context.Context, string) (*v1.ReadCommonServiceItemOK, error)
 	Create(context.Context, v1.PostCommonServiceItemRequest) (*v1.CreateCommonServiceItemCreated, error)
 	Update(context.Context, string, v1.PutCommonServiceItemRequest) (*v1.UpdateCommonServiceItemOK, error)
 	Delete(context.Context, string) error
-	SendMessage(context.Context, string, v1.SendNotificationMessageRequest) (*v1.SendNotificationMessageResponse, error)
+	SendMessage(context.Context, string, v1.SendNotificationRequest) (*v1.SendNotificationResponse, error)
 }
 
 type GroupAPIFactory func() (GroupAPI, error)
@@ -238,7 +238,7 @@ func (c *GroupSendMessageCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &v1.SendNotificationMessageRequest{}
+	request := &v1.SendNotificationRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

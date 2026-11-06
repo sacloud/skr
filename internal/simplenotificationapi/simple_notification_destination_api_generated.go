@@ -22,11 +22,11 @@ type DestinationCommands struct {
 
 type DestinationAPI interface {
 	List(context.Context) (*v1.ListCommonServiceItemsResponse, error)
-	Read(context.Context, string) (*v1.GetCommonServiceItemOK, error)
+	Read(context.Context, string) (*v1.ReadCommonServiceItemOK, error)
 	Create(context.Context, v1.PostCommonServiceItemRequest) (*v1.CreateCommonServiceItemCreated, error)
 	Update(context.Context, string, v1.PutCommonServiceItemRequest) (*v1.UpdateCommonServiceItemOK, error)
 	Delete(context.Context, string) error
-	ReadStatus(context.Context, string) (*v1.GetCommonServiceItemStatusResponse, error)
+	ReadStatus(context.Context, string) (*v1.CheckDestinationStatusResponse, error)
 }
 
 type DestinationAPIFactory func() (DestinationAPI, error)

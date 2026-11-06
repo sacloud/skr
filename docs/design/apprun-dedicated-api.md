@@ -1,14 +1,14 @@
 # AppRun Dedicated API コマンド設計
 
 - Status: API commands implemented; live E2E and tutorial tracked in [#59](https://github.com/sacloud/skr/issues/59)
-- SDK: `github.com/sacloud/sacloud-sdk-go v0.3.0`
+- SDK: `github.com/sacloud/sacloud-sdk-go v0.5.0`
 - Related ADR: [ADR 0027](../adr/0027-apprun-dedicated-api-commands.md)
 
 ## コマンド構成
 
 `skr apprun-dedicated-api` は AppRun 専有型の SDK 公開 API を直接呼び出す低レベルコマンドです。コマンド本体と SDK client の生成は `internal/apprundedicatedapi/`、CLI の登録と Runtime 接続は `internal/cli/` に置きます。認証は SDK プロファイル、または `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` を使います。
 
-公開コマンドは `cluster`、`application`、`version`、`auto-scaling-group`、`worker-node`、`load-balancer`、`certificate`、`service-class` です。各操作は SDK の公開オペレーションに対応し、階層リソースの ID は名前付きフラグまたは位置引数で指定します。ページング結果は `items` と `nextCursor` を含む JSON 形状で出力します。
+公開コマンドは `cluster`、`application`、`version`、`auto-scaling-group`、`worker-node`、`load-balancer`、`certificate`、`service-class` です。各操作は SDK の公開オペレーションに対応し、階層リソースの ID は名前付きフラグまたは位置引数で指定します。ページング結果は `items` と `nextCursor` を含む JSON 形状で出力します。SDK v0.5.0 で追加されたクラスタロードバランサの参照・更新と limits の参照は CLI 未対応で、[#202](https://github.com/sacloud/skr/issues/202) で対応します。
 
 ## 入力と安全な扱い
 
@@ -29,4 +29,4 @@ is1b のライブ E2E と利用者向けチュートリアルは未実装です�
 - [AppRun 専有型の概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html)
 - [クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)
 - [技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)
-- [SDK v0.3.0 AppRun Dedicated API](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.0/api/apprun-dedicated)
+- [SDK v0.5.0 AppRun Dedicated API](https://github.com/sacloud/sacloud-sdk-go/tree/v0.5.0/api/apprun-dedicated)

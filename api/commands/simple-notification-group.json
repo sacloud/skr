@@ -24,7 +24,7 @@
           "help": "参照する通知先グループ ID。"
         }
       ],
-      "response_type": "*v1.GetCommonServiceItemOK"
+      "response_type": "*v1.ReadCommonServiceItemOK"
     },
     {
       "name": "Create",
@@ -70,9 +70,9 @@
       "name": "SendMessage",
       "help": "通知先グループにメッセージを送信します。応答は受付結果であり、通知先への到達を保証しません。",
       "method": "SendMessage",
-      "request_type": "v1.SendNotificationMessageRequest",
+      "request_type": "v1.SendNotificationRequest",
       "request_by_value": true,
-      "response_type": "*v1.SendNotificationMessageResponse",
+      "response_type": "*v1.SendNotificationResponse",
       "request_help": "Message を含む JSON を直接または @path.json で指定するか、--message を指定します。--request と個別フラグは併用できません。例: send-message GROUP-ID --message 'テスト通知'",
       "arguments": [
         {

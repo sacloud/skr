@@ -107,7 +107,7 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 		return stdout.Bytes()
 	}
 
-	var createdCluster v1.CreatedCluster
+	var createdCluster v1.ClusterIdentifier
 	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "cluster", "create", "--request",
 		`{"name":"mock-cluster","servicePrincipalID":"123456789012","ports":[{"port":443,"protocol":"https"}]}`), &createdCluster))
 	clusterOutput := runCommand("apprun-dedicated-api", "cluster", "list")
@@ -130,7 +130,7 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	require.Equal(t, "mock-cluster", readCluster.Name, "cluster read returned name %q, want mock-cluster", readCluster.Name)
 	runCommand("apprun-dedicated-api", "cluster", "update", clusterID, "--request", `{"servicePrincipalID":"123456789012"}`)
 
-	var createdGroup v1.CreatedAutoScalingGroup
+	var createdGroup v1.AutoScalingGroupIdentifier
 	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "auto-scaling-group", "create",
 		"--cluster-id", clusterID,
 		"--request", `{"name":"mock-asg","zone":"is1b","nameServers":["210.188.224.10"],"workerServiceClassPath":"cloud/apprun/dedicated/worker/1vcpu_2gb","minNodes":1,"maxNodes":1,"interfaces":[{"interfaceIndex":0,"upstream":"shared","ipPool":[],"connectsToLB":false}]}`), &createdGroup))
@@ -160,7 +160,7 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	runCommand("apprun-dedicated-api", "worker-node", "update", "--cluster-id", clusterID, "--auto-scaling-group-id", groupID, "--worker-node-id", workerNodeID, "--draining", "true")
 	runCommand("apprun-dedicated-api", "worker-node", "update", "--cluster-id", clusterID, "--auto-scaling-group-id", groupID, "--worker-node-id", workerNodeID, "--draining", "false")
 
-	var createdLB v1.CreatedLoadBalancer
+	var createdLB v1.LoadBalancerIdentifier
 	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "load-balancer", "create",
 		"--cluster-id", clusterID, "--auto-scaling-group-id", groupID,
 		"--request", `{"name":"mock-lb","serviceClassPath":"cloud/apprun/dedicated/lb/1vcpu_2gb","nameServers":["210.188.224.10"],"interfaces":[{"interfaceIndex":0,"upstream":"shared","ipPool":[]}]}`), &createdLB))
@@ -175,7 +175,7 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	runCommand("apprun-dedicated-api", "load-balancer", "node", "list",
 		"--cluster-id", clusterID, "--auto-scaling-group-id", groupID, "--load-balancer-id", lbID)
 
-	var createdCertificate v1.CreatedCertificate
+	var createdCertificate v1.CertificateIdentifier
 	certificateFile := t.TempDir() + "/certificate.json"
 	certificateJSON := `{"name":"mock-cert","certificatePem":"-----BEGIN CERTIFICATE-----\nMIItest\n-----END CERTIFICATE-----","privatekeyPem":"-----BEGIN PRIVATE KEY-----\nMIItest\n-----END PRIVATE KEY-----"}`
 	err4 := os.WriteFile(certificateFile, []byte(certificateJSON), 0o600)
@@ -192,7 +192,7 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	runCommand("apprun-dedicated-api", "service-class", "list-lb")
 	runCommand("apprun-dedicated-api", "service-class", "list-worker")
 
-	var createdApp v1.CreatedApplication
+	var createdApp v1.ApplicationIdentifier
 	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "application", "create",
 		"--name", "mock-app", "--cluster-id", clusterID), &createdApp))
 	appID := jsonString(t, createdApp.ApplicationID)
@@ -205,7 +205,7 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	requestPath := t.TempDir() + "/version.json"
 	err8 := os.WriteFile(requestPath, []byte(`{"cpu":1000,"memory":2048,"scalingMode":"manual","fixedScale":1,"image":"nginx:latest","registryPasswordAction":"keep","exposedPorts":[{"targetPort":80}]}`), 0o600)
 	require.NoError(t, err8)
-	var createdVersion v1.ReadApplicationVersionSummary
+	var createdVersion v1.ApplicationVersionIdentifier
 	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "version", "create",
 		"--application-id", appID, "--request", "@"+requestPath), &createdVersion))
 	if createdVersion.Version < 1 {
@@ -213,7 +213,7 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	}
 
 	var versions struct {
-		Items []v1.ApplicationVersionDeploymentStatus `json:"items"`
+		Items []v1.ApplicationVersionSummary `json:"items"`
 	}
 	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "version", "list",
 		"--application-id", appID, "--max-items", "30"), &versions))

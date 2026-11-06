@@ -24,7 +24,7 @@
           "help": "参照する通知先 ID。"
         }
       ],
-      "response_type": "*v1.GetCommonServiceItemOK"
+      "response_type": "*v1.ReadCommonServiceItemOK"
     },
     {
       "name": "Create",
@@ -78,7 +78,7 @@
           "help": "ステータスを確認する通知先 ID。"
         }
       ],
-      "response_type": "*v1.GetCommonServiceItemStatusResponse"
+      "response_type": "*v1.CheckDestinationStatusResponse"
     }
   ],
   "wiring_target": "SimpleNotificationAPI.Destination",

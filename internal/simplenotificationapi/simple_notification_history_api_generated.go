@@ -17,8 +17,8 @@ type HistoryCommands struct {
 }
 
 type HistoryAPI interface {
-	List(context.Context) (*v1.ListSimpleNotificationHistoriesResponse, error)
-	Read(context.Context, string) (*v1.GetSimpleNotificationHistoryResponse, error)
+	List(context.Context) (*v1.ListNotificationHistoriesResponse, error)
+	Read(context.Context, string) (*v1.ReadNotificationHistoryResponse, error)
 }
 
 type HistoryAPIFactory func() (HistoryAPI, error)
