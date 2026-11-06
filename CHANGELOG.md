@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.0.7](https://github.com/sacloud/skr/compare/v0.0.6...v0.0.7) - 2026-11-06
+
+### 🚀 Changes
+- sacloud-sdk-go を v0.5.0 に更新する by @tokuhirom in https://github.com/sacloud/skr/pull/203
+
 ## [v0.0.6](https://github.com/sacloud/skr/compare/v0.0.5...v0.0.6) - 2026-11-06
 
 ### 🚀 Changes
