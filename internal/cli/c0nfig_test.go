@@ -319,6 +319,10 @@ func TestRunConfigCreateNonInteractive(t *testing.T) {
 	if got, want := profile.Attributes[attrServicePrincipalKeyID], "kid-456"; got != want {
 		t.Errorf("ServicePrincipalKeyID = %q, want %q", got, want)
 	}
+	// KID は旧キーと正規キーの両方に同じ値で保存される。
+	if got, want := profile.Attributes[attrServicePrincipalKeyKID], "kid-456"; got != want {
+		t.Errorf("ServicePrincipalKeyKID = %q, want %q", got, want)
+	}
 	if got, want := profile.Attributes[attrPrivateKeyPEMPath], keyPath; got != want {
 		t.Errorf("PrivateKeyPEMPath = %q, want %q", got, want)
 	}
@@ -530,11 +534,61 @@ func TestRunConfigEditNonInteractive(t *testing.T) {
 	if got, want := profile.Attributes[attrServicePrincipalKeyID], "new-kid"; got != want {
 		t.Errorf("ServicePrincipalKeyID = %q, want %q", got, want)
 	}
+	// 旧形式 (ServicePrincipalKeyID のみ) のプロファイルでも、正規キー (ServicePrincipalKeyKID) が更新される。
+	if got, want := profile.Attributes[attrServicePrincipalKeyKID], "new-kid"; got != want {
+		t.Errorf("ServicePrincipalKeyKID = %q, want %q", got, want)
+	}
 	if got, want := profile.Attributes[attrPrivateKeyPEMPath], newKey; got != want {
 		t.Errorf("PrivateKeyPEMPath = %q, want %q", got, want)
 	}
 	if got, want := profile.Attributes["zone"], "is1a"; got != want {
 		t.Errorf("zone = %q, want %q", got, want)
+	}
+}
+
+// SDK v0.5.0 は旧 ServicePrincipalKeyID から ServicePrincipalKeyKID を補完するため、
+// 旧キーだけを更新すると編集後も認証に使う KID が旧値のまま残る。旧形式のプロファイルを編集した場合も
+// SDK が参照する正規キー (ServicePrincipalKeyKID) が更新されることを回帰テストで確認する。
+func TestRunConfigEditUpdatesServicePrincipalKeyKIDFromLegacyProfile(t *testing.T) {
+	profileDir := t.TempDir()
+	t.Setenv("SAKURA_PROFILE_DIR", profileDir)
+	keyPath := writeTestPrivateKey(t, profileDir)
+
+	profileOp, err := saclient.NewProfileOp(os.Environ())
+	require.NoError(t, err)
+	// 旧バージョンで作成されたプロファイルを想定し、正規キー (ServicePrincipalKeyKID) を持たない状態で作成する。
+	require.NoError(t, profileOp.Create(&saclient.Profile{
+		Name: "legacy",
+		Attributes: map[string]any{
+			attrServicePrincipalID:    "old-spid",
+			attrServicePrincipalKeyID: "old-kid",
+			attrPrivateKeyPEMPath:     keyPath,
+		},
+	}))
+	// 旧キーのみの状態では SDK の認証設定も旧 KID を参照する。
+	legacy, err := profileOp.Read("legacy")
+	require.NoError(t, err)
+	if kid, ok := legacy.Credentials.ServicePrincipalKeyKID.Get(); !ok || kid != "old-kid" {
+		t.Errorf("Credentials.ServicePrincipalKeyKID = %q (set=%v), want old-kid", kid, ok)
+	}
+
+	var stdout, stderr bytes.Buffer
+	args := []string{"config", "edit", "legacy", "--service-principal-key-id", "new-kid"}
+	require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+
+	profile, err := profileOp.Read("legacy")
+	require.NoError(t, err)
+	if got, want := profile.Attributes[attrServicePrincipalKeyID], "new-kid"; got != want {
+		t.Errorf("ServicePrincipalKeyID = %q, want %q", got, want)
+	}
+	if got, want := profile.Attributes[attrServicePrincipalKeyKID], "new-kid"; got != want {
+		t.Errorf("ServicePrincipalKeyKID = %q, want %q", got, want)
+	}
+	// 編集・再読み込み後に SDK が参照する正規キーの KID も更新されている。
+	kid, ok := profile.Credentials.ServicePrincipalKeyKID.Get()
+	require.True(t, ok, "Credentials.ServicePrincipalKeyKID should be set after editing a legacy profile")
+	if kid != "new-kid" {
+		t.Errorf("Credentials.ServicePrincipalKeyKID = %q, want new-kid", kid)
 	}
 }
 
@@ -682,6 +736,9 @@ func TestRunConfigShowMasksSensitiveAttributes(t *testing.T) {
 	}
 	if got, want := attrs[attrServicePrincipalKeyID], "kid-456"; got != want {
 		t.Errorf("ServicePrincipalKeyID = %q, want %q", got, want)
+	}
+	if got, want := attrs[attrServicePrincipalKeyKID], "kid-456"; got != want {
+		t.Errorf("ServicePrincipalKeyKID = %q, want %q", got, want)
 	}
 	for _, key := range []string{"AccessToken", "AccessTokenSecret", "PrivateKey", attrPrivateKeyPEMPath} {
 		if got := attrs[key]; got != "(masked)" {

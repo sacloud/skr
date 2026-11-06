@@ -53,6 +53,8 @@ func TestScenarioProfile(t *testing.T) {
 	attrs := parseProfileAttributes2(t, show)
 	requireProfileAttribute(t, attrs, "ServicePrincipalID", "spid-e2e")
 	requireProfileAttribute(t, attrs, "ServicePrincipalKeyID", "kid-e2e")
+	// KID は旧キー (ServicePrincipalKeyID) と正規キー (ServicePrincipalKeyKID) の両方に同じ値で保存される。
+	requireProfileAttribute(t, attrs, "ServicePrincipalKeyKID", "kid-e2e")
 	requireProfileAttribute(t, attrs, "PrivateKeyPEMPath", "(masked)")
 
 	_ = h.Call(t, "ServicePrincipalID を変更する",
@@ -64,7 +66,19 @@ func TestScenarioProfile(t *testing.T) {
 	attrsAfterEdit := parseProfileAttributes2(t, showAfterEdit)
 	requireProfileAttribute(t, attrsAfterEdit, "ServicePrincipalID", "spid-edited")
 	requireProfileAttribute(t, attrsAfterEdit, "ServicePrincipalKeyID", "kid-e2e")
+	requireProfileAttribute(t, attrsAfterEdit, "ServicePrincipalKeyKID", "kid-e2e")
 	requireProfileAttribute(t, attrsAfterEdit, "PrivateKeyPEMPath", "(masked)")
+
+	_ = h.Call(t, "KID を変更する",
+		"config", "edit", profileName,
+		"--service-principal-key-id", "kid-edited",
+	)
+
+	showAfterKidEdit := h.Call(t, "KID 変更後に旧キーと正規キーの両方が更新されていることを確認する", "config", "show", profileName)
+	attrsAfterKidEdit := parseProfileAttributes2(t, showAfterKidEdit)
+	requireProfileAttribute(t, attrsAfterKidEdit, "ServicePrincipalID", "spid-edited")
+	requireProfileAttribute(t, attrsAfterKidEdit, "ServicePrincipalKeyID", "kid-edited")
+	requireProfileAttribute(t, attrsAfterKidEdit, "ServicePrincipalKeyKID", "kid-edited")
 }
 
 func parseProfileAttributes2(t *testing.T, data []byte) map[string]any {

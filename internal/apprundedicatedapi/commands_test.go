@@ -17,6 +17,9 @@ package apprundedicatedapi
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -24,9 +27,11 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/google/uuid"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadRequest(t *testing.T) {
@@ -349,6 +354,202 @@ func writeRequestFile(t *testing.T, content string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// recordedListRequest は一覧取得のテストサーバが受け取ったリクエストの記録です。
+type recordedListRequest struct {
+	Path     string
+	Cursor   string
+	MaxItems string
+}
+
+// setAppRunTestEndpoint はダミー認証情報とテスト用 API サーバのエンドポイントを環境変数に設定します。
+func setAppRunTestEndpoint(t *testing.T, serverURL string) {
+	t.Helper()
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", serverURL)
+}
+
+// testApplicationJSON は ReadApplication の必須フィールドを含む応答フラグメントを返します。
+func testApplicationJSON(id, clusterID, name string) string {
+	return fmt.Sprintf(`{"applicationID":%q,"name":%q,"clusterID":%q,"clusterName":"cluster-1","activeVersion":null,"desiredCount":null,"scalingCooldownSeconds":300,"enoughResources":{"cpu":null,"memory":null}}`, id, name, clusterID)
+}
+
+// testLoadBalancerNodeJSON は LoadBalancerNode の必須フィールドを含む応答フラグメントを返します。
+func testLoadBalancerNodeJSON(id string) string {
+	return fmt.Sprintf(`{"loadBalancerNodeID":%q,"resourceID":null,"status":"healthy","interfaces":[],"created":1735689600}`, id)
+}
+
+// application list の型付きカーソルが、応答の nextCursor を次ページ取得へ引き渡せることを公開 SDK 経由で確認します。
+func TestApplicationListCommandCursorRoundtrip(t *testing.T) {
+	const (
+		clusterID = "13b9ea83-ddb0-4385-9533-3d693a6a310f"
+		app1ID    = "3f3f6f61-6df3-4f0e-8b9f-63d4d24b31a1"
+		app2ID    = "8b0b8980-8f52-4b21-9be2-2a4f4bd49a2e"
+	)
+	var (
+		requests []recordedListRequest
+		captured []page[v1.ReadApplication]
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, recordedListRequest{
+			Path:     r.URL.Path,
+			Cursor:   r.URL.Query().Get("cursor"),
+			MaxItems: r.URL.Query().Get("maxItems"),
+		})
+		w.Header().Set("Content-Type", "application/json")
+		switch len(requests) {
+		case 1:
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"applications":[%s],"nextCursor":%q}`, testApplicationJSON(app1ID, clusterID, "app-1"), app1ID)))
+		case 2:
+			_, _ = w.Write([]byte(`{"applications":[` + testApplicationJSON(app2ID, clusterID, "app-2") + `]}`))
+		}
+	}))
+	defer server.Close()
+	setAppRunTestEndpoint(t, server.URL)
+
+	command := ApplicationListCommand{
+		MaxItems: 1,
+		runtime: Runtime{
+			ValidateOutput: func(*kong.Context) error { return nil },
+			NewClient:      func() (*v1.Client, error) { return NewClient(false) },
+			WriteOutput: func(_ *kong.Context, result any) error {
+				captured = append(captured, result.(page[v1.ReadApplication]))
+				return nil
+			},
+		},
+	}
+	require.NoError(t, command.Run(new(kong.Context)))
+	require.Len(t, captured, 1)
+	require.Len(t, captured[0].Items, 1)
+	require.Equal(t, "app-1", captured[0].Items[0].Name)
+	nextCursor, ok := captured[0].NextCursor.(*v1.ApplicationID)
+	require.True(t, ok, "1ページ目では nextCursor が設定されるべきです")
+	require.Equal(t, app1ID, uuid.UUID(*nextCursor).String())
+
+	// 応答の nextCursor を次ページ取得に引き渡す。
+	command.Cursor = new(app1ID)
+	require.NoError(t, command.Run(new(kong.Context)))
+	require.Len(t, captured, 2)
+	require.Len(t, captured[1].Items, 1)
+	require.Equal(t, "app-2", captured[1].Items[0].Name)
+	require.Nil(t, captured[1].NextCursor, "最終ページでは nextCursor が空になるべきです")
+
+	require.Len(t, requests, 2)
+	require.Equal(t, "/applications", requests[0].Path)
+	require.Empty(t, requests[0].Cursor)
+	require.Equal(t, "1", requests[0].MaxItems)
+	require.Equal(t, app1ID, requests[1].Cursor)
+	require.Equal(t, "1", requests[1].MaxItems)
+}
+
+// load-balancer node list の新しい --cursor と nextCursor が往復できることを公開 SDK 経由で確認します。
+func TestLoadBalancerNodeListCommandCursorRoundtrip(t *testing.T) {
+	const (
+		clusterID = "13b9ea83-ddb0-4385-9533-3d693a6a310f"
+		asgID     = "e2f66e35-a1ba-47e3-a68c-9f4d2a0e0d01"
+		lbID      = "c8b1e34f-4b27-4e9f-8d38-6c2a2f0a7e02"
+		node1ID   = "5d3f9f61-9af3-4a1e-9c8f-14e5e34c32a3"
+		node2ID   = "9c1c9980-3f52-5c21-8ce2-3b5f5ce59b3e"
+	)
+	wantPath := fmt.Sprintf("/clusters/%s/asg/%s/load_balancers/%s/load_balancer_nodes", clusterID, asgID, lbID)
+	var (
+		requests []recordedListRequest
+		captured []page[v1.LoadBalancerNode]
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, recordedListRequest{
+			Path:     r.URL.Path,
+			Cursor:   r.URL.Query().Get("cursor"),
+			MaxItems: r.URL.Query().Get("maxItems"),
+		})
+		w.Header().Set("Content-Type", "application/json")
+		switch len(requests) {
+		case 1:
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"loadBalancerNodes":[%s],"nextCursor":%q}`, testLoadBalancerNodeJSON(node1ID), node1ID)))
+		case 2:
+			_, _ = w.Write([]byte(`{"loadBalancerNodes":[` + testLoadBalancerNodeJSON(node2ID) + `]}`))
+		}
+	}))
+	defer server.Close()
+	setAppRunTestEndpoint(t, server.URL)
+
+	command := LoadBalancerNodeListCommand{
+		ClusterID:          clusterID,
+		AutoScalingGroupID: asgID,
+		LoadBalancerID:     lbID,
+		MaxItems:           1,
+		runtime: Runtime{
+			ValidateOutput: func(*kong.Context) error { return nil },
+			NewClient:      func() (*v1.Client, error) { return NewClient(false) },
+			WriteOutput: func(_ *kong.Context, result any) error {
+				captured = append(captured, result.(page[v1.LoadBalancerNode]))
+				return nil
+			},
+		},
+	}
+	require.NoError(t, command.Run(new(kong.Context)))
+	require.Len(t, captured, 1)
+	require.Len(t, captured[0].Items, 1)
+	require.Equal(t, node1ID, uuid.UUID(captured[0].Items[0].LoadBalancerNodeID).String())
+	nextCursor, ok := captured[0].NextCursor.(*v1.LoadBalancerNodeID)
+	require.True(t, ok, "1ページ目では nextCursor が設定されるべきです")
+	require.Equal(t, node1ID, uuid.UUID(*nextCursor).String())
+
+	// 応答の nextCursor を次ページ取得に引き渡す。
+	command.Cursor = new(node1ID)
+	require.NoError(t, command.Run(new(kong.Context)))
+	require.Len(t, captured, 2)
+	require.Len(t, captured[1].Items, 1)
+	require.Equal(t, node2ID, uuid.UUID(captured[1].Items[0].LoadBalancerNodeID).String())
+	require.Nil(t, captured[1].NextCursor, "最終ページでは nextCursor が空になるべきです")
+
+	require.Len(t, requests, 2)
+	require.Equal(t, wantPath, requests[0].Path)
+	require.Empty(t, requests[0].Cursor)
+	require.Equal(t, "1", requests[0].MaxItems)
+	require.Equal(t, node1ID, requests[1].Cursor)
+	require.Equal(t, "1", requests[1].MaxItems)
+}
+
+// 不正なカーソルは API クライアントを生成する前に拒否されることを確認します。
+func TestListCommandsRejectInvalidCursorBeforeClientCreation(t *testing.T) {
+	const id = "13b9ea83-ddb0-4385-9533-3d693a6a310f"
+	tests := map[string]func(Runtime) error{
+		"application list": func(rt Runtime) error {
+			command := ApplicationListCommand{Cursor: new("invalid"), runtime: rt}
+			return command.Run(new(kong.Context))
+		},
+		"load-balancer node list": func(rt Runtime) error {
+			command := LoadBalancerNodeListCommand{
+				ClusterID:          id,
+				AutoScalingGroupID: id,
+				LoadBalancerID:     id,
+				Cursor:             new("invalid"),
+				runtime:            rt,
+			}
+			return command.Run(new(kong.Context))
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			clientCreated := false
+			rt := Runtime{
+				ValidateOutput: func(*kong.Context) error { return nil },
+				NewClient: func() (*v1.Client, error) {
+					clientCreated = true
+					return nil, errors.New("クライアントは生成されません")
+				},
+				WriteOutput: func(*kong.Context, any) error { return nil },
+			}
+			err := run(rt)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "カーソル")
+			require.False(t, clientCreated, "不正なカーソルはクライアント生成前に拒否されるべきです")
+		})
+	}
 }
 
 func setStdin(t *testing.T, content string, closed bool) {
