@@ -131,21 +131,24 @@ $ echo "$RULE_BACKUP"
 
 `--service-principal-id` は評価対象リソースへのアクセス権限を付与するサービスプリンシパル ID です。省略した場合は、有効化時に設定されたサービスプリンシパルが使われます。`--targets` は `parameter` に `zones` または `sites` を持つルールでのみ指定でき、反復可能なオプション (`--targets is1b --targets tk1b`) で指定します。省略した場合は空配列 (全ゾーン・全サイト) が送信されます。
 
-評価ルールを有効化する前に、既存の有効な自動アクションを確認します。有効な自動アクションが存在する場合、このルールの評価結果が既存の実行条件に一致すると、Step 5 で作るアクションを無効にしていても、既存の通知やワークフローが実行されます。次のコマンドで `--next` によるページングで全ページを走査して有効な自動アクションを数えます。`ENABLED_COUNT` が 0 の場合だけ、後続のコマンドで評価ルールを有効化してください。0 以外の場合は、評価ルールを変更せずに手順を中止してください。
+評価ルールを有効化する前に、既存の有効な自動アクションを確認します。有効な自動アクションが存在する場合、このルールの評価結果が既存の実行条件に一致すると、Step 5 で作るアクションを無効にしていても、既存の通知やワークフローが実行されます。次のコマンドで `--next` によるページングで全ページを走査して有効な自動アクションを数えます。一覧の取得や応答の解析が失敗した場合は `FAILED` が設定され、有効な応答で `nextPageToken` が空になったときだけループを終えます。最後のチェックで「有効な自動アクションはありません」と表示された場合だけ、後続のコマンドで評価ルールを有効化してください。表示されない場合は、取得や解析の失敗、または有効な自動アクションが存在するため、評価ルールを変更せずに手順を中止してください。
 
 ```console
 $ ENABLED_COUNT=0
 $ NEXT=""
+$ FAILED=""
 $ while :; do
       if [ -n "$NEXT" ]; then
-          PAGE=$(skr security-control-api automated-action list --next "$NEXT")
+          PAGE=$(skr security-control-api automated-action list --next "$NEXT") || { FAILED=1; break; }
       else
-          PAGE=$(skr security-control-api automated-action list)
+          PAGE=$(skr security-control-api automated-action list) || { FAILED=1; break; }
       fi
-      ENABLED_COUNT=$((ENABLED_COUNT + $(echo "$PAGE" | jq '[.items[] | select(.isEnabled)] | length')))
-      NEXT=$(echo "$PAGE" | jq -er '.nextPageToken // empty') || break
+      COUNT=$(echo "$PAGE" | jq '[.items[] | select(.isEnabled)] | length') || { FAILED=1; break; }
+      NEXT=$(echo "$PAGE" | jq -r '.nextPageToken // ""') || { FAILED=1; break; }
+      ENABLED_COUNT=$((ENABLED_COUNT + COUNT))
+      [ -n "$NEXT" ] || break
   done
-$ echo "$ENABLED_COUNT"
+$ [ -z "$FAILED" ] && [ "$ENABLED_COUNT" -eq 0 ] && echo "有効な自動アクションはありません"
 ```
 
 ```console
