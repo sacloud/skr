@@ -8,7 +8,7 @@
 
 `skr apprun-dedicated-api` は AppRun 専有型の SDK 公開 API を直接呼び出す低レベルコマンドです。コマンド本体と SDK client の生成は `internal/apprundedicatedapi/`、CLI の登録と Runtime 接続は `internal/cli/` に置きます。認証は SDK プロファイル、または `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` を使います。
 
-公開コマンドは `cluster`、`application`、`version`、`auto-scaling-group`、`worker-node`、`load-balancer`、`certificate`、`service-class` です。各操作は SDK の公開オペレーションに対応し、階層リソースの ID は名前付きフラグまたは位置引数で指定します。ページング結果は `items` と `nextCursor` を含む JSON 形状で出力します。SDK v0.5.0 で追加されたクラスタロードバランサの参照・更新と limits の参照は CLI 未対応で、[#202](https://github.com/sacloud/skr/issues/202) で対応します。
+公開コマンドは `cluster`、`application`、`version`、`auto-scaling-group`、`worker-node`、`load-balancer`、`certificate`、`service-class` です。各操作は SDK の公開オペレーションに対応し、階層リソースの ID は名前付きフラグまたは位置引数で指定します。ページング結果は `items` と `nextCursor` を含む JSON 形状で出力します。SDK v0.5.0 で追加されたクラスタロードバランサの参照・更新と limits の参照は CLI 未対応で、`cluster read-load-balancer`、`cluster update-load-balancer`、`limit read` として [#202](https://github.com/sacloud/skr/issues/202) で対応します。
 
 ## 入力と安全な扱い
 
