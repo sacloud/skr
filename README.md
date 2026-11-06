@@ -65,6 +65,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr iam-api scim` | ユーザープロビジョニング設定の管理 |
 | `skr iam-api sso` | SSO プロファイルの管理 |
 | `skr iam-api user-2fa` | ユーザーの OTP、信頼済みデバイス、セキュリティキーの管理 |
+| `skr security-control-api` | セキュリティコントロールの有効化、評価ルールと自動アクションの管理 |
 | `skr http <url>` | SDK の認証情報を使った任意の HTTPS エンドポイントへのリクエスト |
 | `skr config current` | 現在選択されているプロファイル名の確認 |
 

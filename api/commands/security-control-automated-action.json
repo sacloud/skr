@@ -1,0 +1,95 @@
+{
+  "package": "securitycontrolapi",
+  "resource": "Security Control automated action",
+  "command_prefix": "AutomatedAction",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/security-control/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "自動アクションの一覧を取得します。--page-size、--next、--prev でページングできます。",
+      "method": "List",
+      "request_type": "v1.AutomatedActionsListParams",
+      "request_by_value": true,
+      "request_optional": true,
+      "response_type": "*v1.AutomatedActionsListOK",
+      "flags": [
+        {
+          "name": "page-size",
+          "field": "PageSize",
+          "type": "int",
+          "conversion": "v1.NewOptInt",
+          "help": "任意: 1 ページの取得件数。"
+        },
+        {
+          "name": "next",
+          "field": "Next",
+          "type": "string",
+          "conversion": "v1.NewOptString",
+          "help": "任意: 前回の list 出力の nextPageToken。次ページを取得します。"
+        },
+        {
+          "name": "prev",
+          "field": "Prev",
+          "type": "string",
+          "conversion": "v1.NewOptString",
+          "help": "任意: 前回の list 出力の prevPageToken。前ページを取得します。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "自動アクション ID を指定してアクション設定を読み取ります。automatedActionId、name、action、executionCondition、isEnabled を出力します。",
+      "method": "Read",
+      "response_type": "*v1.AutomatedActionOutput",
+      "arguments": [
+        {
+          "name": "action-id",
+          "field": "ID",
+          "type": "string",
+          "help": "参照する自動アクション ID。list の出力にある automatedActionId。"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "help": "自動アクションを作成します。--request または個別フラグで入力します。アクションの実行先は simpleNotification (--notification-group-id) または workflows (--workflow-id) のどちらか一方で選択します。個別フラグでは name、execution-condition、is-enabled、service-principal-id が必須です。作成可能なアクション数は activation read の automatedActionLimit で確認できます。",
+      "method": "Create",
+      "request_type": "v1.AutomatedActionInput",
+      "response_type": "*v1.AutomatedActionOutput",
+      "handwritten": true
+    },
+    {
+      "name": "Update",
+      "help": "自動アクション ID を指定してアクション設定を置き換えます。--request または個別フラグで入力します。name、action、executionCondition、isEnabled は自動アクション全体を置き換えるため、維持したい項目は参照結果から再指定してください。",
+      "method": "Update",
+      "request_type": "v1.AutomatedActionInput",
+      "response_type": "*v1.AutomatedActionOutput",
+      "arguments": [
+        {
+          "name": "action-id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新する自動アクション ID。list の出力にある automatedActionId。"
+        }
+      ],
+      "handwritten": true
+    },
+    {
+      "name": "Delete",
+      "help": "自動アクション ID を指定してアクションを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "action-id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除する自動アクション ID。list の出力にある automatedActionId。"
+        }
+      ]
+    }
+  ],
+  "wiring_target": "SecurityControlAPI.AutomatedAction",
+  "sdk_factory": "securitycontrolapi.NewAutomatedActionAPI"
+}

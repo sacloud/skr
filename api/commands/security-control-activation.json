@@ -1,0 +1,58 @@
+{
+  "package": "securitycontrolapi",
+  "resource": "Security Control activation",
+  "command_prefix": "Activation",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/security-control/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "Create",
+      "help": "現在のプロジェクトでセキュリティコントロールを有効化します。評価対象リソースへのアクセス権限を付与するサービスプリンシパル ID を指定します。有効化の状態は read で確認できます。",
+      "method": "Create",
+      "response_type": "*v1.ActivationOutput",
+      "arguments": [
+        {
+          "name": "service-principal-id",
+          "field": "ServicePrincipalID",
+          "type": "string",
+          "flag": true,
+          "required": true,
+          "help": "必須: プロジェクトに紐づけるサービスプリンシパル ID。評価対象リソースへのアクセス権限を付与します。例: 112700012345"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "現在のプロジェクトのセキュリティコントロール有効化の状態を読み取ります。servicePrincipalId、isActive、automatedActionLimit を出力します。automatedActionLimit は登録可能な自動アクションの最大数です。",
+      "method": "Read",
+      "response_type": "*v1.ActivationOutput"
+    },
+    {
+      "name": "Update",
+      "help": "セキュリティコントロールのサービスプリンシパルと有効状態を更新します。servicePrincipalId と is-active は両方とも API に送信されるため、両方を指定してください。",
+      "method": "Update",
+      "response_type": "*v1.ActivationOutput",
+      "arguments": [
+        {
+          "name": "service-principal-id",
+          "field": "ServicePrincipalID",
+          "type": "string",
+          "flag": true,
+          "required": true,
+          "help": "必須: プロジェクトに紐づけるサービスプリンシパル ID。評価対象リソースへのアクセス権限を付与します。例: 112700012345"
+        },
+        {
+          "name": "is-active",
+          "field": "IsActive",
+          "type": "bool",
+          "flag": true,
+          "required": true,
+          "help": "必須: true の場合、セキュリティコントロールを有効化します。false の場合は無効化します。"
+        }
+      ]
+    }
+  ],
+  "wiring_target": "SecurityControlAPI.Activation",
+  "sdk_factory": "securitycontrolapi.NewActivationAPI"
+}
