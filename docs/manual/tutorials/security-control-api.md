@@ -131,6 +131,23 @@ $ echo "$RULE_BACKUP"
 
 `--service-principal-id` は評価対象リソースへのアクセス権限を付与するサービスプリンシパル ID です。省略した場合は、有効化時に設定されたサービスプリンシパルが使われます。`--targets` は `parameter` に `zones` または `sites` を持つルールでのみ指定でき、反復可能なオプション (`--targets is1b --targets tk1b`) で指定します。省略した場合は空配列 (全ゾーン・全サイト) が送信されます。
 
+評価ルールを有効化する前に、既存の有効な自動アクションを確認します。有効な自動アクションが存在する場合、このルールの評価結果が既存の実行条件に一致すると、Step 5 で作るアクションを無効にしていても、既存の通知やワークフローが実行されます。次のコマンドで `--next` によるページングで全ページを走査して有効な自動アクションを数えます。`ENABLED_COUNT` が 0 の場合だけ、後続のコマンドで評価ルールを有効化してください。0 以外の場合は、評価ルールを変更せずに手順を中止してください。
+
+```console
+$ ENABLED_COUNT=0
+$ NEXT=""
+$ while :; do
+      if [ -n "$NEXT" ]; then
+          PAGE=$(skr security-control-api automated-action list --next "$NEXT")
+      else
+          PAGE=$(skr security-control-api automated-action list)
+      fi
+      ENABLED_COUNT=$((ENABLED_COUNT + $(echo "$PAGE" | jq '[.items[] | select(.isEnabled)] | length')))
+      NEXT=$(echo "$PAGE" | jq -er '.nextPageToken // empty') || break
+  done
+$ echo "$ENABLED_COUNT"
+```
+
 ```console
 $ skr security-control-api evaluation-rule update "$RULE_ID" --is-enabled=true --targets is1b
 ```

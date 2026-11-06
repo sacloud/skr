@@ -72,9 +72,10 @@ func TestScenarioAutomatedAction(t *testing.T) {
 	require.False(t, created.IsEnabled, "created action should be disabled: %+v", created)
 	actionID := created.AutomatedActionId
 
-	// 後片付け: 残存していれば ID・名称・指定内容を照合して削除し、一覧に残っていないことを確認する
+	// 後片付け: 残存していれば ID・名称・指定内容 (無効状態を含む) を照合して削除し、
+	// 一覧に残っていないことを確認する
 	defer func() {
-		cleanupAutomatedAction(t, h, actionID, actionName, automatedActionCondition, sp, groupID)
+		cleanupAutomatedAction(t, h, actionID, actionName, automatedActionCondition, sp, groupID, false)
 		remaining := listAutomatedActions(t, h, "削除後にアクションが一覧に残っていないことを確認する")
 		for _, item := range remaining {
 			require.NotEqual(t, actionID, item.AutomatedActionId, "action %q should not remain after deletion", actionID)
@@ -145,16 +146,31 @@ type automatedActionItem struct {
 	IsEnabled          bool   `json:"isEnabled"`
 }
 
-// listAutomatedActions は skr CLI で自動アクションの一覧を取得します。
+// listAutomatedActions は skr CLI で自動アクションの一覧を全ページ取得します。
+// nextPageToken がなくなるまで --next でページを辿り、途中で取得に失敗した場合は
+// テストを失敗させるため、呼び出し側の状態変更は行われません。
 func listAutomatedActions(t *testing.T, h *helper.Helper, description string) []automatedActionItem {
 	t.Helper()
 
-	data := h.Call(t, description, "security-control-api", "automated-action", "list")
-	var out struct {
-		Items []automatedActionItem `json:"items"`
+	var items []automatedActionItem
+	nextToken := ""
+	for {
+		args := []string{"security-control-api", "automated-action", "list"}
+		if nextToken != "" {
+			args = append(args, "--next", nextToken)
+		}
+		data := h.Call(t, description, args...)
+		var out struct {
+			Items         []automatedActionItem `json:"items"`
+			NextPageToken string                `json:"nextPageToken"`
+		}
+		require.NoError(t, json.Unmarshal(data, &out), "decode automated-action list response: %s", string(data))
+		items = append(items, out.Items...)
+		if out.NextPageToken == "" {
+			return items
+		}
+		nextToken = out.NextPageToken
 	}
-	require.NoError(t, json.Unmarshal(data, &out), "decode automated-action list response: %s", string(data))
-	return out.Items
 }
 
 // readAutomatedAction は skr CLI で自動アクションを読み取ります。
@@ -211,8 +227,9 @@ func deleteAutomatedAction(t *testing.T, h *helper.Helper, actionID string, desc
 }
 
 // cleanupAutomatedAction は後片付けでアクションを削除します。読み取りで保持した ID・名称と
-// 作成時に指定した内容を照合してから削除し、不在なら変更せずに終了します。
-func cleanupAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName, condition, sp, groupID string) {
+// 作成・更新時に指定した内容 (無効状態を含む) を照合してから削除し、不在なら変更せずに
+// 終了します。指定内容と一致しない場合や有効化されている場合は、削除せずに失敗します。
+func cleanupAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName, condition, sp, groupID string, expectedEnabled bool) {
 	t.Helper()
 
 	data, stderr, err := h.CallAllowingFailure(t, "後片付け: アクションの残存を確認する",
@@ -232,6 +249,7 @@ func cleanupAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName
 	require.Equal(t, "simpleNotification", read.Action.ActionType, "cleanup: action %q does not match the created action; refusing to delete it: %+v", actionID, read)
 	require.Equal(t, sp, read.Action.ActionParameter.ServicePrincipalId, "cleanup: service principal of action %q does not match the created one; refusing to delete it: %+v", actionID, read)
 	require.Equal(t, groupID, read.Action.ActionParameter.NotificationGroupId, "cleanup: notification group of action %q does not match the created one; refusing to delete it: %+v", actionID, read)
+	require.Equal(t, expectedEnabled, read.IsEnabled, "cleanup: action %q does not match the enabled state set by create/update; refusing to delete it: %+v", actionID, read)
 	deleteAutomatedAction(t, h, actionID, "後片付け: 残存したアクションを削除する")
 }
 
