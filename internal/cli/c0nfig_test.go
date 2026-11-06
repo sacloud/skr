@@ -649,6 +649,39 @@ func TestRunConfigEditNoFlagsFails(t *testing.T) {
 	}
 }
 
+// 対話編集時に表示する KID の現在値は、SDK が認証に使う正規キー (ServicePrincipalKeyKID) を優先する。
+func TestCurrentServicePrincipalKeyKID(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing map[string]any
+		want     string
+	}{
+		{"正規キーのみ", map[string]any{attrServicePrincipalKeyKID: "canonical-kid"}, "canonical-kid"},
+		{"正規キーを優先", map[string]any{attrServicePrincipalKeyID: "legacy-kid", attrServicePrincipalKeyKID: "canonical-kid"}, "canonical-kid"},
+		{"旧キーへフォールバック", map[string]any{attrServicePrincipalKeyID: "legacy-kid"}, "legacy-kid"},
+		{"空の正規キーは無視", map[string]any{attrServicePrincipalKeyID: "legacy-kid", attrServicePrincipalKeyKID: ""}, "legacy-kid"},
+		{"既存値なし", nil, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, currentServicePrincipalKeyKID(tt.existing))
+		})
+	}
+}
+
+// KID を保存する際は旧キーと正規キーの両方へ同じ値を書き込む。
+func TestCollectServicePrincipalKIDValueMirrorsBothKeys(t *testing.T) {
+	values := make(map[string]any)
+	require.NoError(t, collectServicePrincipalKIDValue(values, "new-kid", false, nil))
+	require.Equal(t, "new-kid", values[attrServicePrincipalKeyID])
+	require.Equal(t, "new-kid", values[attrServicePrincipalKeyKID])
+
+	// フラグ未指定かつ非インタラクティブの場合は既存値を流用するため値を変更しない。
+	values = make(map[string]any)
+	require.NoError(t, collectServicePrincipalKIDValue(values, "", false, map[string]any{attrServicePrincipalKeyID: "old-kid"}))
+	require.Empty(t, values)
+}
+
 func TestRunConfigEditUseSwitchesCurrent(t *testing.T) {
 	profileDir := t.TempDir()
 	t.Setenv("SAKURA_PROFILE_DIR", profileDir)

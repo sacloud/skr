@@ -230,7 +230,12 @@ func (c *editCommand) collectValues(interactive bool, existing map[string]any) (
 
 // collectServicePrincipalKIDValue は KID を旧キー (ServicePrincipalKeyID) と正規キー (ServicePrincipalKeyKID) の両方に保存します。
 // SDK は正規キーを優先して参照するため、旧キーだけを更新すると既存プロファイルの編集後に旧 KID が使われ続けます。
+// 対話編集時の現在値表示も正規キーを優先し、SDK が認証に使う値と案内が食い違わないようにします。
 func collectServicePrincipalKIDValue(values map[string]any, flagValue string, interactive bool, existing map[string]any) error {
+	if current := currentServicePrincipalKeyKID(existing); current != "" {
+		// 現在値の取得先を正規キー優先に差し替える。collectServicePrincipalValue は指定キーの値のみを参照する。
+		existing = map[string]any{attrServicePrincipalKeyID: current}
+	}
 	if err := collectServicePrincipalValue(values, attrServicePrincipalKeyID, "Service Principal Key ID", flagValue, interactive, existing); err != nil {
 		return err
 	}
@@ -238,6 +243,18 @@ func collectServicePrincipalKIDValue(values map[string]any, flagValue string, in
 		values[attrServicePrincipalKeyKID] = kid
 	}
 	return nil
+}
+
+// currentServicePrincipalKeyKID は対話編集の現在値表示に使う KID を返します。
+// SDK は正規キー (ServicePrincipalKeyKID) を優先して参照するため、正規キーが存在する場合はその値を使い、存在しない場合だけ旧キー (ServicePrincipalKeyID) にフォールバックします。
+func currentServicePrincipalKeyKID(existing map[string]any) string {
+	if v, ok := existing[attrServicePrincipalKeyKID].(string); ok && v != "" {
+		return v
+	}
+	if v, ok := existing[attrServicePrincipalKeyID].(string); ok {
+		return v
+	}
+	return ""
 }
 
 func collectServicePrincipalValue(values map[string]any, key, label, flagValue string, interactive bool, existing map[string]any) error {
