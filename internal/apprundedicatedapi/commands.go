@@ -229,7 +229,7 @@ func (c *ClusterCreateCommand) Run(ctx *kong.Context) error {
 	if err := decodeRequest(*c.Request, false, &request); err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.CreatedCluster, error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.ClusterIdentifier, error) {
 		return apprun_dedicated.NewClusterOp(client).Create(ctx, request)
 	})
 }
@@ -290,9 +290,13 @@ type ApplicationListCommand struct {
 }
 
 func (c *ApplicationListCommand) Run(ctx *kong.Context) error {
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.ReadApplicationDetail], error) {
-		items, next, err := apprun_dedicated.NewApplicationOp(client).List(ctx, c.MaxItems, c.Cursor)
-		return page[v1.ReadApplicationDetail]{Items: items, NextCursor: next}, err
+	cursor, err := parseCursor[v1.ApplicationID](c.Cursor)
+	if err != nil {
+		return err
+	}
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.ReadApplication], error) {
+		items, next, err := apprun_dedicated.NewApplicationOp(client).List(ctx, c.MaxItems, cursor)
+		return page[v1.ReadApplication]{Items: items, NextCursor: next}, err
 	})
 }
 
@@ -307,7 +311,7 @@ func (c *ApplicationCreateCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.CreatedApplication, error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.ApplicationIdentifier, error) {
 		return apprun_dedicated.NewApplicationOp(client).Create(ctx, c.Name, clusterID)
 	})
 }
@@ -405,9 +409,9 @@ func (c *VersionListCommand) Run(ctx *kong.Context) error {
 		value := v1.ApplicationVersionNumber(*c.Cursor)
 		cursor = &value
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.ApplicationVersionDeploymentStatus], error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.ApplicationVersionSummary], error) {
 		items, next, err := apprun_dedicated.NewVersionOp(client, applicationID).List(ctx, c.MaxItems, cursor)
-		return page[v1.ApplicationVersionDeploymentStatus]{Items: items, NextCursor: next}, err
+		return page[v1.ApplicationVersionSummary]{Items: items, NextCursor: next}, err
 	})
 }
 
@@ -426,7 +430,7 @@ func (c *VersionCreateCommand) Run(ctx *kong.Context) error {
 	if err := decodeRequest(*c.Request, true, &request); err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.ReadApplicationVersionSummary, error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.ApplicationVersionIdentifier, error) {
 		return apprun_dedicated.NewVersionOp(client, applicationID).Create(ctx, request)
 	})
 }
@@ -498,9 +502,9 @@ func (c *AutoScalingGroupListCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.ReadAutoScalingGroupDetail], error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.ReadAutoScalingGroup], error) {
 		items, next, err := apprun_dedicated.NewAutoScalingGroupOp(client, clusterID).List(ctx, c.MaxItems, cursor)
-		return page[v1.ReadAutoScalingGroupDetail]{Items: items, NextCursor: next}, err
+		return page[v1.ReadAutoScalingGroup]{Items: items, NextCursor: next}, err
 	})
 }
 
@@ -519,7 +523,7 @@ func (c *AutoScalingGroupCreateCommand) Run(ctx *kong.Context) error {
 	if err := decodeRequest(*c.Request, false, &request); err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.CreatedAutoScalingGroup, error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.AutoScalingGroupIdentifier, error) {
 		return apprun_dedicated.NewAutoScalingGroupOp(client, clusterID).Create(ctx, request)
 	})
 }
@@ -716,7 +720,7 @@ func (c *LoadBalancerCreateCommand) Run(ctx *kong.Context) error {
 	if err := decodeRequest(*c.Request, false, &request); err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.CreatedLoadBalancer, error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.LoadBalancerIdentifier, error) {
 		return apprun_dedicated.NewLoadBalancerOp(client, clusterID, groupID).Create(ctx, request)
 	})
 }
@@ -781,10 +785,11 @@ func (c *LoadBalancerNodeCommands) setRuntime(runtime Runtime) {
 }
 
 type LoadBalancerNodeListCommand struct {
-	ClusterID          string `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
-	AutoScalingGroupID string `name:"auto-scaling-group-id" required:"" help:"対象グループ ID。"`
-	LoadBalancerID     string `name:"load-balancer-id" required:"" help:"対象ロードバランサ ID。"`
-	MaxItems           int64  `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	ClusterID          string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
+	AutoScalingGroupID string  `name:"auto-scaling-group-id" required:"" help:"対象グループ ID。"`
+	LoadBalancerID     string  `name:"load-balancer-id" required:"" help:"対象ロードバランサ ID。"`
+	MaxItems           int64   `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	Cursor             *string `help:"前ページの nextCursor。"`
 	runtime            Runtime
 }
 
@@ -801,9 +806,13 @@ func (c *LoadBalancerNodeListCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.ReadLoadBalancerNodeSummary], error) {
-		items, err := apprun_dedicated.NewLoadBalancerOp(client, clusterID, groupID).ListNodes(ctx, lbID, c.MaxItems, nil)
-		return page[v1.ReadLoadBalancerNodeSummary]{Items: items}, err
+	cursor, err := parseCursor[v1.LoadBalancerNodeID](c.Cursor)
+	if err != nil {
+		return err
+	}
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.LoadBalancerNode], error) {
+		items, next, err := apprun_dedicated.NewLoadBalancerOp(client, clusterID, groupID).ListNodes(ctx, lbID, c.MaxItems, cursor)
+		return page[v1.LoadBalancerNode]{Items: items, NextCursor: next}, err
 	})
 }
 
@@ -887,7 +896,7 @@ func (c *CertificateCreateCommand) Run(ctx *kong.Context) error {
 	if err := decodeRequest(*c.Request, true, &request); err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.CreatedCertificate, error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (*v1.CertificateIdentifier, error) {
 		return apprun_dedicated.NewCertificateOp(client, clusterID).Create(ctx, request)
 	})
 }
@@ -969,7 +978,7 @@ func (c *ServiceClassCommands) setRuntime(runtime Runtime) {
 type ServiceClassListLBCommand struct{ runtime Runtime }
 
 func (c *ServiceClassListLBCommand) Run(ctx *kong.Context) error {
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) ([]v1.ReadLbServiceClass, error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) ([]v1.LoadBalancerServiceClass, error) {
 		return apprun_dedicated.NewServiceClassOp(client).ListLB(ctx)
 	})
 }
@@ -977,7 +986,7 @@ func (c *ServiceClassListLBCommand) Run(ctx *kong.Context) error {
 type ServiceClassListWorkerCommand struct{ runtime Runtime }
 
 func (c *ServiceClassListWorkerCommand) Run(ctx *kong.Context) error {
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) ([]v1.ReadWorkerServiceClass, error) {
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) ([]v1.WorkerServiceClass, error) {
 		return apprun_dedicated.NewServiceClassOp(client).ListWorker(ctx)
 	})
 }

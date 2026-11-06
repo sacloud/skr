@@ -44,7 +44,7 @@ func (a destinationAdapter) List(ctx context.Context) (*v1.ListCommonServiceItem
 	return result, protectDestinationError("通知先一覧の取得に失敗しました", err)
 }
 
-func (a destinationAdapter) Read(ctx context.Context, id string) (*v1.GetCommonServiceItemOK, error) {
+func (a destinationAdapter) Read(ctx context.Context, id string) (*v1.ReadCommonServiceItemOK, error) {
 	result, err := a.DestinationAPI.Read(ctx, id)
 	return result, protectDestinationError("通知先の取得に失敗しました", err)
 }
@@ -63,7 +63,7 @@ func (a destinationAdapter) Delete(ctx context.Context, id string) error {
 	return protectDestinationError("通知先の削除に失敗しました", a.DestinationAPI.Delete(ctx, id))
 }
 
-func (a destinationAdapter) ReadStatus(ctx context.Context, id string) (*v1.GetCommonServiceItemStatusResponse, error) {
+func (a destinationAdapter) ReadStatus(ctx context.Context, id string) (*v1.CheckDestinationStatusResponse, error) {
 	result, err := a.DestinationAPI.ReadStatus(ctx, id)
 	return result, protectDestinationError("通知先ステータスの取得に失敗しました", err)
 }

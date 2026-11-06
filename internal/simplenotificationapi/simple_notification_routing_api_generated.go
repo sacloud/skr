@@ -23,12 +23,12 @@ type RoutingCommands struct {
 
 type RoutingAPI interface {
 	List(context.Context) (*v1.ListCommonServiceItemsResponse, error)
-	Read(context.Context, string) (*v1.GetCommonServiceItemOK, error)
+	Read(context.Context, string) (*v1.ReadCommonServiceItemOK, error)
 	Create(context.Context, v1.PostCommonServiceItemRequest) (*v1.CreateCommonServiceItemCreated, error)
 	Update(context.Context, string, v1.PutCommonServiceItemRequest) (*v1.UpdateCommonServiceItemOK, error)
 	Delete(context.Context, string) error
-	Reorder(context.Context, v1.PutCommonServiceItemRoutingReorderRequest) (*v1.ReorderRoutingAccepted, error)
-	ListSource(context.Context) (*v1.ListSourcesResponse, error)
+	Reorder(context.Context, v1.ReorderNotificationRoutingRequest) (*v1.ReorderNotificationRoutingAccepted, error)
+	ListSource(context.Context) (*v1.ListNotificationSourcesResponse, error)
 }
 
 type RoutingAPIFactory func() (RoutingAPI, error)
@@ -239,7 +239,7 @@ func (c *RoutingReorderCommand) Run(ctx *kong.Context) error {
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
-	request := &v1.PutCommonServiceItemRoutingReorderRequest{}
+	request := &v1.ReorderNotificationRoutingRequest{}
 	if c.Request != nil {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")

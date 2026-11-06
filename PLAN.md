@@ -2,7 +2,7 @@
 
 ## 対象と方針
 
-対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.3.1](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。SDK の配置ではなく実際の API route とドメインに基づいて CLI の境界を決めます。`service/iaas` に含まれる API でも、System API や CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
+対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.5.0](https://github.com/sacloud/sacloud-sdk-go/tree/v0.5.0) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。SDK の配置ではなく実際の API route とドメインに基づいて CLI の境界を決めます。`service/iaas` に含まれる API でも、System API や CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
 
 一覧は SDK の提供範囲を把握するためのもので、すべてのパッケージをそのまま CLI コマンドにすることを決めるものではありません。各パッケージで公開操作、入力、出力、固有の検証を確認し、対応範囲を明示して段階的に実装します。コマンドの階層は `<domain>-api <resource>` とし、SDK の型だけから公開操作や入力の意味を推測しません。詳細は [ADR 0016](docs/adr/0016-generate-low-level-api-commands.md) に従います。
 
@@ -78,7 +78,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 
 IaaS API のコマンド階層は SDK のサービスパッケージ名ではなく、実際の API route に合わせます。たとえば `/api/cloud/1.1/product/server` は `iaas-api product server`、`/api/cloud/1.1/public/price` は `iaas-api public price` です。低レベル API 操作が SDK にある場合は `sacloud-sdk-go/api/iaas` を直接使い、Find の応答 envelope を含む API 応答モデルを JSON 出力します。JSON は SDK の型から再エンコードするため HTTP body のバイト列そのものではありません。既存 IaaS コマンドの他の出力経路は別途段階的に見直します。
 
-SDK v0.3.1 の route を確認し、未実装候補の CLI 階層を次のように整理します。
+SDK v0.5.0 の route を確認し、未実装候補の CLI 階層を次のように整理します。
 
 | API | route | CLI 階層 |
 | --- | --- | --- |
@@ -116,6 +116,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 - [x] `simple-notification` — `simple-notification-api`。通知先、グループ、ルーティング、履歴の SDK 公開操作を実装済みです。送信は `--message` と JSON 入力に対応します。[ライブ E2E](test/e2e/simple-notification/)（testing.T ベースのシナリオ）と[チュートリアル](docs/manual/tutorials/simple-notification-api.md)があります。2026-10-27 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行しました。既存通知先へのテスト送信シナリオと、通知を送信しない CRUD シナリオがあります。ライブではメール通知の処理完了、利用者による実受信、履歴の個別取得、一時通知先・グループ・ルーティングの作成／参照／更新／削除、設定省略時の保持と設定変更、一時ルーティングだけの並べ替え、既存設定の保持、削除後の不在を確認済みです。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。
 - [ ] `apprun-dedicated` — `apprun-dedicated-api`。リクエスト入力・秘密情報のインライン拒否・エラー伝播のドメイン単体テストを実装済みです。
   - CLI 実装済み、ライブ E2E とチュートリアルは未対応。不足分は [#59](https://github.com/sacloud/skr/issues/59) で対応予定
+  - SDK v0.5.0 で追加されたクラスタロードバランサの参照・更新 (`ClusterOp.ReadLoadBalancer` / `UpdateLoadBalancer`) と limits の参照 (`LimitOp.Read`) は CLI 未対応です。`cluster read-load-balancer`、`cluster update-load-balancer`、`limit read` として追加します ([#202](https://github.com/sacloud/skr/issues/202))
 - [x] `apprun` — `apprun-api` でアプリケーション CRUD・ステータス、バージョンの一覧／参照／削除／ステータス、トラフィック、パケットフィルター、ユーザー操作を実装済みです。Ogen 系 API 共通生成器の設定と生成コードを使います。認証情報を含み得るアプリケーションの作成・更新リクエストは保護したファイルまたは標準入力に限定します。sakumock による CLI 操作テスト、[ライブ E2E](test/e2e/apprun/)（testing.T ベースのシナリオ、[ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md)）、[チュートリアル](docs/manual/tutorials/apprun-api.md)があります。ライブでは Application の作成・一覧・参照、`Healthy` への遷移、公開 URL の HTTP 200 とサンプル本文、削除と削除後の不在を確認済みです。Application の Update(1 vCPU / 2Gi の新バージョン作成)、Version の一覧・参照・ステータス・削除、Traffic の一覧・更新、PacketFilter の参照・更新、User の参照も 2026-10-23 に確認済みです。2026-10-27 には testing.T ベースのシナリオとして全工程を再実行しました。チュートリアルに応答例と安全な後片付けを反映しました
 - [ ] `addon`
 - [ ] `apigw`

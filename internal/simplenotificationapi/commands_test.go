@@ -38,10 +38,10 @@ func (m destinationAPIMock) Create(ctx context.Context, request v1.PostCommonSer
 
 type groupAPIMock struct {
 	GroupAPI
-	sendMessage func(context.Context, string, v1.SendNotificationMessageRequest) (*v1.SendNotificationMessageResponse, error)
+	sendMessage func(context.Context, string, v1.SendNotificationRequest) (*v1.SendNotificationResponse, error)
 }
 
-func (m groupAPIMock) SendMessage(ctx context.Context, id string, request v1.SendNotificationMessageRequest) (*v1.SendNotificationMessageResponse, error) {
+func (m groupAPIMock) SendMessage(ctx context.Context, id string, request v1.SendNotificationRequest) (*v1.SendNotificationResponse, error) {
 	return m.sendMessage(ctx, id, request)
 }
 
@@ -49,26 +49,26 @@ func TestCreateProviderCallbacks(t *testing.T) {
 	for _, test := range []struct {
 		name          string
 		set           func(*v1.PostCommonServiceItemRequest) error
-		providerClass v1.CommonServiceItemProviderClass
-		serviceClass  v1.CommonServiceItemServiceClass
+		providerClass v1.PostCommonServiceItemRequestCommonServiceItemProviderClass
+		serviceClass  v1.PostCommonServiceItemRequestCommonServiceItemServiceClass
 	}{
 		{
 			name:          "destination",
 			set:           SetDestinationProvider,
-			providerClass: v1.CommonServiceItemProviderClassSaknoticedestination,
-			serviceClass:  v1.CommonServiceItemServiceClassCloudSaknoticedestination2,
+			providerClass: v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticedestination,
+			serviceClass:  v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticedestination2,
 		},
 		{
 			name:          "group",
 			set:           SetGroupProvider,
-			providerClass: v1.CommonServiceItemProviderClassSaknoticegroup,
-			serviceClass:  v1.CommonServiceItemServiceClassCloudSaknoticegroup2,
+			providerClass: v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticegroup,
+			serviceClass:  v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticegroup2,
 		},
 		{
 			name:          "routing",
 			set:           SetRoutingProvider,
-			providerClass: v1.CommonServiceItemProviderClassSaknoticerouting,
-			serviceClass:  v1.CommonServiceItemServiceClassCloudSaknoticerouting2,
+			providerClass: v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticerouting,
+			serviceClass:  v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticerouting2,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -108,11 +108,11 @@ func TestDestinationCreateCommandSetsProviderAndPreservesSettings(t *testing.T) 
 		},
 	}
 	require.NoError(t, command.Run(&kong.Context{}))
-	require.Equal(t, v1.CommonServiceItemProviderClassSaknoticedestination, gotRequest.CommonServiceItem.Provider.Class)
-	require.Equal(t, v1.CommonServiceItemServiceClassCloudSaknoticedestination2, gotRequest.CommonServiceItem.ServiceClass)
-	settings, ok := gotRequest.CommonServiceItem.Settings.GetDestinationSettings()
+	require.Equal(t, v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticedestination, gotRequest.CommonServiceItem.Provider.Class)
+	require.Equal(t, v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticedestination2, gotRequest.CommonServiceItem.ServiceClass)
+	settings, ok := gotRequest.CommonServiceItem.Settings.GetCommonServiceItemDestinationSettings()
 	require.True(t, ok, "Settings is not a destination settings variant")
-	require.Equal(t, v1.DestinationSettingsTypeEmail, settings.Type)
+	require.Equal(t, v1.CommonServiceItemDestinationSettingsTypeEmail, settings.Type)
 	require.Equal(t, "example@example.test", settings.Value)
 	require.IsType(t, &v1.CreateCommonServiceItemCreated{}, output, "output should be a create response")
 }
@@ -142,12 +142,12 @@ func TestSendMessageFlagAndJSONInputs(t *testing.T) {
 					WriteOutput:    func(*kong.Context, any) error { return nil },
 				},
 				factory: func() (GroupAPI, error) {
-					return groupAPIMock{sendMessage: func(ctx context.Context, id string, request v1.SendNotificationMessageRequest) (*v1.SendNotificationMessageResponse, error) {
+					return groupAPIMock{sendMessage: func(ctx context.Context, id string, request v1.SendNotificationRequest) (*v1.SendNotificationResponse, error) {
 						called = true
 						require.NotNil(t, ctx)
 						require.Equal(t, "group-123", id)
 						require.Equal(t, message, request.Message)
-						return &v1.SendNotificationMessageResponse{IsOk: true}, nil
+						return &v1.SendNotificationResponse{IsOk: true}, nil
 					}}, nil
 				},
 			}
@@ -265,11 +265,11 @@ func TestDecodeResourceCreateRequestSupportsFileAndPreservesFields(t *testing.T)
 	item := request.CommonServiceItem
 	require.Equal(t, "test-group", item.Name)
 	require.Equal(t, "kept description", item.Description)
-	require.Equal(t, v1.CommonServiceItemProviderClassSaknoticegroup, item.Provider.Class)
-	require.Equal(t, v1.CommonServiceItemServiceClassCloudSaknoticegroup2, item.ServiceClass)
+	require.Equal(t, v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticegroup, item.Provider.Class)
+	require.Equal(t, v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticegroup2, item.ServiceClass)
 	require.Equal(t, []string{"kept-tag"}, item.Tags)
 	require.True(t, item.Icon.IsNull(), "omitted Icon should be represented as null")
-	settings, ok := item.Settings.GetGroupSettings()
+	settings, ok := item.Settings.GetCommonServiceItemGroupSettings()
 	require.True(t, ok)
 	require.Equal(t, []string{"123456789012"}, settings.Destinations)
 }

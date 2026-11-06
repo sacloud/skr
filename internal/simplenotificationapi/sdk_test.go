@@ -140,7 +140,7 @@ func TestGroupCommandsUseSDKRequestAndResponse(t *testing.T) {
 	if err := sendCommand.Run(&kong.Context{}); err != nil {
 		t.Fatal(err)
 	}
-	response, ok := sendOutput.(*v1.SendNotificationMessageResponse)
+	response, ok := sendOutput.(*v1.SendNotificationResponse)
 	if !ok || !response.IsOk {
 		t.Fatalf("send output = %#v, want successful response", sendOutput)
 	}
