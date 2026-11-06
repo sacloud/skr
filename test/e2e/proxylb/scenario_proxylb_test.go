@@ -277,13 +277,15 @@ func getMonitorConnection(t *testing.T, h *helper.Helper, id types.ID) {
 
 	deadline := time.Now().Add(monitorSamplesTimeout)
 	for {
-		end := time.Now().UTC()
-		windowStart := end.Add(-proxylbMonitorWindow)
+		// API には秒精度の RFC3339 で期間を渡すため、比較する期間も送信時刻と同じ秒精度にそろえる。
+		// 小数秒を保持したままで比較すると、開始境界ちょうどのサンプルが期間外として拒否される
+		windowEnd := time.Now().UTC().Truncate(time.Second)
+		windowStart := windowEnd.Add(-proxylbMonitorWindow)
 		output := h.Call(t, "ProxyLB の接続数モニタリングを取得する",
 			"proxylb-api", "monitor-connection", "--id", id.String(),
 			"--start", windowStart.Format(time.RFC3339),
-			"--end", end.Format(time.RFC3339))
-		values, err := checkMonitorConnectionValues(output, windowStart, end)
+			"--end", windowEnd.Format(time.RFC3339))
+		values, err := checkMonitorConnectionValues(output, windowStart, windowEnd)
 		require.NoError(t, err, "monitor-connection should return well-formed monitor values")
 		if len(values) > 0 {
 			return
@@ -454,6 +456,18 @@ func TestCheckMonitorConnectionValues(t *testing.T) {
 	values, err = checkMonitorConnectionValues([]byte(`[]`), windowStart, windowEnd)
 	require.NoError(t, err)
 	require.Empty(t, values, "an empty response should be tolerated as pending samples")
+
+	// 取得期間の境界ちょうどのサンプルは、送信時刻と同じ秒精度で比較するため受け付ける
+	values, err = checkMonitorConnectionValues(
+		[]byte(`[{"Time":"2026-11-06T09:00:00Z","ActiveConnections":0,"ConnectionsPerSec":0}]`),
+		windowStart, windowEnd)
+	require.NoError(t, err, "a sample at the window start should be accepted")
+	require.Len(t, values, 1, "the boundary sample should be collected")
+	values, err = checkMonitorConnectionValues(
+		[]byte(`[{"Time":"2026-11-06T09:10:00Z","ActiveConnections":0,"ConnectionsPerSec":0}]`),
+		windowStart, windowEnd)
+	require.NoError(t, err, "a sample at the window end should be accepted")
+	require.Len(t, values, 1, "the boundary sample should be collected")
 
 	for name, tc := range map[string][]byte{
 		"unparseable Time":          []byte(`[{"Time":"invalid","ActiveConnections":0,"ConnectionsPerSec":0}]`),
