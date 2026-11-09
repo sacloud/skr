@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -164,7 +165,7 @@ func TestDestinationSDKValidationDoesNotExposeFileValues(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := os.WriteFile(path, []byte(test.data), 0o600)
 			require.NoError(t, err)
-			args := append(test.args, "--request", "@"+path)
+			args := append(slices.Clone(test.args), "--request", "@"+path)
 			var output, stderr bytes.Buffer
 			code := run(args, &output, &stderr)
 			require.EqualValues(t, 1, code, "exit = %d, want 1", code)
