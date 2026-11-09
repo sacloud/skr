@@ -37,15 +37,19 @@ import (
 	clientconfig "github.com/sacloud/skr/internal/saclient"
 )
 
+// Commands は AppRun 専有型 API の手書きコマンド集合です。
+// operationId 派生名への移行 (ADR 0074) に合わせ、cluster / application / version などの
+// グループ階層を Kong の embed で展開して 1 階層のフラット構造にしています。
+// サブコマンド名は OpenAPI の operationId から機械派生した名前です。
 type Commands struct {
-	Cluster          ClusterCommands          `cmd:"" help:"クラスタを管理します。"`
-	Application      ApplicationCommands      `cmd:"" help:"アプリケーションを管理します。クラスタ作成後に登録します。"`
-	Version          VersionCommands          `cmd:"" help:"アプリケーションのバージョンを管理します。アプリケーション ID を指定します。"`
-	AutoScalingGroup AutoScalingGroupCommands `cmd:"" name:"auto-scaling-group" help:"クラスタのワーカノードグループを管理します。"`
-	WorkerNode       WorkerNodeCommands       `cmd:"" name:"worker-node" help:"オートスケーリンググループのワーカノードを参照・更新します。"`
-	LoadBalancer     LoadBalancerCommands     `cmd:"" name:"load-balancer" help:"オートスケーリンググループのロードバランサを管理します。"`
-	Certificate      CertificateCommands      `cmd:"" help:"クラスタの証明書を管理します。"`
-	ServiceClass     ServiceClassCommands     `cmd:"" name:"service-class" help:"利用可能なワーカ／ロードバランサのサービスクラスを取得します。"`
+	Cluster          ClusterCommands          `embed:""`
+	Application      ApplicationCommands      `embed:""`
+	Version          VersionCommands          `embed:""`
+	AutoScalingGroup AutoScalingGroupCommands `embed:""`
+	WorkerNode       WorkerNodeCommands       `embed:""`
+	LoadBalancer     LoadBalancerCommands     `embed:""`
+	Certificate      CertificateCommands      `embed:""`
+	ServiceClass     ServiceClassCommands     `embed:""`
 }
 
 type Runtime struct {
@@ -176,11 +180,11 @@ func parseVersionNumber(value string) (v1.ApplicationVersionNumber, error) {
 }
 
 type ClusterCommands struct {
-	List   ClusterListCommand   `cmd:"" help:"クラスタを一覧表示します。JSON 出力には items と nextCursor が含まれます。"`
-	Read   ClusterReadCommand   `cmd:"" help:"クラスタ ID を指定して詳細を取得します。"`
-	Create ClusterCreateCommand `cmd:"" help:"クラスタを作成します。サービスプリンシパル ID とポート設定を含む JSON を指定します。"`
-	Update ClusterUpdateCommand `cmd:"" help:"クラスタの設定を更新します。更新対象の JSON を指定します。"`
-	Delete ClusterDeleteCommand `cmd:"" help:"クラスタを削除します。関連リソースがないことを確認してください。"`
+	List   ClusterListCommand   `cmd:"" name:"list-clusters" help:"クラスタを一覧表示します。JSON 出力には items と nextCursor が含まれます。"`
+	Read   ClusterReadCommand   `cmd:"" name:"read-cluster" help:"クラスタ ID を指定して詳細を取得します。"`
+	Create ClusterCreateCommand `cmd:"" name:"create-cluster" help:"クラスタを作成します。サービスプリンシパル ID とポート設定を含む JSON を指定します。"`
+	Update ClusterUpdateCommand `cmd:"" name:"update-cluster" help:"クラスタの設定を更新します。更新対象の JSON を指定します。"`
+	Delete ClusterDeleteCommand `cmd:"" name:"delete-cluster" help:"クラスタを削除します。関連リソースがないことを確認してください。"`
 }
 
 func (c *ClusterCommands) setRuntime(runtime Runtime) {
@@ -270,12 +274,12 @@ func (c *ClusterDeleteCommand) Run(ctx *kong.Context) error {
 }
 
 type ApplicationCommands struct {
-	List       ApplicationListCommand       `cmd:"" help:"アプリケーションを一覧表示します。"`
-	Create     ApplicationCreateCommand     `cmd:"" help:"アプリケーションをクラスタに登録します。"`
-	Read       ApplicationReadCommand       `cmd:"" help:"アプリケーション ID を指定して詳細を取得します。"`
-	Update     ApplicationUpdateCommand     `cmd:"" help:"アクティブバージョンを切り替えるか、--deactivate で停止します。"`
-	Delete     ApplicationDeleteCommand     `cmd:"" help:"アプリケーションを削除します。削除前に対象 ID を確認してください。"`
-	Containers ApplicationContainersCommand `cmd:"" help:"アプリケーションのコンテナ配置と状態を取得します。"`
+	List       ApplicationListCommand       `cmd:"" name:"list-applications" help:"アプリケーションを一覧表示します。"`
+	Create     ApplicationCreateCommand     `cmd:"" name:"create-application" help:"アプリケーションをクラスタに登録します。"`
+	Read       ApplicationReadCommand       `cmd:"" name:"read-application" help:"アプリケーション ID を指定して詳細を取得します。"`
+	Update     ApplicationUpdateCommand     `cmd:"" name:"update-application" help:"アクティブバージョンを切り替えるか、--deactivate で停止します。"`
+	Delete     ApplicationDeleteCommand     `cmd:"" name:"delete-application" help:"アプリケーションを削除します。削除前に対象 ID を確認してください。"`
+	Containers ApplicationContainersCommand `cmd:"" name:"list-application-containers" help:"アプリケーションのコンテナ配置と状態を取得します。"`
 }
 
 func (c *ApplicationCommands) setRuntime(runtime Runtime) {
@@ -382,10 +386,10 @@ func (c *ApplicationContainersCommand) Run(ctx *kong.Context) error {
 }
 
 type VersionCommands struct {
-	List   VersionListCommand   `cmd:"" help:"アプリケーションのバージョンを一覧表示します。"`
-	Create VersionCreateCommand `cmd:"" help:"アプリケーションバージョンを作成します。"`
-	Read   VersionReadCommand   `cmd:"" help:"バージョンの詳細を取得します。"`
-	Delete VersionDeleteCommand `cmd:"" help:"バージョンを削除します。"`
+	List   VersionListCommand   `cmd:"" name:"list-application-versions" help:"アプリケーションのバージョンを一覧表示します。"`
+	Create VersionCreateCommand `cmd:"" name:"create-application-version" help:"アプリケーションバージョンを作成します。"`
+	Read   VersionReadCommand   `cmd:"" name:"read-application-version" help:"バージョンの詳細を取得します。"`
+	Delete VersionDeleteCommand `cmd:"" name:"delete-application-version" help:"バージョンを削除します。"`
 }
 
 func (c *VersionCommands) setRuntime(runtime Runtime) {
@@ -476,10 +480,10 @@ func (c *VersionDeleteCommand) Run(ctx *kong.Context) error {
 }
 
 type AutoScalingGroupCommands struct {
-	List   AutoScalingGroupListCommand   `cmd:"" help:"クラスタ内のグループを一覧表示します。"`
-	Create AutoScalingGroupCreateCommand `cmd:"" help:"クラスタにオートスケーリンググループを作成します。"`
-	Read   AutoScalingGroupReadCommand   `cmd:"" help:"グループの詳細を取得します。"`
-	Delete AutoScalingGroupDeleteCommand `cmd:"" help:"グループを削除します。"`
+	List   AutoScalingGroupListCommand   `cmd:"" name:"list-auto-scaling-groups" help:"クラスタ内のグループを一覧表示します。"`
+	Create AutoScalingGroupCreateCommand `cmd:"" name:"create-auto-scaling-group" help:"クラスタにオートスケーリンググループを作成します。"`
+	Read   AutoScalingGroupReadCommand   `cmd:"" name:"read-auto-scaling-group" help:"グループの詳細を取得します。"`
+	Delete AutoScalingGroupDeleteCommand `cmd:"" name:"delete-auto-scaling-group" help:"グループを削除します。"`
 }
 
 func (c *AutoScalingGroupCommands) setRuntime(runtime Runtime) {
@@ -569,9 +573,9 @@ func (c *AutoScalingGroupDeleteCommand) Run(ctx *kong.Context) error {
 }
 
 type WorkerNodeCommands struct {
-	List   WorkerNodeListCommand   `cmd:"" help:"グループ内のワーカノードを一覧表示します。"`
-	Read   WorkerNodeReadCommand   `cmd:"" help:"ワーカノードの詳細を取得します。"`
-	Update WorkerNodeUpdateCommand `cmd:"" help:"ワーカノードの draining 状態を変更します。"`
+	List   WorkerNodeListCommand   `cmd:"" name:"list-worker-nodes" help:"グループ内のワーカノードを一覧表示します。"`
+	Read   WorkerNodeReadCommand   `cmd:"" name:"read-worker-node" help:"ワーカノードの詳細を取得します。"`
+	Update WorkerNodeUpdateCommand `cmd:"" name:"update-worker-node-draining" help:"ワーカノードの draining 状態を変更します。"`
 }
 
 func (c *WorkerNodeCommands) setRuntime(runtime Runtime) {
@@ -661,11 +665,11 @@ func (c *WorkerNodeUpdateCommand) Run(ctx *kong.Context) error {
 }
 
 type LoadBalancerCommands struct {
-	List   LoadBalancerListCommand   `cmd:"" help:"グループ内のロードバランサを一覧表示します。"`
-	Create LoadBalancerCreateCommand `cmd:"" help:"ロードバランサを作成します。"`
-	Read   LoadBalancerReadCommand   `cmd:"" help:"ロードバランサの詳細を取得します。"`
-	Delete LoadBalancerDeleteCommand `cmd:"" help:"ロードバランサを削除します。"`
-	Node   LoadBalancerNodeCommands  `cmd:"" help:"ロードバランサノードの状態を参照します。"`
+	List   LoadBalancerListCommand   `cmd:"" name:"list-load-balancers" help:"グループ内のロードバランサを一覧表示します。"`
+	Create LoadBalancerCreateCommand `cmd:"" name:"create-load-balancer" help:"ロードバランサを作成します。"`
+	Read   LoadBalancerReadCommand   `cmd:"" name:"read-load-balancer" help:"ロードバランサの詳細を取得します。"`
+	Delete LoadBalancerDeleteCommand `cmd:"" name:"delete-load-balancer" help:"ロードバランサを削除します。"`
+	Node   LoadBalancerNodeCommands  `embed:""`
 }
 
 func (c *LoadBalancerCommands) setRuntime(runtime Runtime) {
@@ -776,8 +780,8 @@ func (c *LoadBalancerDeleteCommand) Run(ctx *kong.Context) error {
 }
 
 type LoadBalancerNodeCommands struct {
-	List LoadBalancerNodeListCommand `cmd:"" help:"ロードバランサのノード一覧を取得します。"`
-	Read LoadBalancerNodeReadCommand `cmd:"" help:"ロードバランサノードの詳細を取得します。"`
+	List LoadBalancerNodeListCommand `cmd:"" name:"list-load-balancer-nodes" help:"ロードバランサのノード一覧を取得します。"`
+	Read LoadBalancerNodeReadCommand `cmd:"" name:"read-load-balancer-node" help:"ロードバランサノードの詳細を取得します。"`
 }
 
 func (c *LoadBalancerNodeCommands) setRuntime(runtime Runtime) {
@@ -847,11 +851,11 @@ func (c *LoadBalancerNodeReadCommand) Run(ctx *kong.Context) error {
 }
 
 type CertificateCommands struct {
-	List   CertificateListCommand   `cmd:"" help:"クラスタの証明書一覧を取得します。"`
-	Create CertificateCreateCommand `cmd:"" help:"証明書を作成します。PEM を含む JSON は保護したファイルまたは標準入力から渡してください。"`
-	Read   CertificateReadCommand   `cmd:"" help:"証明書の詳細を取得します。"`
-	Update CertificateUpdateCommand `cmd:"" help:"証明書を更新します。PEM を含む JSON は保護したファイルまたは標準入力から渡してください。"`
-	Delete CertificateDeleteCommand `cmd:"" help:"証明書を削除します。"`
+	List   CertificateListCommand   `cmd:"" name:"list-certificates" help:"クラスタの証明書一覧を取得します。"`
+	Create CertificateCreateCommand `cmd:"" name:"create-certificate" help:"証明書を作成します。PEM を含む JSON は保護したファイルまたは標準入力から渡してください。"`
+	Read   CertificateReadCommand   `cmd:"" name:"read-certificate" help:"証明書の詳細を取得します。"`
+	Update CertificateUpdateCommand `cmd:"" name:"update-certificate" help:"証明書を更新します。PEM を含む JSON は保護したファイルまたは標準入力から渡してください。"`
+	Delete CertificateDeleteCommand `cmd:"" name:"delete-certificate" help:"証明書を削除します。"`
 }
 
 func (c *CertificateCommands) setRuntime(runtime Runtime) {
@@ -967,8 +971,8 @@ func (c *CertificateDeleteCommand) Run(ctx *kong.Context) error {
 }
 
 type ServiceClassCommands struct {
-	ListLB     ServiceClassListLBCommand     `cmd:"" name:"list-lb" help:"ロードバランサのサービスクラス一覧を取得します。"`
-	ListWorker ServiceClassListWorkerCommand `cmd:"" name:"list-worker" help:"ワーカノードのサービスクラス一覧を取得します。"`
+	ListLB     ServiceClassListLBCommand     `cmd:"" name:"list-load-balancer-service-classes" help:"ロードバランサのサービスクラス一覧を取得します。"`
+	ListWorker ServiceClassListWorkerCommand `cmd:"" name:"list-worker-service-classes" help:"ワーカノードのサービスクラス一覧を取得します。"`
 }
 
 func (c *ServiceClassCommands) setRuntime(runtime Runtime) {

@@ -15,7 +15,6 @@
 package cli
 
 import (
-	apprundedicatedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 )
@@ -28,41 +27,6 @@ import (
 // 詳細は docs/design/api-command-operation-id-naming.md を参照してください。
 var apiCommandNameBaseline = map[string]string{
 	// apprun-dedicated-api
-	"apprun-dedicated-api application containers":    apprundedicatedv1.ListApplicationContainersOperation,
-	"apprun-dedicated-api application create":        apprundedicatedv1.CreateApplicationOperation,
-	"apprun-dedicated-api application delete":        apprundedicatedv1.DeleteApplicationOperation,
-	"apprun-dedicated-api application list":          apprundedicatedv1.ListApplicationsOperation,
-	"apprun-dedicated-api application read":          apprundedicatedv1.ReadApplicationOperation,
-	"apprun-dedicated-api application update":        apprundedicatedv1.UpdateApplicationOperation,
-	"apprun-dedicated-api auto-scaling-group create": apprundedicatedv1.CreateAutoScalingGroupOperation,
-	"apprun-dedicated-api auto-scaling-group delete": apprundedicatedv1.DeleteAutoScalingGroupOperation,
-	"apprun-dedicated-api auto-scaling-group list":   apprundedicatedv1.ListAutoScalingGroupsOperation,
-	"apprun-dedicated-api auto-scaling-group read":   apprundedicatedv1.ReadAutoScalingGroupOperation,
-	"apprun-dedicated-api certificate create":        apprundedicatedv1.CreateCertificateOperation,
-	"apprun-dedicated-api certificate delete":        apprundedicatedv1.DeleteCertificateOperation,
-	"apprun-dedicated-api certificate list":          apprundedicatedv1.ListCertificatesOperation,
-	"apprun-dedicated-api certificate read":          apprundedicatedv1.ReadCertificateOperation,
-	"apprun-dedicated-api certificate update":        apprundedicatedv1.UpdateCertificateOperation,
-	"apprun-dedicated-api cluster create":            apprundedicatedv1.CreateClusterOperation,
-	"apprun-dedicated-api cluster delete":            apprundedicatedv1.DeleteClusterOperation,
-	"apprun-dedicated-api cluster list":              apprundedicatedv1.ListClustersOperation,
-	"apprun-dedicated-api cluster read":              apprundedicatedv1.ReadClusterOperation,
-	"apprun-dedicated-api cluster update":            apprundedicatedv1.UpdateClusterOperation,
-	"apprun-dedicated-api load-balancer create":      apprundedicatedv1.CreateLoadBalancerOperation,
-	"apprun-dedicated-api load-balancer delete":      apprundedicatedv1.DeleteLoadBalancerOperation,
-	"apprun-dedicated-api load-balancer list":        apprundedicatedv1.ListLoadBalancersOperation,
-	"apprun-dedicated-api load-balancer node list":   apprundedicatedv1.ListLoadBalancerNodesOperation,
-	"apprun-dedicated-api load-balancer node read":   apprundedicatedv1.ReadLoadBalancerNodeOperation,
-	"apprun-dedicated-api load-balancer read":        apprundedicatedv1.ReadLoadBalancerOperation,
-	"apprun-dedicated-api service-class list-lb":     apprundedicatedv1.ListLoadBalancerServiceClassesOperation,
-	"apprun-dedicated-api service-class list-worker": apprundedicatedv1.ListWorkerServiceClassesOperation,
-	"apprun-dedicated-api version create":            apprundedicatedv1.CreateApplicationVersionOperation,
-	"apprun-dedicated-api version delete":            apprundedicatedv1.DeleteApplicationVersionOperation,
-	"apprun-dedicated-api version list":              apprundedicatedv1.ListApplicationVersionsOperation,
-	"apprun-dedicated-api version read":              apprundedicatedv1.ReadApplicationVersionOperation,
-	"apprun-dedicated-api worker-node list":          apprundedicatedv1.ListWorkerNodesOperation,
-	"apprun-dedicated-api worker-node read":          apprundedicatedv1.ReadWorkerNodeOperation,
-	"apprun-dedicated-api worker-node update":        apprundedicatedv1.UpdateWorkerNodeDrainingOperation,
 	// eventbus-api
 	"eventbus-api create-common-service-item":       eventbusv1.CreateCommonServiceItemOperation,
 	"eventbus-api delete-common-service-item":       eventbusv1.DeleteCommonServiceItemOperation,

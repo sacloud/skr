@@ -18,41 +18,41 @@ apprun-api read-application-version live
 apprun-api read-application-version-status live
 apprun-api read-user live
 apprun-api update-application-traffic live
-apprun-dedicated-api application containers deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api application create deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api application delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api application list deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api application read deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api application update deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api auto-scaling-group create deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api auto-scaling-group delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api auto-scaling-group list deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api auto-scaling-group read deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api certificate create deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api certificate delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api certificate list deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api certificate read deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api certificate update deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api cluster create deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api cluster delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api cluster list deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api cluster read deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api cluster update deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api load-balancer create deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api load-balancer delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api load-balancer list deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api load-balancer node list deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api load-balancer node read deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api load-balancer read deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api service-class list-lb deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api service-class list-worker deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api version create deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api version delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api version list deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api version read deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api worker-node list deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api worker-node read deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated-api worker-node update deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-application-containers deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api create-application deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api delete-application deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-applications deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api read-application deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api update-application deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api create-auto-scaling-group deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api delete-auto-scaling-group deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-auto-scaling-groups deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api read-auto-scaling-group deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api create-certificate deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api delete-certificate deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-certificates deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api read-certificate deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api update-certificate deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api create-cluster deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api delete-cluster deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-clusters deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api read-cluster deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api update-cluster deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api create-load-balancer deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api delete-load-balancer deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-load-balancers deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-load-balancer-nodes deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api read-load-balancer-node deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api read-load-balancer deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-load-balancer-service-classes deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-worker-service-classes deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api create-application-version deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api delete-application-version deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-application-versions deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api read-application-version deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api list-worker-nodes deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api read-worker-node deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated-api update-worker-node-draining deferred #59 クラスタ作成を前提とし実行コストが大きいため
 config create live
 config current live
 config edit live
