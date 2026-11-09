@@ -88,6 +88,15 @@ func TestAPICommandNamesFollowOperationIDs(t *testing.T) {
 		pathSet[p] = struct{}{}
 	}
 
+	// 対象ドメインの集合と、公開操作の一覧のキーが一致することを確認します。
+	// 片方だけドメインを更新すると、移行漏れや検証漏れが CI をすり抜けるためです。
+	publishedDomains := make([]string, 0, len(apiPublishedOperations))
+	for dom := range apiPublishedOperations {
+		publishedDomains = append(publishedDomains, dom)
+	}
+	require.ElementsMatch(t, apiCommandNameTargetDomains, publishedDomains,
+		"対象ドメインの集合と公開操作の一覧のドメインが一致しません。両方を同じ内容で更新してください")
+
 	// 対象ドメインごとに、公開する操作の operation 定数から派生名を計算します。
 	expected := make(map[string]map[string]struct{})
 	for dom, ops := range apiPublishedOperations {
