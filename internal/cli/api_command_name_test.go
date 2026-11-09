@@ -44,6 +44,7 @@ var apiCommandNameTargetDomains = []string{
 var apiCommandNameMigratedDomains = []string{
 	"kms-api",
 	"secretmanager-api",
+	"security-control-api",
 	"simplemq-api",
 }
 

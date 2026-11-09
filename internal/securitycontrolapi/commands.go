@@ -28,9 +28,11 @@ import (
 )
 
 type Commands struct {
-	Activation      ActivationCommands      `cmd:"" name:"activation" help:"セキュリティコントロールの有効化状態を管理します。"`
-	EvaluationRule  EvaluationRuleCommands  `cmd:"" name:"evaluation-rule" help:"評価ルールの設定を管理します。"`
-	AutomatedAction AutomatedActionCommands `cmd:"" name:"automated-action" help:"自動アクションを管理します。"`
+	// operationId 派生名への移行 (ADR 0074) に合わせ、activation / evaluation-rule / automated-action の
+	// グループ階層を Kong の embed で展開して 1 階層のフラット構造にしています。
+	Activation      ActivationCommands      `embed:""`
+	EvaluationRule  EvaluationRuleCommands  `embed:""`
+	AutomatedAction AutomatedActionCommands `embed:""`
 }
 
 // NewActivationAPI は共有クライアントからセキュリティコントロールの有効化 API を構築します。
@@ -308,7 +310,7 @@ func (c *AutomatedActionCreateCommand) Run(ctx *kong.Context) error {
 // AutomatedActionUpdateCommand は自動アクションの更新コマンドです。アクション定義の
 // 実行先種別を個別フラグから一意に組み立てるため、手書きで実装しています。
 type AutomatedActionUpdateCommand struct {
-	ID string `arg:"" help:"更新する自動アクション ID。list の出力にある automatedActionId。"`
+	ID string `arg:"" help:"更新する自動アクション ID。automated-actions-list の出力にある automatedActionId。"`
 	automatedActionFlags
 	Request *string `help:"API リクエスト JSON を @path.json または - (標準入力) で指定します。個別フラグと併用できません。workflows アクションの実行引数に秘密情報を含められるため、JSON を直接指定することはできません。name、action、executionCondition、isEnabled は自動アクション全体を置き換えます。"`
 	factory AutomatedActionAPIFactory

@@ -155,7 +155,7 @@ func listAutomatedActions(t *testing.T, h *helper.Helper, description string) []
 	var items []automatedActionItem
 	nextToken := ""
 	for {
-		args := []string{"security-control-api", "automated-action", "list"}
+		args := []string{"security-control-api", "automated-actions-list"}
 		if nextToken != "" {
 			args = append(args, "--next", nextToken)
 		}
@@ -177,7 +177,7 @@ func listAutomatedActions(t *testing.T, h *helper.Helper, description string) []
 func readAutomatedAction(t *testing.T, h *helper.Helper, actionID string, description string) automatedActionItem {
 	t.Helper()
 
-	data := h.Call(t, description, "security-control-api", "automated-action", "read", actionID)
+	data := h.Call(t, description, "security-control-api", "automated-actions-read", actionID)
 	var out automatedActionItem
 	require.NoError(t, json.Unmarshal(data, &out), "decode automated-action read response: %s", string(data))
 	require.Equal(t, actionID, out.AutomatedActionId, "read response should have the requested action ID: %s", string(data))
@@ -189,7 +189,7 @@ func createAutomatedAction(t *testing.T, h *helper.Helper, actionName, condition
 	t.Helper()
 
 	data := h.Call(t, description,
-		"security-control-api", "automated-action", "create",
+		"security-control-api", "automated-actions-create",
 		"--name", actionName,
 		"--execution-condition", condition,
 		"--service-principal-id", sp,
@@ -207,7 +207,7 @@ func updateAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName,
 	t.Helper()
 
 	data := h.Call(t, description,
-		"security-control-api", "automated-action", "update", actionID,
+		"security-control-api", "automated-actions-update", actionID,
 		"--name", actionName,
 		"--execution-condition", condition,
 		"--service-principal-id", sp,
@@ -223,7 +223,7 @@ func updateAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName,
 func deleteAutomatedAction(t *testing.T, h *helper.Helper, actionID string, description string) {
 	t.Helper()
 
-	h.Call(t, description, "security-control-api", "automated-action", "delete", actionID)
+	h.Call(t, description, "security-control-api", "automated-actions-delete", actionID)
 }
 
 // cleanupAutomatedAction は後片付けでアクションを削除します。読み取りで保持した ID・名称と
@@ -233,7 +233,7 @@ func cleanupAutomatedAction(t *testing.T, h *helper.Helper, actionID, actionName
 	t.Helper()
 
 	data, stderr, err := h.CallAllowingFailure(t, "後片付け: アクションの残存を確認する",
-		"security-control-api", "automated-action", "read", actionID)
+		"security-control-api", "automated-actions-read", actionID)
 	if err != nil {
 		if automatedActionNotFound(stderr) {
 			// 不在なら変更せずに終了する

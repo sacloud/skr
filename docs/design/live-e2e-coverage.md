@@ -93,6 +93,8 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 
 2026-11-06 に `security-control-api` の 11 末端コマンドを追加し、同日にライブ E2E を実施しました。シナリオは `test/e2e/security-control-api/` の testing.T ベースのテストです。`activation`、`evaluation-rule`、`automated-action` の 3 シナリオを実行し、baseline の 10 末端コマンドを live に更新しました。`activation create` の正常系は未アクティベートのプロジェクトが必要なため未検証で、baseline は `deferred #200` です (追跡 Issue #200)。
 
+2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行で operationId 派生名に変更したコマンド (`project-activation-*`、`evaluation-rules-*`、`automated-actions-*`) で 3 シナリオを再実行しました。`project-activation-create` はアクティベート済みプロジェクトでの 409 拒否のみ確認し、他の 10 末端コマンドの正常応答を再確認して baseline を新名のまま `live` に維持しました。
+
 ### 横断タスク
 
 - コマンドツリーとシナリオの対応を検査する網羅テストは完了です。[ADR 0065](../adr/0065-e2e-command-coverage-baseline.md) に従い、`internal/cli` の `LeafCommandPaths` が末端コマンドを列挙し、`test/e2e/command-coverage/baseline.txt` への登録を網羅テストが強制します。実行記録から抽出したコマンドが baseline の状況と一致しない場合も網羅テストが失敗します。要求は [ADR 0058](../adr/0058-live-e2e-command-coverage.md) に記載しています。

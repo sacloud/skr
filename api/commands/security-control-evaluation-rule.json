@@ -36,7 +36,8 @@
           "conversion": "v1.NewOptString",
           "help": "任意: 前回の list 出力の prevPageToken。前ページを取得します。"
         }
-      ]
+      ],
+      "command_name": "evaluation-rules-list"
     },
     {
       "name": "Read",
@@ -48,9 +49,10 @@
           "name": "rule-id",
           "field": "ID",
           "type": "string",
-          "help": "参照する評価ルール ID。list の出力にある evaluationRuleId。例: server-no-public-ip"
+          "help": "参照する評価ルール ID。evaluation-rules-list の出力にある evaluationRuleId。例: server-no-public-ip"
         }
-      ]
+      ],
+      "command_name": "evaluation-rules-read"
     },
     {
       "name": "Update",
@@ -66,7 +68,8 @@
           "help": "更新する評価ルール ID。例: server-no-public-ip"
         }
       ],
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "evaluation-rules-update"
     }
   ],
   "wiring_target": "SecurityControlAPI.EvaluationRule",

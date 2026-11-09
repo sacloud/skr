@@ -21,7 +21,6 @@ import (
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	networkingsuitev1 "github.com/sacloud/sacloud-sdk-go/api/networking-suite/apis/v1"
 	objectstoragev1 "github.com/sacloud/sacloud-sdk-go/api/object-storage/apis/v2"
-	securitycontrolv1 "github.com/sacloud/sacloud-sdk-go/api/security-control/apis/v1"
 	serviceendpointgatewayv1 "github.com/sacloud/sacloud-sdk-go/api/service-endpoint-gateway/apis/v1"
 	simplenotificationv1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 )
@@ -241,18 +240,6 @@ var apiCommandNameBaseline = map[string]string{
 	"object-storage-api site status bucket-metering":  objectstoragev1.GetBucketMeteringOperation,
 	"object-storage-api site status quota":            objectstoragev1.GetQuotaOperation,
 	"object-storage-api site status read":             objectstoragev1.GetStatusOperation,
-	// security-control-api
-	"security-control-api activation create":       securitycontrolv1.ProjectActivationCreateOperation,
-	"security-control-api activation read":         securitycontrolv1.ProjectActivationReadOperation,
-	"security-control-api activation update":       securitycontrolv1.ProjectActivationUpdateOperation,
-	"security-control-api automated-action create": securitycontrolv1.AutomatedActionsCreateOperation,
-	"security-control-api automated-action delete": securitycontrolv1.AutomatedActionsDeleteOperation,
-	"security-control-api automated-action list":   securitycontrolv1.AutomatedActionsListOperation,
-	"security-control-api automated-action read":   securitycontrolv1.AutomatedActionsReadOperation,
-	"security-control-api automated-action update": securitycontrolv1.AutomatedActionsUpdateOperation,
-	"security-control-api evaluation-rule list":    securitycontrolv1.EvaluationRulesListOperation,
-	"security-control-api evaluation-rule read":    securitycontrolv1.EvaluationRulesReadOperation,
-	"security-control-api evaluation-rule update":  securitycontrolv1.EvaluationRulesUpdateOperation,
 	// service-endpoint-gateway-api
 	"service-endpoint-gateway-api appliance apply":             serviceendpointgatewayv1.SegApplyOperation,
 	"service-endpoint-gateway-api appliance create":            serviceendpointgatewayv1.SegCreateOperation,
