@@ -15,8 +15,8 @@ type ApplianceCommands struct {
 	List            ApplianceListCommand            "cmd:\"\" name:\"seg-list\" help:\"サービスエンドポイントゲートウェイを一覧表示します。\""
 	Read            ApplianceReadCommand            "cmd:\"\" name:\"seg-get\" help:\"ID を指定してサービスエンドポイントゲートウェイを読み取ります。\""
 	Create          ApplianceCreateCommand          "cmd:\"\" name:\"seg-create\" help:\"スイッチにサービスエンドポイントゲートウェイを作成します。サービスエンドポイントゲートウェイはスイッチ単体でのみ利用でき、ルータ＋スイッチでは作成できません。1 つのスイッチに対して複数のサービスエンドポイントゲートウェイを作成することはできません。作成には接続先スイッチ ID とゲートウェイに割り当てるサブネットマスク長が必要です。--request は Appliance.Remark に Switch.ID、Network.NetworkMaskLen、Servers[].IPAddress を指定する JSON を受け付け、Class と Plan は自動設定されます。--request と個別フラグは併用できません。\""
-	Update          ApplianceUpdateCommand          "cmd:\"\" name:\"seg-update\" help:\"サービスエンドポイントゲートウェイの接続先マネージドサービス設定を更新します。Settings は全体置換です。既存の設定を維持したい項目は JSON に再指定してください。EnabledServices には接続先マネージドサービスを Type と Config で指定します (Type: ObjectStorage、ContainerRegistry、MonitoringSuite、AppRunDedicatedControlPlane など)。MonitoringSuite と DNSForwarding の Enabled は True または False です。設定の反映は apply で行います。\""
-	Apply           ApplianceApplyCommand           "cmd:\"\" name:\"seg-apply\" help:\"update で変更した設定をサービスエンドポイントゲートウェイへ反映します。接続先マネージドサービスの変更時、ゲートウェイ経由の通信が一時的に中断することがあります。\""
+	Update          ApplianceUpdateCommand          "cmd:\"\" name:\"seg-update\" help:\"サービスエンドポイントゲートウェイの接続先マネージドサービス設定を更新します。Settings は全体置換です。既存の設定を維持したい項目は JSON に再指定してください。EnabledServices には接続先マネージドサービスを Type と Config で指定します (Type: ObjectStorage、ContainerRegistry、MonitoringSuite、AppRunDedicatedControlPlane など)。MonitoringSuite と DNSForwarding の Enabled は True または False です。設定の反映は seg-apply で行います。\""
+	Apply           ApplianceApplyCommand           "cmd:\"\" name:\"seg-apply\" help:\"seg-update で変更した設定をサービスエンドポイントゲートウェイへ反映します。接続先マネージドサービスの変更時、ゲートウェイ経由の通信が一時的に中断することがあります。\""
 	Delete          ApplianceDeleteCommand          "cmd:\"\" name:\"seg-delete\" help:\"ID を指定してサービスエンドポイントゲートウェイを削除します。削除前に対象 ID を確認してください。\""
 	ReadInterface   ApplianceReadInterfaceCommand   "cmd:\"\" name:\"seg-interface-get-interface\" help:\"サービスエンドポイントゲートウェイのインターフェース情報を取得します。ゲートウェイの IPv4 アドレスは、利用するサーバーの DNS 設定に使います。\""
 	ReadPowerStatus ApplianceReadPowerStatusCommand "cmd:\"\" name:\"seg-status-get-power-status\" help:\"サービスエンドポイントゲートウェイの電源状態を取得します。\""
@@ -215,7 +215,7 @@ func (c *ApplianceDeleteCommand) Run(ctx *kong.Context) error {
 
 type ApplianceReadInterfaceCommand struct {
 	ApplianceID string "arg:\"\" name:\"appliance-id\" help:\"サービスエンドポイントゲートウェイのリソース ID。\""
-	InterfaceID string "arg:\"\" name:\"interface-id\" help:\"参照するインターフェースのスイッチ ID。seg-get の Interfaces にある Switch で確認できます。\""
+	InterfaceID string "arg:\"\" name:\"interface-id\" help:\"参照するインターフェースの ID。正しい値の取得方法は未確認のため、ライブ検証を [#189](https://github.com/sacloud/skr/issues/189) で管理しています。\""
 	factory     ApplianceAPIFactory
 	runtime     ApplianceRuntime
 }

@@ -40,7 +40,7 @@
     },
     {
       "name": "Update",
-      "help": "サービスエンドポイントゲートウェイの接続先マネージドサービス設定を更新します。Settings は全体置換です。既存の設定を維持したい項目は JSON に再指定してください。EnabledServices には接続先マネージドサービスを Type と Config で指定します (Type: ObjectStorage、ContainerRegistry、MonitoringSuite、AppRunDedicatedControlPlane など)。MonitoringSuite と DNSForwarding の Enabled は True または False です。設定の反映は apply で行います。",
+      "help": "サービスエンドポイントゲートウェイの接続先マネージドサービス設定を更新します。Settings は全体置換です。既存の設定を維持したい項目は JSON に再指定してください。EnabledServices には接続先マネージドサービスを Type と Config で指定します (Type: ObjectStorage、ContainerRegistry、MonitoringSuite、AppRunDedicatedControlPlane など)。MonitoringSuite と DNSForwarding の Enabled は True または False です。設定の反映は seg-apply で行います。",
       "method": "Update",
       "request_type": "v1.ModelsApplianceApplianceUpdateRequest",
       "request_by_value": true,
@@ -58,7 +58,7 @@
     },
     {
       "name": "Apply",
-      "help": "update で変更した設定をサービスエンドポイントゲートウェイへ反映します。接続先マネージドサービスの変更時、ゲートウェイ経由の通信が一時的に中断することがあります。",
+      "help": "seg-update で変更した設定をサービスエンドポイントゲートウェイへ反映します。接続先マネージドサービスの変更時、ゲートウェイ経由の通信が一時的に中断することがあります。",
       "method": "Apply",
       "arguments": [
         {
@@ -100,7 +100,7 @@
           "name": "interface-id",
           "field": "InterfaceID",
           "type": "string",
-          "help": "参照するインターフェースのスイッチ ID。seg-get の Interfaces にある Switch で確認できます。"
+          "help": "参照するインターフェースの ID。正しい値の取得方法は未確認のため、ライブ検証を [#189](https://github.com/sacloud/skr/issues/189) で管理しています。"
         }
       ],
       "command_name": "seg-interface-get-interface"

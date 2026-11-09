@@ -363,7 +363,7 @@ service-endpoint-gateway-api seg-delete live
 service-endpoint-gateway-api seg-list live
 service-endpoint-gateway-api seg-status-update-power-status live
 service-endpoint-gateway-api seg-get live
-service-endpoint-gateway-api seg-interface-get-interface live
+service-endpoint-gateway-api seg-interface-get-interface deferred #189 パスパラメータの interfaceID に指定できる値を応答から取得できないため未検証 (#189)
 service-endpoint-gateway-api seg-status-get-power-status live
 service-endpoint-gateway-api seg-status-reset-power-status live
 service-endpoint-gateway-api seg-status-delete-power-status live
