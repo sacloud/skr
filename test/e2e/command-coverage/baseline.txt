@@ -368,15 +368,15 @@ service-endpoint-gateway-api appliance read-power-status live
 service-endpoint-gateway-api appliance reset live
 service-endpoint-gateway-api appliance shutdown live
 service-endpoint-gateway-api appliance update live
-secretmanager-api create-vault-secret implemented #212 operationId 派生名への移行後にライブ再実行する
-secretmanager-api delete-vault-secret implemented #212 operationId 派生名への移行後にライブ再実行する
-secretmanager-api list-vault-secrets implemented #212 operationId 派生名への移行後にライブ再実行する
-secretmanager-api unveil-secret implemented #212 operationId 派生名への移行後にライブ再実行する
-secretmanager-api create-vault implemented #212 operationId 派生名への移行後にライブ再実行する
-secretmanager-api delete-vault implemented #212 operationId 派生名への移行後にライブ再実行する
-secretmanager-api list-vaults implemented #212 operationId 派生名への移行後にライブ再実行する
-secretmanager-api read-vault implemented #212 operationId 派生名への移行後にライブ再実行する
-secretmanager-api update-vault implemented #212 operationId 派生名への移行後にライブ再実行する
+secretmanager-api create-vault-secret live
+secretmanager-api delete-vault-secret live
+secretmanager-api list-vault-secrets live
+secretmanager-api unveil-secret live
+secretmanager-api create-vault live
+secretmanager-api delete-vault live
+secretmanager-api list-vaults live
+secretmanager-api read-vault live
+secretmanager-api update-vault live
 security-control-api activation create deferred #200 正常系には未アクティベートのプロジェクトが必要で、アクティベート済みプロジェクトでの 409 拒否のみ確認済み
 security-control-api activation read live
 security-control-api activation update live
