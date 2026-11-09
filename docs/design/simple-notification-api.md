@@ -2,20 +2,23 @@
 
 ## 対象範囲
 
-`simple-notification-api` は SDK `github.com/sacloud/sacloud-sdk-go v0.3.1` の Simple Notification API を操作します。通知先、通知先グループ、ルーティング、通知履歴を対象とし、公開する操作は次のとおりです。
+`simple-notification-api` は SDK `github.com/sacloud/sacloud-sdk-go v0.5.0` の Simple Notification API を操作します。2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) に従い、操作Id から派生した `skr simple-notification-api <operation>` のフラット名へ移行しました。通知先、通知先グループ、ルーティング設定は同じ CommonServiceItem 操作を共有し、種別は `--provider-class` で指定します。公開する操作は次のとおりです。
 
-| リソース | 実装操作 |
+| 操作 | コマンド |
 | --- | --- |
-| `destination` | `list`、`read`、`create`、`update`、`delete`、`read-status` |
-| `group` | `list`、`read`、`create`、`update`、`delete`、`send-message` |
-| `routing` | `list`、`read`、`create`、`update`、`delete`、`reorder`、`list-source` |
-| `history` | `list`、`read` |
+| CommonServiceItem 共通 | `list-common-service-items`、`read-common-service-item`、`create-common-service-item`、`update-common-service-item`、`delete-common-service-item` (いずれも `--provider-class` が必須) |
+| 通知先専用 | `check-notification-destination-status` |
+| 通知先グループ専用 | `send-notification` |
+| ルーティング設定専用 | `reorder-notification-routing`、`list-notification-sources` |
+| 通知履歴 | `list-notification-histories`、`read-notification-history` |
 
 シンプル通知はゾーンに依存せず、メールまたは Webhook で通知を送信します。通知先グループは1つ以上の通知先をまとめ、グループへの送信で登録された通知先に通知します。メール通知先はアドレス確認が完了するまで利用できず、Webhook は Slack、Discord、IFTTT、Zapier の URL が対象です。通知の到達は保証されず、メールマガジン、確実性が必要な障害通知、同一宛先への短時間の反復通知には適しません（[サービス基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/about.html)、[通知先](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination.html)、[通知先グループ](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination_group.html)）。
 
 ## パッケージと生成
 
-各リソースの操作は `api/commands/simple-notification-*.json` で明示し、`make generate-api` から `internal/simplenotificationapi/` に生成します。リソース固有の SDK 接続、リクエスト補完、通知先入力の保護処理も同じパッケージに配置します。パッケージはリソースごとの constructor (`NewDestinationAPI` など) と named decoder (`DecodeDestinationRequest` など) を公開し、通知先のエラー保護 adapter は constructor の中に隠蔽します。`internal/cli/` の配線は `make generate-wiring` から生成します。
+CommonServiceItem 操作と通知履歴の操作は、それぞれ `api/commands/simple-notification.json` と `api/commands/simple-notification-history.json` で明示します。
+`make generate-api` から `internal/simplenotificationapi/` に生成します。専用操作 4 つは手書きコマンドとして同じパッケージに配置し、共通操作の factory を種別を固定して呼び出します。リソース固有の SDK 接続、リクエスト補完、通知先入力の保護処理も同じパッケージに配置します。
+パッケージは CommonServiceItem と履歴の constructor (`NewCommonServiceItemAPI`、`NewHistoryAPI`) を公開し、通知先のエラー保護 adapter は factory の中に隠蔽します。`internal/cli/` の配線は `make generate-wiring` から生成します。
 
 生成コードを直接編集せず、設定を変更して再生成します。コマンドの生成コードと設定の一致は `internal/cli/simplenotification_test.go` で、配線の一致は `internal/cli/wiring_test.go` で確認します。手書き処理と SDK 呼び出しは `internal/simplenotificationapi/` の単体テストで、CLI 登録とヘルプは `internal/cli/` のテストで確認します。
 
@@ -26,8 +29,8 @@
 - 通知先の作成は JSON リクエストを `@path.json` で読み込みます。メールアドレスや Webhook URL を `--request` の値としてコマンド引数に渡せません。
 - 通知先の更新は `Settings` を含まないメタデータ変更であればインライン JSON または `@path.json` を利用できます。`Settings` を含む場合は設定値を保護するため `@path.json` を要求します。通知先アドレスは更新できず、変更は別の通知先を作成してグループ設定を更新します。
 - 作成リクエストでは、通知先、グループ、ルーティングそれぞれの `Provider.Class` と `ServiceClass` を CLI が設定します。未指定の `Description`、`Icon`、`Tags` も SDK の入力モデルに合わせて補完します。利用者向けヘルプでは、これらの補完をサービス操作の入力として誤解させないよう説明します。
-- `group send-message` は `--message` または `--request` JSON を受け付けます。`--message` は API リクエストの `Message` に対応し、両経路は併用できません。
-- グループ更新の `Settings` は全体として指定します。宛先や有効状態を維持する場合は、`group read` の結果を確認して更新リクエストにも含めます。
+- `send-notification` は `--message` または `--request` JSON を受け付けます。`--message` は API リクエストの `Message` に対応し、両経路は併用できません。
+- 更新の `Settings` は種別全体として指定します。宛先や有効状態を維持する場合は、`read-common-service-item` の結果を確認して更新リクエストにも含めます。
 - 通知先、グループ、ルーティングなどの配列や複雑な設定は JSON 経路に残します。独自のフラグ構文は追加しません。
 
 通知 API には対象操作の権限が必要です。API キーを使う場合は「作成・削除」アクセスレベルを付与します（[通知API](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/api.html)）。CLI の認証情報は SDK プロファイルまたは既存の SDK 認証機構から読み込みます。
@@ -36,7 +39,7 @@
 
 ## 通知送信と履歴
 
-通知は通知先 ID ではなく通知先グループ ID を指定して送信します。API の `202` 応答と `is_ok: true` は受付結果です。送信後は通知履歴から `request_id`、本文、対象グループと通知先の `statuses` を確認します。履歴 API が取得できるのは直近30日以内の最大100件です。状態 `2` はシンプル通知の送信処理が完了したことを示しますが、通知先への到達を示すものではありません（[通知API](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/api.html)、[通知履歴](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/history.html)、[通知API OpenAPI](https://manual.sakura.ad.jp/api/cloud/portal/simple-notification-api/index.html)）。
+通知は通知先 ID ではなく通知先グループ ID を指定して送信します。API の `202` 応答と `is_ok: true` は受付結果です。送信後は通知履歴から `request_id`、本文、対象グループと通知先の `statuses` を確認します。履歴の取得範囲と件数の上限は公式ドキュメントで確認してください。状態 `2` はシンプル通知の送信処理が完了したことを示しますが、通知先への到達を示すものではありません（[通知API](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/api.html)、[通知履歴](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/history.html)、[通知API OpenAPI](https://manual.sakura.ad.jp/api/cloud/portal/simple-notification-api/index.html)）。
 
 ## ライブ E2E と後片付け
 
@@ -52,7 +55,7 @@ $ SKR_E2E=1 SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID=DESTINATION-ID go test ./
 
 ### 通知を送信しない CRUD シナリオ
 
-`TestScenarioSimpleNotificationCRUDOnly` は、既存のメール通知先からアドレスを読み取り、同じアドレスの一時通知先、一時グループ、一時ルーティングを作成します。メールアドレスはコマンド引数へ渡さず、権限 `0600` の一時リクエストファイルに保存します。既存リソースは変更しません。`send-message` は呼び出しません。通知先登録時には確認メールを受信することがあります。
+`TestScenarioSimpleNotificationCRUDOnly` は、既存のメール通知先からアドレスを読み取り、同じアドレスの一時通知先、一時グループ、一時ルーティングを作成します。メールアドレスはコマンド引数へ渡さず、権限 `0600` の一時リクエストファイルに保存します。既存リソースは変更しません。`send-notification` は呼び出しません。通知先登録時には確認メールを受信することがあります。
 
 ```console
 $ SKR_E2E=1 SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID=DESTINATION-ID go test ./test/e2e/simple-notification/ -run TestScenarioSimpleNotificationCRUDOnly
@@ -60,7 +63,7 @@ $ SKR_E2E=1 SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID=DESTINATION-ID go test ./
 
 - 通知先、グループ、ルーティングの作成、一覧、個別取得、メタデータ更新、設定更新を確認します。通知先とグループは有効状態を切り替えて戻し、ルーティングは固有の照合ラベルを変更します。
 - `Settings` を省略したメタデータ更新で既存設定が維持されることと、設定全体の再指定で宛先や有効状態が保持されることを、更新後の個別取得で確認します。
-- 一時通知先の `read-status` に `IsValid` が含まれることを確認します。確認メールへの応答は要求せず、未確認の通知先を送信可能と判定しません。
+- 一時通知先の `check-notification-destination-status` に `IsValid` が含まれることを確認します。確認メールへの応答は要求せず、未確認の通知先を送信可能と判定しません。
 - ルーティングは固有の照合ラベルと一時グループを使います。作成時の優先順位は応答から取得し、`99` と `100` が未使用の場合だけ、その一時ルーティングの順位を変更します。既存ルーティングの ID や順位は並べ替え要求に含めず、前後の設定を照合します。
 - 一時リソースはルーティング、グループ、通知先の順に、Create 応答から保持した ID で削除します。削除後は一覧で ID と名前が残っていないことを確認します。
 
@@ -74,7 +77,7 @@ $ SKR_E2E=1 SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID=DESTINATION-ID go test ./
 
 単体テストでは、シナリオのリソース照合（タグの順序に依存しない比較、Settings の期待キーだけの比較、完全一致）を検証します。公開 SDK と HTTP テストサーバーを通した更新テストでは、`Settings` 自体の省略、内部の `Disabled` の省略、明示的な `true` と `false` の送信内容を区別します。このテストだけで API サーバーの設定保持動作を確認したとは扱いません。
 
-ライブ E2E ではメール通知処理の完了と一時グループの削除を確認済みです。利用者による実メールの受信確認も完了しています。追加ライブ E2E では通知先・グループ・ルーティングの CRUD、設定省略時の保持、有効状態と照合ラベルの更新、一時ルーティングだけの並べ替え、既存設定の保持、一時リソースの削除と不在を確認済みです。元の通知について履歴の個別取得も確認しています。これは実行結果であり、通知の到達保証を意味しません。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。再実行時も対象プロファイル、通知先、影響を確認して明示的な承認を得てください。
+ライブ E2E ではメール通知処理の完了と一時グループの削除を確認済みです。利用者による実メールの受信確認も完了しています。追加ライブ E2E では通知先・グループ・ルーティングの CRUD、設定省略時の保持、有効状態と照合ラベルの更新、一時ルーティングだけの並べ替え、既存設定の保持、一時リソースの削除と不在を確認済みです。2026-11-09 のフラット名移行後に全シナリオを再実行し、新しいコマンド名で正常応答を確認済みです。元の通知について履歴の個別取得も確認しています。これは実行結果であり、通知の到達保証を意味しません。Webhook の実送信・到達確認は [#130](https://github.com/sacloud/skr/issues/130) で対応します。再実行時も対象プロファイル、通知先、影響を確認して明示的な承認を得てください。
 
 ## 参考資料
 
@@ -83,4 +86,4 @@ $ SKR_E2E=1 SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID=DESTINATION-ID go test ./
 - [通知先グループ](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination_group.html)
 - [通知先ルーティング](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination_routing.html)
 - [通知履歴](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/history.html)
-- [Simple Notification API / sacloud-sdk-go v0.3.1](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1/api/simple-notification)
+- [sacloud-sdk-go v0.5.0: Simple Notification API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.5.0/api/simplenotification)

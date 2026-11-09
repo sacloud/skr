@@ -12,8 +12,8 @@ import (
 )
 
 type HistoryCommands struct {
-	List HistoryListCommand "cmd:\"\" help:\"通知履歴を一覧表示します。\""
-	Read HistoryReadCommand "cmd:\"\" help:\"通知履歴を読み取ります。\""
+	List HistoryListCommand "cmd:\"\" name:\"list-notification-histories\" help:\"通知履歴を一覧表示します。\""
+	Read HistoryReadCommand "cmd:\"\" name:\"read-notification-history\" help:\"通知履歴を読み取ります。\""
 }
 
 type HistoryAPI interface {

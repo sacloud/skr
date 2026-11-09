@@ -1,0 +1,128 @@
+{
+  "package": "simplenotificationapi",
+  "resource": "Simple Notification common service item",
+  "command_prefix": "CommonServiceItem",
+  "factory_arguments": [
+    {
+      "name": "provider-class",
+      "field": "ProviderClass",
+      "type": "string",
+      "required": true,
+      "help": "操作する CommonServiceItem の種別。saknoticedestination (通知先)、saknoticegroup (通知先グループ)、saknoticerouting (ルーティング設定) のいずれかを指定します。一覧では指定した種別に絞り込み、作成と更新ではリクエストの Provider.Class に自動設定します。"
+    }
+  ],
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "通知先、通知先グループ、ルーティング設定のいずれかを一覧表示します。--provider-class で指定した種別に絞り込みます。",
+      "method": "List",
+      "response_type": "*v1.ListCommonServiceItemsResponse",
+      "command_name": "list-common-service-items"
+    },
+    {
+      "name": "Read",
+      "help": "ID を指定して CommonServiceItem を読み取ります。ID は list-common-service-items の出力で確認できます。",
+      "method": "Read",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "list-common-service-items の出力で確認したリソース ID。"
+        }
+      ],
+      "response_type": "*v1.ReadCommonServiceItemOK",
+      "command_name": "read-common-service-item"
+    },
+    {
+      "name": "Create",
+      "help": "CommonServiceItem を作成します。--provider-class で指定した種別に応じて Settings を指定します。通知先 (saknoticedestination) は Settings に Type (email または webhook)、Value、任意の Disabled を指定します。メールアドレスは確認が完了するまで送信先として利用できません。メールアドレスや Webhook URL をコマンド引数に含めないでください。通知先グループ (saknoticegroup) は Settings.Destinations に通知先 ID を指定します。ルーティング設定 (saknoticerouting) は Settings にルーティング API の設定を指定します。Provider.Class と ServiceClass は自動設定します。",
+      "method": "Create",
+      "request_type": "v1.PostCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.CreateCommonServiceItemCreated",
+      "request_help": "CommonServiceItem の作成に使う JSON を直接または @path.json で指定します。Settings は種別ごとに異なります。通知先 (saknoticedestination) はメールアドレスや Webhook URL を保護するため @path.json で指定してください。Provider.Class と ServiceClass は自動設定します。",
+      "request_input_transform": "SetCreateRequestProviderInput",
+      "command_name": "create-common-service-item"
+    },
+    {
+      "name": "Update",
+      "help": "CommonServiceItem を更新します。Name、Description、Tags、Icon は必須です。値を維持する項目は参照結果から再指定してください。Settings を指定する場合は --provider-class で指定した種別の設定全体を指定します。通知先アドレスは変更できません。",
+      "method": "Update",
+      "request_type": "v1.PutCommonServiceItemRequest",
+      "request_by_value": true,
+      "response_type": "*v1.UpdateCommonServiceItemOK",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新するリソース ID。"
+        }
+      ],
+      "request_help": "CommonServiceItem の更新に使う JSON を直接または @path.json で指定します。Name、Description、Tags、Icon は必須です。値を維持する項目は参照結果から再指定してください。Settings を指定する場合は種別の設定全体を指定し、通知先 (saknoticedestination) は Webhook URL 等を保護するため @path.json を使ってください。",
+      "command_name": "update-common-service-item"
+    },
+    {
+      "name": "Delete",
+      "help": "ID を指定して CommonServiceItem を削除します。通知先を削除する場合は、グループから参照されている通知先を先にグループ設定から外してください。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するリソース ID。"
+        }
+      ],
+      "command_name": "delete-common-service-item"
+    },
+    {
+      "name": "ReadStatus",
+      "help": "通知先の送信可否ステータスを取得します。ステータス確認は通知先専用の操作のため --provider-class は不要です。",
+      "method": "ReadStatus",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "ステータスを確認する通知先 ID。"
+        }
+      ],
+      "response_type": "*v1.CheckDestinationStatusResponse",
+      "handwritten": true,
+      "interface_exclude": true,
+      "command_name": "check-notification-destination-status"
+    },
+    {
+      "name": "SendMessage",
+      "help": "通知先グループにメッセージを送信します。応答は受付結果であり、通知先への到達を保証しません。メッセージ送信は通知先グループ専用の操作のため --provider-class は不要です。",
+      "method": "SendMessage",
+      "handwritten": true,
+      "interface_exclude": true,
+      "command_name": "send-notification"
+    },
+    {
+      "name": "Reorder",
+      "help": "ルーティング設定の順序を変更します。順序変更はルーティング設定専用の操作のため --provider-class は不要です。",
+      "method": "Reorder",
+      "handwritten": true,
+      "interface_exclude": true,
+      "command_name": "reorder-notification-routing"
+    },
+    {
+      "name": "ListSource",
+      "help": "ルーティング設定に利用できる通知元を一覧表示します。通知元の一覧はルーティング設定専用の操作のため --provider-class は不要です。",
+      "method": "ListSource",
+      "handwritten": true,
+      "interface_exclude": true,
+      "command_name": "list-notification-sources"
+    }
+  ],
+  "wiring_target": "SimpleNotificationAPI.CommonServiceItem",
+  "sdk_factory": "simplenotificationapi.NewCommonServiceItemAPI",
+  "decoder": "simplenotificationapi.DecodeRequest"
+}

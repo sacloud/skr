@@ -10,7 +10,8 @@
       "name": "List",
       "help": "通知履歴を一覧表示します。",
       "method": "List",
-      "response_type": "*v1.ListNotificationHistoriesResponse"
+      "response_type": "*v1.ListNotificationHistoriesResponse",
+      "command_name": "list-notification-histories"
     },
     {
       "name": "Read",
@@ -24,7 +25,8 @@
           "help": "参照する通知履歴 ID。"
         }
       ],
-      "response_type": "*v1.ReadNotificationHistoryResponse"
+      "response_type": "*v1.ReadNotificationHistoryResponse",
+      "command_name": "read-notification-history"
     }
   ],
   "wiring_target": "SimpleNotificationAPI.History",

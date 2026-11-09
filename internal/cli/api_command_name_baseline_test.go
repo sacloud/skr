@@ -19,7 +19,6 @@ import (
 	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	objectstoragev1 "github.com/sacloud/sacloud-sdk-go/api/object-storage/apis/v2"
-	simplenotificationv1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 )
 
 // apiCommandNameBaseline は operationId 機械派生への移行が完了していないコマンドの
@@ -195,26 +194,4 @@ var apiCommandNameBaseline = map[string]string{
 	"object-storage-api site status bucket-metering":  objectstoragev1.GetBucketMeteringOperation,
 	"object-storage-api site status quota":            objectstoragev1.GetQuotaOperation,
 	"object-storage-api site status read":             objectstoragev1.GetStatusOperation,
-	// simple-notification-api
-	"simple-notification-api destination create":      simplenotificationv1.CreateCommonServiceItemOperation,
-	"simple-notification-api destination delete":      simplenotificationv1.DeleteCommonServiceItemOperation,
-	"simple-notification-api destination list":        simplenotificationv1.ListCommonServiceItemsOperation,
-	"simple-notification-api destination read":        simplenotificationv1.ReadCommonServiceItemOperation,
-	"simple-notification-api destination read-status": simplenotificationv1.CheckNotificationDestinationStatusOperation,
-	"simple-notification-api destination update":      simplenotificationv1.UpdateCommonServiceItemOperation,
-	"simple-notification-api group create":            simplenotificationv1.CreateCommonServiceItemOperation,
-	"simple-notification-api group delete":            simplenotificationv1.DeleteCommonServiceItemOperation,
-	"simple-notification-api group list":              simplenotificationv1.ListCommonServiceItemsOperation,
-	"simple-notification-api group read":              simplenotificationv1.ReadCommonServiceItemOperation,
-	"simple-notification-api group send-message":      simplenotificationv1.SendNotificationOperation,
-	"simple-notification-api group update":            simplenotificationv1.UpdateCommonServiceItemOperation,
-	"simple-notification-api history list":            simplenotificationv1.ListNotificationHistoriesOperation,
-	"simple-notification-api history read":            simplenotificationv1.ReadNotificationHistoryOperation,
-	"simple-notification-api routing create":          simplenotificationv1.CreateCommonServiceItemOperation,
-	"simple-notification-api routing delete":          simplenotificationv1.DeleteCommonServiceItemOperation,
-	"simple-notification-api routing list":            simplenotificationv1.ListCommonServiceItemsOperation,
-	"simple-notification-api routing list-source":     simplenotificationv1.ListNotificationSourcesOperation,
-	"simple-notification-api routing read":            simplenotificationv1.ReadCommonServiceItemOperation,
-	"simple-notification-api routing reorder":         simplenotificationv1.ReorderNotificationRoutingOperation,
-	"simple-notification-api routing update":          simplenotificationv1.UpdateCommonServiceItemOperation,
 }

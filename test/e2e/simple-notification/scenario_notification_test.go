@@ -87,7 +87,7 @@ func TestScenarioSimpleNotification(t *testing.T) {
 
 	// 既存通知先の送信可否を確認する（既存通知先は変更・削除しない）
 	data := h.Call(t, "既存通知先の送信可否を確認する",
-		"simple-notification-api", "destination", "read-status", destinationID)
+		"simple-notification-api", "check-notification-destination-status", destinationID)
 	var status struct {
 		NotificationStatus struct {
 			IsValid bool `json:"IsValid"`
@@ -115,7 +115,7 @@ func TestScenarioSimpleNotification(t *testing.T) {
 		},
 	})
 	created := parseGroupResponse(t, h.Call(t, "一時グループを作成する",
-		"simple-notification-api", "group", "create", "--request", "@"+requestPath), "一時グループを作成する")
+		"simple-notification-api", "create-common-service-item", "--provider-class", "saknoticegroup", "--request", "@"+requestPath), "一時グループを作成する")
 	require.NotEmpty(t, created.ID, "create response has no group ID")
 	require.True(t, sameGroup(created, created.ID, name, description, destinationID),
 		"create response does not match the requested group identity and destination")
@@ -123,7 +123,7 @@ func TestScenarioSimpleNotification(t *testing.T) {
 
 	// 後片付け: グループを削除し、一覧に残っていないことを確認する
 	defer func() {
-		_ = h.Call(t, "一時グループを削除する", "simple-notification-api", "group", "delete", id)
+		_ = h.Call(t, "一時グループを削除する", "simple-notification-api", "delete-common-service-item", "--provider-class", "saknoticegroup", id)
 		remaining := listGroups(t, h, "削除後にグループが一覧に残っていないことを確認する")
 		for _, item := range remaining {
 			require.NotEqual(t, id, item.ID, "E2E group %s remains after delete", id)
@@ -145,13 +145,13 @@ func TestScenarioSimpleNotification(t *testing.T) {
 
 	// 作成したグループを参照する
 	current := parseGroupResponse(t, h.Call(t, "作成したグループを参照する",
-		"simple-notification-api", "group", "read", id), "作成したグループを参照する")
+		"simple-notification-api", "read-common-service-item", "--provider-class", "saknoticegroup", id), "作成したグループを参照する")
 	require.True(t, sameGroup(current, id, name, description, destinationID),
 		"group read does not match the created group")
 
 	// テストメッセージを送信する
 	data = h.Call(t, "テストメッセージを送信する",
-		"simple-notification-api", "group", "send-message", id, "--message", message)
+		"simple-notification-api", "send-notification", id, "--message", message)
 	var send struct {
 		IsOK bool `json:"is_ok"`
 	}
@@ -170,7 +170,7 @@ func TestScenarioSimpleNotification(t *testing.T) {
 func listGroups(t *testing.T, h *helper.Helper, description string) []groupItem {
 	t.Helper()
 
-	data := h.Call(t, description, "simple-notification-api", "group", "list", "--query", groupListQuery)
+	data := h.Call(t, description, "simple-notification-api", "list-common-service-items", "--provider-class", "saknoticegroup", "--query", groupListQuery)
 	var items []groupItem
 	err := json.Unmarshal(data, &items)
 	require.NoError(t, err, "%s: decode projected group list: %v", description, err)
@@ -206,7 +206,7 @@ func waitForNotificationHistory(t *testing.T, h *helper.Helper, groupID, destina
 	for attempt := 1; ; attempt++ {
 		data := h.CallWithTimeout(t, commandTimeout,
 			fmt.Sprintf("通知履歴を確認する（%d 回目）", attempt),
-			"simple-notification-api", "history", "list", "--query", historyListQuery)
+			"simple-notification-api", "list-notification-histories", "--query", historyListQuery)
 		var histories []notificationHistory
 		err := json.Unmarshal(data, &histories)
 		require.NoError(t, err, "decode notification history: %v", err)
@@ -249,7 +249,7 @@ func waitForNotificationHistory(t *testing.T, h *helper.Helper, groupID, destina
 func verifyNotificationHistory(t *testing.T, h *helper.Helper, expected notificationHistory) {
 	t.Helper()
 
-	data := h.Call(t, "通知履歴を個別に参照する", "simple-notification-api", "history", "read", expected.RequestID,
+	data := h.Call(t, "通知履歴を個別に参照する", "simple-notification-api", "read-notification-history", expected.RequestID,
 		"--query", historyReadQuery)
 	var actual notificationHistory
 	err := json.Unmarshal(data, &actual)

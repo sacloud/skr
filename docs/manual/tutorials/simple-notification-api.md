@@ -9,9 +9,12 @@
 
 - `skr simple-notification-api` が利用でき、対象プロジェクトの認証プロファイルが設定されていること。
 - 通知 API の対象操作を利用する権限が付与されていること。API キーを使う場合は「作成・削除」アクセスレベルが必要です（[通知API](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/api.html)）。
-- 通知先 ID を把握していること。メールはアドレス確認済みで、通知先が有効かつ送信可能であること。送信可能状態は `destination read-status` で確認できます（[通知先](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination.html)）。
+- 通知先 ID を把握していること。メールはアドレス確認済みで、通知先が有効かつ送信可能であること。送信可能状態は `check-notification-destination-status` で確認できます（[通知先](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination.html)）。
 - 他の通知先グループと重複しない `GROUP-NAME` と説明を決めること。通知送信の本文はテスト用の文字列にし、秘密情報や個人情報を含めないでください。
 - チュートリアル中に作成するのは通知先グループ1件だけです。既存の通知先は作成・更新・削除しません。
+
+通知先、通知先グループ、ルーティング設定は同じ CommonServiceItem の操作で扱います。
+操作は `list-common-service-items`、`read-common-service-item`、`create-common-service-item`、`update-common-service-item`、`delete-common-service-item` の 5 つです。操作する種別は `--provider-class` で指定します。通知先グループは `--provider-class saknoticegroup` です。
 
 ## 作成するリソースと順序
 
@@ -25,26 +28,25 @@
 ```console
 $ skr config current
 $ skr simple-notification-api --help
-$ skr simple-notification-api destination read-status --help
-$ skr simple-notification-api group --help
-$ skr simple-notification-api group create --help
-$ skr simple-notification-api group read --help
-$ skr simple-notification-api group send-message --help
-$ skr simple-notification-api group delete --help
-$ skr simple-notification-api history list --help
+$ skr simple-notification-api check-notification-destination-status --help
+$ skr simple-notification-api create-common-service-item --help
+$ skr simple-notification-api read-common-service-item --help
+$ skr simple-notification-api send-notification --help
+$ skr simple-notification-api delete-common-service-item --help
+$ skr simple-notification-api list-notification-histories --help
 ```
 
 認証は選択中の SDK プロファイルを使います。追加の環境変数は不要です。`GROUP-NAME` は、以降のコマンドと JSON で同じ一意な名前に置き換えてください。
 
 ## Step 2: 通知先とグループ名を確認する
 
-`DESTINATION-ID` は、利用を承認された既存の通知先 ID に置き換えます。`read-status` は送信可能状態を返します。`IsValid` が `true` であることを確認してください。通知先の詳細出力にはアドレスが含まれるため、この手順では詳細を表示しません。
+`DESTINATION-ID` は、利用を承認された既存の通知先 ID に置き換えます。`check-notification-destination-status` は送信可能状態を返します。`IsValid` が `true` であることを確認してください。通知先の詳細出力にはアドレスが含まれるため、この手順では詳細を表示しません。
 
 新しいグループ名に一致するリソースがないことも確認します。名前が未使用の場合の出力は `[]` です。これは期待する出力形式であり、ライブ環境で取得した結果ではありません。実際に別の要素が表示された場合は、そのリソースを変更・削除せず、異なる名前を選んでください。
 
 ```console
-$ skr simple-notification-api destination read-status DESTINATION-ID
-$ skr simple-notification-api group list --query '.CommonServiceItems | map(select(.Name == "GROUP-NAME") | {ID,Name,Description})'
+$ skr simple-notification-api check-notification-destination-status DESTINATION-ID
+$ skr simple-notification-api list-common-service-items --provider-class saknoticegroup --query '.CommonServiceItems | map(select(.Name == "GROUP-NAME") | {ID,Name,Description})'
 ```
 
 ```json
@@ -68,19 +70,19 @@ $ skr simple-notification-api group list --query '.CommonServiceItems | map(sele
 }
 ```
 
-作成は保護したファイルから読み込みます。作成結果の `CommonServiceItem.ID` を控え、後続の `GROUP-ID` に指定してください。続けて `group read` を実行し、ID、名前、説明、通知先 ID が指定した値と一致することを確認します。
+作成は保護したファイルから読み込みます。作成結果の `CommonServiceItem.ID` を控え、後続の `GROUP-ID` に指定してください。続けて `read-common-service-item` を実行し、ID、名前、説明、通知先 ID が指定した値と一致することを確認します。
 
 作成コマンドがエラーになり ID を取得できなかった場合は、名前だけを手掛かりに削除しないでください。作成された可能性がある場合は、コントロールパネルなどで対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
 
 ```console
-$ skr simple-notification-api group create --request @group-create.json
-$ skr simple-notification-api group read GROUP-ID
+$ skr simple-notification-api create-common-service-item --provider-class saknoticegroup --request @group-create.json
+$ skr simple-notification-api read-common-service-item --provider-class saknoticegroup GROUP-ID
 ```
 
 作成直後に一覧でも確認する場合は、名前で対象を絞り、確認に必要な項目だけを表示します。次はテストで使う応答形式を ID と名前のプレースホルダーに置き換えた例であり、ライブ環境の実行結果ではありません。
 
 ```console
-$ skr simple-notification-api group list --query '.CommonServiceItems | map(select(.Name == "GROUP-NAME") | {ID,Name,Description,Settings})'
+$ skr simple-notification-api list-common-service-items --provider-class saknoticegroup --query '.CommonServiceItems | map(select(.Name == "GROUP-NAME") | {ID,Name,Description,Settings})'
 ```
 
 ```json
@@ -102,15 +104,15 @@ $ skr simple-notification-api group list --query '.CommonServiceItems | map(sele
 通知 API は通知先 ID ではなく通知先グループ ID を受け取ります。本文は API の `Message` フィールドに対応し、`--message` と `--request` は併用できません。API の成功応答は受付を示すもので、通知先への到達を示すものではありません（[通知API](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/api.html)）。
 
 ```console
-$ skr simple-notification-api group send-message GROUP-ID --message 'Simple Notification tutorial test'
+$ skr simple-notification-api send-notification GROUP-ID --message 'Simple Notification tutorial test'
 ```
 
 ## Step 5: 通知履歴を確認する
 
-通知履歴には通知リクエストの受信時刻、本文、通知先ごとの状態が含まれます。API で取得できる履歴は直近30日以内の最大100件です。次のコマンドで対象メッセージを見つけ、`statuses` のグループ ID と通知先 ID が今回の値に一致することを確認してください。状態 `2` は通知処理の完了を示しますが、メールや Webhook の到達完了を保証しません（[通知履歴](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/history.html)、[通知 API の仕様](https://manual.sakura.ad.jp/api/cloud/portal/simple-notification-api/index.html)）。
+通知履歴には通知リクエストの受信時刻、本文、通知先ごとの状態が含まれます。取得できる履歴の範囲と件数の上限は、公式ドキュメントで確認してください。次のコマンドで対象メッセージを見つけ、`statuses` のグループ ID と通知先 ID が今回の値に一致することを確認してください。状態 `2` は通知処理の完了を示しますが、メールや Webhook の到達完了を保証しません（[通知履歴](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/history.html)、[通知 API の仕様](https://manual.sakura.ad.jp/api/cloud/portal/simple-notification-api/index.html)）。
 
 ```console
-$ skr simple-notification-api history list --query '.NotificationHistories | map({request_id,received_at,message:.message.body,statuses:[.statuses[] | {group_id,destination_id,status}]})'
+$ skr simple-notification-api list-notification-histories --query '.NotificationHistories | map({request_id,received_at,message:.message.body,statuses:[.statuses[] | {group_id,destination_id,status}]})'
 ```
 
 次は API 仕様のレスポンス例を基に、ID、時刻、本文をプレースホルダーに置き換えた形状例です。ライブ環境での実行結果ではありません。
@@ -132,16 +134,16 @@ $ skr simple-notification-api history list --query '.NotificationHistories | map
 ]
 ```
 
-通知先の詳細状態は `destination read-status` で確認できます。通知処理が失敗した場合は履歴の状態を確認し、到達を確認したものとして扱わないでください。
+通知先の詳細状態は `check-notification-destination-status` で確認できます。通知処理が失敗した場合は履歴の状態を確認し、到達を確認したものとして扱わないでください。
 
 ## Step 6: 作成したグループだけを削除する
 
-削除前に `group read` で ID、名前、説明、通知先 ID がこの手順で作成したグループと一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。通知先は既存リソースのため削除しません。
+削除前に `read-common-service-item` で ID、名前、説明、通知先 ID がこの手順で作成したグループと一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。通知先は既存リソースのため削除しません。
 
 ```console
-$ skr simple-notification-api group read GROUP-ID
-$ skr simple-notification-api group delete GROUP-ID
-$ skr simple-notification-api group list --query '.CommonServiceItems | map(select(.ID == "GROUP-ID") | {ID,Name,Description})'
+$ skr simple-notification-api read-common-service-item --provider-class saknoticegroup GROUP-ID
+$ skr simple-notification-api delete-common-service-item --provider-class saknoticegroup GROUP-ID
+$ skr simple-notification-api list-common-service-items --provider-class saknoticegroup --query '.CommonServiceItems | map(select(.ID == "GROUP-ID") | {ID,Name,Description})'
 ```
 
 対象 ID が一覧に残っていない場合の出力は `[]` です。以下は E2E テストで確認している削除後の出力形式です。
@@ -150,7 +152,7 @@ $ skr simple-notification-api group list --query '.CommonServiceItems | map(sele
 []
 ```
 
-通知先、通知先グループ、ルーティング、通知履歴の操作一覧は、それぞれの `--help` で確認できます。ルーティングは通知を受け取るサービスを指定する設定です（[通知先ルーティング](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination_routing.html)）。
+ルーティングは通知を受け取るサービスを指定する設定です（[通知先ルーティング](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination_routing.html)）。ルーティング設定は `--provider-class saknoticerouting` で操作し、順序変更は `reorder-notification-routing`、利用できる通知元の一覧は `list-notification-sources` で確認できます。
 
 ## 参考資料
 
@@ -160,4 +162,4 @@ $ skr simple-notification-api group list --query '.CommonServiceItems | map(sele
 - [通知先ルーティング](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/destination_routing.html)
 - [通知履歴](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/history.html)
 - [通知API](https://manual.sakura.ad.jp/cloud/appliance/simplenotification/api.html)
-- [Simple Notification API / sacloud-sdk-go v0.3.1](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1/api/simple-notification)
+- [sacloud-sdk-go v0.5.0: Simple Notification API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.5.0/api/simplenotification)

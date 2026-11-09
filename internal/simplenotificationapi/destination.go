@@ -17,6 +17,7 @@ package simplenotificationapi
 import (
 	"context"
 
+	simplenotification "github.com/sacloud/sacloud-sdk-go/api/simple-notification"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 )
 
@@ -35,8 +36,11 @@ func protectDestinationError(message string, err error) error {
 	return &destinationError{message: message, cause: err}
 }
 
+// destinationAdapter は通知先の SDK 操作を包み、メールアドレスや Webhook URL が
+// 含まれ得るエラーを入力値を含まないメッセージへ変換します。通知先専用の
+// ReadStatus も変換対象にするため、SDK の操作インターフェースを埋め込んで上書きします。
 type destinationAdapter struct {
-	DestinationAPI
+	simplenotification.DestinationAPI
 }
 
 func (a destinationAdapter) List(ctx context.Context) (*v1.ListCommonServiceItemsResponse, error) {

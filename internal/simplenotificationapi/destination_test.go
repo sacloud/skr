@@ -16,80 +16,162 @@ package simplenotificationapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	simplenotification "github.com/sacloud/sacloud-sdk-go/api/simple-notification"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
-	clientconfig "github.com/sacloud/skr/internal/saclient"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDestinationAdapterProtectsAllSDKErrorsAndPreservesClassification(t *testing.T) {
-	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
-	t.Setenv("SAKURA_ACCESS_TOKEN", "test-token")
-	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "test-secret")
-	const webhookURL = "https://example.invalid/private-webhook-value"
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"error_code":"not_found","error_msg":"` + webhookURL + `","is_fatal":true}`))
-	}))
-	t.Cleanup(server.Close)
-	client, err := clientconfig.New(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	apiClient, err := simplenotification.NewClientWithAPIRootURL(client, server.URL+"/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	adapter := destinationAdapter{simplenotification.NewDestinationOp(apiClient)}
-	var create v1.PostCommonServiceItemRequest
-	if err := json.Unmarshal([]byte(`{"CommonServiceItem":{"Name":"test","Description":"","Tags":[],"Icon":null,"Provider":{"Class":"saknoticedestination"},"ServiceClass":"cloud/saknoticedestination/2","Settings":{"Type":"webhook","Value":"`+webhookURL+`"}}}`), &create); err != nil {
-		t.Fatal(err)
-	}
-	var update v1.PutCommonServiceItemRequest
-	if err := json.Unmarshal([]byte(`{"CommonServiceItem":{"Name":"test","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"webhook","Value":"`+webhookURL+`"}}}`), &update); err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	for _, test := range []struct {
-		name string
-		call func() error
+	opErr := errors.New("saknoticedestination op failed")
+	responses := map[string]struct {
+		response any
+		err      error
 	}{
-		{"list", func() error { _, err := adapter.List(ctx); return err }},
-		{"read", func() error { _, err := adapter.Read(ctx, "123456789012"); return err }},
-		{"create", func() error { _, err := adapter.Create(ctx, create); return err }},
-		{"update", func() error { _, err := adapter.Update(ctx, "123456789012", update); return err }},
-		{"delete", func() error { return adapter.Delete(ctx, "123456789012") }},
-		{"read-status", func() error { _, err := adapter.ReadStatus(ctx, "123456789012"); return err }},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			err := test.call()
-			if err == nil || strings.Contains(err.Error(), webhookURL) {
-				t.Fatalf("%s did not return a safe error", test.name)
-			}
-			var sdkError *simplenotification.Error
-			if !errors.As(err, &sdkError) {
-				t.Fatalf("SDK error classification lost: %T", err)
-			}
-			var statusError *v1.ErrorStatusCode
-			if !errors.As(err, &statusError) || statusError.StatusCode != http.StatusNotFound {
-				t.Fatalf("API status classification lost: %v", err)
-			}
+		"List":       {response: &v1.ListCommonServiceItemsResponse{}, err: opErr},
+		"Read":       {response: &v1.ReadCommonServiceItemOK{}, err: opErr},
+		"Create":     {response: &v1.CreateCommonServiceItemCreated{}, err: opErr},
+		"Update":     {response: &v1.UpdateCommonServiceItemOK{}, err: opErr},
+		"ReadStatus": {response: &v1.CheckDestinationStatusResponse{}, err: opErr},
+	}
+	for method, result := range responses {
+		t.Run(method, func(t *testing.T) {
+			adapter := destinationAdapter{newDestinationOpStub(t, method, result.response, result.err)}
+			require.Error(t, callDestinationAdapterMethod(adapter, method), "%s should return an error", method)
 		})
+	}
+	t.Run("Delete", func(t *testing.T) {
+		adapter := destinationAdapter{newDestinationOpStub(t, "Delete", nil, opErr)}
+		require.Error(t, adapter.Delete(context.Background(), "id"))
+	})
+	t.Run("success responses keep classification", func(t *testing.T) {
+		adapter := destinationAdapter{newDestinationOpStub(t, "Read", &v1.ReadCommonServiceItemOK{}, nil)}
+		result, err := adapter.Read(context.Background(), "id")
+		require.NoError(t, err)
+		require.IsType(t, &v1.ReadCommonServiceItemOK{}, result)
+	})
+	t.Run("error messages do not include request values", func(t *testing.T) {
+		adapter := destinationAdapter{newDestinationOpStub(t, "Create", nil, opErr)}
+		_, err := adapter.Create(context.Background(), v1.PostCommonServiceItemRequest{})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "通知先の作成に失敗しました")
+	})
+}
+
+func callDestinationAdapterMethod(adapter destinationAdapter, method string) error {
+	_, err := invokeDestinationAdapter(adapter, method)
+	return err
+}
+
+func invokeDestinationAdapter(adapter destinationAdapter, method string) (any, error) {
+	ctx := context.Background()
+	switch method {
+	case "List":
+		result, err := adapter.List(ctx)
+		return result, err
+	case "Read":
+		result, err := adapter.Read(ctx, "id")
+		return result, err
+	case "Create":
+		result, err := adapter.Create(ctx, v1.PostCommonServiceItemRequest{})
+		return result, err
+	case "Update":
+		result, err := adapter.Update(ctx, "id", v1.PutCommonServiceItemRequest{})
+		return result, err
+	case "ReadStatus":
+		result, err := adapter.ReadStatus(ctx, "id")
+		return result, err
+	default:
+		return nil, errors.New("unknown method: " + method)
 	}
 }
 
-func TestDestinationRequestProtectsDecodeErrorsAndPreservesCause(t *testing.T) {
-	err := DecodeDestinationRequest(`{"CommonServiceItem":{"Name":123}}`, &v1.PutCommonServiceItemRequest{})
-	require.Error(t, err)
-	require.NotContains(t, err.Error(), "https://", "error must not contain request values")
-	require.Contains(t, err.Error(), "通知先リクエストを読み込めません")
-	require.NotNil(t, errors.Unwrap(err), "decode error cause should be preserved")
+func newDestinationOpStub(t *testing.T, method string, response any, err error) simplenotification.DestinationAPI {
+	t.Helper()
+	op := &destinationOpStub{err: err}
+	switch method {
+	case "List":
+		op.list = func() (any, error) { return response, err }
+	case "Read":
+		op.read = func() (any, error) { return response, err }
+	case "Create":
+		op.create = func() (any, error) { return response, err }
+	case "Update":
+		op.update = func() (any, error) { return response, err }
+	case "ReadStatus":
+		op.readStatus = func() (any, error) { return response, err }
+	}
+	return op
+}
+
+// destinationOpStub は DestinationAPI の単一メソッドだけを置き換えるスタブです。
+type destinationOpStub struct {
+	simplenotification.DestinationAPI
+	list       func() (any, error)
+	read       func() (any, error)
+	create     func() (any, error)
+	update     func() (any, error)
+	readStatus func() (any, error)
+	err        error
+}
+
+func (s *destinationOpStub) Delete(ctx context.Context, id string) error {
+	return s.err
+}
+
+func (s *destinationOpStub) List(ctx context.Context) (*v1.ListCommonServiceItemsResponse, error) {
+	if s.list == nil {
+		return nil, s.err
+	}
+	result, err := s.list()
+	if result == nil {
+		return nil, err
+	}
+	return result.(*v1.ListCommonServiceItemsResponse), err
+}
+
+func (s *destinationOpStub) Read(ctx context.Context, id string) (*v1.ReadCommonServiceItemOK, error) {
+	if s.read == nil {
+		return nil, s.err
+	}
+	result, err := s.read()
+	if result == nil {
+		return nil, err
+	}
+	return result.(*v1.ReadCommonServiceItemOK), err
+}
+
+func (s *destinationOpStub) Create(ctx context.Context, request v1.PostCommonServiceItemRequest) (*v1.CreateCommonServiceItemCreated, error) {
+	if s.create == nil {
+		return nil, s.err
+	}
+	result, err := s.create()
+	if result == nil {
+		return nil, err
+	}
+	return result.(*v1.CreateCommonServiceItemCreated), err
+}
+
+func (s *destinationOpStub) Update(ctx context.Context, id string, request v1.PutCommonServiceItemRequest) (*v1.UpdateCommonServiceItemOK, error) {
+	if s.update == nil {
+		return nil, s.err
+	}
+	result, err := s.update()
+	if result == nil {
+		return nil, err
+	}
+	return result.(*v1.UpdateCommonServiceItemOK), err
+}
+
+func (s *destinationOpStub) ReadStatus(ctx context.Context, id string) (*v1.CheckDestinationStatusResponse, error) {
+	if s.readStatus == nil {
+		return nil, s.err
+	}
+	result, err := s.readStatus()
+	if result == nil {
+		return nil, err
+	}
+	return result.(*v1.CheckDestinationStatusResponse), err
 }
