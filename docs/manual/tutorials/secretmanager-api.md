@@ -28,15 +28,15 @@
 ```console
 $ skr config current
 $ skr secretmanager-api --help
-$ skr secretmanager-api vault create --help
-$ skr secretmanager-api vault read --help
-$ skr secretmanager-api vault list --help
-$ skr secretmanager-api vault update --help
-$ skr secretmanager-api vault delete --help
-$ skr secretmanager-api secret list --help
-$ skr secretmanager-api secret create --help
-$ skr secretmanager-api secret delete --help
-$ skr secretmanager-api secret unveil --help
+$ skr secretmanager-api create-vault --help
+$ skr secretmanager-api read-vault --help
+$ skr secretmanager-api list-vaults --help
+$ skr secretmanager-api update-vault --help
+$ skr secretmanager-api delete-vault --help
+$ skr secretmanager-api list-vault-secrets --help
+$ skr secretmanager-api create-vault-secret --help
+$ skr secretmanager-api delete-vault-secret --help
+$ skr secretmanager-api unveil-secret --help
 ```
 
 認証は選択中の SDK プロファイルを使います。`VAULT-NAME` と `SECRET-NAME` は、以降のコマンドと JSON で同じ一意な名前に置き換えてください。`KMS-KEY-ID` はシークレットの暗号化に使う既存の KMS キー ID に置き換えてください。
@@ -46,7 +46,7 @@ $ skr secretmanager-api secret unveil --help
 新しい Vault 名に一致する Vault がないことも確認します。名前が未使用の場合の出力は `[]` です。これは期待する出力形式であり、ライブ環境で取得した結果ではありません。実際に別の要素が表示された場合は、その Vault を変更・削除せず、異なる名前を選んでください。
 
 ```console
-$ skr secretmanager-api vault list --query 'map(select(.Name == "VAULT-NAME") | {ID,Name})'
+$ skr secretmanager-api list-vaults --query 'map(select(.Name == "VAULT-NAME") | {ID,Name})'
 ```
 
 ```json
@@ -56,7 +56,7 @@ $ skr secretmanager-api vault list --query 'map(select(.Name == "VAULT-NAME") | 
 Vault を作成します。`--kms-key-id` にはシークレットの暗号化に使う既存の KMS キー ID を指定します。`--description` は省略できます。Tags は `--request` JSON でのみ指定できます。
 
 ```console
-$ skr secretmanager-api vault create --name 'VAULT-NAME' --description 'SecretManager tutorial' --kms-key-id 'KMS-KEY-ID'
+$ skr secretmanager-api create-vault --name 'VAULT-NAME' --description 'SecretManager tutorial' --kms-key-id 'KMS-KEY-ID'
 ```
 
 ```json
@@ -71,12 +71,12 @@ $ skr secretmanager-api vault create --name 'VAULT-NAME' --description 'SecretMa
 }
 ```
 
-作成結果の `ID` を控え、以降の `VAULT-ID` に指定してください。作成コマンドがエラーになり ID を取得できなかった場合は、名前だけを手掛かりに削除しないでください。作成された可能性がある場合は、`secretmanager-api vault list` やコントロールパネルで対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
+作成結果の `ID` を控え、以降の `VAULT-ID` に指定してください。作成コマンドがエラーになり ID を取得できなかった場合は、名前だけを手掛かりに削除しないでください。作成された可能性がある場合は、`secretmanager-api list-vaults` やコントロールパネルで対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
 
 ## Step 3: 作成した Vault を参照する
 
 ```console
-$ skr secretmanager-api vault read VAULT-ID --query '{ID,Name,KmsKeyID}'
+$ skr secretmanager-api read-vault VAULT-ID --query '{ID,Name,KmsKeyID}'
 ```
 
 ```json
@@ -90,13 +90,13 @@ $ skr secretmanager-api vault read VAULT-ID --query '{ID,Name,KmsKeyID}'
 一覧でも同じ内容が返ることを確認します。
 
 ```console
-$ skr secretmanager-api vault list --query 'map(select(.ID == "VAULT-ID") | {ID,Name})'
+$ skr secretmanager-api list-vaults --query 'map(select(.ID == "VAULT-ID") | {ID,Name})'
 ```
 
-名前と説明の更新は `vault update` で行います。API の更新リクエストは `Name` が必須です。タグを設定・維持する場合は `--request` JSON で `Tags` を指定します。
+名前と説明の更新は `update-vault` で行います。API の更新リクエストは `Name` が必須です。タグを設定・維持する場合は `--request` JSON で `Tags` を指定します。
 
 ```console
-$ skr secretmanager-api vault update VAULT-ID --name 'VAULT-NAME' --description 'updated description'
+$ skr secretmanager-api update-vault VAULT-ID --name 'VAULT-NAME' --description 'updated description'
 ```
 
 ## Step 4: シークレットを作成する
@@ -105,7 +105,7 @@ $ skr secretmanager-api vault update VAULT-ID --name 'VAULT-NAME' --description 
 
 ```console
 $ printf 'db-password-value' > secret-value.txt
-$ skr secretmanager-api secret create VAULT-ID --name 'SECRET-NAME' --value-file secret-value.txt
+$ skr secretmanager-api create-vault-secret VAULT-ID --name 'SECRET-NAME' --value-file secret-value.txt
 ```
 
 ```json
@@ -119,7 +119,7 @@ $ skr secretmanager-api secret create VAULT-ID --name 'SECRET-NAME' --value-file
 
 ```console
 $ printf 'db-password-value-2' > secret-value.txt
-$ skr secretmanager-api secret create VAULT-ID --name 'SECRET-NAME' --value-file secret-value.txt
+$ skr secretmanager-api create-vault-secret VAULT-ID --name 'SECRET-NAME' --value-file secret-value.txt
 ```
 
 ```json
@@ -129,45 +129,45 @@ $ skr secretmanager-api secret create VAULT-ID --name 'SECRET-NAME' --value-file
 }
 ```
 
-Vault 内のシークレット一覧は `secret list` で確認できます。一覧はシークレットの値を含まないメタデータ (`Name`、`LatestVersion`) を返します。
+Vault 内のシークレット一覧は `list-vault-secrets` で確認できます。一覧はシークレットの値を含まないメタデータ (`Name`、`LatestVersion`) を返します。
 
 ```console
-$ skr secretmanager-api secret list VAULT-ID
+$ skr secretmanager-api list-vault-secrets VAULT-ID
 ```
 
 ## Step 5: シークレットを取得する
 
-`secret unveil` でシークレットの値を取得します。値はそのまま標準出力へ出力され、`--query` は適用されません。出力に秘密情報が含まれるため、リダイレクト先とシェル履歴の取り扱いに注意してください。確認後、ローカルの値ファイルは削除してください。
+`unveil-secret` でシークレットの値を取得します。値はそのまま標準出力へ出力され、`--query` は適用されません。出力に秘密情報が含まれるため、リダイレクト先とシェル履歴の取り扱いに注意してください。確認後、ローカルの値ファイルは削除してください。
 
 ```console
-$ skr secretmanager-api secret unveil VAULT-ID 'SECRET-NAME'
+$ skr secretmanager-api unveil-secret VAULT-ID 'SECRET-NAME'
 db-password-value-2
 ```
 
 `--secret-version` でバージョンを指定すると、過去のバージョンの値を取得できます。省略時は最新バージョンを取得します。
 
 ```console
-$ skr secretmanager-api secret unveil VAULT-ID 'SECRET-NAME' --secret-version 1
+$ skr secretmanager-api unveil-secret VAULT-ID 'SECRET-NAME' --secret-version 1
 db-password-value
 ```
 
 ## Step 6: シークレットを削除する
 
 ```console
-$ skr secretmanager-api secret delete VAULT-ID 'SECRET-NAME'
-$ skr secretmanager-api secret list VAULT-ID
+$ skr secretmanager-api delete-vault-secret VAULT-ID 'SECRET-NAME'
+$ skr secretmanager-api list-vault-secrets VAULT-ID
 ```
 
 削除後の一覧に対象シークレットが残っていないことを確認してください。
 
 ## Step 7: Vault を削除する
 
-削除前に `vault read` で ID と名前がこの手順で作成した Vault と一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。
+削除前に `read-vault` で ID と名前がこの手順で作成した Vault と一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。
 
 ```console
-$ skr secretmanager-api vault read VAULT-ID --query '{ID,Name}'
-$ skr secretmanager-api vault delete VAULT-ID
-$ skr secretmanager-api vault list --query 'map(select(.ID == "VAULT-ID") | {ID,Name})'
+$ skr secretmanager-api read-vault VAULT-ID --query '{ID,Name}'
+$ skr secretmanager-api delete-vault VAULT-ID
+$ skr secretmanager-api list-vaults --query 'map(select(.ID == "VAULT-ID") | {ID,Name})'
 ```
 
 対象 ID が一覧に残っていない場合の出力は `[]` です。以下は E2E テストで確認している削除後の出力形式です。
@@ -178,7 +178,7 @@ $ skr secretmanager-api vault list --query 'map(select(.ID == "VAULT-ID") | {ID,
 
 Vault を削除すると、保管していたシークレットは取得できなくなります。連携リソースがある場合は、削除前に依存関係を確認してください（[シークレットマネージャー基本情報](https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html)）。
 
-Vault とシークレットの操作一覧は `skr secretmanager-api vault --help` と `skr secretmanager-api secret --help` で確認できます。
+Vault とシークレットの操作一覧は `skr secretmanager-api --help` で確認できます。
 
 ## 参考資料
 

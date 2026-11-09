@@ -13,10 +13,10 @@ import (
 )
 
 type SecretCommands struct {
-	List   SecretListCommand   "cmd:\"\" help:\"Vault 内のシークレットを一覧表示します。シークレットの値は含まれません。--count と --from でページングできます。\""
-	Create SecretCreateCommand "cmd:\"\" help:\"Vault にシークレットを作成または更新します (upsert)。同名シークレットが存在する場合は新しいバージョンとして登録され、最新を含む 50 世代まで保管されます。値は --value-file でのみ指定できます。\""
-	Delete SecretDeleteCommand "cmd:\"\" help:\"Vault からシークレットを削除します。全バージョンが削除されます。削除前に対象 Vault ID とシークレット名を確認してください。\""
-	Unveil SecretUnveilCommand "cmd:\"\" help:\"シークレットを復号して値を取得します。値はそのまま標準出力へ出力され、--query は適用されません。出力に秘密情報が含まれるため、リダイレクト先とシェル履歴の取り扱いに注意してください。\""
+	List   SecretListCommand   "cmd:\"\" name:\"list-vault-secrets\" help:\"Vault 内のシークレットを一覧表示します。シークレットの値は含まれません。--count と --from でページングできます。\""
+	Create SecretCreateCommand "cmd:\"\" name:\"create-vault-secret\" help:\"Vault にシークレットを作成または更新します (upsert)。同名シークレットが存在する場合は新しいバージョンとして登録され、最新を含む 50 世代まで保管されます。値は --value-file でのみ指定できます。\""
+	Delete SecretDeleteCommand "cmd:\"\" name:\"delete-vault-secret\" help:\"Vault からシークレットを削除します。全バージョンが削除されます。削除前に対象 Vault ID とシークレット名を確認してください。\""
+	Unveil SecretUnveilCommand "cmd:\"\" name:\"unveil-secret\" help:\"シークレットを復号して値を取得します。値はそのまま標準出力へ出力され、--query は適用されません。出力に秘密情報が含まれるため、リダイレクト先とシェル履歴の取り扱いに注意してください。\""
 }
 
 type SecretAPI interface {
