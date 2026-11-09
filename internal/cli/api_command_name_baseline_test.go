@@ -16,7 +16,6 @@ package cli
 
 import (
 	apprundedicatedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
-	apprunv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
 	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	objectstoragev1 "github.com/sacloud/sacloud-sdk-go/api/object-storage/apis/v2"
@@ -30,23 +29,6 @@ import (
 // ドメインの移行を完了したら、該当ドメインのエントリを削除します。
 // 詳細は docs/design/api-command-operation-id-naming.md を参照してください。
 var apiCommandNameBaseline = map[string]string{
-	// apprun-api
-	"apprun-api application create":   apprunv1.CreateApplicationOperation,
-	"apprun-api application delete":   apprunv1.DeleteApplicationOperation,
-	"apprun-api application list":     apprunv1.ListApplicationsOperation,
-	"apprun-api application read":     apprunv1.ReadApplicationOperation,
-	"apprun-api application status":   apprunv1.ReadApplicationStatusOperation,
-	"apprun-api application update":   apprunv1.PatchApplicationOperation,
-	"apprun-api packet-filter read":   apprunv1.ReadApplicationPacketFilterOperation,
-	"apprun-api packet-filter update": apprunv1.PatchApplicationPacketFilterOperation,
-	"apprun-api traffic list":         apprunv1.ListApplicationTrafficOperation,
-	"apprun-api traffic update":       apprunv1.UpdateApplicationTrafficOperation,
-	"apprun-api user create":          apprunv1.CreateUserOperation,
-	"apprun-api user read":            apprunv1.ReadUserOperation,
-	"apprun-api version delete":       apprunv1.DeleteApplicationVersionOperation,
-	"apprun-api version list":         apprunv1.ListApplicationVersionsOperation,
-	"apprun-api version read":         apprunv1.ReadApplicationVersionOperation,
-	"apprun-api version status":       apprunv1.ReadApplicationVersionStatusOperation,
 	// apprun-dedicated-api
 	"apprun-dedicated-api application containers":    apprundedicatedv1.ListApplicationContainersOperation,
 	"apprun-dedicated-api application create":        apprundedicatedv1.CreateApplicationOperation,

@@ -12,8 +12,8 @@ import (
 )
 
 type TrafficCommands struct {
-	List   TrafficListCommand   "cmd:\"\" help:\"アプリケーションのトラフィック分散設定を取得します。\""
-	Update TrafficUpdateCommand "cmd:\"\" help:\"最大4バージョンへのトラフィック分散割合を更新します。最新バージョンを対象にする場合は is_latest_version を指定します。\""
+	List   TrafficListCommand   "cmd:\"\" name:\"list-application-traffic\" help:\"アプリケーションのトラフィック分散設定を取得します。\""
+	Update TrafficUpdateCommand "cmd:\"\" name:\"update-application-traffic\" help:\"最大4バージョンへのトラフィック分散割合を更新します。最新バージョンを対象にする場合は is_latest_version を指定します。\""
 }
 
 type TrafficAPI interface {

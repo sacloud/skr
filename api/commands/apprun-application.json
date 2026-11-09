@@ -44,7 +44,8 @@
           "help": "並び順。asc または desc。",
           "conversion": "NewOptApplicationSortOrder"
         }
-      ]
+      ],
+      "command_name": "list-applications"
     },
     {
       "name": "Read",
@@ -58,16 +59,18 @@
           "type": "string",
           "help": "取得するアプリケーション ID。"
         }
-      ]
+      ],
+      "command_name": "read-application"
     },
     {
       "name": "Create",
-      "help": "コンテナイメージからアプリケーションを作成します。コンテナイメージの設定にはコンポーネント名、CPU、メモリ、レジストリ設定が必要です。認証情報を含む可能性があるためリクエストは保護したファイルまたは標準入力から読み込みます。例: skr apprun-api application create --request @application.json",
+      "help": "コンテナイメージからアプリケーションを作成します。コンテナイメージの設定にはコンポーネント名、CPU、メモリ、レジストリ設定が必要です。認証情報を含む可能性があるためリクエストは保護したファイルまたは標準入力から読み込みます。例: skr apprun-api create-application --request @application.json",
       "method": "Create",
       "request_type": "v1.CreateApplicationBody",
       "request_file_only": true,
       "response_type": "*v1.HandlerCreateApplication",
-      "request_help": "CreateApplicationBody JSON。name、timeout_seconds、port、min_scale、max_scale、components を指定します。components には name、max_cpu、max_memory、deploy_source.container_registry.image が必要です。認証情報を含む場合があるため @path.json または -（標準入力）だけを受け付けます。"
+      "request_help": "CreateApplicationBody JSON。name、timeout_seconds、port、min_scale、max_scale、components を指定します。components には name、max_cpu、max_memory、deploy_source.container_registry.image が必要です。認証情報を含む場合があるため @path.json または -（標準入力）だけを受け付けます。",
+      "command_name": "create-application"
     },
     {
       "name": "Update",
@@ -84,7 +87,8 @@
           "type": "string",
           "help": "更新するアプリケーション ID。"
         }
-      ]
+      ],
+      "command_name": "patch-application"
     },
     {
       "name": "Delete",
@@ -97,7 +101,8 @@
           "type": "string",
           "help": "削除するアプリケーション ID。"
         }
-      ]
+      ],
+      "command_name": "delete-application"
     },
     {
       "name": "Status",
@@ -111,7 +116,8 @@
           "type": "string",
           "help": "ステータスを取得するアプリケーション ID。"
         }
-      ]
+      ],
+      "command_name": "read-application-status"
     }
   ],
   "wiring_target": "AppRunAPI.Application",

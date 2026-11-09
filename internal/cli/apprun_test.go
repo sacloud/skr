@@ -34,18 +34,18 @@ func TestRunAppRunAPIHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"apprun-api", "--help"},
-			want: []string{"application", "version", "packet-filter", "traffic", "user", "AppRun 共用型", "保護したファイル", "manual.sakura.ad.jp/cloud/apprun/about.html"},
+			want: []string{"list-applications", "create-application", "patch-application", "read-application", "delete-application", "read-application-status", "AppRun 共用型", "保護したファイル", "manual.sakura.ad.jp/cloud/apprun/about.html"},
 		},
 		{
-			args: []string{"apprun-api", "application", "create", "--help"},
+			args: []string{"apprun-api", "create-application", "--help"},
 			want: []string{"CreateApplicationBody", "--request", "@path.json", "標準入力", "認証情報"},
 		},
 		{
-			args: []string{"apprun-api", "application", "list", "--help"},
+			args: []string{"apprun-api", "list-applications", "--help"},
 			want: []string{"--page-num", "--page-size", "--sort-field", "--sort-order"},
 		},
 		{
-			args: []string{"apprun-api", "traffic", "update", "--help"},
+			args: []string{"apprun-api", "update-application-traffic", "--help"},
 			want: []string{"UpdateTrafficBody", "version_name", "percent", "最新バージョン"},
 		},
 	} {
@@ -62,7 +62,7 @@ func TestRunAppRunAPIHelp(t *testing.T) {
 
 func TestRunAppRunAPIRejectsInlineSensitiveCreateRequest(t *testing.T) {
 	const secret = "test-only-apprun-secret"
-	args := []string{"apprun-api", "application", "create", "--request",
+	args := []string{"apprun-api", "create-application", "--request",
 		`{"components":[{"secret":[{"key":"TOKEN","value":"` + secret + `"}]}]}`}
 	var stdout, stderr bytes.Buffer
 	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
@@ -72,7 +72,7 @@ func TestRunAppRunAPIRejectsInlineSensitiveCreateRequest(t *testing.T) {
 
 func TestRunAppRunAPIRejectsInlineSensitiveUpdateRequest(t *testing.T) {
 	const secret = "test-only-apprun-secret"
-	args := []string{"apprun-api", "application", "update", "app-id", "--request",
+	args := []string{"apprun-api", "patch-application", "app-id", "--request",
 		`{"components":[{"secret":[{"key":"TOKEN","value":"` + secret + `"}]}]}`}
 	var stdout, stderr bytes.Buffer
 	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
@@ -82,8 +82,8 @@ func TestRunAppRunAPIRejectsInlineSensitiveUpdateRequest(t *testing.T) {
 
 func TestRunAppRunAPIRejectsInvalidSortOrder(t *testing.T) {
 	for _, args := range [][]string{
-		{"apprun-api", "application", "list", "--sort-order", "invalid"},
-		{"apprun-api", "version", "list", "--application-id", "app-id", "--sort-order", "invalid"},
+		{"apprun-api", "list-applications", "--sort-order", "invalid"},
+		{"apprun-api", "list-application-versions", "--application-id", "app-id", "--sort-order", "invalid"},
 	} {
 		var stdout, stderr bytes.Buffer
 		require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
@@ -111,7 +111,7 @@ func TestAppRunAPIWithSakumock(t *testing.T) {
 	request := `{"name":"mock-apprun","timeout_seconds":60,"port":8080,"min_scale":0,"max_scale":1,"scale_target_concurrency":100,"components":[{"name":"web","max_cpu":"0.5","max_memory":"1Gi","deploy_source":{"container_registry":{"image":"ghcr.io/sacloud/apprun-samples/tutorial:latest"}},"secret":[{"key":"TOKEN","value":"test-only-apprun-secret"}]}]}`
 	err := os.WriteFile(requestFile, []byte(request), 0o600)
 	require.NoError(t, err)
-	createdData := runCommand("apprun-api", "application", "create", "--request", "@"+requestFile)
+	createdData := runCommand("apprun-api", "create-application", "--request", "@"+requestFile)
 	if bytes.Contains(createdData, []byte("test-only-apprun-secret")) {
 		t.Fatalf("application create output exposed a secret: %s", createdData)
 	}
@@ -130,46 +130,46 @@ func TestAppRunAPIWithSakumock(t *testing.T) {
 			Name string `json:"name"`
 		} `json:"data"`
 	}
-	err3 := json.Unmarshal(runCommand("apprun-api", "application", "list", "--page-num", "1", "--page-size", "10"), &listed)
+	err3 := json.Unmarshal(runCommand("apprun-api", "list-applications", "--page-num", "1", "--page-size", "10"), &listed)
 	require.NoError(t, err3)
 	require.Len(t, listed.Data, 1, "application list = %+v, want created application", listed)
 	require.Equal(t, created.ID, listed.Data[0].ID, "unexpected value")
 	require.Equal(t, created.Name, listed.Data[0].Name, "unexpected value")
-	runCommand("apprun-api", "application", "read", created.ID)
-	runCommand("apprun-api", "application", "status", created.ID)
-	runCommand("apprun-api", "traffic", "list", created.ID)
-	runCommand("apprun-api", "packet-filter", "read", created.ID)
+	runCommand("apprun-api", "read-application", created.ID)
+	runCommand("apprun-api", "read-application-status", created.ID)
+	runCommand("apprun-api", "list-application-traffic", created.ID)
+	runCommand("apprun-api", "read-application-packet-filter", created.ID)
 
 	updateFile := filepath.Join(t.TempDir(), "update.json")
 	err4 := os.WriteFile(updateFile, []byte(`{"max_scale":1}`), 0o600)
 	require.NoError(t, err4)
-	runCommand("apprun-api", "application", "update", created.ID, "--request", "@"+updateFile)
+	runCommand("apprun-api", "patch-application", created.ID, "--request", "@"+updateFile)
 	err5 := os.WriteFile(updateFile, []byte(`{"min_scale":0}`), 0o600)
 	require.NoError(t, err5)
-	runCommand("apprun-api", "application", "update", created.ID, "--request", "@"+updateFile)
+	runCommand("apprun-api", "patch-application", created.ID, "--request", "@"+updateFile)
 
 	var versions struct {
 		Data []struct {
 			ID string `json:"id"`
 		} `json:"data"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("apprun-api", "version", "list", "--application-id", created.ID,
+	require.NoError(t, json.Unmarshal(runCommand("apprun-api", "list-application-versions", "--application-id", created.ID,
 		"--sort-field", "created_at", "--sort-order", "asc"), &versions))
 	if len(versions.Data) < 2 || versions.Data[0].ID == "" {
 		t.Fatalf("version list = %+v, want two versions created by application updates", versions)
 	}
 	versionID := versions.Data[0].ID
-	runCommand("apprun-api", "version", "read", "--application-id", created.ID, "--version-id", versionID)
-	runCommand("apprun-api", "version", "status", "--application-id", created.ID, "--version-id", versionID)
-	runCommand("apprun-api", "traffic", "update", created.ID, "--request", `[{"is_latest_version":true,"percent":100}]`)
-	runCommand("apprun-api", "version", "delete", "--application-id", created.ID, "--version-id", versionID)
-	runCommand("apprun-api", "packet-filter", "update", created.ID, "--request", `{"is_enabled":false,"settings":[]}`)
+	runCommand("apprun-api", "read-application-version", "--application-id", created.ID, "--version-id", versionID)
+	runCommand("apprun-api", "read-application-version-status", "--application-id", created.ID, "--version-id", versionID)
+	runCommand("apprun-api", "update-application-traffic", created.ID, "--request", `[{"is_latest_version":true,"percent":100}]`)
+	runCommand("apprun-api", "delete-application-version", "--application-id", created.ID, "--version-id", versionID)
+	runCommand("apprun-api", "patch-application-packet-filter", created.ID, "--request", `{"is_enabled":false,"settings":[]}`)
 
-	runCommand("apprun-api", "user", "create")
-	runCommand("apprun-api", "user", "read")
-	runCommand("apprun-api", "application", "delete", created.ID)
+	runCommand("apprun-api", "create-user")
+	runCommand("apprun-api", "read-user")
+	runCommand("apprun-api", "delete-application", created.ID)
 	var remaining []any
-	require.NoError(t, json.Unmarshal(runCommand("apprun-api", "application", "list",
+	require.NoError(t, json.Unmarshal(runCommand("apprun-api", "list-applications",
 		"--query", ".data | map(select(.id == \""+created.ID+"\"))"), &remaining))
 	require.Len(t, remaining, 0, "deleted application remains in list: %+v", remaining)
 }

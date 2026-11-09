@@ -12,10 +12,10 @@ import (
 )
 
 type VersionCommands struct {
-	List   VersionListCommand   "cmd:\"\" help:\"アプリケーションのバージョン一覧を取得します。\""
-	Read   VersionReadCommand   "cmd:\"\" help:\"アプリケーションのバージョン詳細を取得します。\""
-	Delete VersionDeleteCommand "cmd:\"\" help:\"アプリケーションのバージョンを削除します。最新バージョン、トラフィックの宛先に指定したバージョン、最後の1件は削除できません。\""
-	Status VersionStatusCommand "cmd:\"\" help:\"アプリケーションのバージョンステータスを取得します。\""
+	List   VersionListCommand   "cmd:\"\" name:\"list-application-versions\" help:\"アプリケーションのバージョン一覧を取得します。\""
+	Read   VersionReadCommand   "cmd:\"\" name:\"read-application-version\" help:\"アプリケーションのバージョン詳細を取得します。\""
+	Delete VersionDeleteCommand "cmd:\"\" name:\"delete-application-version\" help:\"アプリケーションのバージョンを削除します。最新バージョン、トラフィックの宛先に指定したバージョン、最後の1件は削除できません。\""
+	Status VersionStatusCommand "cmd:\"\" name:\"read-application-version-status\" help:\"アプリケーションのバージョンステータスを取得します。\""
 }
 
 type VersionAPI interface {

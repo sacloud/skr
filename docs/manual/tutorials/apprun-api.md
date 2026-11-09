@@ -17,17 +17,17 @@ AppRun 共用型は、コンテナイメージからアプリケーションを�
 ```console
 $ skr config current
 $ skr apprun-api --help
-$ skr apprun-api application list --help
-$ skr apprun-api application create --help
-$ skr apprun-api application read --help
-$ skr apprun-api application status --help
-$ skr apprun-api application delete --help
+$ skr apprun-api list-applications --help
+$ skr apprun-api create-application --help
+$ skr apprun-api read-application --help
+$ skr apprun-api read-application-status --help
+$ skr apprun-api delete-application --help
 ```
 
 認証には選択中の SDK プロファイルを使います。`APP-NAME` に置き換えた名前で既存のアプリケーションが見つかった場合は、そのアプリケーションを変更せず、別の名前を選んでください。
 
 ```console
-$ skr apprun-api application list --page-num 1 --page-size 100 --query '.data | map({id,name,status,public_url})'
+$ skr apprun-api list-applications --page-num 1 --page-size 100 --query '.data | map({id,name,status,public_url})'
 ```
 
 対象ページにアプリケーションがない場合は、次のように `[]` が表示されます。これはライブ E2E で確認した出力です。
@@ -84,7 +84,7 @@ $ chmod 600 apprun-tutorial/application-create.json
 作成結果の `id`、`name`、`public_url` を控えます。以降の `APP-ID` と `PUBLIC-URL` には、同じ作成結果から取得した値を指定します。出力を共有する場合は、環境固有の値や認証情報を含めないでください。
 
 ```console
-$ skr apprun-api application create --request @apprun-tutorial/application-create.json
+$ skr apprun-api create-application --request @apprun-tutorial/application-create.json
 ```
 
 作成時点で `status` が `Deploying` でも、作成の失敗ではありません。公開 URL の応答確認は Step 4 で行います。
@@ -94,7 +94,7 @@ $ skr apprun-api application create --request @apprun-tutorial/application-creat
 作成した ID を使って設定を参照します。
 
 ```console
-$ skr apprun-api application read APP-ID
+$ skr apprun-api read-application APP-ID
 ```
 
 `id`、`name`、`public_url` が作成結果と一致することを確認します。さらに、`port` が `8080`、`min_scale` が `0`、`max_scale` が `1` であることを照合してください。`components` が1件で、名前が `web`、CPU が `0.5`、メモリが `1Gi`、イメージが指定した公開サンプルと一致することも確認します。異なる場合は操作を止め、原因を確認してください。
@@ -102,7 +102,7 @@ $ skr apprun-api application read APP-ID
 一覧でも作成した ID と名前を確認します。
 
 ```console
-$ skr apprun-api application list --page-num 1 --page-size 100 --query '.data | map({id,name,status,public_url})'
+$ skr apprun-api list-applications --page-num 1 --page-size 100 --query '.data | map({id,name,status,public_url})'
 ```
 
 次はライブ E2E で確認した一覧を基に、ID、名前、公開 URL をプレースホルダーへ置き換えた例です。この例の一覧には、作成したアプリケーション1件だけが含まれています。
@@ -129,7 +129,7 @@ $ skr apprun-api application list --page-num 1 --page-size 100 --query '.data | 
 デプロイは通常1〜2分程度で完了します（[AppRun クイックスタート](https://manual.sakura.ad.jp/cloud/apprun/getting_started.html)、[AppRun API / sacloud-sdk-go v0.3.1](https://github.com/sacloud/sacloud-sdk-go/tree/v0.3.1/api/apprun)）。
 
 ```console
-$ skr apprun-api application status APP-ID
+$ skr apprun-api read-application-status APP-ID
 ```
 
 次はライブ E2E で確認した反映中の応答です。
@@ -170,9 +170,9 @@ HTTP status: 200
 削除前に ID、名前、ポート、公開 URL、コンテナイメージが Step 3 で確認したアプリケーションと一致することを再確認します。ID を取得できない場合や設定が一致しない場合は削除しないでください。
 
 ```console
-$ skr apprun-api application read APP-ID
-$ skr apprun-api application delete APP-ID
-$ skr apprun-api application list --page-num 1 --page-size 100 --query '.data | map({id,name,status,public_url})'
+$ skr apprun-api read-application APP-ID
+$ skr apprun-api delete-application APP-ID
+$ skr apprun-api list-applications --page-num 1 --page-size 100 --query '.data | map({id,name,status,public_url})'
 ```
 
 削除後の一覧に対象 ID がないことを確認します。次はライブ E2E で確認した出力です。他のアプリケーションがないため、一覧全体が空になっています。

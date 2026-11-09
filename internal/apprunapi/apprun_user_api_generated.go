@@ -12,8 +12,8 @@ import (
 )
 
 type UserCommands struct {
-	Read   UserReadCommand   "cmd:\"\" help:\"ログイン中の AppRun ユーザー情報を取得します。\""
-	Create UserCreateCommand "cmd:\"\" help:\"AppRun にサインアップします。\""
+	Read   UserReadCommand   "cmd:\"\" name:\"read-user\" help:\"ログイン中の AppRun ユーザー情報を取得します。\""
+	Create UserCreateCommand "cmd:\"\" name:\"create-user\" help:\"AppRun にサインアップします。\""
 }
 
 type UserAPI interface {

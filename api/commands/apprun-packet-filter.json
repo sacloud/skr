@@ -18,7 +18,8 @@
           "type": "string",
           "help": "対象アプリケーション ID。"
         }
-      ]
+      ],
+      "command_name": "read-application-packet-filter"
     },
     {
       "name": "Update",
@@ -34,7 +35,8 @@
           "type": "string",
           "help": "対象アプリケーション ID。"
         }
-      ]
+      ],
+      "command_name": "patch-application-packet-filter"
     }
   ],
   "wiring_target": "AppRunAPI.PacketFilter",

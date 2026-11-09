@@ -1,23 +1,23 @@
-# 末端サブコマンドごとの E2E 状況。1行1コマンドで、<path> <status> の順に書きます。
-# 延期の場合は status の後に追跡 Issue の参照 (#144 など) と説明を書き、必要に応じて補足を書きます。
 # status は live(ライブ検証済み) / implemented(実装済み・ライブ未実施) / deferred(延期) / todo(未整備) のいずれか。
+# 延期の場合は status の後に追跡 Issue の参照 (#144 など) と説明を書き、必要に応じて補足を書きます。
+# 末端サブコマンドごとの E2E 状況。1行1コマンドで、<path> <status> の順に書きます。
 # 詳細は docs/design/live-e2e-coverage.md を参照。
-apprun-api application create live
-apprun-api application delete live
-apprun-api application list live
-apprun-api application read live
-apprun-api application status live
-apprun-api application update live
-apprun-api packet-filter read live
-apprun-api packet-filter update live
-apprun-api traffic list live
-apprun-api traffic update live
-apprun-api user create live
-apprun-api user read live
-apprun-api version delete live
-apprun-api version list live
-apprun-api version read live
-apprun-api version status live
+apprun-api create-application live
+apprun-api create-user live
+apprun-api delete-application live
+apprun-api delete-application-version live
+apprun-api list-application-traffic live
+apprun-api list-application-versions live
+apprun-api list-applications live
+apprun-api patch-application live
+apprun-api patch-application-packet-filter live
+apprun-api read-application live
+apprun-api read-application-packet-filter live
+apprun-api read-application-status live
+apprun-api read-application-version live
+apprun-api read-application-version-status live
+apprun-api read-user live
+apprun-api update-application-traffic live
 apprun-dedicated-api application containers deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated-api application create deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated-api application delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
@@ -72,8 +72,8 @@ eventbus-api create-common-service-item live
 eventbus-api delete-common-service-item live
 eventbus-api list-common-service-items live
 eventbus-api read-common-service-item live
-eventbus-api update-common-service-item live
 eventbus-api set-process-configuration-secret live
+eventbus-api update-common-service-item live
 gslb-api create live
 gslb-api delete live
 gslb-api find live
@@ -82,6 +82,19 @@ gslb-api update live
 http live
 iaas-api archive find live
 iaas-api archive read live
+iaas-api database boot live
+iaas-api database create live
+iaas-api database delete live
+iaas-api database find live
+iaas-api database list-parameter live
+iaas-api database monitor-cpu live
+iaas-api database monitor-database live
+iaas-api database monitor-disk live
+iaas-api database monitor-interface live
+iaas-api database read live
+iaas-api database reset live
+iaas-api database shutdown live
+iaas-api database update live
 iaas-api disk create live
 iaas-api disk delete live
 iaas-api disk find live
@@ -137,19 +150,6 @@ iaas-api server delete live
 iaas-api server find live
 iaas-api server read live
 iaas-api server update live
-iaas-api database find live
-iaas-api database read live
-iaas-api database create live
-iaas-api database update live
-iaas-api database delete live
-iaas-api database boot live
-iaas-api database shutdown live
-iaas-api database reset live
-iaas-api database monitor-cpu live
-iaas-api database monitor-disk live
-iaas-api database monitor-interface live
-iaas-api database monitor-database live
-iaas-api database list-parameter live
 iaas-api service-class find live
 iaas-api switch create live
 iaas-api switch delete live
@@ -255,19 +255,19 @@ kms-api read-key live
 kms-api rotate-key live
 kms-api schedule-key-destruction live
 kms-api update-key live
-networking-suite-api list-addresses live
-networking-suite-api read-address live
 networking-suite-api create-interface-connection live
-networking-suite-api delete-interface-connection live
 networking-suite-api create-subnet live
-networking-suite-api delete-subnet live
-networking-suite-api list-subnets live
-networking-suite-api read-subnet live
-networking-suite-api update-subnet live
 networking-suite-api create-subnet-group live
+networking-suite-api delete-interface-connection live
+networking-suite-api delete-subnet live
 networking-suite-api delete-subnet-group live
+networking-suite-api list-addresses live
 networking-suite-api list-subnet-groups live
+networking-suite-api list-subnets live
+networking-suite-api read-address live
+networking-suite-api read-subnet live
 networking-suite-api read-subnet-group live
+networking-suite-api update-subnet live
 networking-suite-api update-subnet-group live
 object-storage-api account access-key create live
 object-storage-api account access-key delete live
@@ -314,6 +314,37 @@ proxylb-api read live
 proxylb-api renew-lets-encrypt-cert deferred #199 正常系には実在ドメインの DNS 検証が必要で、Let's Encrypt 未設定時の異常系のみ確認済み
 proxylb-api set-certificates live
 proxylb-api update live
+secretmanager-api create-vault live
+secretmanager-api create-vault-secret live
+secretmanager-api delete-vault live
+secretmanager-api delete-vault-secret live
+secretmanager-api list-vault-secrets live
+secretmanager-api list-vaults live
+secretmanager-api read-vault live
+secretmanager-api unveil-secret live
+secretmanager-api update-vault live
+security-control-api automated-actions-create live
+security-control-api automated-actions-delete live
+security-control-api automated-actions-list live
+security-control-api automated-actions-read live
+security-control-api automated-actions-update live
+security-control-api evaluation-rules-list live
+security-control-api evaluation-rules-read live
+security-control-api evaluation-rules-update live
+security-control-api project-activation-create deferred #200 正常系には未アクティベートのプロジェクトが必要で、アクティベート済みプロジェクトでの 409 拒否のみ確認済み
+security-control-api project-activation-read live
+security-control-api project-activation-update live
+service-endpoint-gateway-api seg-apply live
+service-endpoint-gateway-api seg-create live
+service-endpoint-gateway-api seg-delete live
+service-endpoint-gateway-api seg-get live
+service-endpoint-gateway-api seg-interface-get-interface live
+service-endpoint-gateway-api seg-list live
+service-endpoint-gateway-api seg-status-delete-power-status live
+service-endpoint-gateway-api seg-status-get-power-status live
+service-endpoint-gateway-api seg-status-reset-power-status live
+service-endpoint-gateway-api seg-status-update-power-status live
+service-endpoint-gateway-api seg-update live
 simple-notification-api destination create live
 simple-notification-api destination delete live
 simple-notification-api destination list live
@@ -335,47 +366,16 @@ simple-notification-api routing list-source live
 simple-notification-api routing read live
 simple-notification-api routing reorder live
 simple-notification-api routing update live
-simplemq-api delete-message live
-simplemq-api extend-message-timeout live
-simplemq-api receive-message live
-simplemq-api send-message live
 simplemq-api clear-queue live
-simplemq-api update-queue live
-simplemq-api read-message-count live
 simplemq-api create-queue live
+simplemq-api delete-message live
 simplemq-api delete-queue live
+simplemq-api extend-message-timeout live
 simplemq-api list-queues live
+simplemq-api read-message-count live
 simplemq-api read-queue live
+simplemq-api receive-message live
 simplemq-api rotate-api-key live
-service-endpoint-gateway-api seg-apply live
-service-endpoint-gateway-api seg-create live
-service-endpoint-gateway-api seg-delete live
-service-endpoint-gateway-api seg-list live
-service-endpoint-gateway-api seg-status-update-power-status live
-service-endpoint-gateway-api seg-get live
-service-endpoint-gateway-api seg-interface-get-interface live
-service-endpoint-gateway-api seg-status-get-power-status live
-service-endpoint-gateway-api seg-status-reset-power-status live
-service-endpoint-gateway-api seg-status-delete-power-status live
-service-endpoint-gateway-api seg-update live
-secretmanager-api create-vault-secret live
-secretmanager-api delete-vault-secret live
-secretmanager-api list-vault-secrets live
-secretmanager-api unveil-secret live
-secretmanager-api create-vault live
-secretmanager-api delete-vault live
-secretmanager-api list-vaults live
-secretmanager-api read-vault live
-secretmanager-api update-vault live
-security-control-api project-activation-create deferred #200 正常系には未アクティベートのプロジェクトが必要で、アクティベート済みプロジェクトでの 409 拒否のみ確認済み
-security-control-api project-activation-read live
-security-control-api project-activation-update live
-security-control-api automated-actions-create live
-security-control-api automated-actions-delete live
-security-control-api automated-actions-list live
-security-control-api automated-actions-read live
-security-control-api automated-actions-update live
-security-control-api evaluation-rules-list live
-security-control-api evaluation-rules-read live
-security-control-api evaluation-rules-update live
+simplemq-api send-message live
+simplemq-api update-queue live
 version live
