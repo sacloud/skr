@@ -143,9 +143,14 @@ func TestAPICommandNamesFollowOperationIDs(t *testing.T) {
 		}
 	}
 
-	// baseline に登録した operation 定数は、当該ドメインが公開する操作の一覧に含まれること。
+	// baseline に登録した operation 定数をドメインごとに集め、公開操作の一覧に含まれることも確認します。
+	baselineOps := make(map[string]map[string]struct{})
 	for p, op := range apiCommandNameBaseline {
 		dom := strings.Fields(p)[0]
+		if baselineOps[dom] == nil {
+			baselineOps[dom] = make(map[string]struct{})
+		}
+		baselineOps[dom][op] = struct{}{}
 		require.Contains(t, apiPublishedOperations[dom], op,
 			"baseline のパス skr %s に対応する operation は、ドメイン %s が公開する操作の一覧に登録されていません", p, dom)
 	}
@@ -155,6 +160,19 @@ func TestAPICommandNamesFollowOperationIDs(t *testing.T) {
 	for p := range apiCommandNameBaseline {
 		_, ok := pathSet[p]
 		require.True(t, ok, "baseline に登録されたパスが CLI に存在しません。エントリを整理してください: skr %s", p)
+	}
+
+	// 公開操作の一覧に含まれる各 operation は、派生名のコマンドが CLI に存在するか、
+	// baseline に登録された現行パスが存在すること。
+	// この検証により、一覧に operation を残したままコマンドの配線を削除した場合も検出します。
+	for dom, ops := range apiPublishedOperations {
+		for _, op := range ops {
+			derived := deriveOperationCommandName(op)
+			_, hasCommand := pathSet[dom+" "+derived]
+			_, hasBaseline := baselineOps[dom][op]
+			require.True(t, hasCommand || hasBaseline,
+				"ドメイン %s が公開する operation %q (派生名: skr %s %s) に対応するコマンドが CLI に存在しません", dom, op, dom, derived)
+		}
 	}
 
 	// 対象ドメインの各リーフパスは、operationId から派生した名前か、
