@@ -32,22 +32,22 @@ func TestRunServiceEndpointGatewayAPIHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"service-endpoint-gateway-api", "--help"},
-			want: []string{"appliance", "スイッチ", "閉域接続", "manual.sakura.ad.jp/cloud/network/switch/seg.html"},
+			want: []string{
+				"seg-list", "seg-get", "seg-create", "seg-update", "seg-apply", "seg-delete",
+				"seg-interface-get-interface", "seg-status-get-power-status", "seg-status-update-power-status", "seg-status-delete-power-status", "seg-status-reset-power-status",
+				"スイッチ", "閉域接続", "manual.sakura.ad.jp/cloud/network/switch/seg.html",
+			},
 		},
 		{
-			args: []string{"service-endpoint-gateway-api", "appliance", "--help"},
-			want: []string{"list", "read", "create", "update", "apply", "delete", "read-interface", "read-power-status", "power-on", "shutdown", "reset"},
-		},
-		{
-			args: []string{"service-endpoint-gateway-api", "appliance", "create", "--help"},
+			args: []string{"service-endpoint-gateway-api", "seg-create", "--help"},
 			want: []string{"--switch-id", "--network-mask-len", "--server-ip", "--request", "@path.json", "個別フラグと併用できません", "ルータ＋スイッチ"},
 		},
 		{
-			args: []string{"service-endpoint-gateway-api", "appliance", "update", "--help"},
+			args: []string{"service-endpoint-gateway-api", "seg-update", "--help"},
 			want: []string{"--request", "全体置換", "EnabledServices", "apply"},
 		},
 		{
-			args: []string{"service-endpoint-gateway-api", "appliance", "read-interface", "--help"},
+			args: []string{"service-endpoint-gateway-api", "seg-interface-get-interface", "--help"},
 			want: []string{"appliance-id", "interface-id"},
 		},
 	} {
@@ -64,26 +64,26 @@ func TestRunServiceEndpointGatewayAPIHelp(t *testing.T) {
 
 func TestRunServiceEndpointGatewayAPIRejectsCreateWithoutInput(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "appliance", "create"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "seg-create"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "--request または個別フラグが必要です", "error = %q", stderr.String())
 }
 
 func TestRunServiceEndpointGatewayAPIRejectsMissingSwitchID(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "appliance", "create", "--network-mask-len", "24"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "seg-create", "--network-mask-len", "24"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "--switch-id が必要です", "error = %q", stderr.String())
 }
 
 func TestRunServiceEndpointGatewayAPIRejectsMissingNetworkMaskLen(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "appliance", "create", "--switch-id", "112900500001"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "seg-create", "--switch-id", "112900500001"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "--network-mask-len が必要です", "error = %q", stderr.String())
 }
 
 func TestRunServiceEndpointGatewayAPIRejectsCreateWithRequestAndFlags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	request := `{"Appliance":{"Remark":{"Switch":{"ID":"112900500001"},"Network":{"NetworkMaskLen":24},"Servers":[]}}}`
-	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "appliance", "create", "--request", request, "--switch-id", "112900500001"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "seg-create", "--request", request, "--switch-id", "112900500001"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "--request と個別フラグは併用できません", "error = %q", stderr.String())
 }
 
@@ -124,7 +124,7 @@ func TestServiceEndpointGatewayAPIWithSakumock(t *testing.T) {
 			} `json:"Remark"`
 		} `json:"Appliance"`
 	}
-	err := json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "create", "--switch-id", "112900500001", "--network-mask-len", "24", "--server-ip", "192.168.2.100"), &created)
+	err := json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-create", "--switch-id", "112900500001", "--network-mask-len", "24", "--server-ip", "192.168.2.100"), &created)
 	require.NoError(t, err)
 	require.NotEmpty(t, created.Appliance.ID, "created appliance = %+v", created)
 	require.Equal(t, "serviceendpointgateway", created.Appliance.Class, "unexpected value")
@@ -148,7 +148,7 @@ func TestServiceEndpointGatewayAPIWithSakumock(t *testing.T) {
 			} `json:"Interfaces"`
 		} `json:"Appliance"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "read", applianceID), &read))
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-get", applianceID), &read))
 	require.Equal(t, applianceID, read.Appliance.ID, "unexpected value")
 	require.NotEmpty(t, read.Appliance.Interfaces, "read appliance = %+v", read)
 
@@ -158,7 +158,7 @@ func TestServiceEndpointGatewayAPIWithSakumock(t *testing.T) {
 			ID string `json:"ID"`
 		} `json:"Appliances"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "list"), &listed))
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-list"), &listed))
 	var found bool
 	for _, appliance := range listed.Appliances {
 		if appliance.ID == applianceID {
@@ -175,7 +175,7 @@ func TestServiceEndpointGatewayAPIWithSakumock(t *testing.T) {
 			} `json:"Switch"`
 		} `json:"Interface"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "read-interface", applianceID, "112900500001"), &userInterface))
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-interface-get-interface", applianceID, "112900500001"), &userInterface))
 	require.Equal(t, "user", userInterface.Interface.Switch.Scope, "unexpected value")
 
 	// 電源状態の取得 (応答は Instance 配下)
@@ -184,19 +184,19 @@ func TestServiceEndpointGatewayAPIWithSakumock(t *testing.T) {
 			Status string `json:"Status"`
 		} `json:"Instance"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "read-power-status", applianceID), &powerStatus))
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-status-get-power-status", applianceID), &powerStatus))
 	require.Equal(t, "up", powerStatus.Instance.Status, "unexpected value")
 
 	// 電源操作 (shutdown → power-on。shutdown の応答本文は出力しません)
-	runCommand("service-endpoint-gateway-api", "appliance", "shutdown", applianceID)
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "read-power-status", applianceID), &powerStatus))
+	runCommand("service-endpoint-gateway-api", "seg-status-delete-power-status", applianceID)
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-status-get-power-status", applianceID), &powerStatus))
 	require.Equal(t, "down", powerStatus.Instance.Status, "unexpected value")
 	var poweredOn struct {
 		Success bool `json:"Success"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "power-on", applianceID), &poweredOn))
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-status-update-power-status", applianceID), &poweredOn))
 	require.True(t, poweredOn.Success, "power-on response = %+v", poweredOn)
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "read-power-status", applianceID), &powerStatus))
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-status-get-power-status", applianceID), &powerStatus))
 	require.Equal(t, "up", powerStatus.Instance.Status, "unexpected value")
 
 	// update は Settings を全体置換し、apply で反映します
@@ -216,26 +216,26 @@ func TestServiceEndpointGatewayAPIWithSakumock(t *testing.T) {
 			} `json:"Settings"`
 		} `json:"Appliance"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "update", applianceID, "--request", settingsJSON), &updated))
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-update", applianceID, "--request", settingsJSON), &updated))
 	require.Equal(t, applianceID, updated.Appliance.ID, "unexpected value")
 	require.Len(t, updated.Appliance.Settings.ServiceEndpointGateway.EnabledServices, 1, "updated appliance = %+v", updated)
 	require.Equal(t, "ObjectStorage", updated.Appliance.Settings.ServiceEndpointGateway.EnabledServices[0].Type, "unexpected value")
 	require.Equal(t, "True", updated.Appliance.Settings.ServiceEndpointGateway.MonitoringSuite.Enabled, "unexpected value")
 
 	// apply (応答本文は出力しません。SettingsHash は read で確認できます)
-	runCommand("service-endpoint-gateway-api", "appliance", "apply", applianceID)
+	runCommand("service-endpoint-gateway-api", "seg-apply", applianceID)
 	var applied struct {
 		Appliance struct {
 			ID           string  `json:"ID"`
 			SettingsHash *string `json:"SettingsHash"`
 		} `json:"Appliance"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "appliance", "read", applianceID), &applied))
+	require.NoError(t, json.Unmarshal(runCommand("service-endpoint-gateway-api", "seg-get", applianceID), &applied))
 	require.Equal(t, applianceID, applied.Appliance.ID, "unexpected value")
 	require.NotNil(t, applied.Appliance.SettingsHash, "settings should be applied: %+v", applied)
 
 	// 削除と不在確認
-	runCommand("service-endpoint-gateway-api", "appliance", "delete", applianceID)
+	runCommand("service-endpoint-gateway-api", "seg-delete", applianceID)
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "appliance", "read", applianceID}, &stdout, &stderr), "read after delete should fail")
+	require.NotEqual(t, 0, run([]string{"service-endpoint-gateway-api", "seg-get", applianceID}, &stdout, &stderr), "read after delete should fail")
 }

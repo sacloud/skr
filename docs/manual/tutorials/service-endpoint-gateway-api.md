@@ -18,7 +18,7 @@
 2. スイッチにサービスエンドポイントゲートウェイを 1 件作成します。
 3. 作成したゲートウェイを参照し、一覧に含まれることを確認します。
 4. ゲートウェイのインターフェースと電源状態を確認し、電源を停止・起動します。
-5. 接続先マネージドサービスの設定を更新し、`apply` で反映します。
+5. 接続先マネージドサービスの設定を更新し、`seg-apply` で反映します。
 6. ID と所属を照合したうえで、ゲートウェイを削除します。
 7. スイッチを削除します。
 
@@ -28,16 +28,16 @@
 $ skr config current
 $ skr iaas-api switch --help
 $ skr service-endpoint-gateway-api --help
-$ skr service-endpoint-gateway-api appliance create --help
-$ skr service-endpoint-gateway-api appliance read --help
-$ skr service-endpoint-gateway-api appliance list --help
-$ skr service-endpoint-gateway-api appliance read-interface --help
-$ skr service-endpoint-gateway-api appliance read-power-status --help
-$ skr service-endpoint-gateway-api appliance shutdown --help
-$ skr service-endpoint-gateway-api appliance power-on --help
-$ skr service-endpoint-gateway-api appliance update --help
-$ skr service-endpoint-gateway-api appliance apply --help
-$ skr service-endpoint-gateway-api appliance delete --help
+$ skr service-endpoint-gateway-api seg-create --help
+$ skr service-endpoint-gateway-api seg-get --help
+$ skr service-endpoint-gateway-api seg-list --help
+$ skr service-endpoint-gateway-api seg-interface-get-interface --help
+$ skr service-endpoint-gateway-api seg-status-get-power-status --help
+$ skr service-endpoint-gateway-api seg-status-delete-power-status --help
+$ skr service-endpoint-gateway-api seg-status-update-power-status --help
+$ skr service-endpoint-gateway-api seg-update --help
+$ skr service-endpoint-gateway-api seg-apply --help
+$ skr service-endpoint-gateway-api seg-delete --help
 ```
 
 認証は選択中の SDK プロファイルを使います。以降の `SWITCH-NAME`、`UPDATED-SWITCH-NAME` は、他のリソースと重複しない、自分のテスト専用の名前に置き換えてください。
@@ -76,7 +76,7 @@ $ SWITCH_ID=$(skr iaas-api switch find --zone is1a --query 'map(select(.Name == 
 接続先スイッチにゲートウェイを作成します。`--switch-id` と `--network-mask-len` が必須で、`--server-ip` はゲートウェイに割り当てる IPv4 アドレス (ゲートウェイアドレス) を繰り返し指定できます。ネットマスク長と IP アドレスは、スイッチで構成するプライベートネットワークのサブネットを定義します。ここでは[クイックスタート](https://manual.sakura.ad.jp/cloud/network/switch/seg/getting_started.html)と同じ `192.168.2.0/24` を使います。
 
 ```console
-$ skr service-endpoint-gateway-api appliance create --switch-id "$SWITCH_ID" --network-mask-len 24 --server-ip 192.168.2.110
+$ skr service-endpoint-gateway-api seg-create --switch-id "$SWITCH_ID" --network-mask-len 24 --server-ip 192.168.2.110
 ```
 
 ```json
@@ -128,13 +128,13 @@ $ skr service-endpoint-gateway-api appliance create --switch-id "$SWITCH_ID" --n
 ```
 
 ```console
-$ skr service-endpoint-gateway-api appliance create --request @seg-create.json
+$ skr service-endpoint-gateway-api seg-create --request @seg-create.json
 ```
 
 ゲートウェイを作成したら、ID をシェル変数に取り込みます。以降のコマンドは `APPLIANCE_ID` 変数を使います。
 
 ```console
-$ APPLIANCE_ID=$(skr service-endpoint-gateway-api appliance read "$APPLIANCE_ID" --query .Appliance.ID)
+$ APPLIANCE_ID=$(skr service-endpoint-gateway-api seg-get "$APPLIANCE_ID" --query .Appliance.ID)
 ```
 
 初回は `APPLIANCE_ID` が未設定のため、作成コマンドの出力から `Appliance.ID` の値を指定してください。
@@ -142,7 +142,7 @@ $ APPLIANCE_ID=$(skr service-endpoint-gateway-api appliance read "$APPLIANCE_ID"
 ## Step 4: 作成したゲートウェイを参照する
 
 ```console
-$ skr service-endpoint-gateway-api appliance read "$APPLIANCE_ID" --query '.Appliance | {ID,Class,Availability,Remark,Status: .Instance.Status,ServiceClass}'
+$ skr service-endpoint-gateway-api seg-get "$APPLIANCE_ID" --query '.Appliance | {ID,Class,Availability,Remark,Status: .Instance.Status,ServiceClass}'
 ```
 
 ```json
@@ -171,7 +171,7 @@ $ skr service-endpoint-gateway-api appliance read "$APPLIANCE_ID" --query '.Appl
 一覧でも同じ内容が返ることを確認します。
 
 ```console
-$ skr service-endpoint-gateway-api appliance list --query '.Appliances | map(select(.ID == "'"$APPLIANCE_ID"'") | {ID,Name,Switch: .Remark.Switch.ID,Status: .Instance.Status})'
+$ skr service-endpoint-gateway-api seg-list --query '.Appliances | map(select(.ID == "'"$APPLIANCE_ID"'") | {ID,Name,Switch: .Remark.Switch.ID,Status: .Instance.Status})'
 ```
 
 ```json
@@ -192,7 +192,7 @@ $ skr service-endpoint-gateway-api appliance list --query '.Appliances | map(sel
 電源状態を確認し、電源を停止してから起動します。停止中はゲートウェイを経由した通信が行えません。
 
 ```console
-$ skr service-endpoint-gateway-api appliance read-power-status "$APPLIANCE_ID" --query '{Status: .Instance.Status}'
+$ skr service-endpoint-gateway-api seg-status-get-power-status "$APPLIANCE_ID" --query '{Status: .Instance.Status}'
 ```
 
 ```json
@@ -202,8 +202,8 @@ $ skr service-endpoint-gateway-api appliance read-power-status "$APPLIANCE_ID" -
 ```
 
 ```console
-$ skr service-endpoint-gateway-api appliance shutdown "$APPLIANCE_ID"
-$ skr service-endpoint-gateway-api appliance read-power-status "$APPLIANCE_ID" --query '{Status: .Instance.Status}'
+$ skr service-endpoint-gateway-api seg-status-delete-power-status "$APPLIANCE_ID"
+$ skr service-endpoint-gateway-api seg-status-get-power-status "$APPLIANCE_ID" --query '{Status: .Instance.Status}'
 ```
 
 ```json
@@ -213,7 +213,7 @@ $ skr service-endpoint-gateway-api appliance read-power-status "$APPLIANCE_ID" -
 ```
 
 ```console
-$ skr service-endpoint-gateway-api appliance power-on "$APPLIANCE_ID"
+$ skr service-endpoint-gateway-api seg-status-update-power-status "$APPLIANCE_ID"
 ```
 
 ```json
@@ -223,7 +223,7 @@ $ skr service-endpoint-gateway-api appliance power-on "$APPLIANCE_ID"
 }
 ```
 
-電源操作の反映には時間を要することがあります。`read-power-status` で期待する状態が返るまで再実行してください。
+電源操作の反映には時間を要することがあります。`seg-status-get-power-status` で期待する状態が返るまで再実行してください。
 
 ## Step 6: 接続先マネージドサービスの設定を更新する
 
@@ -252,14 +252,14 @@ $ skr service-endpoint-gateway-api appliance power-on "$APPLIANCE_ID"
 ```
 
 ```console
-$ skr service-endpoint-gateway-api appliance update "$APPLIANCE_ID" --request @seg-settings.json
-$ skr service-endpoint-gateway-api appliance apply "$APPLIANCE_ID"
+$ skr service-endpoint-gateway-api seg-update "$APPLIANCE_ID" --request @seg-settings.json
+$ skr service-endpoint-gateway-api seg-apply "$APPLIANCE_ID"
 ```
 
-`update` は `Settings` の更新だけで、`apply` で設定が反映されます。接続先マネージドサービスの変更時、ゲートウェイを経由した通信が一時的に中断することがあります。反映後の設定は `read` で確認できます。
+`seg-update` は `Settings` の更新だけで、`seg-apply` で設定が反映されます。接続先マネージドサービスの変更時、ゲートウェイを経由した通信が一時的に中断することがあります。反映後の設定は `seg-get` で確認できます。
 
 ```console
-$ skr service-endpoint-gateway-api appliance read "$APPLIANCE_ID" --query '{Settings: .Appliance.Settings,SettingsHash: .Appliance.SettingsHash}'
+$ skr service-endpoint-gateway-api seg-get "$APPLIANCE_ID" --query '{Settings: .Appliance.Settings,SettingsHash: .Appliance.SettingsHash}'
 ```
 
 ```json
@@ -287,10 +287,10 @@ $ skr service-endpoint-gateway-api appliance read "$APPLIANCE_ID" --query '{Sett
 
 ## Step 7: ゲートウェイとスイッチを削除する
 
-削除前に ID と接続先スイッチを照合し、この手順で作成したゲートウェイであることを確認します。`delete` は応答本文を出力しません。
+削除前に ID と接続先スイッチを照合し、この手順で作成したゲートウェイであることを確認します。`seg-delete` は応答本文を出力しません。
 
 ```console
-$ skr service-endpoint-gateway-api appliance read "$APPLIANCE_ID" --query '{ID: .Appliance.ID,Switch: .Appliance.Remark.Switch.ID}'
+$ skr service-endpoint-gateway-api seg-get "$APPLIANCE_ID" --query '{ID: .Appliance.ID,Switch: .Appliance.Remark.Switch.ID}'
 ```
 
 ```json
@@ -301,13 +301,13 @@ $ skr service-endpoint-gateway-api appliance read "$APPLIANCE_ID" --query '{ID: 
 ```
 
 ```console
-$ skr service-endpoint-gateway-api appliance delete "$APPLIANCE_ID"
+$ skr service-endpoint-gateway-api seg-delete "$APPLIANCE_ID"
 ```
 
 削除後、一覧に存在しないことを確認します。出力は `[]` です。
 
 ```console
-$ skr service-endpoint-gateway-api appliance list --query '.Appliances | map(select(.ID == "'"$APPLIANCE_ID"'") | {ID,Name})'
+$ skr service-endpoint-gateway-api seg-list --query '.Appliances | map(select(.ID == "'"$APPLIANCE_ID"'") | {ID,Name})'
 ```
 
 ```json

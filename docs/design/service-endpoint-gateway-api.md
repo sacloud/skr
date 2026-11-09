@@ -4,13 +4,13 @@
 
 `service-endpoint-gateway-api` は SDK `github.com/sacloud/sacloud-sdk-go v0.3.1` のサービスエンドポイントゲートウェイを操作します。サービスエンドポイントゲートウェイはスイッチの拡張機能で、プライベートネットワーク内からオブジェクトストレージやコンテナレジストリなどのマネージドサービスへ閉域接続します。スイッチ単体が対象で、ルータ＋スイッチでは利用できません。1 つのスイッチに対して複数のサービスエンドポイントゲートウェイは作成できません。
 
-公開する操作は `appliance` グループの次のとおりです。
+公開する操作は次のとおりです。コマンド名は operationId から機械派生します ([ADR 0074](../adr/0074-api-command-name-structure.md))。
 
-| グループ | 実装操作 |
-| --- | --- |
-| `appliance` | `list`、`read`、`create`、`update`、`apply`、`delete`、`read-interface`、`read-power-status`、`power-on`、`shutdown`、`reset` |
-
-コマンドグループは [ADR 0069](../adr/0069-api-endpoint-command-groups.md) のとおり API endpoint 構造に対応させます。対応するエンドポイントの一覧は ADR 0069 を参照してください。ゲートウェイ配下の操作は `appliance` グループのサブコマンドとして公開します。
+| 操作名 |
+| --- |
+| `seg-list`、`seg-get`、`seg-create`、`seg-update`、`seg-apply`、`seg-delete` |
+| `seg-interface-get-interface` |
+| `seg-status-get-power-status`、`seg-status-update-power-status`、`seg-status-delete-power-status`、`seg-status-reset-power-status` |
 
 作成の入力経路は [ADR 0070](../adr/0070-service-endpoint-gateway-create-input.md) に従います。
 
@@ -18,11 +18,11 @@ API エンドポイントは `https://secure.sakura.ad.jp/cloud/zone/{ゾーン�
 
 ## パッケージと生成
 
-操作の大半は `api/commands/service-endpoint-gateway.json` で明示します。コマンドコードは `make generate-api` から `internal/serviceendpointgatewayapi/service_endpoint_gateway_api_generated.go` に生成します。生成するのは `list`、`read`、`update`、`apply`、`delete`、`read-interface`、`read-power-status`、`power-on`、`shutdown`、`reset` です。API interface、factory、Runtime も生成します。`internal/cli/` の配線は `make generate-wiring` から生成し、設定との一致を `internal/cli/wiring_test.go` で確認します。
+操作の大半は `api/commands/service-endpoint-gateway.json` で明示します。コマンドコードは `make generate-api` から `internal/serviceendpointgatewayapi/service_endpoint_gateway_api_generated.go` に生成します。生成するのは `seg-list`、`seg-get`、`seg-update`、`seg-apply`、`seg-delete`、`seg-interface-get-interface` と、電源操作の 4 操作です。API interface、factory、Runtime も生成します。`internal/cli/` の配線は `make generate-wiring` から生成し、設定との一致を `internal/cli/wiring_test.go` で確認します。
 
 次の操作は手書きで `internal/serviceendpointgatewayapi/commands.go` に実装します。
 
-- `create`: 個別フラグと `--request` JSON の両経路を設けるため ([ADR 0070](../adr/0070-service-endpoint-gateway-create-input.md))。
+- `seg-create`: 個別フラグと `--request` JSON の両経路を設けるため ([ADR 0070](../adr/0070-service-endpoint-gateway-create-input.md))。
 
 手書き操作でも API interface、factory、Runtime、`Commands` 型のフィールドは生成コードと共有します。型名全体の衝突は `internal/apigen` の設定検証で拒否します。
 
@@ -34,13 +34,13 @@ API エンドポイントは `https://secure.sakura.ad.jp/cloud/zone/{ゾーン�
 - `--network-mask-len` はゲートウェイに割り当てるサブネットマスク長、`--server-ip` はゲートウェイに割り当てる IPv4 アドレス (ゲートウェイアドレス) です。`--server-ip` は指定順に API リクエストの `Servers` 配列を組み立てます。未指定の場合は空配列を送ります。
 - `--request` は、利用者が指定する備考情報 (`Appliance.Remark`) のみを受け付けます。`Class` と `Plan` は自動設定されるため JSON に含める必要がありません。スイッチ ID、ネットマスク長、サーバー配列の指定はデコード時に検証します。
 - サーバー IP の形式、サブネットへの所属、スイッチの種類は CLI で検証せず、API の応答に委ねます。
-- 設定の更新は `--request` JSON のみを受け付けます。`Settings` は有効化するサービスごとに構造が異なり、全体置換であることをヘルプに明記します。既存の設定を維持したい項目は JSON に再指定してください。`EnabledServices` には接続先マネージドサービスを `Type` と `Config` で指定します。設定の反映は `apply` で行い、変更時はゲートウェイ経由の通信が一時的に中断することがあります。
+- 設定の更新は `--request` JSON のみを受け付けます。`Settings` は有効化するサービスごとに構造が異なり、全体置換であることをヘルプに明記します。既存の設定を維持したい項目は JSON に再指定してください。`EnabledServices` には接続先マネージドサービスを `Type` と `Config` で指定します。設定の反映は `seg-apply` で行い、変更時はゲートウェイ経由の通信が一時的に中断することがあります。
 
 API キーやトークンを引数に受け付ける操作はありません。CLI の認証情報は SDK プロファイルまたは既存の SDK 認証機構から読み込みます。
 
 ## 出力
 
-API の応答フィールドは PascalCase です。`list`、`read`、`create`、`update`、`read-interface`、`read-power-status`、`power-on` の出力は JSON で、`--query` による加工に対応します。`apply`、`delete`、`shutdown`、`reset` は応答本文を出力しません。作成・読み取りの応答は `Appliance` 配下に本体を含みます。
+API の応答フィールドは PascalCase です。ゲートウェイ本体とインターフェースの操作、電源状態の参照・投入の出力は JSON で、`--query` による加工に対応します。`seg-apply`、`seg-delete`、`seg-status-delete-power-status`、`seg-status-reset-power-status` は応答本文を出力しません。作成・読み取りの応答は `Appliance` 配下に本体を含みます。
 
 ## ライブ E2E と後片付け
 
@@ -52,9 +52,9 @@ $ SKR_E2E=1 go test ./test/e2e/service-endpoint-gateway-api/ -run TestScenarioSe
 
 実行には `SKR_E2E` の設定と `skr-e2e` プロファイルが必要です。シナリオは接続先スイッチの作成から、ゲートウェイの作成、参照、一覧、電源操作、設定更新と反映、削除と不在確認までを検証します。作成するのはスイッチ 1 件とゲートウェイ 1 件のみで、テスト関数内の `defer` で削除と不在確認まで行います。サービスエンドポイントゲートウェイは作成から削除まで課金される可能性があります。
 
-`is1b` はスイッチのゾーン内上限が 1/1 のため、シナリオは上限が緩い `is1c` を使います。ゲートウェイはゾーン引数を持たず、`SAKURA_ZONE` 環境変数でスイッチと同じゾーンに合わせます。update 直後の反映 (`apply`) は一時的に失敗することがあるため、シナリオは期限までリトライします。
+`is1b` はスイッチのゾーン内上限が 1/1 のため、シナリオは上限が緩い `is1c` を使います。ゲートウェイはゾーン引数を持たず、`SAKURA_ZONE` 環境変数でスイッチと同じゾーンに合わせます。update 直後の反映 (`seg-apply`) は一時的に失敗することがあるため、シナリオは期限までリトライします。
 
-`read-interface` はライブ検証をしていません。openapi の `Appliance.Interfaces` 定義には interface 自身の ID フィールドがなく、パスパラメータの `interfaceID` に指定できる値を応答から取得できないためです (接続先スイッチの ID を指定するとライブ API は 404 を返します)。詳細は [#189](https://github.com/sacloud/skr/issues/189) を参照してください。
+`seg-interface-get-interface` はライブ検証をしていません。openapi の `Appliance.Interfaces` 定義には interface 自身の ID フィールドがなく、パスパラメータの `interfaceID` に指定できる値を応答から取得できないためです (接続先スイッチの ID を指定するとライブ API は 404 を返します)。詳細は [#189](https://github.com/sacloud/skr/issues/189) を参照してください。
 
 sakumock を使った CLI と SDK の統合テストは `internal/cli/service_endpoint_gateway_test.go` で確認します。手書き処理の単体テストは `internal/serviceendpointgatewayapi/commands_test.go` で確認します。
 

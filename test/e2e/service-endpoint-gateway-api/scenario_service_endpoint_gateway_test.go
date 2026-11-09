@@ -92,7 +92,7 @@ func TestScenarioServiceEndpointGateway(t *testing.T) {
 
 	// ゲートウェイを作成する
 	data = h.Call(t, "スイッチにサービスエンドポイントゲートウェイを作成する",
-		"service-endpoint-gateway-api", "appliance", "create",
+		"service-endpoint-gateway-api", "seg-create",
 		"--switch-id", switchID,
 		"--network-mask-len", strconv.Itoa(networkMaskLen),
 		"--server-ip", gatewayIP)
@@ -165,7 +165,7 @@ func TestScenarioServiceEndpointGateway(t *testing.T) {
 		},
 	})
 	data = h.Call(t, "接続先マネージドサービス設定を更新する",
-		"service-endpoint-gateway-api", "appliance", "update", applianceID,
+		"service-endpoint-gateway-api", "seg-update", applianceID,
 		"--request", "@"+settingsPath)
 	var updated struct {
 		Appliance struct {
@@ -198,11 +198,11 @@ func TestScenarioServiceEndpointGateway(t *testing.T) {
 	require.Equal(t, "up", status, "the gateway should be up after creation")
 
 	// 電源を停止する (応答本文は出力されない)
-	h.Call(t, "ゲートウェイの電源を停止する", "service-endpoint-gateway-api", "appliance", "shutdown", applianceID)
+	h.Call(t, "ゲートウェイの電源を停止する", "service-endpoint-gateway-api", "seg-status-delete-power-status", applianceID)
 	waitPowerStatus(t, h, "停止後の電源状態を確認する", applianceID, "down")
 
 	// 電源を起動する
-	data = h.Call(t, "ゲートウェイの電源を起動する", "service-endpoint-gateway-api", "appliance", "power-on", applianceID)
+	data = h.Call(t, "ゲートウェイの電源を起動する", "service-endpoint-gateway-api", "seg-status-update-power-status", applianceID)
 	var poweredOn struct {
 		Success bool `json:"Success"`
 	}
@@ -211,7 +211,7 @@ func TestScenarioServiceEndpointGateway(t *testing.T) {
 	waitPowerStatus(t, h, "起動後の電源状態を確認する", applianceID, "up")
 
 	// reset も実行できることを確認する (応答本文は出力されない)
-	h.Call(t, "ゲートウェイを再起動する", "service-endpoint-gateway-api", "appliance", "reset", applianceID)
+	h.Call(t, "ゲートウェイを再起動する", "service-endpoint-gateway-api", "seg-status-reset-power-status", applianceID)
 	waitPowerStatus(t, h, "再起動後の電源状態を確認する", applianceID, "up")
 }
 
@@ -223,7 +223,7 @@ func applyGateway(t *testing.T, h *helper.Helper, id string) {
 	deadline := time.Now().Add(availableTimeout)
 	for {
 		_, stderr, err := h.CallAllowingFailure(t, "接続先マネージドサービス設定を反映する",
-			"service-endpoint-gateway-api", "appliance", "apply", id)
+			"service-endpoint-gateway-api", "seg-apply", id)
 		if err == nil {
 			return
 		}
@@ -251,7 +251,7 @@ func readGateway(t *testing.T, h *helper.Helper, description, id string) gateway
 	t.Helper()
 
 	data := h.Call(t, description,
-		"service-endpoint-gateway-api", "appliance", "read", id,
+		"service-endpoint-gateway-api", "seg-get", id,
 		"--query", "{ID: .Appliance.ID,SettingsHash: .Appliance.SettingsHash,SwitchID: .Appliance.Remark.Switch.ID,Interfaces: [.Appliance.Interfaces[] | {SwitchID: .Switch.ID,Scope: .Switch.Scope}]}")
 	var item gatewayItem
 	require.NoError(t, json.Unmarshal(data, &item), "%s: decode read response: %s", description, string(data))
@@ -263,7 +263,7 @@ func readGateway(t *testing.T, h *helper.Helper, description, id string) gateway
 func listGatewayIDs(t *testing.T, h *helper.Helper, description string) []string {
 	t.Helper()
 
-	data := h.Call(t, description, "service-endpoint-gateway-api", "appliance", "list")
+	data := h.Call(t, description, "service-endpoint-gateway-api", "seg-list")
 	var resp struct {
 		Appliances []struct {
 			ID string `json:"ID"`
@@ -282,7 +282,7 @@ func readAvailability(t *testing.T, h *helper.Helper, description, id string) st
 	t.Helper()
 
 	data := h.Call(t, description,
-		"service-endpoint-gateway-api", "appliance", "read", id,
+		"service-endpoint-gateway-api", "seg-get", id,
 		"--query", "{Availability: .Appliance.Availability}")
 	var item struct {
 		Availability string `json:"Availability"`
@@ -312,7 +312,7 @@ func readPowerStatus(t *testing.T, h *helper.Helper, description, id string) str
 	t.Helper()
 
 	data := h.Call(t, description,
-		"service-endpoint-gateway-api", "appliance", "read-power-status", id,
+		"service-endpoint-gateway-api", "seg-status-get-power-status", id,
 		"--query", "{Status: .Instance.Status}")
 	var item struct {
 		Status string `json:"Status"`
@@ -350,12 +350,12 @@ func deleteGateway(t *testing.T, h *helper.Helper, id string) {
 
 	// 起動中は電源を停止する
 	if status := readPowerStatus(t, h, "後片付けの前にゲートウェイの電源状態を確認する", id); status == "up" {
-		h.Call(t, "後片付けとしてゲートウェイの電源を停止する", "service-endpoint-gateway-api", "appliance", "shutdown", id)
+		h.Call(t, "後片付けとしてゲートウェイの電源を停止する", "service-endpoint-gateway-api", "seg-status-delete-power-status", id)
 		waitPowerStatus(t, h, "後片付けとしてゲートウェイの停止を待つ", id, "down")
 	}
 
 	// ゲートウェイを削除する
-	h.Call(t, "後片付けとしてゲートウェイを削除する", "service-endpoint-gateway-api", "appliance", "delete", id)
+	h.Call(t, "後片付けとしてゲートウェイを削除する", "service-endpoint-gateway-api", "seg-delete", id)
 }
 
 // deleteSwitch は skr CLI で作成したスイッチを削除します。

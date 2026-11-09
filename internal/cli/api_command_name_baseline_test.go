@@ -21,7 +21,6 @@ import (
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	networkingsuitev1 "github.com/sacloud/sacloud-sdk-go/api/networking-suite/apis/v1"
 	objectstoragev1 "github.com/sacloud/sacloud-sdk-go/api/object-storage/apis/v2"
-	serviceendpointgatewayv1 "github.com/sacloud/sacloud-sdk-go/api/service-endpoint-gateway/apis/v1"
 	simplenotificationv1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 )
 
@@ -240,18 +239,6 @@ var apiCommandNameBaseline = map[string]string{
 	"object-storage-api site status bucket-metering":  objectstoragev1.GetBucketMeteringOperation,
 	"object-storage-api site status quota":            objectstoragev1.GetQuotaOperation,
 	"object-storage-api site status read":             objectstoragev1.GetStatusOperation,
-	// service-endpoint-gateway-api
-	"service-endpoint-gateway-api appliance apply":             serviceendpointgatewayv1.SegApplyOperation,
-	"service-endpoint-gateway-api appliance create":            serviceendpointgatewayv1.SegCreateOperation,
-	"service-endpoint-gateway-api appliance delete":            serviceendpointgatewayv1.SegDeleteOperation,
-	"service-endpoint-gateway-api appliance list":              serviceendpointgatewayv1.SegListOperation,
-	"service-endpoint-gateway-api appliance power-on":          serviceendpointgatewayv1.SegStatusUpdatePowerStatusOperation,
-	"service-endpoint-gateway-api appliance read":              serviceendpointgatewayv1.SegGetOperation,
-	"service-endpoint-gateway-api appliance read-interface":    serviceendpointgatewayv1.SegInterfaceGetInterfaceOperation,
-	"service-endpoint-gateway-api appliance read-power-status": serviceendpointgatewayv1.SegStatusGetPowerStatusOperation,
-	"service-endpoint-gateway-api appliance reset":             serviceendpointgatewayv1.SegStatusResetPowerStatusOperation,
-	"service-endpoint-gateway-api appliance shutdown":          serviceendpointgatewayv1.SegStatusDeletePowerStatusOperation,
-	"service-endpoint-gateway-api appliance update":            serviceendpointgatewayv1.SegUpdateOperation,
 	// simple-notification-api
 	"simple-notification-api destination create":      simplenotificationv1.CreateCommonServiceItemOperation,
 	"simple-notification-api destination delete":      simplenotificationv1.DeleteCommonServiceItemOperation,

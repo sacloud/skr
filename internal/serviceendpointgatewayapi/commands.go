@@ -29,7 +29,9 @@ import (
 
 // Commands は service-endpoint-gateway-api のコマンド群です。
 type Commands struct {
-	Appliance ApplianceCommands `cmd:"" help:"サービスエンドポイントゲートウェイの作成・削除、接続先マネージドサービスの設定、設定反映、電源操作を行います。"`
+	// operationId 派生名への移行 (ADR 0074) に合わせ、appliance のグループ階層を
+	// Kong の embed で展開して 1 階層のフラット構造にしています。
+	Appliance ApplianceCommands `embed:""`
 }
 
 // ApplianceCreateCommand はサービスエンドポイントゲートウェイの作成コマンドです。
