@@ -92,7 +92,7 @@ func (c *QueueListCommand) Run(ctx *kong.Context) error {
 }
 
 type QueueReadCommand struct {
-	ID      string "arg:\"\" name:\"id\" help:\"list の出力にあるキュー ID。\""
+	ID      string "arg:\"\" name:\"id\" help:\"list-queues の出力にあるキュー ID。\""
 	factory QueueAPIFactory
 	runtime QueueRuntime
 }

@@ -23,7 +23,7 @@
           "name": "id",
           "field": "ID",
           "type": "string",
-          "help": "list の出力にあるキュー ID。"
+          "help": "list-queues の出力にあるキュー ID。"
         }
       ],
       "command_name": "read-queue"

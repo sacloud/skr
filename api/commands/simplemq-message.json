@@ -56,7 +56,7 @@
           "name": "message-id",
           "field": "MessageID",
           "type": "string",
-          "help": "receive の出力にあるメッセージ ID。"
+          "help": "receive-message の出力にあるメッセージ ID。"
         }
       ],
       "command_name": "extend-message-timeout"
