@@ -38,8 +38,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr iaas-api switch` | スイッチの検索、参照、作成、更新、削除 |
 | `skr iaas-api zone` | ゾーン一覧の取得 |
 | `skr gslb-api` | GSLB の検索、参照、作成、更新、削除 |
-| `skr simplemq-api queue` | キューの管理、メッセージ数の確認、キュー内メッセージの削除 |
-| `skr simplemq-api message` | メッセージの送信、受信、タイムアウト延長、削除 |
+| `skr simplemq-api` | キューの管理、メッセージ数の確認、キュー内メッセージの削除、メッセージの送信、受信、タイムアウト延長、削除 |
 | `skr simple-notification-api destination` | 通知先の管理と送信可否ステータスの確認 |
 | `skr simple-notification-api group` | 通知先グループの管理と通知送信 |
 | `skr simple-notification-api routing` | 通知ルーティング設定の管理と順序変更 |

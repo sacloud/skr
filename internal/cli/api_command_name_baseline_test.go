@@ -26,8 +26,6 @@ import (
 	securitycontrolv1 "github.com/sacloud/sacloud-sdk-go/api/security-control/apis/v1"
 	serviceendpointgatewayv1 "github.com/sacloud/sacloud-sdk-go/api/service-endpoint-gateway/apis/v1"
 	simplenotificationv1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
-	simplemqmessage "github.com/sacloud/sacloud-sdk-go/api/simplemq/apis/v1/message"
-	simplemqqueue "github.com/sacloud/sacloud-sdk-go/api/simplemq/apis/v1/queue"
 )
 
 // apiCommandNameBaseline は operationId 機械派生への移行が完了していないコマンドの
@@ -312,17 +310,4 @@ var apiCommandNameBaseline = map[string]string{
 	"simple-notification-api routing read":            simplenotificationv1.ReadCommonServiceItemOperation,
 	"simple-notification-api routing reorder":         simplenotificationv1.ReorderNotificationRoutingOperation,
 	"simple-notification-api routing update":          simplenotificationv1.UpdateCommonServiceItemOperation,
-	// simplemq-api
-	"simplemq-api message delete":         simplemqmessage.DeleteMessageOperation,
-	"simplemq-api message extend-timeout": simplemqmessage.ExtendMessageTimeoutOperation,
-	"simplemq-api message receive":        simplemqmessage.ReceiveMessageOperation,
-	"simplemq-api message send":           simplemqmessage.SendMessageOperation,
-	"simplemq-api queue clear-messages":   simplemqqueue.ClearQueueOperation,
-	"simplemq-api queue config":           simplemqqueue.UpdateQueueOperation,
-	"simplemq-api queue count-messages":   simplemqqueue.ReadMessageCountOperation,
-	"simplemq-api queue create":           simplemqqueue.CreateQueueOperation,
-	"simplemq-api queue delete":           simplemqqueue.DeleteQueueOperation,
-	"simplemq-api queue list":             simplemqqueue.ListQueuesOperation,
-	"simplemq-api queue read":             simplemqqueue.ReadQueueOperation,
-	"simplemq-api queue rotate-api-key":   simplemqqueue.RotateAPIKeyOperation,
 }

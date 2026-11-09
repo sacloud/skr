@@ -12,10 +12,10 @@ import (
 )
 
 type MessageCommands struct {
-	Send          MessageSendCommand          "cmd:\"\" help:\"キューへメッセージを送信します。\""
-	Receive       MessageReceiveCommand       "cmd:\"\" help:\"キューからメッセージを受信します。\""
-	ExtendTimeout MessageExtendTimeoutCommand "cmd:\"\" help:\"受信したメッセージの可視性タイムアウトを延長します。\""
-	Delete        MessageDeleteCommand        "cmd:\"\" help:\"受信したメッセージを削除します。\""
+	Send          MessageSendCommand          "cmd:\"\" name:\"send-message\" help:\"キューへメッセージを送信します。\""
+	Receive       MessageReceiveCommand       "cmd:\"\" name:\"receive-message\" help:\"キューからメッセージを受信します。\""
+	ExtendTimeout MessageExtendTimeoutCommand "cmd:\"\" name:\"extend-message-timeout\" help:\"受信したメッセージの可視性タイムアウトを延長します。\""
+	Delete        MessageDeleteCommand        "cmd:\"\" name:\"delete-message\" help:\"受信したメッセージを削除します。\""
 }
 
 type MessageAPI interface {
@@ -112,7 +112,7 @@ func (c *MessageReceiveCommand) Run(ctx *kong.Context) error {
 type MessageExtendTimeoutCommand struct {
 	QueueName  string "name:\"queue-name\" help:\"対象キュー名 (5〜64文字の英数字またはハイフン)。\" required:\"\""
 	APIKeyFile string "name:\"api-key-file\" help:\"キュー API キーのファイル。キーを直接引数に指定せず、- の場合は標準入力から読み込みます。\" required:\"\""
-	MessageID  string "arg:\"\" name:\"message-id\" help:\"receive の出力にあるメッセージ ID。\""
+	MessageID  string "arg:\"\" name:\"message-id\" help:\"receive-message の出力にあるメッセージ ID。\""
 	factory    MessageAPIFactory
 	runtime    MessageRuntime
 }

@@ -1,6 +1,6 @@
 # EventBus API: スイッチ作成イベントを SimpleMQ で受信する
 
-EventBus はイベントやスケジュールをきっかけにジョブを実行します。このチュートリアルでは、通常スイッチの作成イベントで SimpleMQ にメッセージを送り、`skr simplemq-api message receive` で受信します。SimpleMQ はキューを介してソフトウェア間でメッセージを送受信するサービスです（[EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)、[SimpleMQ の基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)）。
+EventBus はイベントやスケジュールをきっかけにジョブを実行します。このチュートリアルでは、通常スイッチの作成イベントで SimpleMQ にメッセージを送り、`skr simplemq-api receive-message` で受信します。SimpleMQ はキューを介してソフトウェア間でメッセージを送受信するサービスです（[EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)、[SimpleMQ の基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)）。
 
 > [!WARNING]
 > この手順では SimpleMQ キュー、EventBus の実行設定とトリガー、テスト用スイッチを作成し、SimpleMQ キューからメッセージを受信します。実行前に `skr config current` で対象プロファイルとプロジェクトを確認してください。テスト専用の名前を使い、同じゾーンで他の通常スイッチを作成する操作と重ならない時間に実施してください。ゾーン条件が一致すると、そのゾーンで発生した他の通常スイッチ作成イベントもトリガーします。EventBus のジョブ実行はベストエフォート型で、即時実行は保証されません（[EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)、[ネットワーク関連イベントタイプ](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events_network.html)）。
@@ -19,16 +19,16 @@ EventBus はイベントやスケジュールをきっかけにジョブを実�
 2. **EventBus 実行設定** — 送信先のキュー名とメッセージ本文を指定し、キューの API キーをシークレットとして登録します。
 3. **EventBus トリガー** — 指定ゾーンの通常スイッチ作成イベントで実行設定を呼び出します。
 4. **テスト用スイッチ** — `skr iaas-api switch` で作成し、対象イベントを発生させます。
-5. **受信確認** — `skr simplemq-api message receive` で実行設定から送られた本文を確認します。
+5. **受信確認** — `skr simplemq-api receive-message` で実行設定から送られた本文を確認します。
 
 ## Step 1: 対象環境とコマンドを確認する
 
 ```console
 $ skr config current
-$ skr simplemq-api queue create --help
-$ skr simplemq-api queue rotate-api-key --help
-$ skr simplemq-api message receive --help
-$ skr simplemq-api queue clear-messages --help
+$ skr simplemq-api create-queue --help
+$ skr simplemq-api rotate-api-key --help
+$ skr simplemq-api receive-message --help
+$ skr simplemq-api clear-queue --help
 $ skr eventbus-api process-configuration create --help
 $ skr eventbus-api process-configuration update-secret --help
 $ skr eventbus-api trigger create --help
@@ -39,7 +39,7 @@ $ skr iaas-api switch create --help
 `UNIQUE-SUFFIX` と `QUEUE-NAME` は前提条件に従って決め、`ZONE` は作成先に置き換えます。作成前に各一覧から同じ名前のリソースがないことを確認します。以下は CLI テストで確認した投影 JSON の形式に基づく、空一覧の出力例です。ほかのリソースが表示された場合は、作成予定の名前と重複しないことを確認してください。
 
 ```console
-$ skr simplemq-api queue list --query 'map({ID,Name})'
+$ skr simplemq-api list-queues --query 'map({ID,Name})'
 []
 $ skr eventbus-api process-configuration list --query 'map({ID,Name})'
 []
@@ -55,9 +55,9 @@ $ skr iaas-api switch find --zone ZONE --query 'map({ID,Name})'
 
 ```console
 $ umask 077
-$ skr simplemq-api queue create --name QUEUE-NAME --description eventbus-tutorial/UNIQUE-SUFFIX > queue.json
+$ skr simplemq-api create-queue --name QUEUE-NAME --description eventbus-tutorial/UNIQUE-SUFFIX > queue.json
 $ QUEUE_ID=$(jq -er '.ID' queue.json)
-$ skr simplemq-api queue list --query 'map({ID,Name})'
+$ skr simplemq-api list-queues --query 'map({ID,Name})'
 ```
 
 作成したキューの ID と名前が一覧に表示されることを確認します。次は CLI テストで確認した出力形式の例で、ID と名前は置き換えています。ほかのキューがある場合は同じ配列に含まれます。
@@ -74,7 +74,7 @@ $ skr simplemq-api queue list --query 'map({ID,Name})'
 キューごとの API キーを発行します。発行結果を画面に表示せず、EventBus のシークレット登録に使う JSON ファイルと、メッセージ受信に使う API キーファイルを作成します。再発行すると以前のキーは無効になります（[SimpleMQ API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/simplemq/api.html)）。
 
 ```console
-$ skr simplemq-api queue rotate-api-key "$QUEUE_ID" > eventbus-secret.json
+$ skr simplemq-api rotate-api-key "$QUEUE_ID" > eventbus-secret.json
 $ jq -er '.APIKey' eventbus-secret.json > simplemq.key
 $ chmod 600 queue.json eventbus-secret.json simplemq.key
 ```
@@ -199,7 +199,7 @@ $ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-U
 メッセージの到着には時間を要する場合があります。EventBus は即時実行を保証しません。
 
 ```console
-$ skr simplemq-api message receive --queue-name QUEUE-NAME --api-key-file simplemq.key
+$ skr simplemq-api receive-message --queue-name QUEUE-NAME --api-key-file simplemq.key
 ```
 
 SimpleMQ は Pull 型で、受信リクエストごとにメッセージを配信します。配信保証は At least once です。そのため、同じメッセージを複数回受信する場合があります（[SimpleMQ の基本情報](https://manual.sakura.ad.jp/cloud/appliance/simplemq/about.html)）。
@@ -242,10 +242,10 @@ $ skr eventbus-api process-configuration list --query 'map({ID,Name})'
 最後に、キュー内のメッセージを消去してからキューを削除します。キューの `Name` と `Description` がこの手順で作成したものと一致することを `queue read` で確認してください。
 
 ```console
-$ skr simplemq-api queue read "$QUEUE_ID"
-$ skr simplemq-api queue clear-messages "$QUEUE_ID"
-$ skr simplemq-api queue delete "$QUEUE_ID"
-$ skr simplemq-api queue list --query 'map({ID,Name})'
+$ skr simplemq-api read-queue "$QUEUE_ID"
+$ skr simplemq-api clear-queue "$QUEUE_ID"
+$ skr simplemq-api delete-queue "$QUEUE_ID"
+$ skr simplemq-api list-queues --query 'map({ID,Name})'
 []
 $ rm queue.json eventbus-secret.json simplemq.key process-configuration.json process-configuration-result.json trigger.json trigger-result.json switch-result.json
 ```

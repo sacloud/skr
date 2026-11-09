@@ -126,7 +126,7 @@ func kindName(kind string) string {
 func listArgs(kind string) ([]string, error) {
 	switch kind {
 	case "queue":
-		return []string{"simplemq-api", "queue", "list"}, nil
+		return []string{"simplemq-api", "list-queues"}, nil
 	case "process-configuration", "trigger", "schedule":
 		return []string{"eventbus-api", kind, "list"}, nil
 	case "switch":
@@ -140,7 +140,7 @@ func listArgs(kind string) ([]string, error) {
 func readArgs(kind, id string) ([]string, error) {
 	switch kind {
 	case "queue":
-		return []string{"simplemq-api", "queue", "read", id}, nil
+		return []string{"simplemq-api", "read-queue", id}, nil
 	case "process-configuration", "trigger", "schedule":
 		return []string{"eventbus-api", kind, "read", id}, nil
 	case "switch":
@@ -155,7 +155,7 @@ func readArgs(kind, id string) ([]string, error) {
 func deleteArgs(kind, id string) ([]string, error) {
 	switch kind {
 	case "queue":
-		return []string{"simplemq-api", "queue", "delete", id}, nil
+		return []string{"simplemq-api", "delete-queue", id}, nil
 	case "process-configuration", "trigger", "schedule":
 		return []string{"eventbus-api", kind, "delete", id}, nil
 	case "switch":
@@ -372,7 +372,7 @@ func cleanupEventbusResource(t *testing.T, h *helper.Helper, r *eventbusResource
 
 	if r.kind == "queue" {
 		if _, stderr, err := h.CallAllowingFailure(t, "キューのメッセージをすべて削除する",
-			"simplemq-api", "queue", "clear-messages", id); err != nil {
+			"simplemq-api", "clear-queue", id); err != nil {
 			t.Errorf("clear queue messages: %v\n%s", err, stderr)
 			return
 		}

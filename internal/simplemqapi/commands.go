@@ -28,9 +28,11 @@ import (
 	clientconfig "github.com/sacloud/skr/internal/saclient"
 )
 
+// Commands は SimpleMQ のコマンド集合です。operationId 派生名への移行 (ADR 0074) に合わせ、
+// リソース別のグループ階層を Kong の embed で展開して 1 階層のフラット構造にしています。
 type Commands struct {
-	Queue   QueueCommands   `cmd:"" help:"キューを作成・管理します。"`
-	Message MessageCommands `cmd:"" help:"キューの API キーを使ってメッセージを送受信します。"`
+	Queue   QueueCommands   `embed:""`
+	Message MessageCommands `embed:""`
 }
 
 type QueueCreateCommand struct {

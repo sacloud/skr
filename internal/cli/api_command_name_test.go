@@ -39,6 +39,12 @@ var apiCommandNameTargetDomains = []string{
 	"simplemq-api",
 }
 
+// apiCommandNameMigratedDomains は operationId 機械派生への移行が完了したドメインです。
+// baseline のエントリ削除と合わせて追加し、末端パスの集合が期待パスの集合と一致することを検証します。
+var apiCommandNameMigratedDomains = []string{
+	"simplemq-api",
+}
+
 // deriveOperationCommandName は SDK の operation 定数の値 (operationId を
 // 正規化した operation 名) から末端サブコマンド名を派生します。
 // camelcase 分割は Kong に内蔵された実装 (fatih/camelcase のコピー、
@@ -136,6 +142,23 @@ func TestAPICommandNamesFollowOperationIDs(t *testing.T) {
 			require.True(t, hasCommand || hasBaseline,
 				"ドメイン %s が公開する operation %q (派生名: skr %s %s) に対応するコマンドが CLI に存在しません", dom, op, dom, derived)
 		}
+	}
+
+	// 移行が完了したドメインでは、末端パスの集合が期待パスの集合と一致することを確認します。
+	// 移行完了後は baseline 例外がなくなるため、余分なコマンドや未整備のコマンドもここで検出します。
+	for _, dom := range apiCommandNameMigratedDomains {
+		var actual []string
+		for _, p := range paths {
+			if leaf, ok := strings.CutPrefix(p, dom+" "); ok {
+				actual = append(actual, leaf)
+			}
+		}
+		want := make([]string, 0, len(expected[dom]))
+		for leaf := range expected[dom] {
+			want = append(want, leaf)
+		}
+		require.ElementsMatch(t, want, actual,
+			"ドメイン %s の末端サブコマンドが operationId から派生した期待パスと一致しません", dom)
 	}
 
 	// 対象ドメインの各リーフパスは、operationId から派生した名前か、

@@ -74,13 +74,13 @@ func TestScenarioEventBus(t *testing.T) {
 	// SimpleMQ キューを作成する
 	queue.attempted = true
 	created := parseEventbusItem(t, h.Call(t, "SimpleMQ キューを作成する",
-		"simplemq-api", "queue", "create", "--name", queue.name, "--description", queue.description))
+		"simplemq-api", "create-queue", "--name", queue.name, "--description", queue.description))
 	queue.id = requireEventbusIdentity(t, created, queue)
 
 	// SimpleMQ キューの API キーを発行する
 	// 応答には秘密情報が含まれるため、実行記録に stdout を残さない
 	apiKey, err := parseAPIKey(h.CallHidingStdout(t, "SimpleMQ キューの API キーを発行する",
-		"simplemq-api", "queue", "rotate-api-key", queue.id))
+		"simplemq-api", "rotate-api-key", queue.id))
 	require.NoError(t, err, "decode rotated SimpleMQ API key: %v", err)
 
 	// 秘密情報を CLI フラグ用の一時ファイルに書き込む
@@ -172,7 +172,7 @@ func waitForEventMessage(t *testing.T, h *helper.Helper, queueName, keyFile, exp
 	for attempt := 1; ; attempt++ {
 		data := h.CallWithTimeout(t, commandTimeout,
 			fmt.Sprintf("イベントメッセージを受信する（%d 回目）", attempt),
-			"simplemq-api", "message", "receive", "--queue-name", queueName, "--api-key-file", keyFile)
+			"simplemq-api", "receive-message", "--queue-name", queueName, "--api-key-file", keyFile)
 		var received []message
 		err := json.Unmarshal(data, &received)
 		require.NoError(t, err, "decode received messages: %v", err)

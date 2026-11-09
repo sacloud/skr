@@ -57,7 +57,7 @@ func TestScenarioSimpleMQ(t *testing.T) {
 
 	// キューを作成する
 	data := h.Call(t, "SimpleMQ キューを作成する",
-		"simplemq-api", "queue", "create", "--name", name, "--description", description)
+		"simplemq-api", "create-queue", "--name", name, "--description", description)
 	created := parseQueue(t, data)
 	id := queueIDString(t, created)
 	require.Equal(t, name, created.Name, "created queue name should match the requested name")
@@ -66,8 +66,8 @@ func TestScenarioSimpleMQ(t *testing.T) {
 
 	// 後片付け: キュー内のメッセージを削除してからキューを削除し、一覧に残っていないことを確認する
 	defer func() {
-		_ = h.Call(t, "キュー内のメッセージをすべて削除する", "simplemq-api", "queue", "clear-messages", id)
-		_ = h.Call(t, "作成したキューを削除する", "simplemq-api", "queue", "delete", id)
+		_ = h.Call(t, "キュー内のメッセージをすべて削除する", "simplemq-api", "clear-queue", id)
+		_ = h.Call(t, "作成したキューを削除する", "simplemq-api", "delete-queue", id)
 		remaining := listQueues(t, h, "削除後にキューが一覧に残っていないことを確認する")
 		for _, item := range remaining {
 			require.NotEqual(t, name, item.Name, "queue %q should not remain after deletion", name)
@@ -75,7 +75,7 @@ func TestScenarioSimpleMQ(t *testing.T) {
 	}()
 
 	// 作成したキューを参照する
-	data = h.Call(t, "作成したキューを参照する", "simplemq-api", "queue", "read", id)
+	data = h.Call(t, "作成したキューを参照する", "simplemq-api", "read-queue", id)
 	requireQueueIdentity(t, parseQueue(t, data), created.ID, name, description)
 
 	// 作成したキューが一覧に含まれることを確認する
@@ -86,7 +86,7 @@ func TestScenarioSimpleMQ(t *testing.T) {
 
 	// --query で一覧を射影して取得する
 	data = h.Call(t, "キュー一覧を射影して取得する",
-		"simplemq-api", "queue", "list", "--query", "map({ID,Name})")
+		"simplemq-api", "list-queues", "--query", "map({ID,Name})")
 	var projected []queueSummary
 	err := json.Unmarshal(data, &projected)
 	require.NoError(t, err, "decode projected queue list: %v", err)
@@ -102,7 +102,7 @@ func TestScenarioSimpleMQ(t *testing.T) {
 
 	// キューの設定を更新する
 	data = h.Call(t, "キューの設定を更新する",
-		"simplemq-api", "queue", "config", id,
+		"simplemq-api", "update-queue", id,
 		"--visibility-timeout-seconds", strconv.Itoa(visibilityTimeoutSeconds),
 		"--expire-seconds", strconv.Itoa(expireSeconds))
 	configured := parseQueue(t, data)
@@ -115,13 +115,13 @@ func TestScenarioSimpleMQ(t *testing.T) {
 	// キューの API キーを発行する
 	// 応答には秘密情報が含まれるため、実行記録に stdout を残さない
 	apiKey, err := parseAPIKey(h.CallHidingStdout(t, "SimpleMQ キューの API キーを発行する",
-		"simplemq-api", "queue", "rotate-api-key", id))
+		"simplemq-api", "rotate-api-key", id))
 	require.NoError(t, err, "decode rotated SimpleMQ API key: %v", err)
 	keyFile := writeKeyFile(t, apiKey)
 
 	// メッセージを送信する
 	data = h.Call(t, "メッセージを送信する",
-		"simplemq-api", "message", "send",
+		"simplemq-api", "send-message",
 		"--queue-name", name, "--api-key-file", keyFile, "--content", messageBody)
 	var sent message.NewMessage
 	err = json.Unmarshal(data, &sent)
@@ -131,7 +131,7 @@ func TestScenarioSimpleMQ(t *testing.T) {
 
 	// 送信したメッセージを受信する
 	data = h.Call(t, "メッセージを受信する",
-		"simplemq-api", "message", "receive", "--queue-name", name, "--api-key-file", keyFile)
+		"simplemq-api", "receive-message", "--queue-name", name, "--api-key-file", keyFile)
 	var received []message.Message
 	err = json.Unmarshal(data, &received)
 	require.NoError(t, err, "decode received messages: %v", err)
@@ -141,7 +141,7 @@ func TestScenarioSimpleMQ(t *testing.T) {
 
 	// 受信したメッセージの可視性タイムアウトを延長する
 	data = h.Call(t, "メッセージの可視性タイムアウトを延長する",
-		"simplemq-api", "message", "extend-timeout",
+		"simplemq-api", "extend-message-timeout",
 		"--queue-name", name, "--api-key-file", keyFile, string(received[0].ID))
 	var extended message.Message
 	err = json.Unmarshal(data, &extended)
@@ -151,11 +151,11 @@ func TestScenarioSimpleMQ(t *testing.T) {
 
 	// 受信したメッセージを削除する
 	_ = h.Call(t, "メッセージを削除する",
-		"simplemq-api", "message", "delete",
+		"simplemq-api", "delete-message",
 		"--queue-name", name, "--api-key-file", keyFile, string(sent.ID))
 
 	// キュー内のメッセージ数が 0 であることを確認する
-	data = h.Call(t, "キュー内のメッセージ数を取得する", "simplemq-api", "queue", "count-messages", id)
+	data = h.Call(t, "キュー内のメッセージ数を取得する", "simplemq-api", "read-message-count", id)
 	var count struct {
 		Count int `json:"Count"`
 	}
@@ -174,7 +174,7 @@ type queueSummary struct {
 func listQueues(t *testing.T, h *helper.Helper, description string) []queue.CommonServiceItem {
 	t.Helper()
 
-	data := h.Call(t, description, "simplemq-api", "queue", "list")
+	data := h.Call(t, description, "simplemq-api", "list-queues")
 	var items []queue.CommonServiceItem
 	err := json.Unmarshal(data, &items)
 	require.NoError(t, err, "%s: decode queues: %v", description, err)
