@@ -100,7 +100,7 @@ $ skr kms-api read-key KEY-ID --query '{ID,Name,Status,KeyOrigin,LatestVersion}'
 $ skr kms-api list-keys --query 'map(select(.ID == "KEY-ID") | {ID,Name,Status})'
 ```
 
-名前と説明の更新は `key update` で行います。API の更新リクエストは `Name` が必須です。タグを設定・維持する場合は `--request` JSON で `Tags` を指定します。
+名前と説明の更新は `update-key` で行います。API の更新リクエストは `Name` が必須です。タグを設定・維持する場合は `--request` JSON で `Tags` を指定します。
 
 ## Step 4: 平文を暗号化し、復号する
 
@@ -159,7 +159,7 @@ $ skr kms-api change-key-status KEY-ID --status active
 
 ## Step 7: キーを削除する
 
-削除前に `key read` で ID と名前がこの手順で作成したキーと一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。
+削除前に `read-key` で ID と名前がこの手順で作成したキーと一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。
 
 ```console
 $ skr kms-api read-key KEY-ID --query '{ID,Name,Status}'
