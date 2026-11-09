@@ -13,11 +13,11 @@ import (
 )
 
 type VaultCommands struct {
-	List   VaultListCommand   "cmd:\"\" help:\"シークレット保管庫 (Vault) を一覧表示します。--count と --from でページングできます。\""
-	Read   VaultReadCommand   "cmd:\"\" help:\"ID を指定してシークレット保管庫 (Vault) を読み取ります。\""
-	Create VaultCreateCommand "cmd:\"\" help:\"シークレット保管庫 (Vault) を作成します。Vault 単位で課金が行われ、Vault が作成されてから削除されるまでの間課金されます。--kms-key-id にはシークレットの暗号化に使う既存の KMS キー ID を指定します。Tags は --request JSON でのみ指定できます。\""
-	Update VaultUpdateCommand "cmd:\"\" help:\"シークレット保管庫 (Vault) の名前、説明、タグを更新します。--name が必須です。Description は指定した場合だけリクエストに含まれます。Tags は常にリクエストに含まれ、個別フラグのみでの更新では null (タグのクリア) として送信されます。タグを設定・維持する場合は --request JSON で Tags を指定してください。\""
-	Delete VaultDeleteCommand "cmd:\"\" help:\"ID を指定してシークレット保管庫 (Vault) を削除します。削除前に対象 ID を確認してください。\""
+	List   VaultListCommand   "cmd:\"\" name:\"list-vaults\" help:\"シークレット保管庫 (Vault) を一覧表示します。--count と --from でページングできます。\""
+	Read   VaultReadCommand   "cmd:\"\" name:\"read-vault\" help:\"ID を指定してシークレット保管庫 (Vault) を読み取ります。\""
+	Create VaultCreateCommand "cmd:\"\" name:\"create-vault\" help:\"シークレット保管庫 (Vault) を作成します。Vault 単位で課金が行われ、Vault が作成されてから削除されるまでの間課金されます。--kms-key-id にはシークレットの暗号化に使う既存の KMS キー ID を指定します。Tags は --request JSON でのみ指定できます。\""
+	Update VaultUpdateCommand "cmd:\"\" name:\"update-vault\" help:\"シークレット保管庫 (Vault) の名前、説明、タグを更新します。--name が必須です。Description は指定した場合だけリクエストに含まれます。Tags は常にリクエストに含まれ、個別フラグのみでの更新では null (タグのクリア) として送信されます。タグを設定・維持する場合は --request JSON で Tags を指定してください。\""
+	Delete VaultDeleteCommand "cmd:\"\" name:\"delete-vault\" help:\"ID を指定してシークレット保管庫 (Vault) を削除します。削除前に対象 ID を確認してください。\""
 }
 
 type VaultAPI interface {
@@ -83,7 +83,7 @@ func (c *VaultListCommand) Run(ctx *kong.Context) error {
 }
 
 type VaultReadCommand struct {
-	ID      string "arg:\"\" name:\"id\" help:\"list の出力にある Vault のリソース ID。\""
+	ID      string "arg:\"\" name:\"id\" help:\"list-vaults の出力にある Vault のリソース ID。\""
 	factory VaultAPIFactory
 	runtime VaultRuntime
 }
@@ -116,7 +116,7 @@ type VaultCreateCommand struct {
 	Request     *string "help:\"API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。\""
 	Name        *string "name:\"name\" help:\"必須: Vault 名 (1〜255 文字)。例: app1-vault\""
 	Description *string "name:\"description\" help:\"任意: Vault の説明。省略するとリクエスト本文に含まれません。\""
-	KmsKeyID    *string "name:\"kms-key-id\" help:\"必須: シークレットの暗号化に使う KMS キー ID (1〜255 文字)。kms-api key list で確認できます。\""
+	KmsKeyID    *string "name:\"kms-key-id\" help:\"必須: シークレットの暗号化に使う KMS キー ID (1〜255 文字)。kms-api list-keys で確認できます。\""
 	factory     VaultAPIFactory
 	runtime     VaultRuntime
 }

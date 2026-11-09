@@ -44,7 +44,7 @@ func createSecretManagerVault(t *testing.T, h *helper.Helper, name, description,
 	t.Helper()
 
 	data := h.Call(t, "シークレット保管庫 (Vault) を作成する",
-		"secretmanager-api", "vault", "create",
+		"secretmanager-api", "create-vault",
 		"--name", name, "--description", description, "--kms-key-id", kmsKeyID,
 		"--query", "{ID,Name,Description,KmsKeyID}",
 	)
@@ -58,7 +58,7 @@ func readSecretManagerVault(t *testing.T, h *helper.Helper, id string) secretMan
 	t.Helper()
 
 	data := h.Call(t, "シークレット保管庫 (Vault) を参照する",
-		"secretmanager-api", "vault", "read", id,
+		"secretmanager-api", "read-vault", id,
 		"--query", "{ID,Name,Description,KmsKeyID}",
 	)
 	var item secretManagerVaultItem
@@ -71,7 +71,7 @@ func listSecretManagerVaults(t *testing.T, h *helper.Helper, description string)
 	t.Helper()
 
 	data := h.Call(t, description,
-		"secretmanager-api", "vault", "list",
+		"secretmanager-api", "list-vaults",
 		"--query", "map({ID,Name,Description,KmsKeyID})",
 	)
 	var items []secretManagerVaultItem
@@ -84,7 +84,7 @@ func updateSecretManagerVault(t *testing.T, h *helper.Helper, id, name, descript
 	t.Helper()
 
 	data := h.Call(t, "シークレット保管庫 (Vault) の名前と説明を更新する",
-		"secretmanager-api", "vault", "update", id,
+		"secretmanager-api", "update-vault", id,
 		"--name", name, "--description", description,
 		"--query", "{ID,Name,Description,KmsKeyID}",
 	)
@@ -97,7 +97,7 @@ func updateSecretManagerVault(t *testing.T, h *helper.Helper, id, name, descript
 func deleteSecretManagerVault(t *testing.T, h *helper.Helper, id string) {
 	t.Helper()
 
-	h.Call(t, "シークレット保管庫 (Vault) を削除する", "secretmanager-api", "vault", "delete", id)
+	h.Call(t, "シークレット保管庫 (Vault) を削除する", "secretmanager-api", "delete-vault", id)
 }
 
 // createSecretManagerSecret は skr CLI で Vault にシークレットを作成し、必要な項目に絞って返します。
@@ -105,7 +105,7 @@ func createSecretManagerSecret(t *testing.T, h *helper.Helper, vaultID, name, va
 	t.Helper()
 
 	data := h.Call(t, "Vault にシークレットを作成する",
-		"secretmanager-api", "secret", "create", vaultID,
+		"secretmanager-api", "create-vault-secret", vaultID,
 		"--name", name, "--value-file", valueFile,
 		"--query", "{Name,LatestVersion}",
 	)
@@ -119,7 +119,7 @@ func listSecretManagerSecrets(t *testing.T, h *helper.Helper, vaultID, descripti
 	t.Helper()
 
 	data := h.Call(t, description,
-		"secretmanager-api", "secret", "list", vaultID,
+		"secretmanager-api", "list-vault-secrets", vaultID,
 		"--query", "map({Name,LatestVersion})",
 	)
 	var items []secretManagerSecretItem
@@ -132,7 +132,7 @@ func listSecretManagerSecrets(t *testing.T, h *helper.Helper, vaultID, descripti
 func unveilSecretManagerSecret(t *testing.T, h *helper.Helper, vaultID, name string, version string) string {
 	t.Helper()
 
-	args := []string{"secretmanager-api", "secret", "unveil", vaultID, name}
+	args := []string{"secretmanager-api", "unveil-secret", vaultID, name}
 	if version != "" {
 		args = append(args, "--secret-version", version)
 	}
@@ -145,7 +145,7 @@ func deleteSecretManagerSecret(t *testing.T, h *helper.Helper, vaultID, name str
 	t.Helper()
 
 	h.Call(t, "Vault からシークレットを削除する",
-		"secretmanager-api", "secret", "delete", vaultID, name)
+		"secretmanager-api", "delete-vault-secret", vaultID, name)
 }
 
 // secretManagerSecretExists は Vault 内に指定したシークレットが存在するかを確認します。

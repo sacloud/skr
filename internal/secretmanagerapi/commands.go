@@ -29,10 +29,11 @@ import (
 	clientconfig "github.com/sacloud/skr/internal/saclient"
 )
 
-// Commands は secretmanager-api のコマンド群です。
+// Commands は secretmanager-api のコマンド群です。operationId 派生名への移行 (ADR 0074) に合わせ、
+// vault / secret のグループ階層を Kong の embed で展開して 1 階層のフラット構造にしています。
 type Commands struct {
-	Vault  VaultCommands  `cmd:"" help:"シークレット保管庫 (Vault) を作成・管理します。Vault 単位で課金が行われ、シークレットは Vault に最新を含む 50 世代まで保管されます。"`
-	Secret SecretCommands `cmd:"" help:"Vault 内のシークレットを操作します。値の入出力はファイルまたは標準入出力経由で行い、コマンド引数に含めません。"`
+	Vault  VaultCommands  `embed:""`
+	Secret SecretCommands `embed:""`
 }
 
 // SecretCreateCommand はシークレットの作成・更新コマンドです。値を引数や

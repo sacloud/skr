@@ -43,6 +43,7 @@ var apiCommandNameTargetDomains = []string{
 // baseline のエントリ削除と合わせて追加し、末端パスの集合が期待パスの集合と一致することを検証します。
 var apiCommandNameMigratedDomains = []string{
 	"kms-api",
+	"secretmanager-api",
 	"simplemq-api",
 }
 

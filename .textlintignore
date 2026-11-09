@@ -3,6 +3,7 @@ dist/
 
 CHANGELOG.md
 AGENTS.md
+PLAN.md
 
 tmp/**
 **/e2e-output/**

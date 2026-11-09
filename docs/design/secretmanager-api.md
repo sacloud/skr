@@ -2,22 +2,22 @@
 
 ## 対象範囲
 
-`secretmanager-api` は SDK `github.com/sacloud/sacloud-sdk-go v0.3.1` のシークレットマネージャー (Secret Manager) を操作します。公開する操作は次のとおりです。
+`secretmanager-api` は SDK `github.com/sacloud/sacloud-sdk-go v0.3.1` のシークレットマネージャー (Secret Manager) を操作します。コマンド名は operationId から機械派生します ([ADR 0074](../adr/0074-api-command-name-structure.md))。公開する操作は次のとおりです。
 
 | リソース | 実装操作 |
 | --- | --- |
-| `vault` | `list`、`read`、`create`、`update`、`delete` |
-| `secret` | `list`、`create`、`delete`、`unveil` |
+| `vault` | `list-vaults`、`read-vault`、`create-vault`、`update-vault`、`delete-vault` |
+| `secret` | `list-vault-secrets`、`create-vault-secret`、`delete-vault-secret`、`unveil-secret` |
 
 シークレットマネージャーは KMS キーで暗号化したシークレットを契約単位で保管し、シークレットは最新を含む複数世代を保持します。シークレットの作成は upsert で、同名シークレットへの作成は新しいバージョンの登録として扱われます。Vault 単位で課金が行われ、Vault が作成されてから削除されるまでの間課金されます。保管できるシークレット数、保持できる世代数、API のレート制限などの上限は[シークレットマネージャー基本情報](https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html)を参照してください。
 
-シークレットの値の取得は `secret unveil` で行います。SDK のシークレット取得 API は `unveil` のみを提供し、値を返す read 操作はありません。バージョンを指定しない場合は最新バージョンを取得します。
+シークレットの値の取得は `unveil-secret` で行います。SDK のシークレット取得 API は `unveil` のみを提供し、値を返す read 操作はありません。バージョンを指定しない場合は最新バージョンを取得します。
 
 API エンドポイントは `https://secure.sakura.ad.jp/cloud/zone/{ゾーン名}/api/cloud/1.1/secretmanager` で、全ゾーンで利用できます。コマンドはゾーン引数を持たず、SDK の既定値を使います。エンドポイントは `SAKURA_ENDPOINTS_SECRETMANAGER` 環境変数で変更できます（[SecretManager API](https://manual.sakura.ad.jp/api/cloud/security-encryption/#tag/secretmanager-vault)）。
 
 ## パッケージと生成
 
-操作は `api/commands/secretmanager-vault.json` と `api/commands/secretmanager-secret.json` で明示し、`make generate-api` から `internal/secretmanagerapi/` に生成します。生成するのは `vault` の全操作と `secret list`、`secret delete` のコマンドと、API interface、factory、Runtime です。`internal/cli/` の配線は `make generate-wiring` から生成し、設定との一致を `internal/cli/wiring_test.go` で確認します。
+操作は `api/commands/secretmanager-vault.json` と `api/commands/secretmanager-secret.json` で明示し、`make generate-api` から `internal/secretmanagerapi/` に生成します。生成するのは `vault` の全操作と `list-vault-secrets`、`delete-vault-secret` のコマンドと、API interface、factory、Runtime です。`internal/cli/` の配線は `make generate-wiring` から生成し、設定との一致を `internal/cli/wiring_test.go` で確認します。
 
 次の操作は手書きで `internal/secretmanagerapi/commands.go` に実装します。
 
@@ -41,7 +41,7 @@ SDK のシークレット操作は Vault スコープのクライアント (`New
 
 ## 出力
 
-SecretManager API の応答フィールドは PascalCase (`ID`、`Name`、`KmsKeyID`、`LatestVersion` など) です。`vault` の全操作と `secret list`、`secret create` の出力は JSON で、`--query` による加工に対応します。`secret list` はシークレットの値を含まないメタデータ (`Name`、`LatestVersion`) を返します。`secret unveil` のみ値をそのまま標準出力へ出力します。
+SecretManager API の応答フィールドは PascalCase (`ID`、`Name`、`KmsKeyID`、`LatestVersion` など) です。`vault` の全操作と `list-vault-secrets`、`create-vault-secret` の出力は JSON で、`--query` による加工に対応します。`list-vault-secrets` はシークレットの値を含まないメタデータ (`Name`、`LatestVersion`) を返します。`unveil-secret` のみ値をそのまま標準出力へ出力します。
 
 ## ライブ E2E と後片付け
 

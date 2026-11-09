@@ -21,7 +21,6 @@ import (
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
 	networkingsuitev1 "github.com/sacloud/sacloud-sdk-go/api/networking-suite/apis/v1"
 	objectstoragev1 "github.com/sacloud/sacloud-sdk-go/api/object-storage/apis/v2"
-	secretmanagerv1 "github.com/sacloud/sacloud-sdk-go/api/secretmanager/apis/v1"
 	securitycontrolv1 "github.com/sacloud/sacloud-sdk-go/api/security-control/apis/v1"
 	serviceendpointgatewayv1 "github.com/sacloud/sacloud-sdk-go/api/service-endpoint-gateway/apis/v1"
 	simplenotificationv1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
@@ -242,16 +241,6 @@ var apiCommandNameBaseline = map[string]string{
 	"object-storage-api site status bucket-metering":  objectstoragev1.GetBucketMeteringOperation,
 	"object-storage-api site status quota":            objectstoragev1.GetQuotaOperation,
 	"object-storage-api site status read":             objectstoragev1.GetStatusOperation,
-	// secretmanager-api
-	"secretmanager-api secret create": secretmanagerv1.CreateVaultSecretOperation,
-	"secretmanager-api secret delete": secretmanagerv1.DeleteVaultSecretOperation,
-	"secretmanager-api secret list":   secretmanagerv1.ListVaultSecretsOperation,
-	"secretmanager-api secret unveil": secretmanagerv1.UnveilSecretOperation,
-	"secretmanager-api vault create":  secretmanagerv1.CreateVaultOperation,
-	"secretmanager-api vault delete":  secretmanagerv1.DeleteVaultOperation,
-	"secretmanager-api vault list":    secretmanagerv1.ListVaultsOperation,
-	"secretmanager-api vault read":    secretmanagerv1.ReadVaultOperation,
-	"secretmanager-api vault update":  secretmanagerv1.UpdateVaultOperation,
 	// security-control-api
 	"security-control-api activation create":       securitycontrolv1.ProjectActivationCreateOperation,
 	"security-control-api activation read":         securitycontrolv1.ProjectActivationReadOperation,
