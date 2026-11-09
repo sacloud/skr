@@ -193,7 +193,7 @@ func (c *SubnetGroupListCommand) Run(ctx *kong.Context) error {
 }
 
 type SubnetGroupReadCommand struct {
-	SRN     string `arg:"" help:"参照するサブネットグループの SRN。list の出力に含まれます。"`
+	SRN     string `arg:"" help:"参照するサブネットグループの SRN。list-subnet-groups の出力に含まれます。"`
 	runtime Runtime
 }
 
@@ -316,7 +316,7 @@ func (c *SubnetListCommand) Run(ctx *kong.Context) error {
 }
 
 type SubnetReadCommand struct {
-	SRN     string `arg:"" help:"参照するサブネットの SRN。list の出力に含まれます。"`
+	SRN     string `arg:"" help:"参照するサブネットの SRN。list-subnets SUBNET-GROUP-SRN の出力に含まれます。"`
 	runtime Runtime
 }
 
@@ -504,7 +504,7 @@ func (c *AddressListCommand) Run(ctx *kong.Context) error {
 }
 
 type AddressReadCommand struct {
-	SRN     string `arg:"" help:"参照するアドレスの SRN。list の出力に含まれます。"`
+	SRN     string `arg:"" help:"参照するアドレスの SRN。list-addresses SUBNET-SRN の出力に含まれます。"`
 	runtime Runtime
 }
 
