@@ -27,8 +27,8 @@
 
 - サイト ID、バケット名、権限 ID、アクセスキー ID は対象を指定する位置引数です。
 - パーミッションの Create / Update は SDK の `PermissionBucketControlsBody` JSON を `--request` で受け取ります。`display_name` と `bucket_controls` は単純な独立値ではなく、バケットごとの権限を含む構造化入力です。直接 JSON と `@path.json` に対応します。
-- `bucket create` の `--plan` は SDK がアーカイブ用サイトのプラン経路を組み立てる補助入力です。`site plans` の `service_class_path` を参照して値を指定します。通常サイトでは指定を拒否します。
-- `bucket-metering` の期間は RFC3339 形式の `--from` と `--to` で指定し、SDK に `time.Time` として渡します。
+- `create-bucket` の `--plan` は SDK がアーカイブ用サイトのプラン経路を組み立てる補助入力です。`get-plans` の `service_class_path` を参照して値を指定します。通常サイトでは指定を拒否します。
+- `get-bucket-metering` の期間は RFC3339 形式の `--from` と `--to` で指定し、SDK に `time.Time` として渡します。
 - アクセスキーのシークレットは Create の SDK 応答にだけ含まれ、標準 JSON 出力へ表示します。作成応答をログに残したり、Git 管理下へ保存したりしないよう注意をヘルプに記載します。
 - API がエラーを返した場合は出力せず、エラーを呼び出し元へ返します。戻り値を持たない変更操作は成功時も JSON を出力しません。
 - 全コマンドで出力式を API factory の呼び出し前に検証します。不正な `--query` でキー発行や設定変更が先に実行されることを防ぎます。
@@ -88,24 +88,24 @@ SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageE
 
 ### コマンド対応とライブ実行状況
 
-2026-10-30 の実行結果です。全34コマンドにシナリオがあり、このうち32コマンドで正常応答と期待内容をライブ確認しました。暗号化3操作もテスト専用の KMS キーでライブ確認し、残る2操作は API エラーのため成功未確認です。
+2026-10-30 の実行結果です。全34コマンドにシナリオがあり、このうち32コマンドで正常応答と期待内容をライブ確認しました。暗号化3操作もテスト専用の KMS キーでライブ確認し、残る2操作は API エラーのため成功未確認です。2026-11-09 に operationId 派生名への移行後、6シナリオをすべて再実行し、32コマンドの正常応答を新しいコマンド名で再確認しました。deferred の2操作は引き続き #142 で追跡します。
 
-| `object-storage-api` 以下のコマンド | 個数 | 主なシナリオ | ライブ結果 |
+| `object-storage-api` のサブコマンド | 個数 | 主なシナリオ | ライブ結果 |
 | --- | --- | --- | --- |
-| `site list / read / plans` | 3 | `Bucket`、`Archive`、`Account` | 成功しました |
-| `site status read / quota` | 2 | `Metrics` | 東京第1サイトで成功しました |
-| `site status bucket-metering` | 1 | deferred | HTTP 400 が返り、成功未確認です。#142 で追跡します |
-| `account create / read / delete` | 3 | `Account` | アーカイブ・東京第1サイトで成功しました |
-| `account access-key list / create / read / delete` | 4 | `Account` | 成功しました |
-| `bucket list / create / delete` | 3 | `Bucket`、`Archive`、`Replication` | 通常・アーカイブ両プランで成功しました |
-| `permission list / create / read / update / delete` | 5 | `Bucket` | 書き込み許可の変更を含め成功しました |
-| `permission access-key list / create / read / delete` | 4 | `Bucket` | 成功しました |
-| `bucket usage / quota` | 2 | `Metrics` | 東京第1サイトで成功しました |
-| `bucket penalty` | 1 | deferred | HTTP 404 が返り、成功未確認です。#142 で追跡します |
-| `bucket encryption read / enable / disable` | 3 | `Encryption` | 2026-10-30 にテスト専用の KMS キーでライブ実行し、有効化・キー ID の照合・無効化と無効化後の不在を確認しました |
-| `bucket replication read / enable / disable` | 3 | `Replication` | 石狩第1サイトから東京第1サイトへの設定で成功しました |
+| `get-clusters`、`get-cluster`、`get-plans` | 3 | `Bucket`、`Archive`、`Account` | 成功しました |
+| `get-status`、`get-quota` | 2 | `Metrics` | 東京第1サイトで成功しました |
+| `get-bucket-metering` | 1 | deferred | HTTP 400 が返り、成功未確認です。#142 で追跡します |
+| `create-account`、`get-account`、`delete-account` | 3 | `Account` | アーカイブ・東京第1サイトで成功しました |
+| `get-account-keys`、`create-account-key`、`get-account-key`、`delete-account-key` | 4 | `Account` | 成功しました |
+| `list-buckets`、`create-bucket`、`delete-bucket` | 3 | `Bucket`、`Archive`、`Replication` | 通常・アーカイブ両プランで成功しました |
+| `get-permissions`、`create-permission`、`get-permission`、`update-permission`、`delete-permission` | 5 | `Bucket` | 書き込み許可の変更を含め成功しました |
+| `get-permission-keys`、`create-permission-key`、`get-permission-key`、`delete-permission-key` | 4 | `Bucket` | 成功しました |
+| `get-bucket-usage`、`get-bucket-quota` | 2 | `Metrics` | 東京第1サイトで成功しました |
+| `get-bucket-penalty` | 1 | deferred | HTTP 404 が返り、成功未確認です。#142 で追跡します |
+| `get-bucket-encryption`、`put-bucket-encryption`、`delete-bucket-encryption` | 3 | `Encryption` | 2026-10-30 にテスト専用の KMS キーでライブ実行し、有効化・キー ID の照合・無効化と無効化後の不在を確認しました |
+| `get-bucket-replication`、`post-bucket-replication`、`delete-bucket-replication` | 3 | `Replication` | 石狩第1サイトから東京第1サイトへの設定で成功しました |
 
-暗号化の3操作は [#141](https://github.com/sacloud/skr/issues/141) で 2026-10-30 に実装・ライブ検証しました。テレメトリーの失敗は [#142](https://github.com/sacloud/skr/issues/142) で追跡します。`penalty` の404をペナルティなしと解釈したり、`bucket-metering` の400を空利用量で置き換えたりしません。CLI は公開 SDK にサイト、バケット名、期間を渡しており、失敗の原因が CLI・SDK・サービスのどこにあるかは未確定です。両操作は baseline で deferred として扱い、正常系のシナリオでは呼び出しません。
+暗号化の3操作は [#141](https://github.com/sacloud/skr/issues/141) で 2026-10-30 に実装・ライブ検証しました。テレメトリーの失敗は [#142](https://github.com/sacloud/skr/issues/142) で追跡します。`get-bucket-penalty` の404をペナルティなしと解釈したり、`get-bucket-metering` の400を空利用量で置き換えたりしません。CLI は公開 SDK にサイト、バケット名、期間を渡しており、失敗の原因が CLI・SDK・サービスのどこにあるかは未確定です。両操作は baseline で deferred として扱い、正常系のシナリオでは呼び出しません。
 
 ### 安全性と証跡
 
@@ -116,5 +116,9 @@ SKR_E2E=1 go test ./test/e2e/object-storage-api/ -run TestScenarioObjectStorageE
 レプリケーションは設定を無効化してから両バケットを削除します。失敗・キャンセル時も独立した期限付きコンテキストで後片付けし、削除失敗を最終終了コードへ反映します。所有を確認できない対象は自動削除を拒否します。
 
 暗号化も無効化直前に設定を再取得し、現在の `kms_key_id` が今回指定したキー ID と一致する場合だけ無効化します。明確な404は設定不在として変更せず終了し、不一致・不正応答・キー ID 欠落・照会失敗は変更を拒否します。キャンセル後の片付けにも同じ条件を適用します。設定の所有を確認できない場合は親バケットも自動削除せず、手動確認を求めるエラーを返します。シナリオが作成した KMS キーはバケットの後片付けの後に削除し、一覧に残っていないことを確認します。
+
+## コマンド名の移行
+
+2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行計画フェーズ 3 として、末端サブコマンド名を OpenAPI の operationId から機械派生した名前に移行しました。site / account / bucket / permission のグループ階層は Kong の embed で展開し、`skr object-storage-api <operationId 派生名>` の 1 階層構造にしています。operationId の動詞は `Get`、`Put`、`Post` を使うため、暗号化の有効化は `put-bucket-encryption`、レプリケーションの有効化は `post-bucket-replication` になります。sakumock を使う CLI 経由の全34コマンド検証と命名検証を新しい名前で更新済みです。ライブ再実行は後述の再実行手順で行います。
 
 証跡は共有ヘルパーが Git 管理外の `test/e2e/object-storage-api/e2e-output/<識別名>-<実行日時>.md` に Markdown で保存します。2026-10-28 の実行では `object-storage-bucket`、`object-storage-account`、`object-storage-archive`、`object-storage-metrics`、`object-storage-replication` の記録を残しました。2026-10-30 の実行では `object-storage-encryption` の記録を残し、テスト専用の KMS キー・サイトアカウント・バケット・権限・キーの削除と不在確認を完了しています。

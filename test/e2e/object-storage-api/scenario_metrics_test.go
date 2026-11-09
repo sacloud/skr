@@ -25,18 +25,18 @@ func TestScenarioObjectStorageMetrics(t *testing.T) {
 }
 
 // readObjectStorageMetrics はサイトの状態・クォータとバケットのメトリクスを参照します。
-// `bucket penalty` と `site status bucket-metering` は現時点で API エラー (#142) となるため deferred とし、
+// `get-bucket-penalty` と `get-bucket-metering` は現時点で API エラー (#142) となるため deferred とし、
 // このシナリオでは呼び出しません。
 func readObjectStorageMetrics(t *testing.T, h *helper.Helper, siteID, bucket string, cleanupVetoed *bool) {
 	t.Helper()
 
-	output := h.Call(t, "サイトの稼働状態を確認する", "object-storage-api", "site", "status", "read", siteID)
+	output := h.Call(t, "サイトの稼働状態を確認する", "object-storage-api", "get-status", siteID)
 	requireObjectFields(t, output, "サイトの稼働状態", "accept_new", "status_code")
 
-	output = h.Call(t, "サイトのクォータ情報を確認する", "object-storage-api", "site", "status", "quota", siteID)
+	output = h.Call(t, "サイトのクォータ情報を確認する", "object-storage-api", "get-quota", siteID)
 	requireObjectFields(t, output, "サイトのクォータ情報", "num_buckets", "num_permissions")
 
-	output = h.Call(t, "バケットの使用量を確認する", "object-storage-api", "bucket", "usage", siteID, bucket)
+	output = h.Call(t, "バケットの使用量を確認する", "object-storage-api", "get-bucket-usage", siteID, bucket)
 	requireObjectFields(t, output, "バケットの使用量", "num_objects_per_bucket", "amount_gib_per_bucket")
 	var usage struct {
 		Objects *int     `json:"num_objects_per_bucket"`
@@ -48,6 +48,6 @@ func readObjectStorageMetrics(t *testing.T, h *helper.Helper, siteID, bucket str
 	require.GreaterOrEqual(t, *usage.Objects, 0, "bucket has invalid storage usage")
 	require.GreaterOrEqual(t, *usage.Amount, 0.0, "bucket has invalid storage usage")
 
-	output = h.Call(t, "バケットのクォータを確認する", "object-storage-api", "bucket", "quota", siteID, bucket)
+	output = h.Call(t, "バケットのクォータを確認する", "object-storage-api", "get-bucket-quota", siteID, bucket)
 	requireObjectFields(t, output, "バケットのクォータ", "num_objects_per_bucket", "amount_gib_per_bucket")
 }

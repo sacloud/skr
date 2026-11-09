@@ -30,7 +30,7 @@ type site struct {
 	ID string `json:"id"`
 }
 
-// plan は site plans の応答から参照する項目です。
+// plan は get-plans の応答から参照する項目です。
 type plan struct {
 	Path      string `json:"service_class_path"`
 	Type      string `json:"type"`
@@ -144,7 +144,7 @@ func objectStorageSitePlanPath(siteID, planValue string) string {
 func confirmObjectStorageSite(t *testing.T, h *helper.Helper, siteID, planValue string) {
 	t.Helper()
 
-	output := h.Call(t, "利用可能なオブジェクトストレージサイト一覧を取得する", "object-storage-api", "site", "list",
+	output := h.Call(t, "利用可能なオブジェクトストレージサイト一覧を取得する", "object-storage-api", "get-clusters",
 		"--query", "map({id,display_name,region,plan_family})")
 	sites := decodeArray[site](t, output, "sites")
 	matches := 0
@@ -155,7 +155,7 @@ func confirmObjectStorageSite(t *testing.T, h *helper.Helper, siteID, planValue 
 	}
 	require.Equal(t, 1, matches, "expected exactly one site %s, got %d", siteID, matches)
 
-	output = h.Call(t, "指定サイトの詳細を確認する", "object-storage-api", "site", "read", siteID)
+	output = h.Call(t, "指定サイトの詳細を確認する", "object-storage-api", "get-cluster", siteID)
 	var selected site
 	require.NoError(t, json.Unmarshal(output, &selected), "decode site")
 	require.Equal(t, siteID, selected.ID, "site read identity does not match the requested site")
@@ -163,7 +163,7 @@ func confirmObjectStorageSite(t *testing.T, h *helper.Helper, siteID, planValue 
 	if planValue == "" {
 		return
 	}
-	output = h.Call(t, "指定サイトで利用可能なプラン一覧を取得する", "object-storage-api", "site", "plans", siteID,
+	output = h.Call(t, "指定サイトで利用可能なプラン一覧を取得する", "object-storage-api", "get-plans", siteID,
 		"--query", "map({service_class_path,type,cluster_id,capacity_gib,fee})")
 	plans := decodeArray[plan](t, output, "plans")
 	for _, item := range plans {
@@ -178,7 +178,7 @@ func confirmObjectStorageSite(t *testing.T, h *helper.Helper, siteID, planValue 
 func listObjectStorageBuckets(t *testing.T, h *helper.Helper, description, siteID string) []bucket {
 	t.Helper()
 
-	output := h.Call(t, description, "object-storage-api", "bucket", "list", siteID,
+	output := h.Call(t, description, "object-storage-api", "list-buckets", siteID,
 		"--query", "map({name,resource_id,plan})")
 	return decodeArray[bucket](t, output, "bucket list")
 }
@@ -198,7 +198,7 @@ func bucketsNamed(items []bucket, name string) []bucket {
 func createObjectStorageBucket(t *testing.T, h *helper.Helper, siteID, name, planValue string) createdBucket {
 	t.Helper()
 
-	args := []string{"object-storage-api", "bucket", "create", siteID, name}
+	args := []string{"object-storage-api", "create-bucket", siteID, name}
 	if planValue != "" {
 		args = append(args, "--plan", planValue)
 	}
@@ -242,7 +242,7 @@ func deleteObjectStorageBucket(t *testing.T, h *helper.Helper, description, site
 	require.Equal(t, created.ResourceID, matches[0].ResourceID,
 		"refusing to delete bucket %s because its resource ID does not match the created bucket", created.Name)
 
-	h.Call(t, "作成したテスト用バケットを削除する", "object-storage-api", "bucket", "delete", created.ClusterID, created.Name)
+	h.Call(t, "作成したテスト用バケットを削除する", "object-storage-api", "delete-bucket", created.ClusterID, created.Name)
 	items = listObjectStorageBuckets(t, h, description+"後にバケットが一覧に残っていないことを確認する", siteID)
 	require.Empty(t, bucketsNamed(items, created.Name), "bucket %s remains after deletion", created.Name)
 }
@@ -251,7 +251,7 @@ func deleteObjectStorageBucket(t *testing.T, h *helper.Helper, description, site
 func listObjectStoragePermissions(t *testing.T, h *helper.Helper, description, siteID string) []permission {
 	t.Helper()
 
-	output := h.Call(t, description, "object-storage-api", "permission", "list", siteID,
+	output := h.Call(t, description, "object-storage-api", "get-permissions", siteID,
 		"--query", "map({id,display_name,bucket_controls})")
 	return decodeArray[permission](t, output, "permission list")
 }
@@ -304,7 +304,7 @@ func verifyObjectStoragePermission(t *testing.T, h *helper.Helper, description, 
 	}
 	require.Equal(t, 1, matches, "created permission ID is missing or ambiguous")
 
-	output := h.Call(t, description, "object-storage-api", "permission", "read", siteID, permissionID)
+	output := h.Call(t, description, "object-storage-api", "get-permission", siteID, permissionID)
 	var actual permission
 	require.NoError(t, json.Unmarshal(output, &actual), "decode permission")
 	require.Equal(t, expected.ID, actual.ID, "permission read does not match the created permission")
@@ -338,10 +338,10 @@ func deleteObjectStoragePermission(t *testing.T, h *helper.Helper, siteID string
 
 	permissionID := strconv.FormatInt(expected.ID, 10)
 	keys := objectStorageKeyList(t, h, "パーミッション削除前にアクセスキーが残っていないことを確認する",
-		[]string{"permission", "access-key"}, []string{siteID, permissionID})
+		objectStoragePermissionKeyCommands, []string{siteID, permissionID})
 	require.Empty(t, keys, "permission still has access keys; refusing to delete it")
 
-	h.Call(t, "一時的なパーミッションを削除する", "object-storage-api", "permission", "delete", siteID, permissionID)
+	h.Call(t, "一時的なパーミッションを削除する", "object-storage-api", "delete-permission", siteID, permissionID)
 	items = listObjectStoragePermissions(t, h, "パーミッション削除後に対象が一覧に残っていないことを確認する", siteID)
 	for _, item := range items {
 		require.NotEqual(t, expected.ID, item.ID, "permission remains after deletion")
@@ -366,7 +366,7 @@ func runBucketPermissionExercise(t *testing.T, h *helper.Helper, siteID, bucketN
 
 	// パーミッションを作成し、識別情報と権限を確認する
 	requestPath := h.WriteRequestJSONFile(t, "permission-create", expected)
-	output := h.Call(t, "テスト用パーミッションを作成する", "object-storage-api", "permission", "create", siteID,
+	output := h.Call(t, "テスト用パーミッションを作成する", "object-storage-api", "create-permission", siteID,
 		"--request", "@"+requestPath)
 	var created permission
 	require.NoError(t, json.Unmarshal(output, &created),
@@ -389,13 +389,13 @@ func runBucketPermissionExercise(t *testing.T, h *helper.Helper, siteID, bucketN
 
 	// パーミッションのアクセスキーのライフサイクル
 	permissionID := strconv.FormatInt(expected.ID, 10)
-	runObjectStorageKeyLifecycle(t, h, []string{"permission", "access-key"}, []string{siteID, permissionID})
+	runObjectStorageKeyLifecycle(t, h, objectStoragePermissionKeyCommands, []string{siteID, permissionID})
 
 	// 書き込み許可を変更し、変更内容を確認する
 	expected.Controls[0].CanWrite = false
 	updatePath := h.WriteRequestJSONFile(t, "permission-update",
 		permission{DisplayName: expected.DisplayName, Controls: expected.Controls})
-	h.Call(t, "パーミッションの書き込み権限を変更する", "object-storage-api", "permission", "update", siteID, permissionID,
+	h.Call(t, "パーミッションの書き込み権限を変更する", "object-storage-api", "update-permission", siteID, permissionID,
 		"--request", "@"+updatePath)
 	verifyObjectStoragePermission(t, h, "変更したパーミッションの内容を確認する", siteID, expected)
 
@@ -403,10 +403,25 @@ func runBucketPermissionExercise(t *testing.T, h *helper.Helper, siteID, bucketN
 	deleted = true
 }
 
+// objectStorageAccountKeyCommands と objectStoragePermissionKeyCommands は
+// アクセキー系コマンドの operationId 派生名です。操作の種類からコマンド名を引きます。
+var objectStorageAccountKeyCommands = map[string]string{
+	"list":   "get-account-keys",
+	"create": "create-account-key",
+	"read":   "get-account-key",
+	"delete": "delete-account-key",
+}
+
+var objectStoragePermissionKeyCommands = map[string]string{
+	"list":   "get-permission-keys",
+	"create": "create-permission-key",
+	"read":   "get-permission-key",
+	"delete": "delete-permission-key",
+}
+
 // objectStorageKeyArgs はアクセキー系コマンドの引数を組み立てます。
-func objectStorageKeyArgs(commandPath []string, operation string, commandTarget []string, id string) []string {
-	args := append([]string{"object-storage-api"}, commandPath...)
-	args = append(args, operation)
+func objectStorageKeyArgs(commands map[string]string, operation string, commandTarget []string, id string) []string {
+	args := append([]string{"object-storage-api"}, commands[operation])
 	args = append(args, commandTarget...)
 	if id != "" {
 		args = append(args, id)
@@ -415,20 +430,20 @@ func objectStorageKeyArgs(commandPath []string, operation string, commandTarget 
 }
 
 // objectStorageKeyList はアクセスキーの一覧を取得します。
-func objectStorageKeyList(t *testing.T, h *helper.Helper, description string, commandPath, commandTarget []string) []accessKey {
+func objectStorageKeyList(t *testing.T, h *helper.Helper, description string, commands map[string]string, commandTarget []string) []accessKey {
 	t.Helper()
 
-	args := append(objectStorageKeyArgs(commandPath, "list", commandTarget, ""), "--query", "map({id})")
+	args := append(objectStorageKeyArgs(commands, "list", commandTarget, ""), "--query", "map({id})")
 	output := h.Call(t, description, args...)
 	return decodeArray[accessKey](t, output, "access key list")
 }
 
 // createObjectStorageKey はアクセスキーを作成します。作成応答にはシークレットが含まれるため、
 // 実行記録から stdout を除いて取得します。
-func createObjectStorageKey(t *testing.T, h *helper.Helper, commandPath, commandTarget []string) accessKey {
+func createObjectStorageKey(t *testing.T, h *helper.Helper, commands map[string]string, commandTarget []string) accessKey {
 	t.Helper()
 
-	output := h.CallHidingStdout(t, "アクセスキーを作成する", objectStorageKeyArgs(commandPath, "create", commandTarget, "")...)
+	output := h.CallHidingStdout(t, "アクセスキーを作成する", objectStorageKeyArgs(commands, "create", commandTarget, "")...)
 	var created accessKey
 	require.NoError(t, json.Unmarshal(output, &created),
 		"cannot identify created access key; inspect the new permission or account manually")
@@ -440,10 +455,10 @@ func createObjectStorageKey(t *testing.T, h *helper.Helper, commandPath, command
 
 // deleteObjectStorageKey はアクセスキーを削除し、一覧に残っていないことを確認します。
 // 対象が一覧に存在しない場合は削除済みとして扱います。
-func deleteObjectStorageKey(t *testing.T, h *helper.Helper, commandPath, commandTarget []string, id string) {
+func deleteObjectStorageKey(t *testing.T, h *helper.Helper, commands map[string]string, commandTarget []string, id string) {
 	t.Helper()
 
-	items := objectStorageKeyList(t, h, "アクセスキー削除前に対象が存在することを確認する", commandPath, commandTarget)
+	items := objectStorageKeyList(t, h, "アクセスキー削除前に対象が存在することを確認する", commands, commandTarget)
 	found := false
 	for _, item := range items {
 		if item.ID == id {
@@ -453,36 +468,36 @@ func deleteObjectStorageKey(t *testing.T, h *helper.Helper, commandPath, command
 	if !found {
 		return
 	}
-	h.Call(t, "アクセスキーを削除する", objectStorageKeyArgs(commandPath, "delete", commandTarget, id)...)
-	items = objectStorageKeyList(t, h, "アクセスキー削除後に対象が一覧に残っていないことを確認する", commandPath, commandTarget)
+	h.Call(t, "アクセスキーを削除する", objectStorageKeyArgs(commands, "delete", commandTarget, id)...)
+	items = objectStorageKeyList(t, h, "アクセスキー削除後に対象が一覧に残っていないことを確認する", commands, commandTarget)
 	for _, item := range items {
 		require.NotEqual(t, id, item.ID, "access key remains after deletion")
 	}
 }
 
 // runObjectStorageKeyLifecycle はアクセスキーの作成・参照・失効を検証します。
-func runObjectStorageKeyLifecycle(t *testing.T, h *helper.Helper, commandPath, commandTarget []string) {
+func runObjectStorageKeyLifecycle(t *testing.T, h *helper.Helper, commands map[string]string, commandTarget []string) {
 	t.Helper()
 
-	items := objectStorageKeyList(t, h, "作成前に既存アクセスキーがないことを確認する", commandPath, commandTarget)
+	items := objectStorageKeyList(t, h, "作成前に既存アクセスキーがないことを確認する", commands, commandTarget)
 	require.Empty(t, items, "access keys already exist; refusing to replace them")
 
-	created := createObjectStorageKey(t, h, commandPath, commandTarget)
+	created := createObjectStorageKey(t, h, commands, commandTarget)
 	deleted := false
 	defer func() {
 		if !deleted {
-			deleteObjectStorageKey(t, h, commandPath, commandTarget, created.ID)
+			deleteObjectStorageKey(t, h, commands, commandTarget, created.ID)
 		}
 	}()
 
 	// 作成したアクセキーの詳細を確認する。参照応答にシークレットは含まれません。
-	output := h.Call(t, "作成したアクセキーの詳細を確認する", objectStorageKeyArgs(commandPath, "read", commandTarget, created.ID)...)
+	output := h.Call(t, "作成したアクセキーの詳細を確認する", objectStorageKeyArgs(commands, "read", commandTarget, created.ID)...)
 	var read accessKey
 	require.NoError(t, json.Unmarshal(output, &read), "decode access key read response")
 	require.Equal(t, created.ID, read.ID, "access key read ID mismatch or secret was unexpectedly returned")
 	require.Empty(t, read.Secret, "access key read ID mismatch or secret was unexpectedly returned")
 
-	deleteObjectStorageKey(t, h, commandPath, commandTarget, created.ID)
+	deleteObjectStorageKey(t, h, commands, commandTarget, created.ID)
 	deleted = true
 }
 
@@ -490,7 +505,7 @@ func runObjectStorageKeyLifecycle(t *testing.T, h *helper.Helper, commandPath, c
 func verifyObjectStorageAccount(t *testing.T, h *helper.Helper, description, siteID string, expected account) {
 	t.Helper()
 
-	output := h.Call(t, description, "object-storage-api", "account", "read", siteID)
+	output := h.Call(t, description, "object-storage-api", "get-account", siteID)
 	var actual account
 	require.NoError(t, json.Unmarshal(output, &actual), "decode site account")
 	require.Equal(t, expected.ResourceID, actual.ResourceID, "site account ID changed; refusing modification")
@@ -502,7 +517,7 @@ func deleteObjectStorageAccount(t *testing.T, h *helper.Helper, siteID string, e
 	t.Helper()
 
 	output, stderr, err := h.CallAllowingFailure(t, "アカウント削除前に作成したアカウントを再照合する",
-		"object-storage-api", "account", "read", siteID)
+		"object-storage-api", "get-account", siteID)
 	if err != nil {
 		require.True(t, objectStorageNotFound(stderr, "Accounts.Read"),
 			"failed to re-read the site account before deletion: %s", stderr)
@@ -517,12 +532,12 @@ func deleteObjectStorageAccount(t *testing.T, h *helper.Helper, siteID string, e
 	require.Empty(t, listObjectStoragePermissions(t, h, "アカウント削除前にパーミッションが残っていないことを確認する", siteID),
 		"site account contains permissions; refusing to delete it")
 	require.Empty(t, objectStorageKeyList(t, h, "アカウント削除前にアクセスキーが残っていないことを確認する",
-		[]string{"account", "access-key"}, []string{siteID}),
+		objectStorageAccountKeyCommands, []string{siteID}),
 		"site account contains access keys; refusing to delete it")
 
-	h.Call(t, "オブジェクトストレージアカウントを削除する", "object-storage-api", "account", "delete", siteID)
+	h.Call(t, "オブジェクトストレージアカウントを削除する", "object-storage-api", "delete-account", siteID)
 	_, stderr, err = h.CallAllowingFailure(t, "アカウント削除後に 404 になることを確認する",
-		"object-storage-api", "account", "read", siteID)
+		"object-storage-api", "get-account", siteID)
 	require.Error(t, err, "site account still exists after deletion")
 	require.True(t, objectStorageNotFound(stderr, "Accounts.Read"),
 		"account deletion was not confirmed by an Accounts.Read API 404: %s", stderr)
@@ -534,7 +549,7 @@ func ensureObjectStorageAccount(t *testing.T, h *helper.Helper, siteID string) f
 	t.Helper()
 
 	output, stderr, err := h.CallAllowingFailure(t, "サイトアカウントの有無を確認する",
-		"object-storage-api", "account", "read", siteID)
+		"object-storage-api", "get-account", siteID)
 	if err == nil {
 		var existing account
 		require.NoError(t, json.Unmarshal(output, &existing), "decode site account")
@@ -544,7 +559,7 @@ func ensureObjectStorageAccount(t *testing.T, h *helper.Helper, siteID string) f
 	require.True(t, objectStorageNotFound(stderr, "Accounts.Read"),
 		"account absence was not confirmed by an Accounts.Read API 404: %s", stderr)
 
-	output = h.Call(t, "オブジェクトストレージアカウントを作成する", "object-storage-api", "account", "create", siteID)
+	output = h.Call(t, "オブジェクトストレージアカウントを作成する", "object-storage-api", "create-account", siteID)
 	var created account
 	require.NoError(t, json.Unmarshal(output, &created), "decode created account")
 	require.NotEmpty(t, created.ResourceID, "created account ID is unknown; manual inspection required")
@@ -560,7 +575,7 @@ func runBucketScenario(t *testing.T, h *helper.Helper, siteID, planValue string,
 
 	// サイトアカウントが存在することを確認する
 	output, stderr, err := h.CallAllowingFailure(t, "指定サイトのアカウント情報が取得できることを確認する",
-		"object-storage-api", "account", "read", siteID)
+		"object-storage-api", "get-account", siteID)
 	if err != nil {
 		require.True(t, objectStorageNotFound(stderr, "Accounts.Read"),
 			"site account must already exist: %s", stderr)
@@ -642,7 +657,7 @@ func runEncryptionLifecycle(t *testing.T, h *helper.Helper, siteID, bucket, kmsK
 	t.Helper()
 
 	read := func(description string) ([]byte, string, error) {
-		return h.CallAllowingFailure(t, description, "object-storage-api", "bucket", "encryption", "read", siteID, bucket)
+		return h.CallAllowingFailure(t, description, "object-storage-api", "get-bucket-encryption", siteID, bucket)
 	}
 	// 設定が存在しない場合は true。読み取りの失敗が不在以外の場合はテストを失敗させます。
 	absent := func(stderr string, err error) bool {
@@ -666,7 +681,7 @@ func runEncryptionLifecycle(t *testing.T, h *helper.Helper, siteID, bucket, kmsK
 			t.Errorf("bucket encryption setting ownership is unverified; refusing to disable it or delete the bucket; manual inspection required")
 			return
 		}
-		h.Call(t, "バケットの暗号化を無効化する", "object-storage-api", "bucket", "encryption", "disable", siteID, bucket)
+		h.Call(t, "バケットの暗号化を無効化する", "object-storage-api", "delete-bucket-encryption", siteID, bucket)
 		waitForObjectStorage(t, h, "暗号化の無効化を待つ", func() bool {
 			output, stderr, err := read("バケットの暗号化設定を確認する")
 			if absent(stderr, err) {
@@ -698,7 +713,7 @@ func runEncryptionLifecycle(t *testing.T, h *helper.Helper, siteID, bucket, kmsK
 	}
 
 	// 有効化と反映待ち
-	h.Call(t, "バケットの暗号化を有効化する", "object-storage-api", "bucket", "encryption", "enable", siteID, bucket,
+	h.Call(t, "バケットの暗号化を有効化する", "object-storage-api", "put-bucket-encryption", siteID, bucket,
 		"--kms-key-id", kmsKeyID)
 	waitForObjectStorage(t, h, "暗号化の有効化を待つ", func() bool {
 		output, stderr, err := read("バケットの暗号化設定を確認する")
@@ -738,7 +753,7 @@ func runReplicationLifecycle(t *testing.T, h *helper.Helper, sourceSite, sourceB
 	t.Helper()
 
 	read := func(description string) ([]byte, string, error) {
-		return h.CallAllowingFailure(t, description, "object-storage-api", "bucket", "replication", "read", sourceSite, sourceBucket)
+		return h.CallAllowingFailure(t, description, "object-storage-api", "get-bucket-replication", sourceSite, sourceBucket)
 	}
 	// 設定が存在しない場合は true。読み取りの失敗が不在以外の場合はテストを失敗させます。
 	absent := func(stderr string, err error) bool {
@@ -757,7 +772,7 @@ func runReplicationLifecycle(t *testing.T, h *helper.Helper, sourceSite, sourceB
 			return
 		}
 		checkObjectStorageReplication(t, output, sourceSite, sourceBucket, targetSite, targetBucket)
-		h.Call(t, "バケットのレプリケーションを無効化する", "object-storage-api", "bucket", "replication", "disable", sourceSite, sourceBucket)
+		h.Call(t, "バケットのレプリケーションを無効化する", "object-storage-api", "delete-bucket-replication", sourceSite, sourceBucket)
 		waitForObjectStorage(t, h, "レプリケーションの無効化を待つ", func() bool {
 			_, stderr, err := read("バケットのレプリケーション設定を確認する")
 			return absent(stderr, err)
@@ -777,7 +792,7 @@ func runReplicationLifecycle(t *testing.T, h *helper.Helper, sourceSite, sourceB
 	require.True(t, absent(stderr, err), "new source bucket must have no replication setting")
 
 	// 有効化と反映待ち
-	output := h.Call(t, "バケットのレプリケーションを有効化する", "object-storage-api", "bucket", "replication", "enable",
+	output := h.Call(t, "バケットのレプリケーションを有効化する", "object-storage-api", "post-bucket-replication",
 		sourceSite, sourceBucket, "--target-bucket", targetBucket)
 	checkObjectStorageReplication(t, output, sourceSite, sourceBucket, targetSite, targetBucket)
 	waitForObjectStorage(t, h, "レプリケーションの作成を待つ", func() bool {

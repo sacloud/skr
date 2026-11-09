@@ -45,6 +45,7 @@ var apiCommandNameMigratedDomains = []string{
 	"apprun-api",
 	"eventbus-api",
 	"kms-api",
+	"object-storage-api",
 	"secretmanager-api",
 	"security-control-api",
 	"service-endpoint-gateway-api",

@@ -23,14 +23,14 @@ func TestScenarioObjectStorageAccount(t *testing.T) {
 
 	// アカウントが未作成であることを確認する
 	_, stderr, err := h.CallAllowingFailure(t, "アカウントが未作成であることを確認する",
-		"object-storage-api", "account", "read", siteID)
+		"object-storage-api", "get-account", siteID)
 	if err == nil {
 		t.Skipf("site account already exists on %s; refusing to create or delete an existing account", siteID)
 	}
 	require.True(t, objectStorageNotFound(stderr, "Accounts.Read"),
 		"account absence was not confirmed by an Accounts.Read API 404: %s", stderr)
 
-	output := h.Call(t, "オブジェクトストレージアカウントを作成する", "object-storage-api", "account", "create", siteID)
+	output := h.Call(t, "オブジェクトストレージアカウントを作成する", "object-storage-api", "create-account", siteID)
 	var created account
 	require.NoError(t, json.Unmarshal(output, &created), "decode created account")
 	require.NotEmpty(t, created.ResourceID, "created account ID is unknown; manual inspection required")
@@ -45,13 +45,13 @@ func TestScenarioObjectStorageAccount(t *testing.T) {
 	verifyObjectStorageAccount(t, h, "作成したアカウントの ID が変更されていないことを確認する", siteID, created)
 
 	// サイトで利用可能なプラン一覧を取得する
-	plans := h.Call(t, "サイトで利用可能なプラン一覧を取得する", "object-storage-api", "site", "plans", siteID,
+	plans := h.Call(t, "サイトで利用可能なプラン一覧を取得する", "object-storage-api", "get-plans", siteID,
 		"--query", "map({service_class_path,type,cluster_id,capacity_gib,fee})")
 	available := decodeArray[plan](t, plans, "account site plans")
 	require.NotEmpty(t, available, "site returned no available plans")
 
 	// アカウントアクセキーのライフサイクル
-	runObjectStorageKeyLifecycle(t, h, []string{"account", "access-key"}, []string{siteID})
+	runObjectStorageKeyLifecycle(t, h, objectStorageAccountKeyCommands, []string{siteID})
 
 	deleteObjectStorageAccount(t, h, siteID, created)
 	deleted = true

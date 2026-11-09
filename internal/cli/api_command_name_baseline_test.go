@@ -18,7 +18,6 @@ import (
 	apprundedicatedv1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
-	objectstoragev1 "github.com/sacloud/sacloud-sdk-go/api/object-storage/apis/v2"
 )
 
 // apiCommandNameBaseline は operationId 機械派生への移行が完了していないコマンドの
@@ -159,39 +158,4 @@ var apiCommandNameBaseline = map[string]string{
 	"iam-api user-2fa list-security-keys":        iamv1.ListSecurityKeysOperation,
 	"iam-api user-2fa list-trusted-devices":      iamv1.ListTrustedDevicesOperation,
 	"iam-api user-2fa read-security-key":         iamv1.ReadSecurityKeyOperation,
-	// object-storage-api
-	"object-storage-api account access-key create":    objectstoragev1.CreateAccountKeyOperation,
-	"object-storage-api account access-key delete":    objectstoragev1.DeleteAccountKeyOperation,
-	"object-storage-api account access-key list":      objectstoragev1.GetAccountKeysOperation,
-	"object-storage-api account access-key read":      objectstoragev1.GetAccountKeyOperation,
-	"object-storage-api account create":               objectstoragev1.CreateAccountOperation,
-	"object-storage-api account delete":               objectstoragev1.DeleteAccountOperation,
-	"object-storage-api account read":                 objectstoragev1.GetAccountOperation,
-	"object-storage-api bucket create":                objectstoragev1.CreateBucketOperation,
-	"object-storage-api bucket delete":                objectstoragev1.DeleteBucketOperation,
-	"object-storage-api bucket encryption disable":    objectstoragev1.DeleteBucketEncryptionOperation,
-	"object-storage-api bucket encryption enable":     objectstoragev1.PutBucketEncryptionOperation,
-	"object-storage-api bucket encryption read":       objectstoragev1.GetBucketEncryptionOperation,
-	"object-storage-api bucket list":                  objectstoragev1.ListBucketsOperation,
-	"object-storage-api bucket penalty":               objectstoragev1.GetBucketPenaltyOperation,
-	"object-storage-api bucket quota":                 objectstoragev1.GetBucketQuotaOperation,
-	"object-storage-api bucket replication disable":   objectstoragev1.DeleteBucketReplicationOperation,
-	"object-storage-api bucket replication enable":    objectstoragev1.PostBucketReplicationOperation,
-	"object-storage-api bucket replication read":      objectstoragev1.GetBucketReplicationOperation,
-	"object-storage-api bucket usage":                 objectstoragev1.GetBucketUsageOperation,
-	"object-storage-api permission access-key create": objectstoragev1.CreatePermissionKeyOperation,
-	"object-storage-api permission access-key delete": objectstoragev1.DeletePermissionKeyOperation,
-	"object-storage-api permission access-key list":   objectstoragev1.GetPermissionKeysOperation,
-	"object-storage-api permission access-key read":   objectstoragev1.GetPermissionKeyOperation,
-	"object-storage-api permission create":            objectstoragev1.CreatePermissionOperation,
-	"object-storage-api permission delete":            objectstoragev1.DeletePermissionOperation,
-	"object-storage-api permission list":              objectstoragev1.GetPermissionsOperation,
-	"object-storage-api permission read":              objectstoragev1.GetPermissionOperation,
-	"object-storage-api permission update":            objectstoragev1.UpdatePermissionOperation,
-	"object-storage-api site list":                    objectstoragev1.GetClustersOperation,
-	"object-storage-api site plans":                   objectstoragev1.GetPlansOperation,
-	"object-storage-api site read":                    objectstoragev1.GetClusterOperation,
-	"object-storage-api site status bucket-metering":  objectstoragev1.GetBucketMeteringOperation,
-	"object-storage-api site status quota":            objectstoragev1.GetQuotaOperation,
-	"object-storage-api site status read":             objectstoragev1.GetStatusOperation,
 }

@@ -39,7 +39,7 @@ func TestBucketCreateUsesSiteBucketAndPlan(t *testing.T) {
 		}, nil
 	})
 
-	runCommand(t, commands, []string{"bucket", "create", "arc02", "test-bucket", "--plan", "example"})
+	runCommand(t, commands, []string{"create-bucket", "arc02", "test-bucket", "--plan", "example"})
 
 	if got == nil {
 		t.Fatal("Bucket.Create was not called")
@@ -55,9 +55,9 @@ func TestBucketCreateValidatesSDKSupportedSitesAndPlans(t *testing.T) {
 		args    []string
 		wantErr string
 	}{
-		{name: "archive plan required", args: []string{"bucket", "create", "arc02", "test-bucket"}, wantErr: "--site-id arc02 では --plan が必要です"},
-		{name: "plan not used on standard site", args: []string{"bucket", "create", "isk01", "test-bucket", "--plan", "example"}, wantErr: "--plan はアーカイブプラン用サイト arc02 でのみ指定できます"},
-		{name: "unsupported site", args: []string{"bucket", "create", "unknown", "test-bucket"}, wantErr: "バケット作成に対応するサイト ID は isk01、tky01、arc02"},
+		{name: "archive plan required", args: []string{"create-bucket", "arc02", "test-bucket"}, wantErr: "--site-id arc02 では --plan が必要です"},
+		{name: "plan not used on standard site", args: []string{"create-bucket", "isk01", "test-bucket", "--plan", "example"}, wantErr: "--plan はアーカイブプラン用サイト arc02 でのみ指定できます"},
+		{name: "unsupported site", args: []string{"create-bucket", "unknown", "test-bucket"}, wantErr: "バケット作成に対応するサイト ID は isk01、tky01、arc02"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			called := false
@@ -90,7 +90,7 @@ func TestPermissionCreateDecodesSDKRequest(t *testing.T) {
 	})
 
 	runCommand(t, commands, []string{
-		"permission", "create", "isk01",
+		"create-permission", "isk01",
 		`--request={"display_name":"tutorial","bucket_controls":[{"bucket_name":"example-bucket","can_read":true,"can_write":false}]}`,
 	})
 
@@ -120,7 +120,7 @@ func TestBucketEncryptionUsesBucketBoundOperation(t *testing.T) {
 		}, nil
 	})
 
-	runCommand(t, commands, []string{"bucket", "encryption", "enable", "isk01", "example-bucket", "--kms-key-id", "kms-key"})
+	runCommand(t, commands, []string{"put-bucket-encryption", "isk01", "example-bucket", "--kms-key-id", "kms-key"})
 	if gotBucket != "example-bucket" || gotKey != "kms-key" {
 		t.Fatalf("bucket = %q, key = %q", gotBucket, gotKey)
 	}
@@ -137,7 +137,7 @@ func TestPermissionCreateReturnsSDKError(t *testing.T) {
 	})
 
 	err := runCommandError(t, commands, []string{
-		"permission", "create", "isk01",
+		"create-permission", "isk01",
 		`--request={"display_name":"tutorial","bucket_controls":[]}`,
 	})
 	if !errors.Is(err, wantErr) {
@@ -210,10 +210,10 @@ func runCommandError(t *testing.T, commands Commands, args []string) error {
 
 func TestFederationOperationsRefuseUnconfirmedBucketSite(t *testing.T) {
 	for _, args := range [][]string{
-		{"bucket", "delete", "tky01", "source"},
-		{"bucket", "replication", "read", "tky01", "source"},
-		{"bucket", "replication", "enable", "tky01", "source", "--target-bucket", "target"},
-		{"bucket", "replication", "disable", "tky01", "source"},
+		{"delete-bucket", "tky01", "source"},
+		{"get-bucket-replication", "tky01", "source"},
+		{"post-bucket-replication", "tky01", "source", "--target-bucket", "target"},
+		{"delete-bucket-replication", "tky01", "source"},
 	} {
 		for _, response := range []string{"[]", "null", `[{"name":"other"}]`, `[{"name":"source"},{"name":"source"}]`, "error"} {
 			t.Run(strings.Join(args, " ")+"/"+response, func(t *testing.T) {
