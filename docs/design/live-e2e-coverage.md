@@ -34,7 +34,7 @@
 | `test/e2e/object-storage-api` | 6シナリオで34コマンド | testing.T ベースのシナリオに移行済み。ライブは32コマンドの正常応答を確認済みで、`bucket penalty` と `site status bucket-metering` は API エラー。2026-10-30 にテスト専用の KMS キーで暗号化3操作をライブ検証済み。状況は `PLAN.md` を参照 |
 | `test/e2e/kms-api` | key 10操作(10) | 全コマンド実装済み。2026-10-30 に testing.T ベースのシナリオでライブ実行し、生成モードと BYOK モードのキー作成から削除後の不在まで正常応答を確認済み |
 | `test/e2e/secretmanager-api` | vault 5操作、secret 4操作(9) | 全コマンド実装済み。2026-10-30 に testing.T ベースのシナリオでテスト専用の KMS キーを使い、Vault 作成から削除後の不在までをライブ検証済み。`secret unveil` の出力は秘密情報のため実行記録から非表示にする |
-| `test/e2e/service-endpoint-gateway-api` | appliance 10操作(10) | 全コマンド実装済み。2026-10-31 に testing.T ベースのシナリオでライブ実行し、スイッチ接続ゲートウェイの作成から削除後の不在までを確認済み。`read-interface` はライブ検証外で [#189](https://github.com/sacloud/skr/issues/189) で管理 |
+| `test/e2e/service-endpoint-gateway-api` | appliance 10操作(10) | 全コマンド実装済み。2026-10-31 に testing.T ベースのシナリオでライブ実行し、スイッチ接続ゲートウェイの作成から削除後の不在までを確認済み。`seg-interface-get-interface` はライブ検証外で [#189](https://github.com/sacloud/skr/issues/189) で管理 |
 | `test/e2e/database` | database 13操作(13) | 全コマンド実装済み。testing.T ベースのシナリオ (`test/e2e/database/scenario_database_test.go`) でライブ実行し、作成 (起動待ち合わせ) → read → list-parameter → find → Monitor 4種 → update → shutdown → boot → reset → delete → 削除後の不在まで確認済み (2026-11-02)。create / update は api 層の操作に移行済み |
 | `test/e2e/iam-api` | 9シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | testing.T ベースのシナリオに移行済み。ライブは57コマンドの正常実行を確認済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
 
@@ -94,6 +94,10 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 2026-11-06 に `security-control-api` の 11 末端コマンドを追加し、同日にライブ E2E を実施しました。シナリオは `test/e2e/security-control-api/` の testing.T ベースのテストです。`activation`、`evaluation-rule`、`automated-action` の 3 シナリオを実行し、baseline の 10 末端コマンドを live に更新しました。`activation create` の正常系は未アクティベートのプロジェクトが必要なため未検証で、baseline は `deferred #200` です (追跡 Issue #200)。
 
 2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行で operationId 派生名に変更したコマンド (`project-activation-*`、`evaluation-rules-*`、`automated-actions-*`) で 3 シナリオを再実行しました。`project-activation-create` はアクティベート済みプロジェクトでの 409 拒否のみ確認し、他の 10 末端コマンドの正常応答を再確認して baseline を新名のまま `live` に維持しました。
+
+### タスク6: service-endpoint-gateway-api
+
+2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行で operationId 派生名に変更したコマンド (`seg-*`) でシナリオを再実行しました。既存のライブ検証結果を再確認し、baseline を新名のまま `live` に維持しました。`seg-interface-get-interface` は引き続き [#189](https://github.com/sacloud/skr/issues/189) で管理します。
 
 ### 横断タスク
 

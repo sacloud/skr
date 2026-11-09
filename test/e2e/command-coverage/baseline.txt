@@ -357,17 +357,17 @@ simplemq-api delete-queue live
 simplemq-api list-queues live
 simplemq-api read-queue live
 simplemq-api rotate-api-key live
-service-endpoint-gateway-api appliance apply live
-service-endpoint-gateway-api appliance create live
-service-endpoint-gateway-api appliance delete live
-service-endpoint-gateway-api appliance list live
-service-endpoint-gateway-api appliance power-on live
-service-endpoint-gateway-api appliance read live
-service-endpoint-gateway-api appliance read-interface live
-service-endpoint-gateway-api appliance read-power-status live
-service-endpoint-gateway-api appliance reset live
-service-endpoint-gateway-api appliance shutdown live
-service-endpoint-gateway-api appliance update live
+service-endpoint-gateway-api seg-apply live
+service-endpoint-gateway-api seg-create live
+service-endpoint-gateway-api seg-delete live
+service-endpoint-gateway-api seg-list live
+service-endpoint-gateway-api seg-status-update-power-status live
+service-endpoint-gateway-api seg-get live
+service-endpoint-gateway-api seg-interface-get-interface live
+service-endpoint-gateway-api seg-status-get-power-status live
+service-endpoint-gateway-api seg-status-reset-power-status live
+service-endpoint-gateway-api seg-status-delete-power-status live
+service-endpoint-gateway-api seg-update live
 secretmanager-api create-vault-secret live
 secretmanager-api delete-vault-secret live
 secretmanager-api list-vault-secrets live

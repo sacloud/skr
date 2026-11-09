@@ -10,7 +10,8 @@
       "name": "List",
       "help": "サービスエンドポイントゲートウェイを一覧表示します。",
       "method": "List",
-      "response_type": "*v1.ModelsApplianceApplianceListResponseBody"
+      "response_type": "*v1.ModelsApplianceApplianceListResponseBody",
+      "command_name": "seg-list"
     },
     {
       "name": "Read",
@@ -22,9 +23,10 @@
           "name": "id",
           "field": "ID",
           "type": "string",
-          "help": "list の出力にあるサービスエンドポイントゲートウェイのリソース ID。"
+          "help": "seg-list の出力にあるサービスエンドポイントゲートウェイのリソース ID。"
         }
-      ]
+      ],
+      "command_name": "seg-get"
     },
     {
       "name": "Create",
@@ -33,7 +35,8 @@
       "request_type": "v1.ModelsApplianceApplianceCreateRequest",
       "request_by_value": true,
       "response_type": "*v1.ModelsApplianceApplianceCreateResponseBody",
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "seg-create"
     },
     {
       "name": "Update",
@@ -50,7 +53,8 @@
           "type": "string",
           "help": "更新するサービスエンドポイントゲートウェイのリソース ID。"
         }
-      ]
+      ],
+      "command_name": "seg-update"
     },
     {
       "name": "Apply",
@@ -63,7 +67,8 @@
           "type": "string",
           "help": "設定を反映するサービスエンドポイントゲートウェイのリソース ID。"
         }
-      ]
+      ],
+      "command_name": "seg-apply"
     },
     {
       "name": "Delete",
@@ -76,7 +81,8 @@
           "type": "string",
           "help": "削除するサービスエンドポイントゲートウェイのリソース ID。"
         }
-      ]
+      ],
+      "command_name": "seg-delete"
     },
     {
       "name": "ReadInterface",
@@ -94,9 +100,10 @@
           "name": "interface-id",
           "field": "InterfaceID",
           "type": "string",
-          "help": "参照するインターフェースのスイッチ ID。read の Interfaces にある Switch で確認できます。"
+          "help": "参照するインターフェースのスイッチ ID。seg-get の Interfaces にある Switch で確認できます。"
         }
-      ]
+      ],
+      "command_name": "seg-interface-get-interface"
     },
     {
       "name": "ReadPowerStatus",
@@ -110,7 +117,8 @@
           "type": "string",
           "help": "サービスエンドポイントゲートウェイのリソース ID。"
         }
-      ]
+      ],
+      "command_name": "seg-status-get-power-status"
     },
     {
       "name": "PowerOn",
@@ -124,7 +132,8 @@
           "type": "string",
           "help": "電源を投入するサービスエンドポイントゲートウェイのリソース ID。"
         }
-      ]
+      ],
+      "command_name": "seg-status-update-power-status"
     },
     {
       "name": "Shutdown",
@@ -137,7 +146,8 @@
           "type": "string",
           "help": "電源を停止するサービスエンドポイントゲートウェイのリソース ID。"
         }
-      ]
+      ],
+      "command_name": "seg-status-delete-power-status"
     },
     {
       "name": "Reset",
@@ -150,7 +160,8 @@
           "type": "string",
           "help": "再起動するサービスエンドポイントゲートウェイのリソース ID。"
         }
-      ]
+      ],
+      "command_name": "seg-status-reset-power-status"
     }
   ],
   "wiring_target": "ServiceEndpointGatewayAPI.Appliance",
