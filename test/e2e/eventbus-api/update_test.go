@@ -91,7 +91,7 @@ func updateConfigurationAndVerify(t *testing.T, h *helper.Helper, config, queue 
 		},
 	})
 	h.Call(t, "プロセス設定を更新する",
-		"eventbus-api", "process-configuration", "update", config.id, "--request", "@"+updateRequest)
+		"eventbus-api", "update-common-service-item", "--provider-class", "eventbusprocessconfiguration", config.id, "--request", "@"+updateRequest)
 
 	updated, err := lookupTypedItem[configurationItem](t, h, "更新後のプロセス設定を参照する", "process-configuration", config.id)
 	require.NoError(t, err, "read updated process-configuration: %v", err)
@@ -128,7 +128,7 @@ func updateTriggerDescription(t *testing.T, h *helper.Helper, description, id, n
 			"Description": newDescription,
 		},
 	})
-	h.Call(t, description, "eventbus-api", "trigger", "update", id, "--request", "@"+request)
+	h.Call(t, description, "eventbus-api", "update-common-service-item", "--provider-class", "eventbustrigger", id, "--request", "@"+request)
 }
 
 // checkUpdatedConfiguration は更新後のプロセス設定が、

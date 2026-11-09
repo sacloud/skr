@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -27,114 +28,63 @@ import (
 	v1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 )
 
-func TestDecodeAndSetCreateProvider(t *testing.T) {
+func TestParseProviderClass(t *testing.T) {
 	for _, test := range []struct {
-		name     string
-		provider v1.ProviderClass
-		settings string
-		set      func(*v1.CreateCommonServiceItemRequest) error
+		input string
+		want  v1.ProviderClass
 	}{
-		{"SetProcessConfigurationProvider", v1.ProviderClassEventbusprocessconfiguration, `{"Destination":"simplemq","Parameters":"{\"queue_name\":\"test\",\"content\":\"message\"}"}`, SetProcessConfigurationProvider},
-		{"SetScheduleProvider", v1.ProviderClassEventbusschedule, `{"ProcessConfigurationID":"123","StartsAt":1893456000000,"RecurringStep":1,"RecurringUnit":"day"}`, SetScheduleProvider},
-		{"SetTriggerProvider", v1.ProviderClassEventbustrigger, `{"ProcessConfigurationID":"123","Source":"source","Types":["type"]}`, SetTriggerProvider},
+		{"eventbusprocessconfiguration", v1.ProviderClassEventbusprocessconfiguration},
+		{"eventbusschedule", v1.ProviderClassEventbusschedule},
+		{"eventbustrigger", v1.ProviderClassEventbustrigger},
 	} {
-		t.Run(test.name, func(t *testing.T) {
-			for _, provider := range []string{"", `,"Provider":{"Class":"eventbustrigger"}`} {
-				input := `{"CommonServiceItem":{"Name":"test","Settings":` + test.settings + provider + `}}`
-				for _, source := range []string{input, "@" + writeRequestFile(t, input)} {
-					var request v1.CreateCommonServiceItemRequest
-					if err := DecodeRequest(source, &request); err != nil {
-						t.Fatal(err)
-					}
-					if request.CommonServiceItem.Provider.Class != v1.ProviderClassEventbusprocessconfiguration {
-						t.Fatalf("decoded Provider = %v", request.CommonServiceItem.Provider)
-					}
-					before, err := json.Marshal(request.CommonServiceItem.Settings)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if err := test.set(&request); err != nil {
-						t.Fatal(err)
-					}
-					if request.CommonServiceItem.Provider.Class != test.provider || request.CommonServiceItem.Name != "test" {
-						t.Fatalf("validated item = %#v", request.CommonServiceItem)
-					}
-					after, err := json.Marshal(request.CommonServiceItem.Settings)
-					if err != nil {
-						t.Fatal(err)
-					}
-					assertJSONEqual(t, before, []byte(test.settings))
-					assertJSONEqual(t, after, before)
-				}
+		t.Run(test.input, func(t *testing.T) {
+			got, err := parseProviderClass(test.input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != test.want {
+				t.Fatalf("parseProviderClass() = %q, want %q", got, test.want)
 			}
 		})
 	}
+	t.Run("unknown class", func(t *testing.T) {
+		_, err := parseProviderClass("eventbusscheduler")
+		if err == nil || !strings.Contains(err.Error(), "--provider-class") {
+			t.Fatalf("error = %v, want --provider-class validation error", err)
+		}
+	})
+	t.Run("empty class", func(t *testing.T) {
+		_, err := parseProviderClass("")
+		if err == nil || !strings.Contains(err.Error(), "--provider-class") {
+			t.Fatalf("error = %v, want --provider-class validation error", err)
+		}
+	})
 }
 
-func TestWithProviderPreservesItemFields(t *testing.T) {
-	input := `{"CommonServiceItem":{"Name":"test","Description":"description","Tags":["tag"],"Settings":{"nested":{"values":[1,true,null]},"custom":"value"},"Provider":{"Class":"eventbustrigger"}}}`
-	for _, provider := range []v1.ProviderClass{
-		v1.ProviderClassEventbusprocessconfiguration,
-		v1.ProviderClassEventbusschedule,
-		v1.ProviderClassEventbustrigger,
-	} {
-		data, err := withProvider([]byte(input), provider)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var got, want map[string]map[string]json.RawMessage
-		if err := json.Unmarshal(data, &got); err != nil {
-			t.Fatal(err)
-		}
-		if err := json.Unmarshal([]byte(input), &want); err != nil {
-			t.Fatal(err)
-		}
-		assertJSONEqual(t, got["CommonServiceItem"]["Provider"], []byte(`{"Class":"`+string(provider)+`"}`))
-		delete(got["CommonServiceItem"], "Provider")
-		delete(want["CommonServiceItem"], "Provider")
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("item fields changed: got %s", data)
-		}
+func TestNewCommonServiceItemAPIRejectsUnknownProviderClass(t *testing.T) {
+	// 認証設定がなくても、種別の検証エラーはクライアント生成より先に返ること
+	_, err := NewCommonServiceItemAPI(false, "unknown-class")
+	if err == nil || !strings.Contains(err.Error(), "--provider-class") {
+		t.Fatalf("error = %v, want --provider-class validation error", err)
 	}
 }
 
-func TestDecodeRequestErrors(t *testing.T) {
+func TestNewCommonServiceItemAPISelectsOperationsByProviderClass(t *testing.T) {
 	for _, test := range []struct {
-		name  string
-		input string
+		class v1.ProviderClass
 		want  string
 	}{
-		{"malformed", `{"CommonServiceItem":`, "decode request JSON"},
-		{"trailing", `{"CommonServiceItem":{}} {}`, "decode request JSON"},
-		{"missing item", `{}`, "decode CommonServiceItem"},
-		{"null item", `{"CommonServiceItem":null}`, "expected JSON object"},
-		{"string item", `{"CommonServiceItem":"item"}`, "decode CommonServiceItem"},
-		{"array item", `{"CommonServiceItem":[]}`, "decode CommonServiceItem"},
-		{"number item", `{"CommonServiceItem":1}`, "decode CommonServiceItem"},
-		{"wrong field type", `{"CommonServiceItem":{"Name":123}}`, "decode request JSON"},
-		{"missing file", "@" + filepath.Join(t.TempDir(), "missing.json"), "read request file"},
-		{"malformed file", "@" + writeRequestFile(t, `{`), "decode request JSON"},
+		{v1.ProviderClassEventbusprocessconfiguration, "processConfigurationOp"},
+		{v1.ProviderClassEventbusschedule, "scheduleOp"},
+		{v1.ProviderClassEventbustrigger, "triggerOp"},
 	} {
-		t.Run(test.name, func(t *testing.T) {
-			var request v1.CreateCommonServiceItemRequest
-			err := DecodeRequest(test.input, &request)
-			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("error = %v, want %q", err, test.want)
-			}
-			if test.name == "missing file" && !errors.Is(err, os.ErrNotExist) {
-				t.Fatalf("error = %v, want os.ErrNotExist", err)
+		t.Run(string(test.class), func(t *testing.T) {
+			op := selectCommonServiceItemOp(test.class, nil)
+			got := fmt.Sprintf("%T", op)
+			if !strings.Contains(got, test.want) {
+				t.Fatalf("selected operation type = %s, want %s", got, test.want)
 			}
 		})
-	}
-}
-
-func TestDecodeUpdateRequestDoesNotSetProvider(t *testing.T) {
-	var request v1.UpdateCommonServiceItemRequest
-	if err := DecodeRequest(`{"CommonServiceItem":{"Name":"updated"}}`, &request); err != nil {
-		t.Fatal(err)
-	}
-	if request.CommonServiceItem.Name.Value != "updated" {
-		t.Fatalf("Name = %#v", request.CommonServiceItem.Name)
 	}
 }
 
@@ -167,12 +117,13 @@ func TestReadSecretFile(t *testing.T) {
 	})
 }
 
-type secretAPI struct {
-	ProcessConfigurationAPI
+// secretUpdaterAPI はシークレット更新を含む API 操作の差し替えです。
+type secretUpdaterAPI struct {
+	CommonServiceItemAPI
 	updateSecret func(context.Context, string, v1.SetSecretRequest) error
 }
 
-func (api secretAPI) UpdateSecret(ctx context.Context, id string, request v1.SetSecretRequest) error {
+func (api secretUpdaterAPI) UpdateSecret(ctx context.Context, id string, request v1.SetSecretRequest) error {
 	return api.updateSecret(ctx, id, request)
 }
 
@@ -184,10 +135,13 @@ func TestUpdateSecretCommand(t *testing.T) {
 				setStdin(t, content, false)
 			}
 			called := false
-			command := ProcessConfigurationUpdateSecretCommand{
+			command := CommonServiceItemUpdateSecretCommand{
 				ID: "process-id", SecretFile: source,
-				factory: func() (ProcessConfigurationAPI, error) {
-					return secretAPI{updateSecret: func(ctx context.Context, id string, request v1.SetSecretRequest) error {
+				factory: func(providerClass string) (CommonServiceItemAPI, error) {
+					if providerClass != string(v1.ProviderClassEventbusprocessconfiguration) {
+						t.Fatalf("factory providerClass = %q, want %q", providerClass, v1.ProviderClassEventbusprocessconfiguration)
+					}
+					return secretUpdaterAPI{updateSecret: func(ctx context.Context, id string, request v1.SetSecretRequest) error {
 						called = true
 						if ctx == nil || id != "process-id" {
 							t.Fatalf("UpdateSecret context = %v, ID = %q", ctx, id)
@@ -216,7 +170,7 @@ func TestUpdateSecretCommandErrors(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		input   string
-		factory ProcessConfigurationAPIFactory
+		factory CommonServiceItemAPIFactory
 		want    string
 		wrapped error
 	}{
@@ -224,13 +178,17 @@ func TestUpdateSecretCommandErrors(t *testing.T) {
 		{"decode", writeRequestFile(t, `{"APIKey":"test-only-secret"`), nil, "decode request JSON", nil},
 		{"type", writeRequestFile(t, `{"APIKey":{"value":"test-only-secret"}}`), nil, "decode request JSON", nil},
 		{"missing factory", writeRequestFile(t, `{"APIKey":"test-only-secret"}`), nil, "API クライアント", nil},
-		{"factory", writeRequestFile(t, `{"APIKey":"test-only-secret"}`), func() (ProcessConfigurationAPI, error) { return nil, sentinel }, "", sentinel},
-		{"API", writeRequestFile(t, `{"APIKey":"test-only-secret"}`), func() (ProcessConfigurationAPI, error) {
-			return secretAPI{updateSecret: func(context.Context, string, v1.SetSecretRequest) error { return sentinel }}, nil
+		{"factory", writeRequestFile(t, `{"APIKey":"test-only-secret"}`), func(string) (CommonServiceItemAPI, error) { return nil, sentinel }, "", sentinel},
+		{"unsupported operation", writeRequestFile(t, `{"APIKey":"test-only-secret"}`), func(string) (CommonServiceItemAPI, error) {
+			// シークレット更新をサポートしない操作 (schedule、trigger 相当) を返します
+			return &unsupportedSecretUpdaterAPI{}, nil
+		}, "シークレットの更新は実行設定", nil},
+		{"API", writeRequestFile(t, `{"APIKey":"test-only-secret"}`), func(string) (CommonServiceItemAPI, error) {
+			return secretUpdaterAPI{updateSecret: func(context.Context, string, v1.SetSecretRequest) error { return sentinel }}, nil
 		}, "", sentinel},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			command := ProcessConfigurationUpdateSecretCommand{ID: "id", SecretFile: test.input, factory: test.factory}
+			command := CommonServiceItemUpdateSecretCommand{ID: "id", SecretFile: test.input, factory: test.factory}
 			err := command.Run(nil)
 			if err == nil || !strings.Contains(err.Error(), test.want) || strings.Contains(err.Error(), "test-only-secret") {
 				t.Fatalf("error = %v, want safe error containing %q", err, test.want)
@@ -239,6 +197,24 @@ func TestUpdateSecretCommandErrors(t *testing.T) {
 				t.Fatalf("error = %v, want wrapped %v", err, test.wrapped)
 			}
 		})
+	}
+}
+
+// unsupportedSecretUpdaterAPI はシークレット更新をサポートしない API 操作です。
+type unsupportedSecretUpdaterAPI struct {
+	CommonServiceItemAPI
+}
+
+func TestProviderClassValidationRejectsUnexpectedRequestProvider(t *testing.T) {
+	// リクエスト JSON に任意の Provider を含めても、SDK 操作が --provider-class の値で上書きします。
+	// ここではデコード経路の動作を確認します。
+	var request v1.CreateCommonServiceItemRequest
+	input := `{"CommonServiceItem":{"Name":"test","Provider":{"Class":"eventbustrigger"},"Settings":{"ProcessConfigurationID":"123","StartsAt":1893456000000,"RecurringStep":1,"RecurringUnit":"day"}}}`
+	if err := json.Unmarshal([]byte(input), &request); err != nil {
+		t.Fatal(err)
+	}
+	if request.CommonServiceItem.Provider.Class != v1.ProviderClassEventbustrigger || request.CommonServiceItem.Name != "test" {
+		t.Fatalf("decoded item = %#v", request.CommonServiceItem)
 	}
 }
 

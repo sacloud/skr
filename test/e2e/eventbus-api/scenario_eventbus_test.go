@@ -101,7 +101,7 @@ func TestScenarioEventBus(t *testing.T) {
 		},
 	})
 	created = parseEventbusItem(t, h.Call(t, "プロセス設定を作成する",
-		"eventbus-api", "process-configuration", "create", "--request", "@"+createConfigRequest))
+		"eventbus-api", "create-common-service-item", "--provider-class", "eventbusprocessconfiguration", "--request", "@"+createConfigRequest))
 	config.id = requireEventbusIdentity(t, created, config)
 
 	// プロセス設定を更新して反映を確認する
@@ -109,7 +109,7 @@ func TestScenarioEventBus(t *testing.T) {
 
 	// プロセス設定へ SimpleMQ の API キーを登録する
 	h.Call(t, "プロセス設定へ SimpleMQ の API キーを登録する",
-		"eventbus-api", "process-configuration", "update-secret", config.id, "--secret-file", secretFile)
+		"eventbus-api", "set-process-configuration-secret", config.id, "--secret-file", secretFile)
 
 	// トリガーを作成する
 	trigger.attempted = true
@@ -128,7 +128,7 @@ func TestScenarioEventBus(t *testing.T) {
 		},
 	})
 	created = parseEventbusItem(t, h.Call(t, "トリガーを作成する",
-		"eventbus-api", "trigger", "create", "--request", "@"+createTriggerRequest))
+		"eventbus-api", "create-common-service-item", "--provider-class", "eventbustrigger", "--request", "@"+createTriggerRequest))
 	trigger.id = requireEventbusIdentity(t, created, trigger)
 
 	// トリガーを参照して設定を確認する

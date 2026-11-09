@@ -29,9 +29,9 @@ $ skr simplemq-api create-queue --help
 $ skr simplemq-api rotate-api-key --help
 $ skr simplemq-api receive-message --help
 $ skr simplemq-api clear-queue --help
-$ skr eventbus-api process-configuration create --help
-$ skr eventbus-api process-configuration update-secret --help
-$ skr eventbus-api trigger create --help
+$ skr eventbus-api create-common-service-item --provider-class eventbusprocessconfiguration --help
+$ skr eventbus-api set-process-configuration-secret --help
+$ skr eventbus-api create-common-service-item --provider-class eventbustrigger --help
 $ skr iaas-api switch create --help
 ```
 
@@ -41,9 +41,9 @@ $ skr iaas-api switch create --help
 ```console
 $ skr simplemq-api list-queues --query 'map({ID,Name})'
 []
-$ skr eventbus-api process-configuration list --query 'map({ID,Name})'
+$ skr eventbus-api list-common-service-items --provider-class eventbusprocessconfiguration --query 'map({ID,Name})'
 []
-$ skr eventbus-api trigger list --query 'map({ID,Name})'
+$ skr eventbus-api list-common-service-items --provider-class eventbustrigger --query 'map({ID,Name})'
 []
 $ skr iaas-api switch find --zone ZONE --query 'map({ID,Name})'
 []
@@ -79,7 +79,7 @@ $ jq -er '.APIKey' eventbus-secret.json > simplemq.key
 $ chmod 600 queue.json eventbus-secret.json simplemq.key
 ```
 
-`eventbus-secret.json` は `process-configuration update-secret` 用、`simplemq.key` は `message receive --api-key-file` 用です。両ファイルとも作業端末上だけで管理し、コマンドラインやリポジトリにキーを書かないでください。
+`eventbus-secret.json` は `set-process-configuration-secret` 用、`simplemq.key` は `receive-message --api-key-file` 用です。両ファイルとも作業端末上だけで管理し、コマンドラインやリポジトリにキーを書かないでください。
 
 ## Step 3: SimpleMQ 宛ての実行設定を作成する
 
@@ -101,11 +101,11 @@ $ chmod 600 queue.json eventbus-secret.json simplemq.key
 実行設定を作成し、結果の `ID` を控えます。続いて、キューの API キーを実行設定のシークレットとして登録します。シークレットは `--secret-file` から読み込み、コマンド引数には含めません。
 
 ```console
-$ skr eventbus-api process-configuration create --request @process-configuration.json > process-configuration-result.json
+$ skr eventbus-api create-common-service-item --provider-class eventbusprocessconfiguration --request @process-configuration.json > process-configuration-result.json
 $ PROCESS_CONFIGURATION_ID=$(jq -er '.ID' process-configuration-result.json)
-$ skr eventbus-api process-configuration update-secret "$PROCESS_CONFIGURATION_ID" --secret-file eventbus-secret.json
-$ skr eventbus-api process-configuration read "$PROCESS_CONFIGURATION_ID"
-$ skr eventbus-api process-configuration list --query 'map({ID,Name})'
+$ skr eventbus-api set-process-configuration-secret "$PROCESS_CONFIGURATION_ID" --secret-file eventbus-secret.json
+$ skr eventbus-api read-common-service-item --provider-class eventbusprocessconfiguration "$PROCESS_CONFIGURATION_ID"
+$ skr eventbus-api list-common-service-items --provider-class eventbusprocessconfiguration --query 'map({ID,Name})'
 ```
 
 作成した実行設定の `ID` と `Name` が一覧に表示されることを確認します。以下は CLI テストで確認した出力形式の例で、ID と名前は置き換えています。全件一覧から対象の要素だけを抜粋しています。
@@ -149,10 +149,10 @@ $ skr eventbus-api process-configuration list --query 'map({ID,Name})'
 `ZONE` は Step 5 でスイッチを作成するゾーンと同じ値にします。`Conditions` により `zone` が一致するイベントだけを対象にします。トリガーを作成して ID を控え、設定を読み戻します。
 
 ```console
-$ skr eventbus-api trigger create --request @trigger.json > trigger-result.json
+$ skr eventbus-api create-common-service-item --provider-class eventbustrigger --request @trigger.json > trigger-result.json
 $ TRIGGER_ID=$(jq -er '.ID' trigger-result.json)
-$ skr eventbus-api trigger read "$TRIGGER_ID"
-$ skr eventbus-api trigger list --query 'map({ID,Name})'
+$ skr eventbus-api read-common-service-item --provider-class eventbustrigger "$TRIGGER_ID"
+$ skr eventbus-api list-common-service-items --provider-class eventbustrigger --query 'map({ID,Name})'
 ```
 
 作成したトリガーの `ID` と `Name` が一覧に表示されることを確認します。以下は CLI テストで確認した出力形式の例で、ID と名前は置き換えています。全件一覧から対象の要素だけを抜粋しています。
@@ -209,13 +209,13 @@ SimpleMQ は Pull 型で、受信リクエストごとにメッセージを配�
 まずトリガーを削除して以降のイベントで実行設定が起動しないようにします。ID と名前を確認し、この手順で作成したリソースだけを削除してください。
 
 ```console
-$ skr eventbus-api trigger delete "$TRIGGER_ID"
+$ skr eventbus-api delete-common-service-item --provider-class eventbustrigger "$TRIGGER_ID"
 ```
 
 トリガーを削除した後、一覧に試験用の名前がないことを確認します。以下は一覧自体が空の場合の出力例です。実行設定とキューの削除確認も同様です。ほかのリソースが表示される場合は、試験用の名前の要素がないことを確認してください。
 
 ```console
-$ skr eventbus-api trigger list --query 'map({ID,Name})'
+$ skr eventbus-api list-common-service-items --provider-class eventbustrigger --query 'map({ID,Name})'
 []
 ```
 
@@ -234,8 +234,8 @@ $ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-U
 続けて実行設定を削除し、一覧に試験用の名前がないことを確認します。以下は一覧自体が空の場合の出力例です。
 
 ```console
-$ skr eventbus-api process-configuration delete "$PROCESS_CONFIGURATION_ID"
-$ skr eventbus-api process-configuration list --query 'map({ID,Name})'
+$ skr eventbus-api delete-common-service-item --provider-class eventbusprocessconfiguration "$PROCESS_CONFIGURATION_ID"
+$ skr eventbus-api list-common-service-items --provider-class eventbusprocessconfiguration --query 'map({ID,Name})'
 []
 ```
 
@@ -265,6 +265,6 @@ $ rm queue.json eventbus-secret.json simplemq.key process-configuration.json pro
 - [SimpleMQ メッセージ API](https://manual.sakura.ad.jp/api/cloud/portal/simplemq-api/index.html)
 - [スイッチの概要](https://manual.sakura.ad.jp/cloud/network/switch/about.html)
 - [スイッチの作成・削除](https://manual.sakura.ad.jp/cloud/network/switch/router-switch.html)
-- [sacloud-sdk-go v0.3.0: EventBus API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/api/eventbus)
-- [sacloud-sdk-go v0.3.0: SimpleMQ API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/api/simplemq)
-- [sacloud-sdk-go v0.3.0: Switch サービス](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/swytch)
+- [sacloud-sdk-go v0.5.0: EventBus API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.5.0/api/eventbus)
+- [sacloud-sdk-go v0.5.0: SimpleMQ API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.5.0/api/simplemq)
+- [sacloud-sdk-go v0.5.0: Switch サービス](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.5.0/service/iaas/swytch)

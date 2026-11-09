@@ -130,10 +130,13 @@ func TestRunEventbusAPIHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	require.Equal(t, 0, run([]string{"eventbus-api", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
 	for _, text := range []string{
-		"process-configuration list",
-		"process-configuration update-secret",
-		"schedule list",
-		"trigger list",
+		"list-common-service-items",
+		"read-common-service-item",
+		"create-common-service-item",
+		"update-common-service-item",
+		"delete-common-service-item",
+		"set-process-configuration-secret",
+		"--provider-class",
 		"ベストエフォート型",
 	} {
 		require.Contains(t, stdout.String(), text, "help output does not contain %q", text)
@@ -146,31 +149,31 @@ func TestRunEventbusResourceHelpExplainsRequest(t *testing.T) {
 		want []string
 	}{
 		{
-			args: []string{"eventbus-api", "process-configuration", "create", "--help"},
-			want: []string{"Destination", "simplemq", "Parameters", "Provider"},
+			args: []string{"eventbus-api", "create-common-service-item", "--provider-class", "eventbusprocessconfiguration", "--help"},
+			want: []string{"Destination", "simplemq", "Parameters", "Provider.Class"},
 		},
 		{
-			args: []string{"eventbus-api", "schedule", "create", "--help"},
+			args: []string{"eventbus-api", "create-common-service-item", "--provider-class", "eventbusschedule", "--help"},
 			want: []string{"ProcessConfigurationID", "StartsAt", "RecurringUnit", "RecurringStep", "1893456000000"},
 		},
 		{
-			args: []string{"eventbus-api", "trigger", "create", "--help"},
+			args: []string{"eventbus-api", "create-common-service-item", "--provider-class", "eventbustrigger", "--help"},
 			want: []string{"Source", "Types", "ProcessConfigurationID", "EVENT-SOURCE", "EVENT-TYPE"},
 		},
 		{
-			args: []string{"eventbus-api", "process-configuration", "update-secret", "--help"},
+			args: []string{"eventbus-api", "set-process-configuration-secret", "--help"},
 			want: []string{"--secret-file", "APIKey", "AccessTokenSecret"},
 		},
 		{
-			args: []string{"eventbus-api", "process-configuration", "update", "--help"},
+			args: []string{"eventbus-api", "update-common-service-item", "--provider-class", "eventbusprocessconfiguration", "--help"},
 			want: []string{"Destination", "Parameters", "指定", "null"},
 		},
 		{
-			args: []string{"eventbus-api", "schedule", "update", "--help"},
+			args: []string{"eventbus-api", "update-common-service-item", "--provider-class", "eventbusschedule", "--help"},
 			want: []string{"部分更新", "Settings", "Description"},
 		},
 		{
-			args: []string{"eventbus-api", "trigger", "update", "--help"},
+			args: []string{"eventbus-api", "update-common-service-item", "--provider-class", "eventbustrigger", "--help"},
 			want: []string{"Source", "Types", "ProcessConfigurationID"},
 		},
 	} {
@@ -191,19 +194,15 @@ func TestRunEventbusResourceHelpExplainsWorkflow(t *testing.T) {
 	}{
 		{
 			args: []string{"eventbus-api", "--help"},
-			want: []string{"process-configuration list", "schedule list", "trigger list", "SAKURA_ACCESS_TOKEN", "JSON"},
+			want: []string{"list-common-service-items", "set-process-configuration-secret", "--provider-class", "SAKURA_ACCESS_TOKEN", "JSON"},
 		},
 		{
-			args: []string{"eventbus-api", "process-configuration", "--help"},
-			want: []string{"実行先サービス", "schedule または trigger"},
+			args: []string{"eventbus-api", "list-common-service-items", "--help"},
+			want: []string{"実行設定", "schedule または trigger", "eventbustrigger"},
 		},
 		{
-			args: []string{"eventbus-api", "schedule", "--help"},
-			want: []string{"process-configuration を作成", "StartsAt", "Unix epoch"},
-		},
-		{
-			args: []string{"eventbus-api", "trigger", "--help"},
-			want: []string{"イベントソース", "process-configuration", "EVENT-SOURCE"},
+			args: []string{"eventbus-api", "create-common-service-item", "--help"},
+			want: []string{"実行先サービス", "Unix epoch", "イベントソース"},
 		},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -260,7 +259,7 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 
 	checkProjection := func(resource, id, name string) {
 		t.Helper()
-		output := runCommand("eventbus-api", resource, "list", "--query", "map({ID,Name})")
+		output := runCommand("eventbus-api", "list-common-service-items", "--provider-class", resource, "--query", "map({ID,Name})")
 		var projected []struct {
 			ID   string
 			Name string
@@ -274,7 +273,7 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 
 	createJSON := `{"CommonServiceItem":{"Name":"sakumock-process-configuration","Settings":{"Destination":"simplemq","Parameters":"{\"queue_name\":\"sakumock\",\"content\":\"created\"}"}}}`
 	var created v1.CommonServiceItem
-	err := json.Unmarshal(runCommand("eventbus-api", "process-configuration", "create", "--request", createJSON), &created)
+	err := json.Unmarshal(runCommand("eventbus-api", "create-common-service-item", "--provider-class", "eventbusprocessconfiguration", "--request", createJSON), &created)
 	require.NoError(t, err)
 	require.NotEmpty(t, created.ID, "create returned an empty ID")
 	if got, want := created.Provider.Class, v1.ProviderClassEventbusprocessconfiguration; got != want {
@@ -282,22 +281,22 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 	}
 
 	var items []v1.CommonServiceItem
-	err2 := json.Unmarshal(runCommand("eventbus-api", "process-configuration", "list"), &items)
+	err2 := json.Unmarshal(runCommand("eventbus-api", "list-common-service-items", "--provider-class", "eventbusprocessconfiguration"), &items)
 	require.NoError(t, err2)
 	require.Len(t, items, 1, "list returned %#v, want the created process configuration", items)
 	require.Equal(t, created.ID, items[0].ID, "unexpected value")
-	checkProjection("process-configuration", created.ID, created.Name)
+	checkProjection("eventbusprocessconfiguration", created.ID, created.Name)
 
-	for _, resource := range []string{"schedule", "trigger"} {
+	for _, resource := range []string{"eventbusschedule", "eventbustrigger"} {
 		items = nil
-		err3 := json.Unmarshal(runCommand("eventbus-api", resource, "list"), &items)
+		err3 := json.Unmarshal(runCommand("eventbus-api", "list-common-service-items", "--provider-class", resource), &items)
 		require.NoError(t, err3, "decode %s list", resource)
 		require.Len(t, items, 0, "%s list returned %#v, want no resources", resource, items)
-		got := string(runCommand("eventbus-api", resource, "list", "--query", "map({ID,Name})"))
+		got := string(runCommand("eventbus-api", "list-common-service-items", "--provider-class", resource, "--query", "map({ID,Name})"))
 		require.Equal(t, "[]\n", got, "%s empty projection = %q, want []", resource, got)
 	}
 
-	exerciseResource := func(resource, name, updatedName string, providerClass v1.ProviderClass, settings any) {
+	exerciseResource := func(providerClassString, name, updatedName string, providerClass v1.ProviderClass, settings any) {
 		t.Helper()
 		requestJSON, err := json.Marshal(map[string]any{
 			"CommonServiceItem": map[string]any{
@@ -307,76 +306,76 @@ func TestEventbusAPIProcessConfigurationWithSakumock(t *testing.T) {
 		})
 		require.NoError(t, err)
 		var item v1.CommonServiceItem
-		err4 := json.Unmarshal(runCommand("eventbus-api", resource, "create", "--request", string(requestJSON)), &item)
-		require.NoError(t, err4, "create %s", resource)
-		require.NotEmpty(t, item.ID, "create %s returned an empty ID", resource)
+		err4 := json.Unmarshal(runCommand("eventbus-api", "create-common-service-item", "--provider-class", string(providerClass), "--request", string(requestJSON)), &item)
+		require.NoError(t, err4, "create %s", providerClassString)
+		require.NotEmpty(t, item.ID, "create %s returned an empty ID", providerClassString)
 		if got, want := item.Provider.Class, providerClass; got != want {
-			t.Errorf("created %s provider class = %q, want %q", resource, got, want)
+			t.Errorf("created %s provider class = %q, want %q", providerClassString, got, want)
 		}
 
 		var listed []v1.CommonServiceItem
-		err5 := json.Unmarshal(runCommand("eventbus-api", resource, "list"), &listed)
-		require.NoError(t, err5, "list %s", resource)
-		require.Len(t, listed, 1, "%s list returned %#v, want created resource %q", resource, listed, item.ID)
+		err5 := json.Unmarshal(runCommand("eventbus-api", "list-common-service-items", "--provider-class", string(providerClass)), &listed)
+		require.NoError(t, err5, "list %s", providerClassString)
+		require.Len(t, listed, 1, "%s list returned %#v, want created resource %q", providerClassString, listed, item.ID)
 		require.Equal(t, item.ID, listed[0].ID, "unexpected value")
-		checkProjection(resource, item.ID, item.Name)
+		checkProjection(providerClassString, item.ID, item.Name)
 
 		var read v1.CommonServiceItem
-		err6 := json.Unmarshal(runCommand("eventbus-api", resource, "read", item.ID), &read)
-		require.NoError(t, err6, "read %s", resource)
-		require.Equal(t, item.ID, read.ID, "%s read ID = %q, want %q", resource, read.ID, item.ID)
+		err6 := json.Unmarshal(runCommand("eventbus-api", "read-common-service-item", "--provider-class", string(providerClass), item.ID), &read)
+		require.NoError(t, err6, "read %s", providerClassString)
+		require.Equal(t, item.ID, read.ID, "%s read ID = %q, want %q", providerClassString, read.ID, item.ID)
 
 		updateJSON, err := json.Marshal(map[string]any{
 			"CommonServiceItem": map[string]any{"Name": updatedName},
 		})
 		require.NoError(t, err)
 		var updated v1.CommonServiceItem
-		err7 := json.Unmarshal(runCommand("eventbus-api", resource, "update", item.ID, "--request", string(updateJSON)), &updated)
-		require.NoError(t, err7, "update %s", resource)
-		require.Equal(t, updatedName, updated.Name, "%s update Name = %q, want %q", resource, updated.Name, updatedName)
+		err7 := json.Unmarshal(runCommand("eventbus-api", "update-common-service-item", "--provider-class", string(providerClass), item.ID, "--request", string(updateJSON)), &updated)
+		require.NoError(t, err7, "update %s", providerClassString)
+		require.Equal(t, updatedName, updated.Name, "%s update Name = %q, want %q", providerClassString, updated.Name, updatedName)
 
-		runCommand("eventbus-api", resource, "delete", item.ID)
+		runCommand("eventbus-api", "delete-common-service-item", "--provider-class", string(providerClass), item.ID)
 		listed = nil
-		err8 := json.Unmarshal(runCommand("eventbus-api", resource, "list"), &listed)
-		require.NoError(t, err8, "list %s after delete", resource)
-		require.Len(t, listed, 0, "%s list after delete returned %#v, want no resources", resource, listed)
+		err8 := json.Unmarshal(runCommand("eventbus-api", "list-common-service-items", "--provider-class", string(providerClass)), &listed)
+		require.NoError(t, err8, "list %s after delete", providerClassString)
+		require.Len(t, listed, 0, "%s list after delete returned %#v, want no resources", providerClassString, listed)
 	}
 
-	exerciseResource("schedule", "sakumock-schedule", "updated-sakumock-schedule", v1.ProviderClassEventbusschedule, map[string]any{
+	exerciseResource("eventbusschedule", "sakumock-schedule", "updated-sakumock-schedule", v1.ProviderClassEventbusschedule, map[string]any{
 		"ProcessConfigurationID": created.ID,
 		"StartsAt":               1700000000000,
 		"RecurringStep":          1,
 		"RecurringUnit":          "day",
 	})
-	exerciseResource("trigger", "sakumock-trigger", "updated-sakumock-trigger", v1.ProviderClassEventbustrigger, map[string]any{
+	exerciseResource("eventbustrigger", "sakumock-trigger", "updated-sakumock-trigger", v1.ProviderClassEventbustrigger, map[string]any{
 		"ProcessConfigurationID": created.ID,
 		"Source":                 "//sakumock/source",
 		"Types":                  []string{"sakumock.created"},
 	})
 
 	var read v1.CommonServiceItem
-	err9 := json.Unmarshal(runCommand("eventbus-api", "process-configuration", "read", created.ID), &read)
+	err9 := json.Unmarshal(runCommand("eventbus-api", "read-common-service-item", "--provider-class", "eventbusprocessconfiguration", created.ID), &read)
 	require.NoError(t, err9)
 	require.Equal(t, created.ID, read.ID, "read ID = %q, want %q", read.ID, created.ID)
 
 	updateJSON := `{"CommonServiceItem":{"Name":"updated-process-configuration"}}`
 	var updated v1.CommonServiceItem
-	err10 := json.Unmarshal(runCommand("eventbus-api", "process-configuration", "update", created.ID, "--request", updateJSON), &updated)
+	err10 := json.Unmarshal(runCommand("eventbus-api", "update-common-service-item", "--provider-class", "eventbusprocessconfiguration", created.ID, "--request", updateJSON), &updated)
 	require.NoError(t, err10)
 	require.Equal(t, "updated-process-configuration", updated.Name, "updated Name = %q, want updated-process-configuration", updated.Name)
 
 	secretPath := filepath.Join(t.TempDir(), "secret.json")
 	err11 := os.WriteFile(secretPath, []byte(`{"AccessToken":"mock-token","AccessTokenSecret":"mock-secret"}`), 0o600)
 	require.NoError(t, err11)
-	runCommand("eventbus-api", "process-configuration", "update-secret", created.ID, "--secret-file", secretPath)
+	runCommand("eventbus-api", "set-process-configuration-secret", created.ID, "--secret-file", secretPath)
 	storedSecret, ok := server.Secret(created.ID)
 	if !ok || !bytes.Contains(storedSecret, []byte("mock-token")) {
 		t.Errorf("stored secret = %s, want mock-token", storedSecret)
 	}
 
-	runCommand("eventbus-api", "process-configuration", "delete", created.ID)
+	runCommand("eventbus-api", "delete-common-service-item", "--provider-class", "eventbusprocessconfiguration", created.ID)
 	items = nil
-	err12 := json.Unmarshal(runCommand("eventbus-api", "process-configuration", "list"), &items)
+	err12 := json.Unmarshal(runCommand("eventbus-api", "list-common-service-items", "--provider-class", "eventbusprocessconfiguration"), &items)
 	require.NoError(t, err12)
 	require.Len(t, items, 0, "list after delete returned %#v, want no resources", items)
 }

@@ -65,7 +65,7 @@ func runScheduleScenario(t *testing.T, h *helper.Helper, schedule *eventbusResou
 		},
 	})
 	created := parseEventbusItem(t, h.Call(t, "スケジュールを作成する",
-		"eventbus-api", "schedule", "create", "--request", "@"+createRequest))
+		"eventbus-api", "create-common-service-item", "--provider-class", "eventbusschedule", "--request", "@"+createRequest))
 	id := requireEventbusIdentity(t, created, schedule)
 	schedule.id = id
 
@@ -95,7 +95,7 @@ func runScheduleScenario(t *testing.T, h *helper.Helper, schedule *eventbusResou
 		"restored schedule check failed")
 
 	// スケジュールを削除する
-	h.Call(t, "スケジュールを削除する", "eventbus-api", "schedule", "delete", id)
+	h.Call(t, "スケジュールを削除する", "eventbus-api", "delete-common-service-item", "--provider-class", "eventbusschedule", id)
 
 	// 削除後に一覧に残っていないことを確認する
 	remaining := listEventbusItems(t, h, "削除後にスケジュールが一覧に残っていないことを確認する", "schedule")
@@ -114,7 +114,7 @@ func updateScheduleDescription(t *testing.T, h *helper.Helper, description, id, 
 			"Description": newDescription,
 		},
 	})
-	h.Call(t, description, "eventbus-api", "schedule", "update", id, "--request", "@"+request)
+	h.Call(t, description, "eventbus-api", "update-common-service-item", "--provider-class", "eventbusschedule", id, "--request", "@"+request)
 }
 
 // checkSchedule はスケジュールの識別情報と設定が、

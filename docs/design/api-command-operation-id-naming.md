@@ -43,6 +43,10 @@ operationId から名前を機械派生する方式では、このような課�
 
 operationId 機械派生に移行する際、この 2 ドメインでは spec のとおり 1 組の CommonServiceItem 操作に統合します。リソースの種別は `--provider-class` オプションで渡します。値は SDK が公開する `ProviderClass` の列挙値です。`eventbus-api` では `eventbustrigger`、`eventbusschedule`、`eventbusprocessconfiguration` を使います。`simple-notification-api` では `saknoticedestination`、`saknoticegroup`、`saknoticerouting` を使います。一覧操作では Provider.Class による絞り込みに、作成と更新ではリクエストの `CommonServiceItem.Provider.Class` の設定に使います。
 
+`--provider-class` は一覧、読み取り、作成、更新、削除の 5 操作で必須にします。読み取りと削除は ID で直接操作しますが、操作対象の種別を利用者に明示させ、誤操作を防ぐために種別を毎回指定させます。生成コマンドの実装では、CLI が `--provider-class` に対応する SDK の種別別操作を選択し、Provider.Class による絞り込み、リクエストへの Provider.Class 設定、Settings 型の検証は SDK に委ねます。シークレット更新 (`set-process-configuration-secret`) は実行設定専用の操作のため `--provider-class` を付けず、種別を `eventbusprocessconfiguration` に固定します。
+
+`eventbus-api` の移行では、設定ファイルをリソースごと (`eventbus-process-c0nfiguration.json`、`eventbus-schedule.json`、`eventbus-trigger.json`) からドメイン 1 件 (`eventbus.json`) に統合します。生成型名の接頭辞は `CommonServiceItem` を使います。リソースごとに使いやすい操作の形が必要な場合は、高レベルコマンドとして提供します。
+
 リソースごとに使いやすい操作の形 (たとえば `trigger` の作成) が必要な場合は、高レベルコマンドとして提供します。
 
 ## 対象範囲
