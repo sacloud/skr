@@ -122,7 +122,8 @@ func TestDeriveOperationCommandName(t *testing.T) {
 // operationId から派生した名前と一致するか、移行前の現行パスとして baseline
 // (apiCommandNameBaseline) に登録されていることを確認します。
 //
-// baseline に登録できない新規コマンドは、最初から派生名に従う必要があります。
+// 期待名の計算元は、対象ドメインが公開する操作の一覧 (apiPublishedOperations) です。
+// 新規コマンドは対応する operation 定数を一覧に登録することで、例外なしで検証できます。
 // 移行の進行に合わせて該当ドメインの baseline エントリを削除し、全ドメイン完了後に
 // baseline の機構自体を削除します。
 func TestAPICommandNamesFollowOperationIDs(t *testing.T) {
@@ -133,21 +134,27 @@ func TestAPICommandNamesFollowOperationIDs(t *testing.T) {
 		pathSet[p] = struct{}{}
 	}
 
+	// 対象ドメインごとに、公開する操作の operation 定数から派生名を計算します。
+	expected := make(map[string]map[string]struct{})
+	for dom, ops := range apiPublishedOperations {
+		expected[dom] = make(map[string]struct{}, len(ops))
+		for _, op := range ops {
+			expected[dom][deriveOperationCommandName(op)] = struct{}{}
+		}
+	}
+
+	// baseline に登録した operation 定数は、当該ドメインが公開する操作の一覧に含まれること。
+	for p, op := range apiCommandNameBaseline {
+		dom := strings.Fields(p)[0]
+		require.Contains(t, apiPublishedOperations[dom], op,
+			"baseline のパス skr %s に対応する operation は、ドメイン %s が公開する操作の一覧に登録されていません", p, dom)
+	}
+
 	// baseline に登録されたパスは CLI に実在することを確認します。
 	// 実在しないパスの登録は baseline の腐敗 (移行済みエントリの残置) を示します。
 	for p := range apiCommandNameBaseline {
 		_, ok := pathSet[p]
 		require.True(t, ok, "baseline に登録されたパスが CLI に存在しません。エントリを整理してください: skr %s", p)
-	}
-
-	// baseline に登録した operation 定数から、ドメインごとの派生名を計算します。
-	expected := make(map[string]map[string]struct{})
-	for p, op := range apiCommandNameBaseline {
-		dom := strings.Fields(p)[0]
-		if expected[dom] == nil {
-			expected[dom] = make(map[string]struct{})
-		}
-		expected[dom][deriveOperationCommandName(op)] = struct{}{}
 	}
 
 	// 対象ドメインの各リーフパスは、operationId から派生した名前か、
