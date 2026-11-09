@@ -392,7 +392,7 @@ operationId 機械派生に移行する際、この 2 ドメインでは spec �
 
 各ドメインのフェーズでは次の手順を踏みます。
 
-1. コマンド構造の変更。生成対象は `api/commands/*.json` の定義を `skr <domain>-api <operation>` の形に変更します。手書き対象はコマンド識別子を operation 名の派生形に変更します。
+1. コマンド構造の変更。生成対象は `api/commands/*.json` の全 operation に `command_name` (operationId から派生した名前) を指定して、`skr <domain>-api <operation>` の形にします。手書きの `Commands` 構造体は、生成したコマンド集合を Kong の `embed` タグでドメイン直下に展開して、リソースごとのグループ階層をなくします。手書きコマンドもコマンド識別子を operation 名の派生形に変更します。
 2. 再生成と追従。`make generate-api` と `make generate-wiring` で生成コードを更新し、手書きの実装とテストを追従させます。
 3. E2E シナリオ (`test/e2e/<domain>-api/`) のコマンド名を更新し、既存の E2E 網羅用 `test/e2e/command-coverage/baseline.txt` の旧パスを新パスへ置き換えます。各パスの実装状況とライブ検証状況を区別し、ライブ再実行は別途行って結果を記録します。
 4. ドキュメントの更新。`docs/design/<domain>-api.md` と `docs/manual/tutorials/<domain>-api.md` のコマンド名と CLI ↔ API 対応を更新します。

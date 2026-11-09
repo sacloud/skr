@@ -12,10 +12,10 @@ import (
 )
 
 type MessageCommands struct {
-	Send          MessageSendCommand          "cmd:\"\" help:\"キューへメッセージを送信します。\""
-	Receive       MessageReceiveCommand       "cmd:\"\" help:\"キューからメッセージを受信します。\""
-	ExtendTimeout MessageExtendTimeoutCommand "cmd:\"\" help:\"受信したメッセージの可視性タイムアウトを延長します。\""
-	Delete        MessageDeleteCommand        "cmd:\"\" help:\"受信したメッセージを削除します。\""
+	Send          MessageSendCommand          "cmd:\"\" name:\"send-message\" help:\"キューへメッセージを送信します。\""
+	Receive       MessageReceiveCommand       "cmd:\"\" name:\"receive-message\" help:\"キューからメッセージを受信します。\""
+	ExtendTimeout MessageExtendTimeoutCommand "cmd:\"\" name:\"extend-message-timeout\" help:\"受信したメッセージの可視性タイムアウトを延長します。\""
+	Delete        MessageDeleteCommand        "cmd:\"\" name:\"delete-message\" help:\"受信したメッセージを削除します。\""
 }
 
 type MessageAPI interface {

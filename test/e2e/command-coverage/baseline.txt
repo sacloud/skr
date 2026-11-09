@@ -345,18 +345,18 @@ simple-notification-api routing list-source live
 simple-notification-api routing read live
 simple-notification-api routing reorder live
 simple-notification-api routing update live
-simplemq-api message delete live
-simplemq-api message extend-timeout live
-simplemq-api message receive live
-simplemq-api message send live
-simplemq-api queue clear-messages live
-simplemq-api queue config live
-simplemq-api queue count-messages live
-simplemq-api queue create live
-simplemq-api queue delete live
-simplemq-api queue list live
-simplemq-api queue read live
-simplemq-api queue rotate-api-key live
+simplemq-api delete-message live
+simplemq-api extend-message-timeout live
+simplemq-api receive-message live
+simplemq-api send-message live
+simplemq-api clear-queue live
+simplemq-api update-queue live
+simplemq-api read-message-count live
+simplemq-api create-queue live
+simplemq-api delete-queue live
+simplemq-api list-queues live
+simplemq-api read-queue live
+simplemq-api rotate-api-key live
 service-endpoint-gateway-api appliance apply live
 service-endpoint-gateway-api appliance create live
 service-endpoint-gateway-api appliance delete live

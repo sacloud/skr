@@ -10,7 +10,8 @@
       "name": "List",
       "help": "キューを一覧表示します。",
       "method": "List",
-      "response_type": "[]queue.CommonServiceItem"
+      "response_type": "[]queue.CommonServiceItem",
+      "command_name": "list-queues"
     },
     {
       "name": "Read",
@@ -24,7 +25,8 @@
           "type": "string",
           "help": "list の出力にあるキュー ID。"
         }
-      ]
+      ],
+      "command_name": "read-queue"
     },
     {
       "name": "Create",
@@ -33,7 +35,8 @@
       "request_type": "queue.CreateQueueRequest",
       "request_by_value": true,
       "response_type": "*queue.CommonServiceItem",
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "create-queue"
     },
     {
       "name": "Config",
@@ -50,7 +53,8 @@
           "help": "設定を変更するキュー ID。"
         }
       ],
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "update-queue"
     },
     {
       "name": "Delete",
@@ -63,7 +67,8 @@
           "type": "string",
           "help": "削除するキュー ID。"
         }
-      ]
+      ],
+      "command_name": "delete-queue"
     },
     {
       "name": "CountMessages",
@@ -78,7 +83,8 @@
           "help": "メッセージ数を取得するキュー ID。"
         }
       ],
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "read-message-count"
     },
     {
       "name": "RotateAPIKey",
@@ -93,7 +99,8 @@
           "help": "キーを発行するキュー ID。"
         }
       ],
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "rotate-api-key"
     },
     {
       "name": "ClearMessages",
@@ -106,7 +113,8 @@
           "type": "string",
           "help": "メッセージをすべて削除するキュー ID。"
         }
-      ]
+      ],
+      "command_name": "clear-queue"
     }
   ],
   "wiring_target": "SimpleMQAPI.Queue",

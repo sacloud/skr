@@ -12,14 +12,14 @@ import (
 )
 
 type QueueCommands struct {
-	List          QueueListCommand          "cmd:\"\" help:\"キューを一覧表示します。\""
-	Read          QueueReadCommand          "cmd:\"\" help:\"ID を指定してキューを読み取ります。\""
-	Create        QueueCreateCommand        "cmd:\"\" help:\"キューを作成します。作成後、rotate-api-key でメッセージ API 用のキーを発行してください。\""
-	Config        QueueConfigCommand        "cmd:\"\" help:\"キューの設定を更新します。--visibility-timeout-seconds と --expire-seconds を指定するか、--request JSON を指定してください。\""
-	Delete        QueueDeleteCommand        "cmd:\"\" help:\"ID を指定してキューを削除します。\""
-	CountMessages QueueCountMessagesCommand "cmd:\"\" help:\"キュー内のメッセージ数を取得します。\""
-	RotateAPIKey  QueueRotateAPIKeyCommand  "cmd:\"\" help:\"メッセージ API キーを発行または再発行し、結果を出力します。APIKey は認証情報として安全に扱ってください。\""
-	ClearMessages QueueClearMessagesCommand "cmd:\"\" help:\"キュー内のメッセージをすべて削除します。\""
+	List          QueueListCommand          "cmd:\"\" name:\"list-queues\" help:\"キューを一覧表示します。\""
+	Read          QueueReadCommand          "cmd:\"\" name:\"read-queue\" help:\"ID を指定してキューを読み取ります。\""
+	Create        QueueCreateCommand        "cmd:\"\" name:\"create-queue\" help:\"キューを作成します。作成後、rotate-api-key でメッセージ API 用のキーを発行してください。\""
+	Config        QueueConfigCommand        "cmd:\"\" name:\"update-queue\" help:\"キューの設定を更新します。--visibility-timeout-seconds と --expire-seconds を指定するか、--request JSON を指定してください。\""
+	Delete        QueueDeleteCommand        "cmd:\"\" name:\"delete-queue\" help:\"ID を指定してキューを削除します。\""
+	CountMessages QueueCountMessagesCommand "cmd:\"\" name:\"read-message-count\" help:\"キュー内のメッセージ数を取得します。\""
+	RotateAPIKey  QueueRotateAPIKeyCommand  "cmd:\"\" name:\"rotate-api-key\" help:\"メッセージ API キーを発行または再発行し、結果を出力します。APIKey は認証情報として安全に扱ってください。\""
+	ClearMessages QueueClearMessagesCommand "cmd:\"\" name:\"clear-queue\" help:\"キュー内のメッセージをすべて削除します。\""
 }
 
 type QueueAPI interface {

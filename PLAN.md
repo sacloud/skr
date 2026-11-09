@@ -166,4 +166,4 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 2. CLI に公開する操作、コマンド名、必須入力、ヘルプ、個別処理を明示します。全リソースに同一の CRUD 操作を仮定しません。
 3. 既存の生成器を使える操作は設定と生成コードを追加し、生成器の対象外となる固有処理は手書きで実装します。
 4. 対象パッケージのテストで SDK 呼び出し、入力、出力、エラー経路を検証し、関連ドキュメントを更新してから一覧の状況を反映します。
-5. `iaas-api` 以外の `*-api` コマンドは、OpenAPI の `operationId` から機械派生した名前で `skr <domain>-api <operation>` の形に統一し、CI で検証します。命名規則、対応表、移行計画は [API コマンド名の operationId 準拠と移行計画](docs/design/api-command-operation-id-naming.md) に記載します。フェーズ 1 の CI 導入と全ドメインの baseline 登録は完了しています。次はフェーズ 2 として pilot で `simplemq-api` を変更し、手順を確立します。
+5. `iaas-api` 以外の `*-api` コマンドは、OpenAPI の `operationId` から機械派生した名前で `skr <domain>-api <operation>` の形に統一し、CI で検証します。命名規則、対応表、移行計画は [API コマンド名の operationId 準拠と移行計画](docs/design/api-command-operation-id-naming.md) に記載します。フェーズ 1 の CI 導入と全ドメインの baseline 登録、フェーズ 2 の pilot としての `simplemq-api` 移行は完了しています。次はフェーズ 3 として残りのドメインを移行します。

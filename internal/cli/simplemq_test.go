@@ -63,26 +63,27 @@ func TestRunSimpleMQAPIHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"simplemq-api", "--help"},
-			want: []string{"queue", "message", "SAKURA_ACCESS_TOKEN", "--api-key-file", "JSON"},
+			want: []string{
+				"list-queues", "read-queue", "create-queue", "update-queue", "delete-queue",
+				"read-message-count", "rotate-api-key", "clear-queue",
+				"send-message", "receive-message", "extend-message-timeout", "delete-message",
+				"SAKURA_ACCESS_TOKEN", "--api-key-file", "JSON",
+			},
 		},
 		{
-			args: []string{"simplemq-api", "queue", "--help"},
-			want: []string{"list", "read", "create", "config", "delete", "count-messages", "rotate-api-key", "clear-messages"},
-		},
-		{
-			args: []string{"simplemq-api", "queue", "create", "--help"},
+			args: []string{"simplemq-api", "create-queue", "--help"},
 			want: []string{"--name", "--description", "--request", "5〜64", "@path.json", "併用不可"},
 		},
 		{
-			args: []string{"simplemq-api", "queue", "config", "--help"},
+			args: []string{"simplemq-api", "update-queue", "--help"},
 			want: []string{"--visibility-timeout-seconds", "--expire-seconds", "--request", "併用不可", "API の", "CommonServiceItem.Settings", "5〜900", "60〜1209600", "345600"},
 		},
 		{
-			args: []string{"simplemq-api", "queue", "rotate-api-key", "--help"},
+			args: []string{"simplemq-api", "rotate-api-key", "--help"},
 			want: []string{"キュー ID"},
 		},
 		{
-			args: []string{"simplemq-api", "message", "send", "--help"},
+			args: []string{"simplemq-api", "send-message", "--help"},
 			want: []string{"--queue-name", "--api-key-file", "--content", "256000"},
 		},
 	} {
@@ -115,7 +116,7 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	}
 
 	var created queue.CommonServiceItem
-	err := json.Unmarshal(runCommand("simplemq-api", "queue", "create", "--name", "mock-queue", "--description", "test queue"), &created)
+	err := json.Unmarshal(runCommand("simplemq-api", "create-queue", "--name", "mock-queue", "--description", "test queue"), &created)
 	require.NoError(t, err)
 	if id := simplemq.GetQueueID(&created); id == "" || simplemq.GetQueueName(&created) != "mock-queue" {
 		t.Fatalf("create returned %#v, want queue ID and name", created)
@@ -123,7 +124,7 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	queueID := simplemq.GetQueueID(&created)
 
 	var listed []queue.CommonServiceItem
-	err2 := json.Unmarshal(runCommand("simplemq-api", "queue", "list"), &listed)
+	err2 := json.Unmarshal(runCommand("simplemq-api", "list-queues"), &listed)
 	require.NoError(t, err2)
 	if len(listed) != 1 || simplemq.GetQueueID(&listed[0]) != queueID {
 		t.Fatalf("list returned %#v, want queue %s", listed, queueID)
@@ -132,29 +133,29 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 		ID   string
 		Name string
 	}
-	err3 := json.Unmarshal(runCommand("simplemq-api", "queue", "list", "--query", "map({ID,Name})"), &projected)
+	err3 := json.Unmarshal(runCommand("simplemq-api", "list-queues", "--query", "map({ID,Name})"), &projected)
 	require.NoError(t, err3)
 	require.Len(t, projected, 1, "projected output = %+v, want created queue ID and name", projected)
 	require.Equal(t, queueID, projected[0].ID, "unexpected value")
 	require.Equal(t, "mock-queue", projected[0].Name, "unexpected value")
 
 	var jsonCreated queue.CommonServiceItem
-	err4 := json.Unmarshal(runCommand("simplemq-api", "queue", "create", "--request", `{"CommonServiceItem":{"Name":"json-queue"}}`), &jsonCreated)
+	err4 := json.Unmarshal(runCommand("simplemq-api", "create-queue", "--request", `{"CommonServiceItem":{"Name":"json-queue"}}`), &jsonCreated)
 	require.NoError(t, err4)
 	if simplemq.GetQueueName(&jsonCreated) != "json-queue" {
 		t.Fatalf("JSON create returned %#v, want json-queue", jsonCreated)
 	}
-	runCommand("simplemq-api", "queue", "delete", simplemq.GetQueueID(&jsonCreated))
+	runCommand("simplemq-api", "delete-queue", simplemq.GetQueueID(&jsonCreated))
 
 	var configured queue.CommonServiceItem
 	configRequest := `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":45,"ExpireSeconds":604800}}}`
-	err5 := json.Unmarshal(runCommand("simplemq-api", "queue", "config", queueID, "--request", configRequest), &configured)
+	err5 := json.Unmarshal(runCommand("simplemq-api", "update-queue", queueID, "--request", configRequest), &configured)
 	require.NoError(t, err5)
 	require.EqualValues(t, 45, configured.Settings.VisibilityTimeoutSeconds, "config returned settings %+v, want visibility timeout 45 and expiry 604800", configured.Settings)
 	require.EqualValues(t, 604800, configured.Settings.ExpireSeconds, "unexpected value")
 	var configuredByFlags queue.CommonServiceItem
 	require.NoError(t, json.Unmarshal(runCommand(
-		"simplemq-api", "queue", "config", queueID,
+		"simplemq-api", "update-queue", queueID,
 		"--visibility-timeout-seconds", "45", "--expire-seconds", "604800",
 	), &configuredByFlags))
 	require.Equal(t, configured.Settings, configuredByFlags.Settings, "flag config returned settings %+v, JSON config returned %+v", configuredByFlags.Settings, configured.Settings)
@@ -162,7 +163,7 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	var rotated struct {
 		APIKey string
 	}
-	rotateOutput := runCommand("simplemq-api", "queue", "rotate-api-key", queueID)
+	rotateOutput := runCommand("simplemq-api", "rotate-api-key", queueID)
 	err6 := json.Unmarshal(rotateOutput, &rotated)
 	require.NoError(t, err6)
 	if rotated.APIKey == "" || !bytes.Contains(rotateOutput, []byte(rotated.APIKey)) {
@@ -173,62 +174,62 @@ func TestSimpleMQAPIWithSakumock(t *testing.T) {
 	require.NoError(t, err7)
 
 	var read queue.CommonServiceItem
-	err8 := json.Unmarshal(runCommand("simplemq-api", "queue", "read", queueID), &read)
+	err8 := json.Unmarshal(runCommand("simplemq-api", "read-queue", queueID), &read)
 	require.NoError(t, err8)
 	if simplemq.GetQueueName(&read) != "mock-queue" {
 		t.Fatalf("read returned %#v, want mock-queue", read)
 	}
 
 	var sent message.NewMessage
-	err9 := json.Unmarshal(runCommand("simplemq-api", "message", "send", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath, "--content", "aGVsbG8="), &sent)
+	err9 := json.Unmarshal(runCommand("simplemq-api", "send-message", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath, "--content", "aGVsbG8="), &sent)
 	require.NoError(t, err9)
 	require.Equal(t, "aGVsbG8=", string(sent.Content), "send returned %#v, want message content and ID", sent)
 	require.NotEmpty(t, sent.ID, "should not be empty")
 
 	var received []message.Message
-	err10 := json.Unmarshal(runCommand("simplemq-api", "message", "receive", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath), &received)
+	err10 := json.Unmarshal(runCommand("simplemq-api", "receive-message", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath), &received)
 	require.NoError(t, err10)
 	require.Len(t, received, 1, "receive returned %#v, want sent message %s", received, sent.ID)
 	require.Equal(t, sent.ID, received[0].ID, "unexpected value")
 	require.Equal(t, sent.Content, received[0].Content, "unexpected value")
 
 	var extended message.Message
-	err11 := json.Unmarshal(runCommand("simplemq-api", "message", "extend-timeout", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath, string(sent.ID)), &extended)
+	err11 := json.Unmarshal(runCommand("simplemq-api", "extend-message-timeout", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath, string(sent.ID)), &extended)
 	require.NoError(t, err11)
 	require.Equal(t, sent.ID, extended.ID, "extend-timeout returned ID %s, want %s", extended.ID, sent.ID)
-	runCommand("simplemq-api", "message", "delete", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath, string(sent.ID))
+	runCommand("simplemq-api", "delete-message", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath, string(sent.ID))
 
 	var count map[string]int
-	err12 := json.Unmarshal(runCommand("simplemq-api", "queue", "count-messages", queueID), &count)
+	err12 := json.Unmarshal(runCommand("simplemq-api", "read-message-count", queueID), &count)
 	require.NoError(t, err12)
 	require.Zero(t, count["Count"], "count-messages = %d, want 0", count["Count"])
 
-	runCommand("simplemq-api", "message", "send", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath, "--content", "dGVzdA==")
-	runCommand("simplemq-api", "queue", "clear-messages", queueID)
-	err13 := json.Unmarshal(runCommand("simplemq-api", "queue", "count-messages", queueID), &count)
+	runCommand("simplemq-api", "send-message", "--queue-name", "mock-queue", "--api-key-file", apiKeyPath, "--content", "dGVzdA==")
+	runCommand("simplemq-api", "clear-queue", queueID)
+	err13 := json.Unmarshal(runCommand("simplemq-api", "read-message-count", queueID), &count)
 	require.NoError(t, err13)
 	require.Zero(t, count["Count"], "count after clear-messages = %d, want 0", count["Count"])
 
-	runCommand("simplemq-api", "queue", "delete", queueID)
+	runCommand("simplemq-api", "delete-queue", queueID)
 	listed = nil
-	err14 := json.Unmarshal(runCommand("simplemq-api", "queue", "list"), &listed)
+	err14 := json.Unmarshal(runCommand("simplemq-api", "list-queues"), &listed)
 	require.NoError(t, err14)
 	require.Len(t, listed, 0, "list after delete returned %#v, want empty", listed)
-	emptyJSON := string(runCommand("simplemq-api", "queue", "list", "--query", "map({ID,Name})"))
+	emptyJSON := string(runCommand("simplemq-api", "list-queues", "--query", "map({ID,Name})"))
 	want := "[]\n"
 	require.Equal(t, want, emptyJSON, "empty projected output = %q, want %q", emptyJSON, want)
 }
 
 func TestSimpleMQCommandInputErrors(t *testing.T) {
 	for _, args := range [][]string{
-		{"simplemq-api", "queue", "create"},
-		{"simplemq-api", "queue", "create", "--request", `{"CommonServiceItem":{"Name":"mock-queue"}}`, "--name", "mock-queue"},
-		{"simplemq-api", "queue", "config", "queue-id"},
-		{"simplemq-api", "queue", "config", "queue-id", "--visibility-timeout-seconds", "30"},
-		{"simplemq-api", "queue", "config", "queue-id", "--expire-seconds", "345600"},
-		{"simplemq-api", "queue", "config", "queue-id", "--request", `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}`, "--expire-seconds", "345600"},
-		{"simplemq-api", "queue", "config", "queue-id", "--request", `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}`, "--visibility-timeout-seconds", "0"},
-		{"simplemq-api", "message", "receive", "--queue-name", "mock-queue", "--api-key-file", "/missing/simplemq.key"},
+		{"simplemq-api", "create-queue"},
+		{"simplemq-api", "create-queue", "--request", `{"CommonServiceItem":{"Name":"mock-queue"}}`, "--name", "mock-queue"},
+		{"simplemq-api", "update-queue", "queue-id"},
+		{"simplemq-api", "update-queue", "queue-id", "--visibility-timeout-seconds", "30"},
+		{"simplemq-api", "update-queue", "queue-id", "--expire-seconds", "345600"},
+		{"simplemq-api", "update-queue", "queue-id", "--request", `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}`, "--expire-seconds", "345600"},
+		{"simplemq-api", "update-queue", "queue-id", "--request", `{"CommonServiceItem":{"Settings":{"VisibilityTimeoutSeconds":30,"ExpireSeconds":345600}}}`, "--visibility-timeout-seconds", "0"},
+		{"simplemq-api", "receive-message", "--queue-name", "mock-queue", "--api-key-file", "/missing/simplemq.key"},
 	} {
 		var stdout, stderr bytes.Buffer
 		exitCode := run(args, &stdout, &stderr)
