@@ -87,7 +87,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 
 ### タスク4: apprun-dedicated-api
 
-35コマンドがクラスタ作成を前提とし、実行コストが大きいため、[#59](https://github.com/sacloud/skr/issues/59) の範囲で管理します。
+35コマンドがクラスタ作成を前提とし、実行コストが大きいため、[#59](https://github.com/sacloud/skr/issues/59) の範囲で管理します。2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の operationId 由来のフラット名へ移行済みです。移行に伴う sakumock による CLI 操作検証と命名検証は更新済みで、ライブ実行は未実施です。
 
 ### タスク5: security-control-api
 
