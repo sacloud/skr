@@ -164,6 +164,7 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 				Name:                disk.Name,
 				Availability:        disk.Availability,
 				Connection:          disk.Connection,
+				ConnectionOrder:     disk.ConnectionOrder,
 				SizeMB:              disk.SizeMB,
 				DiskPlanID:          disk.DiskPlanID,
 				EncryptionAlgorithm: disk.EncryptionAlgorithm,

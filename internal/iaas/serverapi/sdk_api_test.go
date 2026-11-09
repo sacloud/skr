@@ -128,14 +128,27 @@ func TestCreateCompletesResponseDisksWhenServerResponseOmitsThem(t *testing.T) {
 	// 確定できるようにします
 	serverOp := &serverAPIFake{createResult: &iaas.Server{ID: 123}}
 	diskOp := &diskAPIFake{
-		createResult: &iaas.Disk{
-			ID:                  456,
-			Name:                "test-disk",
-			Availability:        types.Availabilities.Migrating,
-			Connection:          types.DiskConnections.VirtIO,
-			SizeMB:              20480,
-			DiskPlanID:          7,
-			EncryptionAlgorithm: types.DiskEncryptionAlgorithms.None,
+		createResults: []*iaas.Disk{
+			{
+				ID:                  456,
+				Name:                "test-disk",
+				Availability:        types.Availabilities.Migrating,
+				Connection:          types.DiskConnections.VirtIO,
+				ConnectionOrder:     1,
+				SizeMB:              20480,
+				DiskPlanID:          7,
+				EncryptionAlgorithm: types.DiskEncryptionAlgorithms.None,
+			},
+			{
+				ID:                  457,
+				Name:                "test-disk-2",
+				Availability:        types.Availabilities.Migrating,
+				Connection:          types.DiskConnections.VirtIO,
+				ConnectionOrder:     2,
+				SizeMB:              40960,
+				DiskPlanID:          7,
+				EncryptionAlgorithm: types.DiskEncryptionAlgorithms.AES256XTS,
+			},
 		},
 	}
 	sdk := &sdkAPI{op: serverOp, diskOp: diskOp}
@@ -149,19 +162,29 @@ func TestCreateCompletesResponseDisksWhenServerResponseOmitsThem(t *testing.T) {
 			Name:       "test-disk",
 			DiskPlanID: 7,
 			SizeGB:     20,
+		}, {
+			Name:       "test-disk-2",
+			DiskPlanID: 7,
+			SizeGB:     40,
 		}},
 	})
 
 	require.NoError(t, err)
-	require.Len(t, result.Disks, 1,
-		"the create result should include the disk created by the CLI")
+	require.Len(t, result.Disks, 2,
+		"the create result should include the disks created by the CLI")
 	require.EqualValues(t, 456, result.Disks[0].ID)
 	require.Equal(t, "test-disk", result.Disks[0].Name)
 	require.Equal(t, types.Availabilities.Migrating, result.Disks[0].Availability)
 	require.Equal(t, types.DiskConnections.VirtIO, result.Disks[0].Connection)
+	require.Equal(t, 1, result.Disks[0].ConnectionOrder)
 	require.EqualValues(t, 20480, result.Disks[0].SizeMB)
 	require.EqualValues(t, 7, result.Disks[0].DiskPlanID)
 	require.Equal(t, types.DiskEncryptionAlgorithms.None, result.Disks[0].EncryptionAlgorithm)
+	require.EqualValues(t, 457, result.Disks[1].ID)
+	require.Equal(t, "test-disk-2", result.Disks[1].Name)
+	require.Equal(t, 2, result.Disks[1].ConnectionOrder,
+		"the connection order of the created disk should be preserved")
+	require.Equal(t, types.DiskEncryptionAlgorithms.AES256XTS, result.Disks[1].EncryptionAlgorithm)
 }
 
 func TestCreateKeepsServerResponseDisksWhenPresent(t *testing.T) {
@@ -221,10 +244,15 @@ func TestCreatePassesDiskSourceAndEncryptionFieldsFromJSON(t *testing.T) {
 	caller := &serverDiskCreateAPICallerFake{}
 	sdk := &sdkAPI{op: iaas.NewServerOp(caller), diskOp: iaas.NewDiskOp(caller)}
 
-	_, err := sdk.CreateWithContext(context.Background(), &request)
+	result, err := sdk.CreateWithContext(context.Background(), &request)
 
 	require.NoError(t, err)
 	require.Equal(t, 2, caller.calls)
+	// 実際の SDK のデコード経路を通った応答でも、作成したディスクの情報が
+	// Disks に保持されることを確認します
+	require.Len(t, result.Disks, 1)
+	require.EqualValues(t, 456, result.Disks[0].ID)
+	require.Equal(t, "test-disk", result.Disks[0].Name)
 	var body struct {
 		Disk struct {
 			EncryptionAlgorithm types.EDiskEncryptionAlgorithm
@@ -524,6 +552,7 @@ type diskAPIFake struct {
 	calls         []string
 	createRequest *iaas.DiskCreateRequest
 	createResult  *iaas.Disk
+	createResults []*iaas.Disk
 	readResults   []*iaas.Disk
 	events        *[]string
 }
@@ -534,6 +563,11 @@ func (api *diskAPIFake) Create(_ context.Context, _ string, request *iaas.DiskCr
 		*api.events = append(*api.events, "disk-create")
 	}
 	api.createRequest = request
+	if len(api.createResults) > 0 {
+		result := api.createResults[0]
+		api.createResults = api.createResults[1:]
+		return result, nil
+	}
 	return api.createResult, nil
 }
 
@@ -604,7 +638,7 @@ func (caller *serverDiskCreateAPICallerFake) Do(_ context.Context, _, _ string, 
 		if err != nil {
 			return nil, err
 		}
-		return []byte(`{"Disk":{"ID":456}}`), nil
+		return []byte(`{"Disk":{"ID":456,"Name":"test-disk","Availability":"migrating","Connection":"virtio","ConnectionOrder":1,"SizeMB":20480,"Plan":{"ID":7}}}`), nil
 	default:
 		return nil, fmt.Errorf("unexpected API call %d", caller.calls)
 	}
