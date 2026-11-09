@@ -42,6 +42,7 @@ var apiCommandNameTargetDomains = []string{
 // apiCommandNameMigratedDomains は operationId 機械派生への移行が完了したドメインです。
 // baseline のエントリ削除と合わせて追加し、末端パスの集合が期待パスの集合と一致することを検証します。
 var apiCommandNameMigratedDomains = []string{
+	"kms-api",
 	"simplemq-api",
 }
 

@@ -13,16 +13,16 @@ import (
 )
 
 type KeyCommands struct {
-	List                KeyListCommand                "cmd:\"\" help:\"KMS キーを一覧表示します。--count と --from でページングできます。\""
-	Read                KeyReadCommand                "cmd:\"\" help:\"ID を指定して KMS キーを読み取ります。\""
-	Create              KeyCreateCommand              "cmd:\"\" help:\"KMS キーを作成します。\""
-	Update              KeyUpdateCommand              "cmd:\"\" help:\"KMS キーの名前、説明、タグを更新します。--name が必須です。Description は指定した場合だけリクエストに含まれます。Tags は常にリクエストに含まれ、個別フラグのみでの更新では null (タグのクリア) として送信されます。タグを設定・維持する場合は --request JSON で Tags を指定してください。\""
-	Delete              KeyDeleteCommand              "cmd:\"\" help:\"ID を指定して KMS キーを削除します。削除前に対象 ID を確認してください。\""
-	Rotate              KeyRotateCommand              "cmd:\"\" help:\"KMS キーをローテーションします。有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。\""
-	ChangeStatus        KeyChangeStatusCommand        "cmd:\"\" help:\"KMS キーの状態を変更します。\""
-	ScheduleDestruction KeyScheduleDestructionCommand "cmd:\"\" help:\"KMS キーの削除を予約します。削除予約中のキーは利用できませんが、状態変更で削除を取り消せます。\""
-	Encrypt             KeyEncryptCommand             "cmd:\"\" help:\"KMS キーで平文を暗号化します。\""
-	Decrypt             KeyDecryptCommand             "cmd:\"\" help:\"KMS キーで暗号文を復号します。\""
+	List                KeyListCommand                "cmd:\"\" name:\"list-keys\" help:\"KMS キーを一覧表示します。--count と --from でページングできます。\""
+	Read                KeyReadCommand                "cmd:\"\" name:\"read-key\" help:\"ID を指定して KMS キーを読み取ります。\""
+	Create              KeyCreateCommand              "cmd:\"\" name:\"create-key\" help:\"KMS キーを作成します。\""
+	Update              KeyUpdateCommand              "cmd:\"\" name:\"update-key\" help:\"KMS キーの名前、説明、タグを更新します。--name が必須です。Description は指定した場合だけリクエストに含まれます。Tags は常にリクエストに含まれ、個別フラグのみでの更新では null (タグのクリア) として送信されます。タグを設定・維持する場合は --request JSON で Tags を指定してください。\""
+	Delete              KeyDeleteCommand              "cmd:\"\" name:\"delete-key\" help:\"ID を指定して KMS キーを削除します。削除前に対象 ID を確認してください。\""
+	Rotate              KeyRotateCommand              "cmd:\"\" name:\"rotate-key\" help:\"KMS キーをローテーションします。有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。\""
+	ChangeStatus        KeyChangeStatusCommand        "cmd:\"\" name:\"change-key-status\" help:\"KMS キーの状態を変更します。\""
+	ScheduleDestruction KeyScheduleDestructionCommand "cmd:\"\" name:\"schedule-key-destruction\" help:\"KMS キーの削除を予約します。削除予約中のキーは利用できませんが、状態変更で削除を取り消せます。\""
+	Encrypt             KeyEncryptCommand             "cmd:\"\" name:\"encrypt-data-with-key\" help:\"KMS キーで平文を暗号化します。\""
+	Decrypt             KeyDecryptCommand             "cmd:\"\" name:\"decrypt-data-with-key\" help:\"KMS キーで暗号文を復号します。\""
 }
 
 type KeyAPI interface {
@@ -103,7 +103,7 @@ func (c *KeyListCommand) Run(ctx *kong.Context) error {
 }
 
 type KeyReadCommand struct {
-	ID      string "arg:\"\" name:\"id\" help:\"list の出力にある KMS キー ID。\""
+	ID      string "arg:\"\" name:\"id\" help:\"list-keys の出力にある KMS キー ID。\""
 	factory KeyAPIFactory
 	runtime KeyRuntime
 }

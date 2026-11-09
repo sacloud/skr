@@ -19,7 +19,6 @@ import (
 	apprunv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
 	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
-	kmsv1 "github.com/sacloud/sacloud-sdk-go/api/kms/apis/v1"
 	networkingsuitev1 "github.com/sacloud/sacloud-sdk-go/api/networking-suite/apis/v1"
 	objectstoragev1 "github.com/sacloud/sacloud-sdk-go/api/object-storage/apis/v2"
 	secretmanagerv1 "github.com/sacloud/sacloud-sdk-go/api/secretmanager/apis/v1"
@@ -193,17 +192,6 @@ var apiCommandNameBaseline = map[string]string{
 	"iam-api user-2fa list-security-keys":        iamv1.ListSecurityKeysOperation,
 	"iam-api user-2fa list-trusted-devices":      iamv1.ListTrustedDevicesOperation,
 	"iam-api user-2fa read-security-key":         iamv1.ReadSecurityKeyOperation,
-	// kms-api
-	"kms-api key change-status":        kmsv1.ChangeKeyStatusOperation,
-	"kms-api key create":               kmsv1.CreateKeyOperation,
-	"kms-api key decrypt":              kmsv1.DecryptDataWithKeyOperation,
-	"kms-api key delete":               kmsv1.DeleteKeyOperation,
-	"kms-api key encrypt":              kmsv1.EncryptDataWithKeyOperation,
-	"kms-api key list":                 kmsv1.ListKeysOperation,
-	"kms-api key read":                 kmsv1.ReadKeyOperation,
-	"kms-api key rotate":               kmsv1.RotateKeyOperation,
-	"kms-api key schedule-destruction": kmsv1.ScheduleKeyDestructionOperation,
-	"kms-api key update":               kmsv1.UpdateKeyOperation,
 	// networking-suite-api
 	"networking-suite-api address list":                networkingsuitev1.ListAddressesOperation,
 	"networking-suite-api address read":                networkingsuitev1.ReadAddressOperation,

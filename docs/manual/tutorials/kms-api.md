@@ -27,15 +27,15 @@
 ```console
 $ skr config current
 $ skr kms-api --help
-$ skr kms-api key create --help
-$ skr kms-api key read --help
-$ skr kms-api key list --help
-$ skr kms-api key encrypt --help
-$ skr kms-api key decrypt --help
-$ skr kms-api key rotate --help
-$ skr kms-api key schedule-destruction --help
-$ skr kms-api key change-status --help
-$ skr kms-api key delete --help
+$ skr kms-api create-key --help
+$ skr kms-api read-key --help
+$ skr kms-api list-keys --help
+$ skr kms-api encrypt-data-with-key --help
+$ skr kms-api decrypt-data-with-key --help
+$ skr kms-api rotate-key --help
+$ skr kms-api schedule-key-destruction --help
+$ skr kms-api change-key-status --help
+$ skr kms-api delete-key --help
 ```
 
 認証は選択中の SDK プロファイルを使います。`KEY-NAME` は、以降のコマンドと JSON で同じ一意な名前に置き換えてください。
@@ -45,7 +45,7 @@ $ skr kms-api key delete --help
 新しいキー名に一致するキーがないことも確認します。名前が未使用の場合の出力は `[]` です。これは期待する出力形式であり、ライブ環境で取得した結果ではありません。実際に別の要素が表示された場合は、そのキーを変更・削除せず、異なる名前を選んでください。
 
 ```console
-$ skr kms-api key list --query 'map(select(.Name == "KEY-NAME") | {ID,Name,Status})'
+$ skr kms-api list-keys --query 'map(select(.Name == "KEY-NAME") | {ID,Name,Status})'
 ```
 
 ```json
@@ -55,7 +55,7 @@ $ skr kms-api key list --query 'map(select(.Name == "KEY-NAME") | {ID,Name,Statu
 生成モードでキーを作成します。`--description` は省略できます。
 
 ```console
-$ skr kms-api key create --name 'KEY-NAME' --description 'KMS tutorial'
+$ skr kms-api create-key --name 'KEY-NAME' --description 'KMS tutorial'
 ```
 
 ```json
@@ -74,14 +74,14 @@ $ skr kms-api key create --name 'KEY-NAME' --description 'KMS tutorial'
 }
 ```
 
-作成結果の `ID` を控え、以降の `KEY-ID` に指定してください。作成コマンドがエラーになり ID を取得できなかった場合は、名前だけを手掛かりに削除しないでください。作成された可能性がある場合は、`kms-api key list` やコントロールパネルで対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
+作成結果の `ID` を控え、以降の `KEY-ID` に指定してください。作成コマンドがエラーになり ID を取得できなかった場合は、名前だけを手掛かりに削除しないでください。作成された可能性がある場合は、`kms-api list-keys` やコントロールパネルで対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
 
 BYOK モードでインポートする場合は、256 bit の対称鍵を base64 エンコードした内容のファイルを用意し、`--plain-key-file` で指定します。ファイルを引数として渡すだけで、鍵素材をコマンド引数に含めないでください。インポートしたキーはローテーションできません。
 
 ## Step 3: 作成したキーを参照する
 
 ```console
-$ skr kms-api key read KEY-ID --query '{ID,Name,Status,KeyOrigin,LatestVersion}'
+$ skr kms-api read-key KEY-ID --query '{ID,Name,Status,KeyOrigin,LatestVersion}'
 ```
 
 ```json
@@ -97,28 +97,28 @@ $ skr kms-api key read KEY-ID --query '{ID,Name,Status,KeyOrigin,LatestVersion}'
 一覧でも同じ内容が返ることを確認します。
 
 ```console
-$ skr kms-api key list --query 'map(select(.ID == "KEY-ID") | {ID,Name,Status})'
+$ skr kms-api list-keys --query 'map(select(.ID == "KEY-ID") | {ID,Name,Status})'
 ```
 
-名前と説明の更新は `key update` で行います。API の更新リクエストは `Name` が必須です。タグを設定・維持する場合は `--request` JSON で `Tags` を指定します。
+名前と説明の更新は `update-key` で行います。API の更新リクエストは `Name` が必須です。タグを設定・維持する場合は `--request` JSON で `Tags` を指定します。
 
 ## Step 4: 平文を暗号化し、復号する
 
 暗号化する平文をローカルファイルに保存します。平文は `--plain-file` でファイルから読み込み、API 向けに base64 エンコードされて送信されます。`-` を指定すると標準入力から読み込みます。アルゴリズムは `--algo` で指定でき、未指定の場合は `aes-256-gcm` が使われます。
 
 ```console
-$ skr kms-api key encrypt KEY-ID --plain-file plain.txt
+$ skr kms-api encrypt-data-with-key KEY-ID --plain-file plain.txt
 ```
 
 ```json
 "CIPHERTEXT"
 ```
 
-暗号文は base64 エンコードされたテキストです。ファイルに保存し、`--cipher-file` で指定して復号します。`encrypt` の JSON 出力をそのままリダイレクトしたファイルも使えます。復号結果は平文のバイト列のまま標準出力へ出力されます。
+暗号文は base64 エンコードされたテキストです。ファイルに保存し、`--cipher-file` で指定して復号します。`encrypt-data-with-key` の JSON 出力をそのままリダイレクトしたファイルも使えます。復号結果は平文のバイト列のまま標準出力へ出力されます。
 
 ```console
-$ skr kms-api key encrypt KEY-ID --plain-file plain.txt > cipher.txt
-$ skr kms-api key decrypt KEY-ID --cipher-file cipher.txt
+$ skr kms-api encrypt-data-with-key KEY-ID --plain-file plain.txt > cipher.txt
+$ skr kms-api decrypt-data-with-key KEY-ID --cipher-file cipher.txt
 HelloKMS
 ```
 
@@ -129,16 +129,16 @@ HelloKMS
 ローテーションは有効 (active) なキーだけが対象です。実行後、`LatestVersion` が増えることを確認します。ローテーション前のバージョンで暗号化したデータも、同じキー ID で復号できます。
 
 ```console
-$ skr kms-api key rotate KEY-ID
-$ skr kms-api key read KEY-ID --query '{ID,LatestVersion}'
+$ skr kms-api rotate-key KEY-ID
+$ skr kms-api read-key KEY-ID --query '{ID,LatestVersion}'
 ```
 
 ## Step 6: 削除を予約し、取り消す
 
-削除は猶予期間つきの削除予約制です。`schedule-destruction` の `--pending-days` で猶予日数を指定します。削除予約中のキーはステータス `pending_destruction` になり、利用できません。
+削除は猶予期間つきの削除予約制です。`schedule-key-destruction` の `--pending-days` で猶予日数を指定します。削除予約中のキーはステータス `pending_destruction` になり、利用できません。
 
 ```console
-$ skr kms-api key schedule-destruction KEY-ID --pending-days 7
+$ skr kms-api schedule-key-destruction KEY-ID --pending-days 7
 ```
 
 ```json
@@ -151,7 +151,7 @@ $ skr kms-api key schedule-destruction KEY-ID --pending-days 7
 削除を取り消す場合は、状態を `active` に戻します。
 
 ```console
-$ skr kms-api key change-status KEY-ID --status active
+$ skr kms-api change-key-status KEY-ID --status active
 "active"
 ```
 
@@ -159,12 +159,12 @@ $ skr kms-api key change-status KEY-ID --status active
 
 ## Step 7: キーを削除する
 
-削除前に `key read` で ID と名前がこの手順で作成したキーと一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。
+削除前に `read-key` で ID と名前がこの手順で作成したキーと一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。
 
 ```console
-$ skr kms-api key read KEY-ID --query '{ID,Name,Status}'
-$ skr kms-api key delete KEY-ID
-$ skr kms-api key list --query 'map(select(.ID == "KEY-ID") | {ID,Name})'
+$ skr kms-api read-key KEY-ID --query '{ID,Name,Status}'
+$ skr kms-api delete-key KEY-ID
+$ skr kms-api list-keys --query 'map(select(.ID == "KEY-ID") | {ID,Name})'
 ```
 
 対象 ID が一覧に残っていない場合の出力は `[]` です。以下は E2E テストで確認している削除後の出力形式です。
@@ -175,7 +175,6 @@ $ skr kms-api key list --query 'map(select(.ID == "KEY-ID") | {ID,Name})'
 
 キーを削除すると、そのキーで暗号化したデータは復号できなくなります。連携リソースがある場合は、削除前に依存関係を確認してください（[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)）。
 
-キーの操作一覧は `skr kms-api key --help` で確認できます。
 
 ## 参考資料
 
