@@ -2,11 +2,11 @@
 
 ## 対象範囲
 
-`kms-api` は SDK `github.com/sacloud/sacloud-sdk-go v0.3.1` の KMS (Key Management Service) を操作します。公開する操作は `key` リソースの次のとおりです。
+`kms-api` は SDK `github.com/sacloud/sacloud-sdk-go v0.3.1` の KMS (Key Management Service) を操作します。コマンド名は operationId から機械派生します ([ADR 0074](../adr/0074-api-command-name-structure.md))。公開する操作は `key` リソースの次のとおりです。
 
 | リソース | 実装操作 |
 | --- | --- |
-| `key` | `list`、`read`、`create`、`update`、`delete`、`rotate`、`change-status`、`schedule-destruction`、`encrypt`、`decrypt` |
+| `key` | `list-keys`、`read-key`、`create-key`、`update-key`、`delete-key`、`rotate-key`、`change-key-status`、`schedule-key-destruction`、`encrypt-data-with-key`、`decrypt-data-with-key` |
 
 KMS は FIPS 140-3 level 3 認証の HSM と連携し、対称鍵 AES-256 bit の暗号化・復号を提供します。キーは取り出しやバックアップができません。削除は削除予約制で、削除予約中のキーは状態変更で取り消せます。ローテーションは有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。レガシーキー (`cloud/kms/key/legacy`) は課金対象外で、新規作成はできません。キーの作成数や削除の猶予期間などの上限は[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)を参照してください。
 
@@ -14,14 +14,14 @@ API エンドポイントは `https://secure.sakura.ad.jp/cloud/zone/{ゾーン�
 
 ## パッケージと生成
 
-操作の大半は `api/commands/kms-key.json` で明示し、`make generate-api` から `internal/kmsapi/kms_key_api_generated.go` に生成します。生成するのは `list`、`read`、`update`、`delete`、`rotate`、`schedule-destruction` のコマンドと、API interface、factory、Runtime です。`internal/cli/` の配線は `make generate-wiring` から生成し、設定との一致を `internal/cli/wiring_test.go` で確認します。
+操作の大半は `api/commands/kms-key.json` で明示し、`make generate-api` から `internal/kmsapi/kms_key_api_generated.go` に生成します。生成するのは `list-keys`、`read-key`、`update-key`、`delete-key`、`rotate-key`、`schedule-key-destruction` のコマンドと、API interface、factory、Runtime です。`internal/cli/` の配線は `make generate-wiring` から生成し、設定との一致を `internal/cli/wiring_test.go` で確認します。
 
 次の操作は手書きで `internal/kmsapi/commands.go` に実装します。
 
-- `create`: PlainKey (BYOK の秘密鍵) を引数やインライン JSON で受け取らないため。秘密鍵は `--plain-key-file` (`@` ではなくパスまたは `-` で標準入力) から読み込みます。
-- `change-status`: 状態の選択値 (`active`、`restricted`、`suspended`) を CLI 側で検証するため。
-- `encrypt`: 平文を引数に含めないため。平文は `--plain-file` (パスまたは `-`) から読み込みます。
-- `decrypt`: 暗号文を引数に含めず、復号結果をバイト列のまま標準出力へ出力するため。
+- `create-key`: PlainKey (BYOK の秘密鍵) を引数やインライン JSON で受け取らないため。秘密鍵は `--plain-key-file` (`@` ではなくパスまたは `-` で標準入力) から読み込みます。
+- `change-key-status`: 状態の選択値 (`active`、`restricted`、`suspended`) を CLI 側で検証するため。
+- `encrypt-data-with-key`: 平文を引数に含めないため。平文は `--plain-file` (パスまたは `-`) から読み込みます。
+- `decrypt-data-with-key`: 暗号文を引数に含めず、復号結果をバイト列のまま標準出力へ出力するため。
 
 手書き操作でも API interface、factory、Runtime、`Commands` 型のフィールドは生成コードと共有します。型名全体の衝突は `internal/apigen` の設定検証で拒否します。
 
@@ -30,11 +30,11 @@ API エンドポイントは `https://secure.sakura.ad.jp/cloud/zone/{ゾーン�
 ## 入力と秘密情報
 
 - キーの作成は `--name` (必須)、`--description`、`--plain-key-file` の個別フラグか、`--request` JSON を `@path.json` または `-`（標準入力）で受け付けます。両経路は併用できません。
-- PlainKey を含む可能性があるため、`create --request` はインライン JSON を受け付けません。`@path.json` または `-` だけを許可し、インライン指定はエラーにします。
+- PlainKey を含む可能性があるため、`create-key --request` はインライン JSON を受け付けません。`@path.json` または `-` だけを許可し、インライン指定はエラーにします。
 - `--plain-key-file` は 256 bit の対称鍵を base64 エンコードした内容のファイルを想定します。前後の空白は正規化してから API へ送ります。
 - キーの更新は `--name` (必須) と `--description` の個別フラグか、`--request` JSON (`@path.json` または `-`) を受け付けます。API の更新リクエストは `Name` が必須で、`Description` は指定した場合だけ本文に含まれ、`Tags` は常に本文に含まれます。個別フラグのみでの更新ではタグをクリアしないよう、`Tags` を指定しない個別フラグ経路は SDK の入力モデルで null (タグのクリア) として送信します。タグを設定・維持する場合は `--request` JSON で `Tags` を指定します。
-- `encrypt` は平文を `--plain-file` (パスまたは `-`) から読み込み、API 向けに base64 エンコードして送ります。アルゴリズムは `--algo` で `aes-256-gcm` (既定)、`aes-256-cbc`、`aes-256-kw` から選択し、CLI 側で検証します。
-- `decrypt` は暗号文を `--cipher-file` (パスまたは `-`) から読み込みます。`encrypt` の JSON 出力をリダイレクトしたファイル (引用符付き) もそのまま使えます。復号結果はバイト列のまま標準出力へ出力し、`--query` は適用しません。
+- `encrypt-data-with-key` は平文を `--plain-file` (パスまたは `-`) から読み込み、API 向けに base64 エンコードして送ります。アルゴリズムは `--algo` で `aes-256-gcm` (既定)、`aes-256-cbc`、`aes-256-kw` から選択し、CLI 側で検証します。
+- `decrypt-data-with-key` は暗号文を `--cipher-file` (パスまたは `-`) から読み込みます。`encrypt-data-with-key` の JSON 出力をリダイレクトしたファイル (引用符付き) もそのまま使えます。復号結果はバイト列のまま標準出力へ出力し、`--query` は適用しません。
 
 API キーを使う場合は、対象キーへの操作権限を付与します（[KMS API](https://manual.sakura.ad.jp/api/cloud/security-encryption/#tag/kms-key)）。CLI の認証情報は SDK プロファイルまたは既存の SDK 認証機構から読み込みます。
 
@@ -42,7 +42,7 @@ API キーを使う場合は、対象キーへの操作権限を付与します�
 
 ## 出力
 
-KMS API の応答フィールドは PascalCase (`ID`、`Name`、`Status`、`KeyOrigin` など) です。`list`、`read`、`create`、`update`、`rotate` の出力は JSON で、`--query` による加工に対応します。`change-status`、`encrypt` は文字列、`schedule-destruction` はステータスと削除予定日時の JSON です。`decrypt` のみ復号結果をバイト列のまま出力します。
+KMS API の応答フィールドは PascalCase (`ID`、`Name`、`Status`、`KeyOrigin` など) です。`list-keys`、`read-key`、`create-key`、`update-key`、`rotate-key` の出力は JSON で、`--query` による加工に対応します。`change-key-status`、`encrypt-data-with-key` は文字列、`schedule-key-destruction` はステータスと削除予定日時の JSON です。`decrypt-data-with-key` のみ復号結果をバイト列のまま出力します。
 
 ## ライブ E2E と後片付け
 

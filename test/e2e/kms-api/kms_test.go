@@ -42,7 +42,7 @@ func createKmsKey(t *testing.T, h *helper.Helper, name, description string) kmsK
 	t.Helper()
 
 	data := h.Call(t, "KMS キーを作成する",
-		"kms-api", "key", "create",
+		"kms-api", "create-key",
 		"--name", name, "--description", description,
 		"--query", "{ID,Name,Status,KeyOrigin,ServiceClass,LatestVersion}",
 	)
@@ -56,7 +56,7 @@ func createKmsKeyWithPlainKeyFile(t *testing.T, h *helper.Helper, name, plainKey
 	t.Helper()
 
 	data := h.Call(t, "BYOK モードの KMS キーを作成する",
-		"kms-api", "key", "create",
+		"kms-api", "create-key",
 		"--name", name, "--plain-key-file", plainKeyFile,
 		"--query", "{ID,Name,Status,KeyOrigin,ServiceClass,LatestVersion}",
 	)
@@ -70,7 +70,7 @@ func readKmsKey(t *testing.T, h *helper.Helper, id string) kmsKeyItem {
 	t.Helper()
 
 	data := h.Call(t, "KMS キーを参照する",
-		"kms-api", "key", "read", id,
+		"kms-api", "read-key", id,
 		"--query", "{ID,Name,Status,KeyOrigin,ServiceClass,LatestVersion}",
 	)
 	var item kmsKeyItem
@@ -83,7 +83,7 @@ func listKmsKeys(t *testing.T, h *helper.Helper, description string) []kmsKeyIte
 	t.Helper()
 
 	data := h.Call(t, description,
-		"kms-api", "key", "list",
+		"kms-api", "list-keys",
 		"--query", "map({ID,Name,Status,KeyOrigin,ServiceClass,LatestVersion})",
 	)
 	var items []kmsKeyItem
@@ -96,7 +96,7 @@ func updateKmsKey(t *testing.T, h *helper.Helper, id, name, description string) 
 	t.Helper()
 
 	data := h.Call(t, "KMS キーの名前と説明を更新する",
-		"kms-api", "key", "update", id,
+		"kms-api", "update-key", id,
 		"--name", name, "--description", description,
 		"--query", "{ID,Name,Status,KeyOrigin,ServiceClass,LatestVersion}",
 	)
@@ -110,7 +110,7 @@ func rotateKmsKey(t *testing.T, h *helper.Helper, id string) kmsKeyItem {
 	t.Helper()
 
 	data := h.Call(t, "KMS キーをローテーションする",
-		"kms-api", "key", "rotate", id,
+		"kms-api", "rotate-key", id,
 		"--query", "{ID,Name,Status,KeyOrigin,ServiceClass,LatestVersion}",
 	)
 	var item kmsKeyItem
@@ -123,7 +123,7 @@ func changeKmsKeyStatus(t *testing.T, h *helper.Helper, id, status string) strin
 	t.Helper()
 
 	data := h.Call(t, "KMS キーの状態を変更する",
-		"kms-api", "key", "change-status", id, "--status", status,
+		"kms-api", "change-key-status", id, "--status", status,
 	)
 	var changed string
 	require.NoError(t, json.Unmarshal(data, &changed), "decode kms-api key change-status response")
@@ -135,7 +135,7 @@ func scheduleKmsKeyDestruction(t *testing.T, h *helper.Helper, id string, pendin
 	t.Helper()
 
 	data := h.Call(t, "KMS キーの削除を予約する",
-		"kms-api", "key", "schedule-destruction", id,
+		"kms-api", "schedule-key-destruction", id,
 		"--pending-days", "7",
 	)
 	var scheduled struct {
@@ -151,7 +151,7 @@ func encryptKmsKey(t *testing.T, h *helper.Helper, id, plainFile string) string 
 	t.Helper()
 
 	data := h.Call(t, "KMS キーで平文を暗号化する",
-		"kms-api", "key", "encrypt", id, "--plain-file", plainFile,
+		"kms-api", "encrypt-data-with-key", id, "--plain-file", plainFile,
 	)
 	var cipher string
 	require.NoError(t, json.Unmarshal(data, &cipher), "decode kms-api key encrypt response")
@@ -163,7 +163,7 @@ func decryptKmsKey(t *testing.T, h *helper.Helper, id, cipherFile string) string
 	t.Helper()
 
 	data := h.Call(t, "KMS キーで暗号文を復号する",
-		"kms-api", "key", "decrypt", id, "--cipher-file", cipherFile,
+		"kms-api", "decrypt-data-with-key", id, "--cipher-file", cipherFile,
 	)
 	return string(data)
 }
@@ -172,7 +172,7 @@ func decryptKmsKey(t *testing.T, h *helper.Helper, id, cipherFile string) string
 func deleteKmsKey(t *testing.T, h *helper.Helper, id string) {
 	t.Helper()
 
-	h.Call(t, "KMS キーを削除する", "kms-api", "key", "delete", id)
+	h.Call(t, "KMS キーを削除する", "kms-api", "delete-key", id)
 }
 
 // writePlainFile は暗号化する平文を一時ファイルに書き込みます。

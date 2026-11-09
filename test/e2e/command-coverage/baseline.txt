@@ -255,16 +255,16 @@ iam-api user-2fa delete-trusted-device live
 iam-api user-2fa list-security-keys live
 iam-api user-2fa list-trusted-devices live
 iam-api user-2fa read-security-key live
-kms-api key change-status live
-kms-api key create live
-kms-api key decrypt live
-kms-api key delete live
-kms-api key encrypt live
-kms-api key list live
-kms-api key read live
-kms-api key rotate live
-kms-api key schedule-destruction live
-kms-api key update live
+kms-api change-key-status implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api create-key implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api decrypt-data-with-key implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api delete-key implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api encrypt-data-with-key implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api list-keys implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api read-key implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api rotate-key implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api schedule-key-destruction implemented #210 operationId 派生名への移行後にライブ再実行する
+kms-api update-key implemented #210 operationId 派生名への移行後にライブ再実行する
 networking-suite-api address list live
 networking-suite-api address read live
 networking-suite-api interface-connection create live

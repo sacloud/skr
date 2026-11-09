@@ -35,38 +35,38 @@ func TestRunKmsAPIHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"kms-api", "--help"},
-			want: []string{"key", "FIPS 140-3", "AES-256", "削除予約制", "manual.sakura.ad.jp/cloud/appliance/kms/index.html"},
+			want: []string{
+				"list-keys", "read-key", "create-key", "update-key", "delete-key", "rotate-key",
+				"change-key-status", "schedule-key-destruction", "encrypt-data-with-key", "decrypt-data-with-key",
+				"FIPS 140-3", "AES-256", "削除予約制", "manual.sakura.ad.jp/cloud/appliance/kms/index.html",
+			},
 		},
 		{
-			args: []string{"kms-api", "key", "--help"},
-			want: []string{"list", "read", "create", "update", "delete", "rotate", "change-status", "schedule-destruction", "encrypt", "decrypt"},
-		},
-		{
-			args: []string{"kms-api", "key", "create", "--help"},
+			args: []string{"kms-api", "create-key", "--help"},
 			want: []string{"--name", "--description", "--plain-key-file", "--request", "@path.json", "標準入力", "認証情報"},
 		},
 		{
-			args: []string{"kms-api", "key", "update", "--help"},
+			args: []string{"kms-api", "update-key", "--help"},
 			want: []string{"--name", "--description", "--request", "@path.json", "個別フラグと併用できません"},
 		},
 		{
-			args: []string{"kms-api", "key", "list", "--help"},
+			args: []string{"kms-api", "list-keys", "--help"},
 			want: []string{"--count", "--from"},
 		},
 		{
-			args: []string{"kms-api", "key", "change-status", "--help"},
+			args: []string{"kms-api", "change-key-status", "--help"},
 			want: []string{"--status", "active", "restricted", "suspended"},
 		},
 		{
-			args: []string{"kms-api", "key", "schedule-destruction", "--help"},
+			args: []string{"kms-api", "schedule-key-destruction", "--help"},
 			want: []string{"--pending-days", "7〜90"},
 		},
 		{
-			args: []string{"kms-api", "key", "encrypt", "--help"},
+			args: []string{"kms-api", "encrypt-data-with-key", "--help"},
 			want: []string{"--plain-file", "--algo", "aes-256-gcm", "aes-256-cbc", "aes-256-kw"},
 		},
 		{
-			args: []string{"kms-api", "key", "decrypt", "--help"},
+			args: []string{"kms-api", "decrypt-data-with-key", "--help"},
 			want: []string{"--cipher-file", "base64"},
 		},
 	} {
@@ -83,7 +83,7 @@ func TestRunKmsAPIHelp(t *testing.T) {
 
 func TestRunKmsAPIRejectsInlineSensitiveCreateRequest(t *testing.T) {
 	const material = "test-only-kms-imported-material"
-	args := []string{"kms-api", "key", "create", "--request",
+	args := []string{"kms-api", "create-key", "--request",
 		`{"Name":"my-key","PlainKey":"` + material + `"}`}
 	var stdout, stderr bytes.Buffer
 	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
@@ -93,26 +93,26 @@ func TestRunKmsAPIRejectsInlineSensitiveCreateRequest(t *testing.T) {
 
 func TestRunKmsAPIRejectsMissingName(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"kms-api", "key", "create"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"kms-api", "create-key"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "--name が必要です", "error = %q", stderr.String())
 }
 
 func TestRunKmsAPIRejectsInvalidChangeStatus(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"kms-api", "key", "change-status", "123456789012", "--status", "invalid"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"kms-api", "change-key-status", "123456789012", "--status", "invalid"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "active、restricted、suspended", "error = %q", stderr.String())
 }
 
 func TestRunKmsAPIRejectsInvalidAlgo(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"kms-api", "key", "encrypt", "123456789012", "--plain-file", "plain.txt", "--algo", "invalid"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"kms-api", "encrypt-data-with-key", "123456789012", "--plain-file", "plain.txt", "--algo", "invalid"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "aes-256-gcm", "error = %q", stderr.String())
 }
 
 func TestRunKmsAPIRejectsMissingPlainFile(t *testing.T) {
 	// --plain-file にはファイルまたは標準入力を指定するため、存在しないパスは読み込みエラーになる
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"kms-api", "key", "encrypt", "123456789012", "--plain-file", "missing-plain.txt"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"kms-api", "encrypt-data-with-key", "123456789012", "--plain-file", "missing-plain.txt"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "read secret file", "error = %q", stderr.String())
 }
 
@@ -140,7 +140,7 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 		KeyOrigin    string `json:"KeyOrigin"`
 		ServiceClass string `json:"ServiceClass"`
 	}
-	err := json.Unmarshal(runCommand("kms-api", "key", "create", "--name", "mock-kms", "--description", "test key"), &created)
+	err := json.Unmarshal(runCommand("kms-api", "create-key", "--name", "mock-kms", "--description", "test key"), &created)
 	require.NoError(t, err)
 	require.NotEmpty(t, created.ID, "created key = %+v", created)
 	require.Equal(t, "mock-kms", created.Name, "unexpected value")
@@ -149,7 +149,7 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 	require.Equal(t, "cloud/kms/key", created.ServiceClass, "unexpected value")
 	keyID := created.ID
 
-	createdData := runCommand("kms-api", "key", "read", keyID)
+	createdData := runCommand("kms-api", "read-key", keyID)
 	var readKey struct {
 		ID          string   `json:"ID"`
 		Name        string   `json:"Name"`
@@ -168,36 +168,36 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 		ID        string `json:"ID"`
 		KeyOrigin string `json:"KeyOrigin"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "create", "--name", "mock-kms-byok", "--plain-key-file", plainKeyFile), &imported))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "create-key", "--name", "mock-kms-byok", "--plain-key-file", plainKeyFile), &imported))
 	require.NotEmpty(t, imported.ID, "imported key = %+v", imported)
 	require.Equal(t, "imported", imported.KeyOrigin, "unexpected value")
 
 	var listed []struct {
 		ID string `json:"ID"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "list", "--count", "10", "--from", "0"), &listed))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "list-keys", "--count", "10", "--from", "0"), &listed))
 	require.NotEmpty(t, listed, "key list = %+v, want created keys", listed)
 
 	var updated struct {
 		ID   string `json:"ID"`
 		Name string `json:"Name"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "update", keyID, "--name", "mock-kms-renamed", "--description", "renamed"), &updated))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "update-key", keyID, "--name", "mock-kms-renamed", "--description", "renamed"), &updated))
 	require.Equal(t, "mock-kms-renamed", updated.Name, "unexpected value")
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "rotate", keyID), &updated))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "rotate-key", keyID), &updated))
 	require.Equal(t, keyID, updated.ID, "unexpected value")
 	var restricted string
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "change-status", keyID, "--status", "restricted"), &restricted))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "change-key-status", keyID, "--status", "restricted"), &restricted))
 	require.Equal(t, "restricted", restricted, "unexpected value")
 	var activated string
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "change-status", keyID, "--status", "active"), &activated))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "change-key-status", keyID, "--status", "active"), &activated))
 	require.Equal(t, "active", activated, "unexpected value")
 
 	// 暗号化・復号
 	plainFile := filepath.Join(dir, "plain.txt")
 	plain := "test-plain-text"
 	require.NoError(t, os.WriteFile(plainFile, []byte(plain), 0o600))
-	cipherJSON := runCommand("kms-api", "key", "encrypt", keyID, "--plain-file", plainFile)
+	cipherJSON := runCommand("kms-api", "encrypt-data-with-key", keyID, "--plain-file", plainFile)
 	var cipherText string
 	require.NoError(t, json.Unmarshal(cipherJSON, &cipherText))
 	require.NotEmpty(t, cipherText, "encrypt result = %q", string(cipherJSON))
@@ -205,7 +205,7 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 	cipherFile := filepath.Join(dir, "cipher.txt")
 	require.NoError(t, os.WriteFile(cipherFile, cipherJSON, 0o600))
 	var stdout, stderr bytes.Buffer
-	require.Equal(t, 0, run([]string{"kms-api", "key", "decrypt", keyID, "--cipher-file", cipherFile}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Equal(t, 0, run([]string{"kms-api", "decrypt-data-with-key", keyID, "--cipher-file", cipherFile}, &stdout, &stderr), "stderr: %s", stderr.String())
 	require.Equal(t, plain, stdout.String(), "decrypt result mismatch")
 
 	// 削除予約と取り消し
@@ -213,18 +213,18 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 		Status                 string `json:"Status"`
 		DeletionScheduledAfter string `json:"DeletionScheduledAfter"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "schedule-destruction", keyID, "--pending-days", "7"), &scheduled))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "schedule-key-destruction", keyID, "--pending-days", "7"), &scheduled))
 	require.Equal(t, "pending_destruction", scheduled.Status, "schedule-destruction result = %+v", scheduled)
 	require.NotEmpty(t, scheduled.DeletionScheduledAfter, "schedule-destruction result = %+v", scheduled)
 	var canceled string
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "change-status", keyID, "--status", "active"), &canceled))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "change-key-status", keyID, "--status", "active"), &canceled))
 	require.Equal(t, "active", canceled, "canceled destruction schedule = %+v", canceled)
 
-	runCommand("kms-api", "key", "delete", keyID)
-	runCommand("kms-api", "key", "delete", imported.ID)
+	runCommand("kms-api", "delete-key", keyID)
+	runCommand("kms-api", "delete-key", imported.ID)
 	var remaining []struct {
 		ID string `json:"ID"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "key", "list", "--query", `map(select(.ID == "`+keyID+`" or .ID == "`+imported.ID+`"))`), &remaining))
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "list-keys", "--query", `map(select(.ID == "`+keyID+`" or .ID == "`+imported.ID+`"))`), &remaining))
 	require.Len(t, remaining, 0, "deleted keys remain in list: %+v", remaining)
 }

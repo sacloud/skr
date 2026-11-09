@@ -28,7 +28,9 @@ import (
 )
 
 type Commands struct {
-	Key KeyCommands `cmd:"" help:"KMS キーを作成・管理します。キーはプロジェクト単位で最大 100 個まで作成でき、削除は猶予期間 7〜90 日の削除予約制です。"`
+	// Key は KMS キーの生成・手書きコマンド集合です。operationId 派生名への移行 (ADR 0074) に合わせ、
+	// key グループ階層を Kong の embed で展開して 1 階層のフラット構造にしています。
+	Key KeyCommands `embed:""`
 }
 
 // KeyCreateCommand は KMS キーの作成コマンドです。PlainKey (BYOK) を引数や
@@ -141,7 +143,7 @@ func (c *KeyEncryptCommand) Run(ctx *kong.Context) error {
 // 復号結果をバイト列のまま出力するため手書きで実装しています。
 type KeyDecryptCommand struct {
 	ID         string `arg:"" help:"復号に使う KMS キー ID。"`
-	CipherFile string `name:"cipher-file" required:"" help:"必須: encrypt が出力した暗号文 (base64 テキスト) のファイル。- の場合は標準入力から読み込みます。encrypt の JSON 出力をリダイレクトしたファイルもそのまま使えます。復号した平文はバイト列のまま標準出力に出力され、--query は適用されません。"`
+	CipherFile string `name:"cipher-file" required:"" help:"必須: encrypt-data-with-key が出力した暗号文 (base64 テキスト) のファイル。- の場合は標準入力から読み込みます。encrypt-data-with-key の JSON 出力をリダイレクトしたファイルもそのまま使えます。復号した平文はバイト列のまま標準出力に出力され、--query は適用されません。"`
 	factory    KeyAPIFactory
 	runtime    KeyRuntime
 }
@@ -266,7 +268,7 @@ func (r KeyRuntime) writeOutput(ctx *kong.Context, value any) error {
 	return r.WriteOutput(ctx, value)
 }
 
-// decodeCipherText は暗号文の入力を正規化します。encrypt の JSON 出力を
+// decodeCipherText は暗号文の入力を正規化します。encrypt-data-with-key の JSON 出力を
 // リダイレクトしたファイル (引用符付き) と、引用符のない base64 テキストの
 // 両方を受け付けます。
 func decodeCipherText(data []byte) (string, error) {
