@@ -17,9 +17,8 @@ package cli
 import (
 	"strings"
 	"testing"
-	"unicode"
-	"unicode/utf8"
 
+	"github.com/fatih/camelcase"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,58 +39,13 @@ var apiCommandNameTargetDomains = []string{
 	"simplemq-api",
 }
 
-// splitCamelWords は Kong がフィールド名からコマンド名を生成する際に使う
-// camelcase 分割と同じアルゴリズムで語列に分割します。
-// Kong の既定命名は分割した語をハイフンで結合して小文字化したものです。
-func splitCamelWords(src string) []string {
-	// 無効な UTF-8 は分割しない
-	if !utf8.ValidString(src) {
-		return []string{src}
-	}
-	var runes [][]rune
-	lastClass := 0
-	// 文字の種類 (小文字 / 大文字 / 数字 / それ以外) が変わる位置で分割する
-	for _, r := range src {
-		var class int
-		switch {
-		case unicode.IsLower(r):
-			class = 1
-		case unicode.IsUpper(r):
-			class = 2
-		case unicode.IsDigit(r):
-			class = 3
-		default:
-			class = 4
-		}
-		if class == lastClass {
-			runes[len(runes)-1] = append(runes[len(runes)-1], r)
-		} else {
-			runes = append(runes, []rune{r})
-		}
-		lastClass = class
-	}
-	// 大文字から小文字へ続く語の最後の大文字を次の語に移動する
-	// (例: "PDFL", "oader" -> "PDF", "Loader")
-	for i := 0; i < len(runes)-1; i++ {
-		if unicode.IsUpper(runes[i][0]) && unicode.IsLower(runes[i+1][0]) {
-			runes[i+1] = append([]rune{runes[i][len(runes[i])-1]}, runes[i+1]...)
-			runes[i] = runes[i][:len(runes[i])-1]
-		}
-	}
-	var entries []string
-	for _, s := range runes {
-		if len(s) > 0 {
-			entries = append(entries, string(s))
-		}
-	}
-	return entries
-}
-
 // deriveOperationCommandName は SDK の operation 定数の値 (operationId を
 // 正規化した operation 名) から末端サブコマンド名を派生します。
+// camelcase 分割は Kong に内蔵された実装 (fatih/camelcase のコピー、
+// Kong の camelcase.go 冒頭で由来を明記) と同じものを利用し、
 // 語列のハイフン結合と小文字化は Kong の既定命名と同じです。
 func deriveOperationCommandName(operationName string) string {
-	return strings.ToLower(strings.Join(splitCamelWords(operationName), "-"))
+	return strings.ToLower(strings.Join(camelcase.Split(operationName), "-"))
 }
 
 // TestDeriveOperationCommandName は operation 名から末端サブコマンド名を派生する処理を確認します。
