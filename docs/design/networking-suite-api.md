@@ -6,18 +6,20 @@
 
 ## コマンド対応範囲
 
+コマンド名は operationId から機械派生します ([ADR 0074](../adr/0074-api-command-name-structure.md))。公開する操作は次のとおりです。
+
 | リソース | 操作 |
 | --- | --- |
-| `subnet-group` | `list`, `read`, `create`, `update`, `delete` |
-| `subnet` | `list`, `read`, `create`, `update`, `delete` |
-| `interface-connection` | `create`, `delete` |
-| `address` | `list`, `read` |
+| サブネットグループ | `list-subnet-groups`, `read-subnet-group`, `create-subnet-group`, `update-subnet-group`, `delete-subnet-group` |
+| サブネット | `list-subnets`, `read-subnet`, `create-subnet`, `update-subnet`, `delete-subnet` |
+| インターフェース接続 | `create-interface-connection`, `delete-interface-connection` |
+| アドレス | `list-addresses`, `read-address` |
 
 コマンドは SDK の公開操作に対応します。SDK に公開されていないインターフェースコネクションの `read` や、別サブネット間の通信を CLI が仲介する操作はありません。
 
 ### SRN と入力
 
-リソース参照は位置引数の SRN で受け取り、API 呼び出し前にリソース種別を検証します。`subnet list` は親サブネットグループの SRN、`address list` はサブネットの SRN を位置引数にします。`interface-connection create` は NIC とサブネットの SRN をフラグで受け取ります。NIC SRN の位置識別子と ID の組み立て方は SDK v0.3.0 の CreateInterfaceConnection API ドキュメントに記載されています。
+リソース参照は位置引数の SRN で受け取り、API 呼び出し前にリソース種別を検証します。`list-subnets` は親サブネットグループの SRN、`list-addresses` はサブネットの SRN を位置引数にします。`create-interface-connection` は NIC とサブネットの SRN をフラグで受け取ります。NIC SRN の位置識別子と ID の組み立て方は SDK v0.3.0 の CreateInterfaceConnection API ドキュメントに記載されています。
 
 サブネットグループ／サブネットの Create は、名前、説明、CIDR、リージョンまたはゾーン、親グループ SRN をフラグで構成できます。Update の API 入力は `Name` と `Description` の値型フィールドであるため、フラグ経路では両方を必須にします。`--request` を指定する場合は個別フラグを併用せず、SDK のリクエスト JSON 全体を渡します。直接 JSON、`@path.json`、標準入力 `-` に対応します。
 
@@ -56,7 +58,9 @@ $ SKR_E2E=1 \
     go test ./test/e2e/networking-suite/ -run TestScenarioNetworkingSuite -v -timeout 60m
 ```
 
-この実行では Server と Disk を作成し、起動と別サブネット間の TCP 接続を確認してから削除します。利用料金が発生し、外部接続も行うため、環境変数による明示的な同意を必須にします。2026-10-28 に testing.T ベースのシナリオをライブ実行し、サブネットグループ・サブネット・インターフェース接続・IP アドレスの操作、別サブネット間の TCP 疏通、後片付けを確認しました。
+この実行では Server と Disk を作成し、起動と別サブネット間の TCP 接続を確認してから削除します。利用料金が発生し、外部接続も行うため、環境変数による明示的な同意を必須にします。2026-10-28 に testing.T ベースのシナリオをライブ実行し、サブネットグループ・サブネット・インターフェース接続・IP アドレスの操作、別サブネット間の TCP 疏通、後片付けを確認しました。2026-11-09 に operationId 派生名へ移行した 14 コマンドで再実行しました。
+
+再実行時に、アーカイブからのディスクコピーが進行中だと `iaas-api server create` 応答の `Disks` が空で返ることがありました。server create は CLI が実行したディスク作成の応答を応答の `Disks` に統合するため、ディスクの ID を常に作成応答から確定できます。応答にディスクが含まれない場合はシナリオを失敗させ、cleanup の自動削除を拒否して原因を確認します。
 
 ## 参照
 

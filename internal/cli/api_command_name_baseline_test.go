@@ -19,7 +19,6 @@ import (
 	apprunv1 "github.com/sacloud/sacloud-sdk-go/api/apprun/apis/v1"
 	eventbusv1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 	iamv1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
-	networkingsuitev1 "github.com/sacloud/sacloud-sdk-go/api/networking-suite/apis/v1"
 	objectstoragev1 "github.com/sacloud/sacloud-sdk-go/api/object-storage/apis/v2"
 	simplenotificationv1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 )
@@ -189,21 +188,6 @@ var apiCommandNameBaseline = map[string]string{
 	"iam-api user-2fa list-security-keys":        iamv1.ListSecurityKeysOperation,
 	"iam-api user-2fa list-trusted-devices":      iamv1.ListTrustedDevicesOperation,
 	"iam-api user-2fa read-security-key":         iamv1.ReadSecurityKeyOperation,
-	// networking-suite-api
-	"networking-suite-api address list":                networkingsuitev1.ListAddressesOperation,
-	"networking-suite-api address read":                networkingsuitev1.ReadAddressOperation,
-	"networking-suite-api interface-connection create": networkingsuitev1.CreateInterfaceConnectionOperation,
-	"networking-suite-api interface-connection delete": networkingsuitev1.DeleteInterfaceConnectionOperation,
-	"networking-suite-api subnet create":               networkingsuitev1.CreateSubnetOperation,
-	"networking-suite-api subnet delete":               networkingsuitev1.DeleteSubnetOperation,
-	"networking-suite-api subnet list":                 networkingsuitev1.ListSubnetsOperation,
-	"networking-suite-api subnet read":                 networkingsuitev1.ReadSubnetOperation,
-	"networking-suite-api subnet update":               networkingsuitev1.UpdateSubnetOperation,
-	"networking-suite-api subnet-group create":         networkingsuitev1.CreateSubnetGroupOperation,
-	"networking-suite-api subnet-group delete":         networkingsuitev1.DeleteSubnetGroupOperation,
-	"networking-suite-api subnet-group list":           networkingsuitev1.ListSubnetGroupsOperation,
-	"networking-suite-api subnet-group read":           networkingsuitev1.ReadSubnetGroupOperation,
-	"networking-suite-api subnet-group update":         networkingsuitev1.UpdateSubnetGroupOperation,
 	// object-storage-api
 	"object-storage-api account access-key create":    objectstoragev1.CreateAccountKeyOperation,
 	"object-storage-api account access-key delete":    objectstoragev1.DeleteAccountKeyOperation,

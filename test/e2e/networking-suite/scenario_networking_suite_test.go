@@ -84,7 +84,7 @@ func requireNoNameCollision(t *testing.T, h *helper.Helper, name string) {
 	t.Helper()
 
 	data, _, err := h.CallAllowingFailure(t, "同名のサブネットグループが存在しないことを確認する",
-		"networking-suite-api", "subnet-group", "list",
+		"networking-suite-api", "list-subnet-groups",
 		"--query", "map({SRN,Name,Description,IPv4AddressRangeCIDR,Region})",
 	)
 	require.NoError(t, err, "list subnet groups")
@@ -127,7 +127,7 @@ func createSubnetGroupAndSubnets(t *testing.T, h *helper.Helper, run *networking
 
 	// サブネットグループを作成する
 	data, _, err := h.CallAllowingFailure(t, "テスト用のサブネットグループを作成する",
-		"networking-suite-api", "subnet-group", "create",
+		"networking-suite-api", "create-subnet-group",
 		"--name", run.name, "--description", description,
 		"--ipv4-address-range-cidr", ipv4GroupCIDR, "--region", regionCode,
 	)
@@ -138,7 +138,7 @@ func createSubnetGroupAndSubnets(t *testing.T, h *helper.Helper, run *networking
 
 	// サブネットグループの名前を更新する。Update は Name と Description の両方が必須です
 	_, _, err = h.CallAllowingFailure(t, "サブネットグループの名前を更新する",
-		"networking-suite-api", "subnet-group", "update", run.group.SRN,
+		"networking-suite-api", "update-subnet-group", run.group.SRN,
 		"--name", updatedGroupName(run.name), "--description", description,
 	)
 	require.NoError(t, err, "update the subnet group")
@@ -156,7 +156,7 @@ func createSubnetGroupAndSubnets(t *testing.T, h *helper.Helper, run *networking
 		subnetName := fmt.Sprintf("%s-subnet-%d", run.name, i+1)
 		data, _, err := h.CallAllowingFailure(t,
 			fmt.Sprintf("テスト用のサブネット%dを作成する", i+1),
-			"networking-suite-api", "subnet", "create",
+			"networking-suite-api", "create-subnet",
 			"--name", subnetName, "--description", description,
 			"--ipv4-address-range-cidr", subnetCIDRs[i], "--zone", zone,
 			"--subnet-group-srn", run.group.SRN,
@@ -169,7 +169,7 @@ func createSubnetGroupAndSubnets(t *testing.T, h *helper.Helper, run *networking
 
 	// 1つ目のサブネットの名前を更新する
 	_, _, err = h.CallAllowingFailure(t, "1つ目のサブネットの名前を更新する",
-		"networking-suite-api", "subnet", "update", run.subnets[0].SRN,
+		"networking-suite-api", "update-subnet", run.subnets[0].SRN,
 		"--name", updatedSubnetName(run.name), "--description", description,
 	)
 	require.NoError(t, err, "update the subnet")
@@ -177,7 +177,7 @@ func createSubnetGroupAndSubnets(t *testing.T, h *helper.Helper, run *networking
 
 	// サブネット一覧を参照する
 	data, _, err = h.CallAllowingFailure(t, "サブネットグループのサブネット一覧を参照する",
-		"networking-suite-api", "subnet", "list", run.group.SRN,
+		"networking-suite-api", "list-subnets", run.group.SRN,
 		"--query", "map({SRN,Name,Description,IPv4AddressRangeCIDR,Zone,SubnetGroup})",
 	)
 	require.NoError(t, err, "list subnets")
@@ -220,6 +220,10 @@ func createServersAndConnections(t *testing.T, h *helper.Helper, servers *server
 		require.Equal(t, name, run.servers[i].Name,
 			"the create response should match the temporary name")
 		require.Equal(t, description, run.servers[i].Description)
+		// CLI はディスク作成の応答を server create の応答の Disks に統合するため、
+		// 作成したディスクの ID は作成応答から確定できます。応答にディスクが含まれない
+		// 場合は Disk ID を確定できず、cleanup の自動削除も拒否されるため、ここで
+		// 失敗させて原因を確認します
 		require.Len(t, run.servers[i].Disks, 1,
 			"the create response should identify its Disk")
 		require.False(t, run.servers[i].Disks[0].ID.IsEmpty(),
@@ -249,7 +253,7 @@ func createServersAndConnections(t *testing.T, h *helper.Helper, servers *server
 		nic, err := findInterface(run.servers[i], "disconnected")
 		require.NoError(t, err, "find the disconnected NIC")
 		data = h.Call(t, fmt.Sprintf("未接続 NIC をサブネット%dへ接続する", i+1),
-			"networking-suite-api", "interface-connection", "create",
+			"networking-suite-api", "create-interface-connection",
 			"--interface-srn", interfaceSRN(zone, nic.ID), "--subnet-srn", run.subnets[i].SRN,
 		)
 		require.NoError(t, json.Unmarshal(data, &run.connects[i]), "decode the interface connection")
@@ -267,7 +271,7 @@ func verifyAddresses(t *testing.T, h *helper.Helper, run *networkingRun) {
 
 	for i := 0; i < 2; i++ {
 		data := h.Call(t, fmt.Sprintf("サブネット%dに割り当てられた IP アドレスを検索する", i+1),
-			"networking-suite-api", "address", "list", run.subnets[i].SRN,
+			"networking-suite-api", "list-addresses", run.subnets[i].SRN,
 			"--interface-connection-srn", run.connects[i].SRN,
 			"--query", "map({SRN,IPAddress,Subnet})",
 		)
@@ -279,7 +283,7 @@ func verifyAddresses(t *testing.T, h *helper.Helper, run *networkingRun) {
 			"address list should return the interface connection address")
 
 		data = h.Call(t, "割り当てられた IP アドレスを参照する",
-			"networking-suite-api", "address", "read", addresses[0].SRN,
+			"networking-suite-api", "read-address", addresses[0].SRN,
 			"--query", "{SRN,IPAddress,Subnet}",
 		)
 		var address addressItem

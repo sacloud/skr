@@ -120,6 +120,7 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 		return nil, errors.Join(fmt.Errorf("サーバ %d のパケットフィルター設定に失敗しました: %w", server.ID, err), cleanupErr)
 	}
 	createdDisks := make([]types.ID, 0, len(request.Disks))
+	createdDiskResponses := make([]*iaas.Disk, 0, len(request.Disks))
 	for _, disk := range request.Disks {
 		diskParams := &iaas.DiskCreateRequest{
 			DiskPlanID:          disk.DiskPlanID,
@@ -137,6 +138,7 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 			return nil, errors.Join(fmt.Errorf("サーバ %d のディスク作成に失敗しました: %w", server.ID, err), cleanupErr)
 		}
 		createdDisks = append(createdDisks, createdDisk.ID)
+		createdDiskResponses = append(createdDiskResponses, createdDisk)
 	}
 	if request.BootAfterCreate {
 		waitCtx, cancel := context.WithTimeout(ctx, serverDiskReadyTimeout)
@@ -148,6 +150,25 @@ func (api *sdkAPI) CreateWithContext(ctx context.Context, request *CreateRequest
 		}
 		if err := api.op.Boot(ctx, request.Zone, server.ID); err != nil {
 			return nil, fmt.Errorf("サーバ %d は作成されましたが、起動に失敗しました: %w", server.ID, err)
+		}
+	}
+	// サーバ作成 API の応答にディスクが含まれないことがあります (アーカイブからの
+	// ディスクコピー進行中に Disks が空の応答を観測しています)。その場合は CLI が
+	// 実行したディスク作成の応答で補完し、作成したディスクの ID を応答から確定
+	// できるようにします。
+	if len(server.Disks) == 0 && len(createdDiskResponses) > 0 {
+		server.Disks = make([]*iaas.ServerConnectedDisk, 0, len(createdDiskResponses))
+		for _, disk := range createdDiskResponses {
+			server.Disks = append(server.Disks, &iaas.ServerConnectedDisk{
+				ID:                  disk.ID,
+				Name:                disk.Name,
+				Availability:        disk.Availability,
+				Connection:          disk.Connection,
+				ConnectionOrder:     disk.ConnectionOrder,
+				SizeMB:              disk.SizeMB,
+				DiskPlanID:          disk.DiskPlanID,
+				EncryptionAlgorithm: disk.EncryptionAlgorithm,
+			})
 		}
 	}
 	return server, nil

@@ -38,10 +38,13 @@ const (
 )
 
 type Commands struct {
-	SubnetGroup         SubnetGroupCommands         `cmd:"" name:"subnet-group" help:"リージョン内のネットワーク範囲を管理します。サブネットを作成する前に作成してください。"`
-	Subnet              SubnetCommands              `cmd:"" help:"サブネットグループ内のゾーン別ネットワークを管理します。"`
-	InterfaceConnection InterfaceConnectionCommands `cmd:"" name:"interface-connection" help:"サーバの NIC とサブネットの接続を管理します。"`
-	Address             AddressCommands             `cmd:"" help:"サブネットで使用中の IPv4 アドレスを参照します。"`
+	// operationId 派生名への移行 (ADR 0074) に合わせ、subnet-group / subnet /
+	// interface-connection / address のグループ階層を Kong の embed で展開して
+	// 1 階層のフラット構造にしています。
+	SubnetGroup         SubnetGroupCommands         `embed:""`
+	Subnet              SubnetCommands              `embed:""`
+	InterfaceConnection InterfaceConnectionCommands `embed:""`
+	Address             AddressCommands             `embed:""`
 }
 
 type Runtime struct {
@@ -166,11 +169,11 @@ func parseSRN(value, expectedResource string) (srn.SRN, error) {
 }
 
 type SubnetGroupCommands struct {
-	List   SubnetGroupListCommand   `cmd:"" help:"サブネットグループを一覧表示します。例: skr networking-suite-api subnet-group list"`
-	Read   SubnetGroupReadCommand   `cmd:"" help:"SRN を指定してサブネットグループを参照します。例: skr networking-suite-api subnet-group read SUBNET-GROUP-SRN"`
-	Create SubnetGroupCreateCommand `cmd:"" help:"リージョン単位のサブネットグループを作成します。例: skr networking-suite-api subnet-group create --name NAME --description DESCRIPTION --ipv4-address-range-cidr 10.0.0.0/16 --region is1"`
-	Update SubnetGroupUpdateCommand `cmd:"" help:"サブネットグループの名前と説明を更新します。両方の値を指定してください。例: skr networking-suite-api subnet-group update SUBNET-GROUP-SRN --name NAME --description DESCRIPTION"`
-	Delete SubnetGroupDeleteCommand `cmd:"" help:"サブネットグループを削除します。配下のサブネットを先に削除してください。例: skr networking-suite-api subnet-group delete SUBNET-GROUP-SRN"`
+	List   SubnetGroupListCommand   `cmd:"" name:"list-subnet-groups" help:"サブネットグループを一覧表示します。例: skr networking-suite-api list-subnet-groups"`
+	Read   SubnetGroupReadCommand   `cmd:"" name:"read-subnet-group" help:"SRN を指定してサブネットグループを参照します。例: skr networking-suite-api read-subnet-group SUBNET-GROUP-SRN"`
+	Create SubnetGroupCreateCommand `cmd:"" name:"create-subnet-group" help:"リージョン単位のサブネットグループを作成します。例: skr networking-suite-api create-subnet-group --name NAME --description DESCRIPTION --ipv4-address-range-cidr 10.0.0.0/16 --region is1"`
+	Update SubnetGroupUpdateCommand `cmd:"" name:"update-subnet-group" help:"サブネットグループの名前と説明を更新します。両方の値を指定してください。例: skr networking-suite-api update-subnet-group SUBNET-GROUP-SRN --name NAME --description DESCRIPTION"`
+	Delete SubnetGroupDeleteCommand `cmd:"" name:"delete-subnet-group" help:"サブネットグループを削除します。配下のサブネットを先に削除してください。例: skr networking-suite-api delete-subnet-group SUBNET-GROUP-SRN"`
 }
 
 func (c *SubnetGroupCommands) setRuntime(runtime Runtime) {
@@ -190,7 +193,7 @@ func (c *SubnetGroupListCommand) Run(ctx *kong.Context) error {
 }
 
 type SubnetGroupReadCommand struct {
-	SRN     string `arg:"" help:"参照するサブネットグループの SRN。list の出力に含まれます。"`
+	SRN     string `arg:"" help:"参照するサブネットグループの SRN。list-subnet-groups の出力に含まれます。"`
 	runtime Runtime
 }
 
@@ -282,11 +285,11 @@ func (c *SubnetGroupDeleteCommand) Run(_ *kong.Context) error {
 }
 
 type SubnetCommands struct {
-	List   SubnetListCommand   `cmd:"" help:"サブネットグループの SRN を指定してサブネットを一覧表示します。例: skr networking-suite-api subnet list SUBNET-GROUP-SRN"`
-	Read   SubnetReadCommand   `cmd:"" help:"SRN を指定してサブネットを参照します。例: skr networking-suite-api subnet read SUBNET-SRN"`
-	Create SubnetCreateCommand `cmd:"" help:"サブネットグループにゾーン別サブネットを作成します。例: skr networking-suite-api subnet create --name NAME --description DESCRIPTION --ipv4-address-range-cidr 10.0.1.0/24 --zone is1b --subnet-group-srn SUBNET-GROUP-SRN"`
-	Update SubnetUpdateCommand `cmd:"" help:"サブネットの名前と説明を更新します。両方の値を指定してください。例: skr networking-suite-api subnet update SUBNET-SRN --name NAME --description DESCRIPTION"`
-	Delete SubnetDeleteCommand `cmd:"" help:"サブネットを削除します。接続中の NIC がないことを確認してください。例: skr networking-suite-api subnet delete SUBNET-SRN"`
+	List   SubnetListCommand   `cmd:"" name:"list-subnets" help:"サブネットグループの SRN を指定してサブネットを一覧表示します。例: skr networking-suite-api list-subnets SUBNET-GROUP-SRN"`
+	Read   SubnetReadCommand   `cmd:"" name:"read-subnet" help:"SRN を指定してサブネットを参照します。例: skr networking-suite-api read-subnet SUBNET-SRN"`
+	Create SubnetCreateCommand `cmd:"" name:"create-subnet" help:"サブネットグループにゾーン別サブネットを作成します。例: skr networking-suite-api create-subnet --name NAME --description DESCRIPTION --ipv4-address-range-cidr 10.0.1.0/24 --zone is1b --subnet-group-srn SUBNET-GROUP-SRN"`
+	Update SubnetUpdateCommand `cmd:"" name:"update-subnet" help:"サブネットの名前と説明を更新します。両方の値を指定してください。例: skr networking-suite-api update-subnet SUBNET-SRN --name NAME --description DESCRIPTION"`
+	Delete SubnetDeleteCommand `cmd:"" name:"delete-subnet" help:"サブネットを削除します。接続中の NIC がないことを確認してください。例: skr networking-suite-api delete-subnet SUBNET-SRN"`
 }
 
 func (c *SubnetCommands) setRuntime(runtime Runtime) {
@@ -313,7 +316,7 @@ func (c *SubnetListCommand) Run(ctx *kong.Context) error {
 }
 
 type SubnetReadCommand struct {
-	SRN     string `arg:"" help:"参照するサブネットの SRN。list の出力に含まれます。"`
+	SRN     string `arg:"" help:"参照するサブネットの SRN。list-subnets SUBNET-GROUP-SRN の出力に含まれます。"`
 	runtime Runtime
 }
 
@@ -411,8 +414,8 @@ func (c *SubnetDeleteCommand) Run(_ *kong.Context) error {
 }
 
 type InterfaceConnectionCommands struct {
-	Create InterfaceConnectionCreateCommand `cmd:"" help:"指定したサーバ NIC をサブネットへ接続します。例: skr networking-suite-api interface-connection create --interface-srn INTERFACE-SRN --subnet-srn SUBNET-SRN"`
-	Delete InterfaceConnectionDeleteCommand `cmd:"" help:"NIC とサブネットの接続を解除します。サーバは停止状態にしてください。例: skr networking-suite-api interface-connection delete INTERFACE-CONNECTION-SRN"`
+	Create InterfaceConnectionCreateCommand `cmd:"" name:"create-interface-connection" help:"指定したサーバ NIC をサブネットへ接続します。例: skr networking-suite-api create-interface-connection --interface-srn INTERFACE-SRN --subnet-srn SUBNET-SRN"`
+	Delete InterfaceConnectionDeleteCommand `cmd:"" name:"delete-interface-connection" help:"NIC とサブネットの接続を解除します。サーバは停止状態にしてください。例: skr networking-suite-api delete-interface-connection INTERFACE-CONNECTION-SRN"`
 }
 
 func (c *InterfaceConnectionCommands) setRuntime(runtime Runtime) {
@@ -464,8 +467,8 @@ func (c *InterfaceConnectionDeleteCommand) Run(_ *kong.Context) error {
 }
 
 type AddressCommands struct {
-	List AddressListCommand `cmd:"" help:"サブネットに割り当てられた IPv4 アドレスを一覧表示します。例: skr networking-suite-api address list SUBNET-SRN"`
-	Read AddressReadCommand `cmd:"" help:"SRN を指定して IPv4 アドレスを参照します。例: skr networking-suite-api address read ADDRESS-SRN"`
+	List AddressListCommand `cmd:"" name:"list-addresses" help:"サブネットに割り当てられた IPv4 アドレスを一覧表示します。例: skr networking-suite-api list-addresses SUBNET-SRN"`
+	Read AddressReadCommand `cmd:"" name:"read-address" help:"SRN を指定して IPv4 アドレスを参照します。例: skr networking-suite-api read-address ADDRESS-SRN"`
 }
 
 func (c *AddressCommands) setRuntime(runtime Runtime) {
@@ -501,7 +504,7 @@ func (c *AddressListCommand) Run(ctx *kong.Context) error {
 }
 
 type AddressReadCommand struct {
-	SRN     string `arg:"" help:"参照するアドレスの SRN。list の出力に含まれます。"`
+	SRN     string `arg:"" help:"参照するアドレスの SRN。list-addresses SUBNET-SRN の出力に含まれます。"`
 	runtime Runtime
 }
 

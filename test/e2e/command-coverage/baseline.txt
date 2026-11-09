@@ -265,20 +265,20 @@ kms-api read-key live
 kms-api rotate-key live
 kms-api schedule-key-destruction live
 kms-api update-key live
-networking-suite-api address list live
-networking-suite-api address read live
-networking-suite-api interface-connection create live
-networking-suite-api interface-connection delete live
-networking-suite-api subnet create live
-networking-suite-api subnet delete live
-networking-suite-api subnet list live
-networking-suite-api subnet read live
-networking-suite-api subnet update live
-networking-suite-api subnet-group create live
-networking-suite-api subnet-group delete live
-networking-suite-api subnet-group list live
-networking-suite-api subnet-group read live
-networking-suite-api subnet-group update live
+networking-suite-api list-addresses live
+networking-suite-api read-address live
+networking-suite-api create-interface-connection live
+networking-suite-api delete-interface-connection live
+networking-suite-api create-subnet live
+networking-suite-api delete-subnet live
+networking-suite-api list-subnets live
+networking-suite-api read-subnet live
+networking-suite-api update-subnet live
+networking-suite-api create-subnet-group live
+networking-suite-api delete-subnet-group live
+networking-suite-api list-subnet-groups live
+networking-suite-api read-subnet-group live
+networking-suite-api update-subnet-group live
 object-storage-api account access-key create live
 object-storage-api account access-key delete live
 object-storage-api account access-key list live
