@@ -29,7 +29,7 @@ operationId から名前を機械派生する方式では、このような課�
 
 1. SDK (`sacloud-sdk-go` v0.5.0) の各ドメインには OpenAPI spec が同梱され、各操作に `operationId` が定義されています。spec の配置は `api/<domain>/openapi/` です。
 2. SDK は ogen が生成するコードで `operationId` を operation 名 (PascalCase) に正規化します。snake_case を含む `service-endpoint-gateway` の `seg_apply` は、この段階で `SegApply` に正規化されます。
-3. operation 名を Kong と同じ camelcase 処理で語に分割し、ハイフンで結合して小文字化します。これが末端サブコマンド名です。たとえば `rotateAPIKey` → `rotate-api-key`、`segStatus_getPowerStatus` → `seg-status-update-power-status`、`sendMessage` → `send-message` になります。
+3. operation 名を Kong と同じ camelcase 処理で語に分割し、ハイフンで結合して小文字化します。これが末端サブコマンド名です。たとえば `rotateAPIKey` → `rotate-api-key`、`segStatus_getPowerStatus` → `seg-status-get-power-status`、`sendMessage` → `send-message` になります。
 4. `security-control` は spec を SDK に同梱しておらず、ogen 生成コードの定数が機械的な根拠になります。
 
 命名の根拠は SDK の spec と ogen 生成コードです。
@@ -394,7 +394,7 @@ operationId 機械派生に移行する際、この 2 ドメインでは spec �
 
 1. コマンド構造の変更。生成対象は `api/commands/*.json` の定義を `skr <domain>-api <operation>` の形に変更します。手書き対象はコマンド識別子を operation 名の派生形に変更します。
 2. 再生成と追従。`make generate-api` と `make generate-wiring` で生成コードを更新し、手書きの実装とテストを追従させます。
-3. E2E シナリオ (`test/e2e/<domain>-api/`) のコマンド名を更新します。ライブ再実行は別途行い、結果を記録します。
+3. E2E シナリオ (`test/e2e/<domain>-api/`) のコマンド名を更新し、既存の E2E 網羅用 `test/e2e/command-coverage/baseline.txt` の旧パスを新パスへ置き換えます。各パスの実装状況とライブ検証状況を区別し、ライブ再実行は別途行って結果を記録します。
 4. ドキュメントの更新。`docs/design/<domain>-api.md` と `docs/manual/tutorials/<domain>-api.md` のコマンド名と CLI ↔ API 対応を更新します。
 5. CI baseline から当該ドメインのエントリを削除します。
 6. `make test`、`make lint-go`、`make lint-text` を実行します。

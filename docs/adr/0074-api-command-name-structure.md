@@ -31,7 +31,7 @@ skr の現行実装は前者に従い、[ADR 0005](0005-low-level-and-high-level
 ## Consequences
 
 - コマンド名と API 操作の対応が完全に機械的になり、CI が派生名との一致を検証できます。operationId に存在しない語や、operationId と別の動詞 (`config`、`link`) がコマンド名に入る余地がなくなります。
-- operationId を共有する操作は 1 つのコマンドに統合されるため、CLI コマンドの数が SDK 操作の数と一致します。
+- operationId を共有する操作は 1 つのコマンドに統合されるため、公開対象の各 operationId に対応する CLI コマンドは 1 つになります。
 - Ogen 系ドメインでは、リソースごとの操作一覧を `--help` の階層で示せなくなります。リソース名は操作名の語に含まれるため、ドメイン配下の一覧で操作と対象リソースを読み取れます。
 - usacloud の `server list` 型と語順が変わるため、usacloud から移行する利用者は操作感が変わります。
 - 既存の Ogen 系コマンドはすべて名前が変わります。usacloud との互換性を含め、互換性は保証しません ([ADR 0001](0001-new-cli-without-usacloud-compatibility.md))。
