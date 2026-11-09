@@ -79,7 +79,7 @@
     },
     {
       "name": "Create",
-      "help": "サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'",
+      "help": "サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。作成したディスクの情報を応答の Disks に出力します。API 応答にディスクが含まれない場合も、ディスク作成の応答で補完します。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'",
       "method": "CreateWithContext",
       "request_type": "CreateRequest",
       "response_type": "*iaas.Server",

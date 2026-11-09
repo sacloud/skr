@@ -122,6 +122,76 @@ func TestCreateWaitsForArchiveDiskBeforeBoot(t *testing.T) {
 	require.Equal(t, []string{"server-create", "disk-create", "disk-read", "disk-read", "server-boot"}, events)
 }
 
+func TestCreateCompletesResponseDisksWhenServerResponseOmitsThem(t *testing.T) {
+	// サーバ作成 API の応答にディスクが含まれない場合でも、CLI が実行した
+	// ディスク作成の応答で Disks を補完して、作成したディスクの ID を応答から
+	// 確定できるようにします
+	serverOp := &serverAPIFake{createResult: &iaas.Server{ID: 123}}
+	diskOp := &diskAPIFake{
+		createResult: &iaas.Disk{
+			ID:                  456,
+			Name:                "test-disk",
+			Availability:        types.Availabilities.Migrating,
+			Connection:          types.DiskConnections.VirtIO,
+			SizeMB:              20480,
+			DiskPlanID:          7,
+			EncryptionAlgorithm: types.DiskEncryptionAlgorithms.None,
+		},
+	}
+	sdk := &sdkAPI{op: serverOp, diskOp: diskOp}
+
+	result, err := sdk.CreateWithContext(context.Background(), &CreateRequest{
+		Zone:     "is1b",
+		Name:     "test-server",
+		CPU:      2,
+		MemoryGB: 4,
+		Disks: []DiskRequest{{
+			Name:       "test-disk",
+			DiskPlanID: 7,
+			SizeGB:     20,
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Disks, 1,
+		"the create result should include the disk created by the CLI")
+	require.EqualValues(t, 456, result.Disks[0].ID)
+	require.Equal(t, "test-disk", result.Disks[0].Name)
+	require.Equal(t, types.Availabilities.Migrating, result.Disks[0].Availability)
+	require.Equal(t, types.DiskConnections.VirtIO, result.Disks[0].Connection)
+	require.EqualValues(t, 20480, result.Disks[0].SizeMB)
+	require.EqualValues(t, 7, result.Disks[0].DiskPlanID)
+	require.Equal(t, types.DiskEncryptionAlgorithms.None, result.Disks[0].EncryptionAlgorithm)
+}
+
+func TestCreateKeepsServerResponseDisksWhenPresent(t *testing.T) {
+	// サーバ作成 API の応答にディスクが含まれる場合は API 応答をそのまま返します
+	serverOp := &serverAPIFake{createResult: &iaas.Server{ID: 123, Disks: []*iaas.ServerConnectedDisk{
+		{ID: 999, Name: "from-server-response"},
+	}}}
+	diskOp := &diskAPIFake{
+		createResult: &iaas.Disk{ID: 456, Name: "from-disk-create-response"},
+	}
+	sdk := &sdkAPI{op: serverOp, diskOp: diskOp}
+
+	result, err := sdk.CreateWithContext(context.Background(), &CreateRequest{
+		Zone:     "is1b",
+		Name:     "test-server",
+		CPU:      2,
+		MemoryGB: 4,
+		Disks: []DiskRequest{{
+			Name:       "test-disk",
+			DiskPlanID: 7,
+			SizeGB:     20,
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Disks, 1)
+	require.EqualValues(t, 999, result.Disks[0].ID)
+	require.Equal(t, "from-server-response", result.Disks[0].Name)
+}
+
 func TestCreateDoesNotBootWhenDiskCannotBecomeAvailable(t *testing.T) {
 	serverOp := &serverAPIFake{createResult: &iaas.Server{ID: 123}}
 	diskOp := &diskAPIFake{

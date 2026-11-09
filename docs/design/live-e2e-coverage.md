@@ -101,7 +101,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 
 ### タスク7: networking-suite-api
 
-2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行で operationId 派生名に変更したコマンドでシナリオを再実行しました。14 末端コマンドすべての正常応答と後片付けを再確認し、baseline を新名のまま `live` に維持しました。再実行時に `iaas-api server create` 応答の `Disks` が空で返るケースを確認したため、scenario は server read で取り直して接続ディスクの ID を確定するように堅牢化しました (詳細は [networking-suite-api](networking-suite-api.md))。
+2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行で operationId 派生名に変更したコマンドでシナリオを再実行しました。14 末端コマンドすべての正常応答と後片付けを再確認し、baseline を新名のまま `live` に維持しました。再実行時に `iaas-api server create` 応答の `Disks` が空で返るケースを確認したため、server create が CLI が実行したディスク作成の応答を応答の `Disks` に統合するように変更しました (詳細は [networking-suite-api](networking-suite-api.md))。
 
 ### 横断タスク
 

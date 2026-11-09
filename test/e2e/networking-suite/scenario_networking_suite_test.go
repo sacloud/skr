@@ -220,19 +220,10 @@ func createServersAndConnections(t *testing.T, h *helper.Helper, servers *server
 		require.Equal(t, name, run.servers[i].Name,
 			"the create response should match the temporary name")
 		require.Equal(t, description, run.servers[i].Description)
-		// アーカイブからのディスクコピーが進行中の場合、create 応答の Disks が空になることがあります。
-		// server read ではコピー中でも Disks が返るため、取り直して接続ディスクの ID を確定します
-		if len(run.servers[i].Disks) == 0 {
-			data = h.Call(t, "create 応答にディスクが含まれないため server read で取り直す",
-				"iaas-api", "server", "read", "--zone", zone, "--id", run.servers[i].ID.String(),
-				"--query", "{ID,Disks}",
-			)
-			var refreshed serverItem
-			require.NoError(t, json.Unmarshal(data, &refreshed), "decode the refreshed Server")
-			require.Equal(t, run.servers[i].ID, refreshed.ID,
-				"the refreshed Server should match the created Server")
-			run.servers[i].Disks = refreshed.Disks
-		}
+		// CLI はディスク作成の応答を server create の応答の Disks に統合するため、
+		// 作成したディスクの ID は作成応答から確定できます。応答にディスクが含まれない
+		// 場合は Disk ID を確定できず、cleanup の自動削除も拒否されるため、ここで
+		// 失敗させて原因を確認します
 		require.Len(t, run.servers[i].Disks, 1,
 			"the create response should identify its Disk")
 		require.False(t, run.servers[i].Disks[0].ID.IsEmpty(),

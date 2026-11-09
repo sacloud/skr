@@ -16,7 +16,7 @@ import (
 type Commands struct {
 	Find   FindCommand   "cmd:\"\" help:\"サーバを指定したゾーンで検索して出力します。例: skr iaas-api server find --zone tk1v\""
 	Read   ReadCommand   "cmd:\"\" help:\"サーバを読み取って出力します。例: skr iaas-api server read --zone ZONE --id 123456789012\""
-	Create CreateCommand "cmd:\"\" help:\"サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'\""
+	Create CreateCommand "cmd:\"\" help:\"サーバを作成して出力します。基本項目はフラグ、複雑な構成は --request JSON で指定します。ディスクと NIC は --disk と --nic を繰り返して指定できます。作成したディスクの情報を応答の Disks に出力します。API 応答にディスクが含まれない場合も、ディスク作成の応答で補完します。例: skr iaas-api server create --zone ZONE --name example --cpu 1 --memory-gb 1 --disk 'archive-id=ARCHIVE-ID,plan-id=DISK-PLAN-ID,size-gb=20' --nic 'upstream=shared'\""
 	Boot   BootCommand   "cmd:\"\" help:\"サーバを起動します。cloud-init の user-data は任意で、--user-data @path.yaml または --user-data - で指定します。例: skr iaas-api server boot --zone ZONE --id 123456789012\""
 	Update UpdateCommand "cmd:\"\" help:\"サーバの API 更新リクエストを送信して出力します。更新リクエストで省略した項目は現在値を維持します。CPU または MemoryGB の指定はプラン変更です。プラン変更後は新しいサーバ ID を確認してください。例: skr iaas-api server update --zone ZONE --id 123456789012 --name updated\""
 	Delete DeleteCommand "cmd:\"\" help:\"サーバを削除します。成功時は出力しません。ディスクも削除する場合は --with-disks を指定します。例: skr iaas-api server delete --zone ZONE --id 123456789012\""
