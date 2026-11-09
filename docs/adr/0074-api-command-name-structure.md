@@ -1,6 +1,6 @@
 # ADR 0074: API コマンド名を operationId から機械派生する
 
-- Status: Proposed
+- Status: Accepted (2026-11-09 に全対象ドメインの移行が完了)
 - Date: 2026-11-09
 
 ## Context

@@ -384,15 +384,15 @@ operationId 機械派生に移行する際、この 2 ドメインでは spec �
 
 ## 移行計画
 
-一括変更ではなく、ドメインごとに独立して完了する段階で進めます。各フェーズは個別にレビューとマージができ、完了するごとに CI の許容範囲を狭めます。
+一括変更ではなく、ドメインごとに独立して完了する段階で進めます。各フェーズは個別にレビューとマージができ、完了するごとに CI の許容範囲を狭めます。2026-11-09 に全ドメインの移行と baseline の廃止が完了しました。
 
-| フェーズ | 内容 |
-|---|---|
-| 0 | この計画の承認と、決定内容の ADR 化 |
-| 1 | CI 導入。全ドメインの現行コマンドを baseline に登録して許容し、新規コマンドは最初から機械派生を強制 |
-| 2 | pilot として `simplemq-api` (12 コマンド) を変更し、手順を確立 |
-| 3 以降 | 残りのドメインを変更 (`kms-api`、`secretmanager-api`、`security-control-api`、`service-endpoint-gateway-api`、`networking-suite-api`、`eventbus-api`、`apprun-api`、`simple-notification-api`、`object-storage-api`、`apprun-dedicated-api`、`iam-api`) |
-| 最終 | baseline の廃止と PLAN.md の更新 |
+| フェーズ | 内容 | 状況 |
+|---|---|---|
+| 0 | この計画の承認と、決定内容の ADR 化 | 完了 ([ADR 0074](../adr/0074-api-command-name-structure.md)) |
+| 1 | CI 導入。全ドメインの現行コマンドを baseline に登録して許容し、新規コマンドは最初から機械派生を強制 | 完了 |
+| 2 | pilot として `simplemq-api` (12 コマンド) を変更し、手順を確立 | 完了 |
+| 3 以降 | 残りのドメインを変更 (`kms-api`、`secretmanager-api`、`security-control-api`、`service-endpoint-gateway-api`、`networking-suite-api`、`eventbus-api`、`apprun-api`、`simple-notification-api`、`object-storage-api`、`apprun-dedicated-api`、`iam-api`) | 完了 |
+| 最終 | baseline の廃止と PLAN.md の更新 | 完了 |
 
 各ドメインのフェーズでは次の手順を踏みます。
 
@@ -400,25 +400,22 @@ operationId 機械派生に移行する際、この 2 ドメインでは spec �
 2. 再生成と追従。`make generate-api` と `make generate-wiring` で生成コードを更新し、手書きの実装とテストを追従させます。
 3. E2E シナリオ (`test/e2e/<domain>-api/`) のコマンド名を更新し、既存の E2E 網羅用 `test/e2e/command-coverage/baseline.txt` の旧パスを新パスへ置き換えます。各パスの実装状況とライブ検証状況を区別し、ライブ再実行は別途行って結果を記録します。
 4. ドキュメントの更新。`docs/design/<domain>-api.md` と `docs/manual/tutorials/<domain>-api.md` のコマンド名と CLI ↔ API 対応を更新します。
-5. CI baseline から当該ドメインのエントリを削除します。
+5. CI baseline (移行中は現行パスの許容表として運用) から当該ドメインのエントリを削除します。
 6. `make test`、`make lint-go`、`make lint-text` を実行します。
 
 ## CI 設計
 
-`internal/cli` にテストを追加し、次を検証します。
+`internal/cli` のテストで次を検証します。
 
 1. `LeafCommandPaths` で全末端サブコマンドを列挙します。
-2. 対象ドメインが公開する操作の operation 定数一覧を Go コードとして参照し、Kong と同じ camelcase 処理で期待パスを計算します。camelcase 分割は Kong に内蔵された実装 (fatih/camelcase のコピー、Kong の camelcase.go 冒頭で由来を明記) と同じライブラリを利用します。実際のコマンド名は Kong が決定するため、移行が完了したドメインの完全一致検証で Kong との不一致も自動的に検出します。SDK の更新で operation が改名・削除された場合はコンパイルエラーとして検出します。新規コマンドを追加するときは、対応する operation 定数を一覧に登録します。CLI に公開しない operation は一覧に登録しません。
-3. 移行が完了したドメインでは、末端パスの集合が期待パスの集合と一致することを検証します。この検証は該当ドメインの移行完了時に baseline のエントリ削除と合わせて追加します。
-4. 移行中のドメインは、各末端パスが期待パスと一致するか、baseline に登録された現行パスと一致することを検証します。baseline には現行パスと対応する operation 定数を登録します。
-5. 公開操作の一覧と CLI の整合は双方向に検証します。baseline に登録した operation 定数は公開操作の一覧に含まれること、そして一覧の各 operation は派生名のコマンドか baseline の現行パスとして CLI に存在することを確認します。これにより、一覧に operation を残したままコマンドの配線を削除した場合も検出します。
-6. 新規コマンドは baseline に登録せず、operation 定数を一覧に登録したうえで、期待パスに一致する必要があります。
+2. 対象ドメインが公開する操作の operation 定数一覧を Go コードとして参照し、Kong と同じ camelcase 処理で期待パスを計算します。camelcase 分割は Kong に内蔵された実装 (fatih/camelcase のコピー、Kong の camelcase.go 冒頭で由来を明記) と同じライブラリを利用します。実際のコマンド名は Kong が決定するため、期待パスとの不一致も自動的に検出します。SDK の更新で operation が改名・削除された場合はコンパイルエラーとして検出します。新規コマンドを追加するときは、対応する operation 定数を一覧に登録します。CLI に公開しない operation は一覧に登録しません。
+3. 対象ドメインごとに、末端パスの集合が期待パスの集合と一致することを検証します。余分なコマンドや未整備のコマンドも検出します。
 
-全ドメイン完了後に baseline の機構自体を削除します。生成されたコマンドと設定の一致は、既存の再生成フロー (`make generate-api` / `make generate-wiring` とその差分検証) が担保します。
+移行中に使っていた baseline (現行パスと operation 定数の対応表) は、移行完了に合わせて廃止しました。生成されたコマンドと設定の一致は、既存の再生成フロー (`make generate-api` / `make generate-wiring` とその差分検証) が担保します。
 
 ## 影響
 
-- 対象 12 ドメインの 276 コマンドはすべて名前が変わる破壊的変更です。CommonServiceItem 操作の統合で、コマンド数は 276 から 256 に減ります。既存のスクリプトやドキュメントは影響を受けます。
+- 対象 12 ドメインの 276 コマンドはすべて名前が変わる破壊的変更です。CommonServiceItem 操作の統合で、コマンド数は 276 から 256 に減ります。既存のスクリプトやドキュメントは影響を受けます。移行は 2026-11-09 に完了しました。
 - `eventbus-api` と `simple-notification-api` では、リソースごとに分かれていた操作が 1 組のコマンドに統合されます。リソースの種別は `--provider-class` で指定します。
 - リリース時にリリースノートで変更内容を告知します。
-- `docs/manual/tutorials/` 配下のチュートリアルは、各ドメインのフェーズで新しいコマンド名に更新します。
+- `docs/manual/tutorials/` 配下のチュートリアルは、各ドメインの移行時に新しいコマンド名へ更新済みです。
