@@ -14,17 +14,17 @@ import (
 )
 
 type ServicePrincipalCommands struct {
-	List       ServicePrincipalListCommand       "cmd:\"\" help:\"サービスプリンシパルを一覧表示します。\""
-	Create     ServicePrincipalCreateCommand     "cmd:\"\" help:\"サービスプリンシパルを作成します。\""
-	Read       ServicePrincipalReadCommand       "cmd:\"\" help:\"ID を指定してサービスプリンシパルを読み取ります。\""
-	Update     ServicePrincipalUpdateCommand     "cmd:\"\" help:\"サービスプリンシパルの名前と説明を更新します。名前と説明は必須です。\""
-	Delete     ServicePrincipalDeleteCommand     "cmd:\"\" help:\"ID を指定してサービスプリンシパルを削除します。\""
-	ListKeys   ServicePrincipalListKeysCommand   "cmd:\"\" help:\"サービスプリンシパルに登録されたキーを一覧表示します。\""
-	UploadKey  ServicePrincipalUploadKeyCommand  "cmd:\"\" help:\"サービスプリンシパルに PEM 形式の RSA 公開鍵（2048～4096 ビット）を登録します。公開鍵は --public-key-file で読み込みます。\""
-	EnableKey  ServicePrincipalEnableKeyCommand  "cmd:\"\" help:\"指定したサービスプリンシパルキーを有効化します。\""
-	DisableKey ServicePrincipalDisableKeyCommand "cmd:\"\" help:\"指定したサービスプリンシパルキーを無効化します。\""
-	DeleteKey  ServicePrincipalDeleteKeyCommand  "cmd:\"\" help:\"指定したサービスプリンシパルキーを削除します。\""
-	IssueToken ServicePrincipalIssueTokenCommand "cmd:\"\" help:\"登録済み公開鍵に対応する秘密鍵で署名した JWT アサーションからアクセストークンを発行します。アサーションは --assertion-file で読み込み、発行されたトークンは秘密情報として扱います。\""
+	List       ServicePrincipalListCommand       "cmd:\"\" name:\"list-service-principals\" help:\"サービスプリンシパルを一覧表示します。\""
+	Create     ServicePrincipalCreateCommand     "cmd:\"\" name:\"create-service-principal\" help:\"サービスプリンシパルを作成します。\""
+	Read       ServicePrincipalReadCommand       "cmd:\"\" name:\"read-service-principal\" help:\"ID を指定してサービスプリンシパルを読み取ります。\""
+	Update     ServicePrincipalUpdateCommand     "cmd:\"\" name:\"update-service-principal\" help:\"サービスプリンシパルの名前と説明を更新します。名前と説明は必須です。\""
+	Delete     ServicePrincipalDeleteCommand     "cmd:\"\" name:\"delete-service-principal\" help:\"ID を指定してサービスプリンシパルを削除します。\""
+	ListKeys   ServicePrincipalListKeysCommand   "cmd:\"\" name:\"list-service-principal-keys\" help:\"サービスプリンシパルに登録されたキーを一覧表示します。\""
+	UploadKey  ServicePrincipalUploadKeyCommand  "cmd:\"\" name:\"upload-service-principal-key\" help:\"サービスプリンシパルに PEM 形式の RSA 公開鍵（2048～4096 ビット）を登録します。公開鍵は --public-key-file で読み込みます。\""
+	EnableKey  ServicePrincipalEnableKeyCommand  "cmd:\"\" name:\"enable-service-principal-key\" help:\"指定したサービスプリンシパルキーを有効化します。\""
+	DisableKey ServicePrincipalDisableKeyCommand "cmd:\"\" name:\"disable-service-principal-key\" help:\"指定したサービスプリンシパルキーを無効化します。\""
+	DeleteKey  ServicePrincipalDeleteKeyCommand  "cmd:\"\" name:\"delete-service-principal-key\" help:\"指定したサービスプリンシパルキーを削除します。\""
+	IssueToken ServicePrincipalIssueTokenCommand "cmd:\"\" name:\"issue-service-principal-token\" help:\"登録済み公開鍵に対応する秘密鍵で署名した JWT アサーションからアクセストークンを発行します。アサーションは --assertion-file で読み込み、発行されたトークンは秘密情報として扱います。\""
 }
 
 type ServicePrincipalAPI interface {

@@ -158,93 +158,93 @@ iaas-api switch read live
 iaas-api switch update live
 iaas-api zone find live
 iaas-api zone read live
-iam-api auth read-auth-conditions live
-iam-api auth read-auth-context live
-iam-api auth read-password-policy live
-iam-api auth update-auth-conditions live
-iam-api auth update-password-policy live
-iam-api folder create live
-iam-api folder delete live
-iam-api folder list live
-iam-api folder move live
-iam-api folder read live
-iam-api folder update live
-iam-api group create live
-iam-api group delete live
-iam-api group list live
-iam-api group read live
-iam-api group read-memberships live
-iam-api group update live
-iam-api group update-memberships live
-iam-api iam-role list live
-iam-api iam-role read live
-iam-api id-policy read-organization live
-iam-api id-policy update-organization live
-iam-api id-role list live
-iam-api id-role read live
-iam-api organization read live
-iam-api organization read-service-policy live
-iam-api organization update live
-iam-api organization update-service-policy live
-iam-api policy read-folder live
-iam-api policy read-organization live
-iam-api policy read-project live
-iam-api policy update-folder live
-iam-api policy update-organization live
-iam-api policy update-project live
-iam-api project create live
-iam-api project delete live
-iam-api project list live
-iam-api project move live
-iam-api project read live
-iam-api project update live
-iam-api project-api-key create live
-iam-api project-api-key delete live
-iam-api project-api-key list live
-iam-api project-api-key read live
-iam-api project-api-key update live
-iam-api scim create live
-iam-api scim delete live
-iam-api scim list live
-iam-api scim read live
-iam-api scim regenerate-token live
-iam-api scim update live
-iam-api service-policy disable live
-iam-api service-policy enable live
-iam-api service-policy is-enabled live
-iam-api service-policy list-rule-templates live
-iam-api service-principal create live
-iam-api service-principal delete live
-iam-api service-principal delete-key live
-iam-api service-principal disable-key live
-iam-api service-principal enable-key live
-iam-api service-principal issue-token live
-iam-api service-principal list live
-iam-api service-principal list-keys live
-iam-api service-principal read live
-iam-api service-principal update live
-iam-api service-principal upload-key live
-iam-api sso create live
-iam-api sso delete live
-iam-api sso link deferred #144 全組織ユーザーのログイン方法に影響するため
-iam-api sso list live
-iam-api sso read live
-iam-api sso unlink deferred #144 全組織ユーザーのログイン方法に影響するため
-iam-api sso update live
-iam-api user create live
-iam-api user delete live
-iam-api user list live
-iam-api user read live
-iam-api user register-email live
-iam-api user unregister-email live
-iam-api user update live
-iam-api user-2fa clear-trusted-devices live
-iam-api user-2fa deactivate-otp live
-iam-api user-2fa delete-security-key live
-iam-api user-2fa delete-trusted-device live
-iam-api user-2fa list-security-keys live
-iam-api user-2fa list-trusted-devices live
-iam-api user-2fa read-security-key live
+iam-api read-organization-auth-conditions live
+iam-api read-auth-context live
+iam-api read-organization-password-policy live
+iam-api update-organization-auth-conditions live
+iam-api update-organization-password-policy live
+iam-api create-folder live
+iam-api delete-folder live
+iam-api list-folders live
+iam-api move-folders live
+iam-api read-folder live
+iam-api update-folder live
+iam-api create-group live
+iam-api delete-group live
+iam-api list-groups live
+iam-api read-group live
+iam-api list-memberships live
+iam-api update-group live
+iam-api update-memberships live
+iam-api list-iam-roles live
+iam-api read-iam-role live
+iam-api read-organization-id-policy live
+iam-api update-organization-id-policy live
+iam-api list-id-roles live
+iam-api read-id-role live
+iam-api read-organization live
+iam-api read-organization-service-policy live
+iam-api update-organization live
+iam-api update-organization-service-policy live
+iam-api read-folder-iam-policy live
+iam-api read-organization-iam-policy live
+iam-api read-project-iam-policy live
+iam-api update-folder-iam-policy live
+iam-api update-organization-iam-policy live
+iam-api update-project-iam-policy live
+iam-api create-project live
+iam-api delete-project live
+iam-api list-projects live
+iam-api move-projects live
+iam-api read-project live
+iam-api update-project live
+iam-api create-api-key live
+iam-api delete-api-key live
+iam-api list-api-keys live
+iam-api read-api-key live
+iam-api update-api-key live
+iam-api create-scim-configuration live
+iam-api delete-scim-configuration live
+iam-api list-scim-configurations live
+iam-api read-scim-configuration live
+iam-api regenerate-scim-configuration-token live
+iam-api update-scim-configuration live
+iam-api disable-service-policy live
+iam-api enable-service-policy live
+iam-api check-service-policy-status live
+iam-api list-service-policy-rule-templates live
+iam-api create-service-principal live
+iam-api delete-service-principal live
+iam-api delete-service-principal-key live
+iam-api disable-service-principal-key live
+iam-api enable-service-principal-key live
+iam-api issue-service-principal-token live
+iam-api list-service-principals live
+iam-api list-service-principal-keys live
+iam-api read-service-principal live
+iam-api update-service-principal live
+iam-api upload-service-principal-key live
+iam-api create-sso-profile live
+iam-api delete-sso-profile live
+iam-api assign-sso-profile live
+iam-api list-sso-profiles live
+iam-api read-sso-profile live
+iam-api unassign-sso-profile live
+iam-api update-sso-profile live
+iam-api create-user live
+iam-api delete-user live
+iam-api list-users live
+iam-api read-user live
+iam-api register-email live
+iam-api unregister-email live
+iam-api update-user live
+iam-api clear-trusted-devices live
+iam-api deactivate-otp live
+iam-api delete-security-key live
+iam-api delete-trusted-device live
+iam-api list-security-keys live
+iam-api list-trusted-devices live
+iam-api read-security-key live
 kms-api change-key-status live
 kms-api create-key live
 kms-api decrypt-data-with-key live

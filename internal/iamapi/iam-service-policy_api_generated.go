@@ -13,10 +13,10 @@ import (
 )
 
 type ServicePolicyCommands struct {
-	Enable            ServicePolicyEnableCommand            "cmd:\"\" help:\"サービス利用ポリシーを有効化します。サービス操作の制限に影響するため、実行前に設定内容を確認してください。\""
-	Disable           ServicePolicyDisableCommand           "cmd:\"\" help:\"サービス利用ポリシーを無効化します。サービス操作の制限に影響するため、実行前に設定内容を確認してください。\""
-	IsEnabled         ServicePolicyIsEnabledCommand         "cmd:\"\" help:\"サービス利用ポリシーが有効かどうかを確認します。\""
-	ListRuleTemplates ServicePolicyListRuleTemplatesCommand "cmd:\"\" help:\"サービス利用ポリシーのルールテンプレートを一覧表示します。\""
+	Enable            ServicePolicyEnableCommand            "cmd:\"\" name:\"enable-service-policy\" help:\"サービス利用ポリシーを有効化します。サービス操作の制限に影響するため、実行前に設定内容を確認してください。\""
+	Disable           ServicePolicyDisableCommand           "cmd:\"\" name:\"disable-service-policy\" help:\"サービス利用ポリシーを無効化します。サービス操作の制限に影響するため、実行前に設定内容を確認してください。\""
+	IsEnabled         ServicePolicyIsEnabledCommand         "cmd:\"\" name:\"check-service-policy-status\" help:\"サービス利用ポリシーが有効かどうかを確認します。\""
+	ListRuleTemplates ServicePolicyListRuleTemplatesCommand "cmd:\"\" name:\"list-service-policy-rule-templates\" help:\"サービス利用ポリシーのルールテンプレートを一覧表示します。\""
 }
 
 type ServicePolicyAPI interface {

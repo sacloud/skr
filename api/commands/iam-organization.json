@@ -11,14 +11,25 @@
       "name": "Read",
       "help": "IAM 組織の情報を参照します。",
       "method": "Read",
-      "response_type": "*v1.Organization"
+      "response_type": "*v1.Organization",
+      "command_name": "read-organization"
     },
     {
       "name": "Update",
       "help": "IAM 組織名を更新します。",
       "method": "Update",
       "response_type": "*v1.Organization",
-      "arguments": [{"name":"name","field":"Name","type":"string","help":"更新後の組織名。","flag":true,"required":true}]
+      "arguments": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "更新後の組織名。",
+          "flag": true,
+          "required": true
+        }
+      ],
+      "command_name": "update-organization"
     },
     {
       "name": "ReadServicePolicy",
@@ -30,21 +41,54 @@
       "request_help": "サービス利用ポリシーの絞り込み条件 JSON。省略すると既定の条件で取得します。直接指定するか @path.json で読み込みます。--request と個別フラグは併用できません。",
       "response_type": "[]v1.RuleResponse",
       "flags": [
-        {"name":"is-active","field":"IsActive","type":"bool","help":"任意: 有効状態で絞り込みます。","pointer":true},
-        {"name":"is-dry-run","field":"IsDryRun","type":"bool","help":"任意: ドライラン状態で絞り込みます。","pointer":true},
-        {"name":"name","field":"Name","type":"string","help":"任意: サービス名で絞り込みます。","pointer":true},
-        {"name":"code","field":"Code","type":"string","help":"任意: サービスコードで絞り込みます。","pointer":true},
-        {"name":"type","field":"Type","type":"string","help":"任意: サービスポリシーの型で絞り込みます。","pointer":true,"conversion":"v1.ReadOrganizationServicePolicyType"}
-      ]
+        {
+          "name": "is-active",
+          "field": "IsActive",
+          "type": "bool",
+          "help": "任意: 有効状態で絞り込みます。",
+          "pointer": true
+        },
+        {
+          "name": "is-dry-run",
+          "field": "IsDryRun",
+          "type": "bool",
+          "help": "任意: ドライラン状態で絞り込みます。",
+          "pointer": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: サービス名で絞り込みます。",
+          "pointer": true
+        },
+        {
+          "name": "code",
+          "field": "Code",
+          "type": "string",
+          "help": "任意: サービスコードで絞り込みます。",
+          "pointer": true
+        },
+        {
+          "name": "type",
+          "field": "Type",
+          "type": "string",
+          "help": "任意: サービスポリシーの型で絞り込みます。",
+          "pointer": true,
+          "conversion": "v1.ReadOrganizationServicePolicyType"
+        }
+      ],
+      "command_name": "read-organization-service-policy"
     },
     {
       "name": "UpdateServicePolicy",
-      "help": "組織のサービス利用ポリシー全体を更新します。設定はサービス操作に影響するため、変更前に read-service-policy で現在の設定を確認してください。",
+      "help": "組織のサービス利用ポリシー全体を更新します。設定はサービス操作に影響するため、変更前に read-organization-service-policy で現在の設定を確認してください。",
       "method": "UpdateServicePolicy",
       "request_type": "[]v1.Rule",
       "request_by_value": true,
       "request_help": "サービス利用ポリシーのルール全体を表す JSON 配列。直接指定するか @path.json で読み込みます。",
-      "response_type": "[]v1.RuleResponse"
+      "response_type": "[]v1.RuleResponse",
+      "command_name": "update-organization-service-policy"
     }
   ],
   "wiring_target": "IAMAPI.Organization",

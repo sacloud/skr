@@ -10,7 +10,8 @@
       "name": "ReadOrganization",
       "help": "組織の ID ポリシーを参照します。",
       "method": "ReadOrganizationIdPolicy",
-      "response_type": "[]v1.IdPolicy"
+      "response_type": "[]v1.IdPolicy",
+      "command_name": "read-organization-id-policy"
     },
     {
       "name": "UpdateOrganization",
@@ -19,7 +20,8 @@
       "request_type": "[]v1.IdPolicy",
       "request_by_value": true,
       "request_help": "組織の ID ポリシー全体を表す JSON 配列。直接指定するか @path.json で読み込みます。既存設定全体を置き換えるため、更新前に read-organization で確認してください。",
-      "response_type": "[]v1.IdPolicy"
+      "response_type": "[]v1.IdPolicy",
+      "command_name": "update-organization-id-policy"
     }
   ],
   "wiring_target": "IAMAPI.IDPolicy",

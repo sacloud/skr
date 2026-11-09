@@ -67,12 +67,12 @@ func TestScenarioIAMPolicy(t *testing.T) {
 // binding を確認してから元の binding に戻します。
 func updateFolderPolicy(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	original := readPolicyBindings(t, h, "folderのロール付与前のbindingを読み込む", "policy", "read-folder", run.folder.id)
+	original := readPolicyBindings(t, h, "folderのロール付与前のbindingを読み込む", "read-folder-iam-policy", run.folder.id)
 	updated := append(append([]policyBinding{}, original...), newPolicyBinding(run, folderPolicyRole))
-	updatePolicyBindings(t, h, "folderのbindingを更新してロールを付与する", "policy", "update-folder", run.folder.id, updated)
-	checkPolicyBindings(t, h, "更新後のfolderのbindingを確認する", "policy", "read-folder", run.folder.id, updated)
-	updatePolicyBindings(t, h, "folderのbindingを元に戻す", "policy", "update-folder", run.folder.id, original)
-	checkPolicyBindings(t, h, "復元後のfolderのbindingを確認する", "policy", "read-folder", run.folder.id, original)
+	updatePolicyBindings(t, h, "folderのbindingを更新してロールを付与する", "update-folder-iam-policy", run.folder.id, updated)
+	checkPolicyBindings(t, h, "更新後のfolderのbindingを確認する", "read-folder-iam-policy", run.folder.id, updated)
+	updatePolicyBindings(t, h, "folderのbindingを元に戻す", "update-folder-iam-policy", run.folder.id, original)
+	checkPolicyBindings(t, h, "復元後のfolderのbindingを確認する", "read-folder-iam-policy", run.folder.id, original)
 }
 
 // updateProjectPolicy は元の binding に加えて、この実行の principal に project ロールを付与し、
@@ -82,12 +82,12 @@ func updateFolderPolicy(t *testing.T, h *helper.Helper, run *iamRun) {
 // この実行自身のアクセスは維持されます。
 func updateProjectPolicy(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	original := readPolicyBindings(t, h, "projectのロール付与前のbindingを読み込む", "policy", "read-project", run.project.id)
+	original := readPolicyBindings(t, h, "projectのロール付与前のbindingを読み込む", "read-project-iam-policy", run.project.id)
 	updated := append(append([]policyBinding{}, original...), newPolicyBinding(run, projectPolicyRole))
-	updatePolicyBindings(t, h, "projectのbindingを更新してロールを付与する", "policy", "update-project", run.project.id, updated)
-	checkPolicyBindings(t, h, "更新後のprojectのbindingを確認する", "policy", "read-project", run.project.id, updated)
-	updatePolicyBindings(t, h, "projectのbindingを元に戻す", "policy", "update-project", run.project.id, original)
-	checkPolicyBindings(t, h, "復元後のprojectのbindingを確認する", "policy", "read-project", run.project.id, original)
+	updatePolicyBindings(t, h, "projectのbindingを更新してロールを付与する", "update-project-iam-policy", run.project.id, updated)
+	checkPolicyBindings(t, h, "更新後のprojectのbindingを確認する", "read-project-iam-policy", run.project.id, updated)
+	updatePolicyBindings(t, h, "projectのbindingを元に戻す", "update-project-iam-policy", run.project.id, original)
+	checkPolicyBindings(t, h, "復元後のprojectのbindingを確認する", "read-project-iam-policy", run.project.id, original)
 }
 
 func newPolicyBinding(run *iamRun, roleID string) policyBinding {
@@ -101,10 +101,10 @@ func newPolicyBinding(run *iamRun, roleID string) policyBinding {
 // 指定した JSON 配列のリクエストで置き換えます。
 // organization レベルの操作では resourceID を指定せず、
 // コマンド引数に空の位置引数を渡しません。
-func updatePolicyBindings(t *testing.T, h *helper.Helper, description, kind, subcommand, resourceID string, bindings []policyBinding) {
+func updatePolicyBindings(t *testing.T, h *helper.Helper, description, command, resourceID string, bindings []policyBinding) {
 	t.Helper()
 	request := mustSettingsJSON(bindings)
-	args := []string{"iam-api", kind, subcommand}
+	args := []string{"iam-api", command}
 	if resourceID != "" {
 		args = append(args, resourceID)
 	}
@@ -113,8 +113,8 @@ func updatePolicyBindings(t *testing.T, h *helper.Helper, description, kind, sub
 
 // checkPolicyBindings は binding を読み込み、
 // 期待されるリストと比較します。
-func checkPolicyBindings(t *testing.T, h *helper.Helper, description, kind, subcommand, resourceID string, expected []policyBinding) {
+func checkPolicyBindings(t *testing.T, h *helper.Helper, description, command, resourceID string, expected []policyBinding) {
 	t.Helper()
-	actual := readPolicyBindings(t, h, description, kind, subcommand, resourceID)
+	actual := readPolicyBindings(t, h, description, command, resourceID)
 	require.Equal(t, expected, actual, "%s: bindingが期待値と一致すること", description)
 }

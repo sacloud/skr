@@ -66,7 +66,7 @@ func decodeNamedResource(step string, data []byte) (id string, name string, err 
 // findManaged はリソース種別を一覧表示し、指定した name の項目を返します。
 func findManaged(t *testing.T, h *helper.Helper, description, kind, name string) (nameID, bool, error) {
 	t.Helper()
-	data, _, err := h.CallAllowingFailure(t, description, "iam-api", kind, "list", "--query", managedListQuery)
+	data, _, err := h.CallAllowingFailure(t, description, "iam-api", "list-"+kind+"s", "--query", managedListQuery)
 	if err != nil {
 		return nameID{}, false, fmt.Errorf("%s: %w", description, err)
 	}
@@ -119,7 +119,7 @@ func cleanupManagedResource(t *testing.T, h *helper.Helper, target *iamResource)
 		id = found.ID
 	}
 	data, _, err := h.CallAllowingFailure(t, "後片付けの前に"+target.kind+"の識別情報を確認する",
-		"iam-api", target.kind, "read", id, "--query", "{id: (.id | tostring), name: .name}")
+		"iam-api", "read-"+target.kind, id, "--query", "{id: (.id | tostring), name: .name}")
 	if err != nil {
 		return fmt.Errorf("cannot verify %s before cleanup: %w", target.kind, err)
 	}
@@ -132,11 +132,11 @@ func cleanupManagedResource(t *testing.T, h *helper.Helper, target *iamResource)
 	if currentID != id || (currentName != target.name && currentName != target.renamedTo) {
 		return fmt.Errorf("cleanup refused: %s %s does not match %q", target.kind, currentID, target.name)
 	}
-	if _, _, err := h.CallAllowingFailure(t, "後片付けとして"+target.kind+"を削除する", "iam-api", target.kind, "delete", id); err != nil {
+	if _, _, err := h.CallAllowingFailure(t, "後片付けとして"+target.kind+"を削除する", "iam-api", "delete-"+target.kind, id); err != nil {
 		return fmt.Errorf("delete E2E %s: %w", target.kind, err)
 	}
 	data, _, err = h.CallAllowingFailure(t, "後片付けの後に"+target.kind+"が残っていないことを確認する",
-		"iam-api", target.kind, "list", "--query", managedListQuery)
+		"iam-api", "list-"+target.kind+"s", "--query", managedListQuery)
 	if err != nil {
 		return fmt.Errorf("verify E2E %s deletion: %w", target.kind, err)
 	}

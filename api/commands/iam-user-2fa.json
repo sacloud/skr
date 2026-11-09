@@ -3,7 +3,13 @@
   "resource": "IAM user two-factor authentication",
   "command_prefix": "User2FA",
   "factory_arguments": [
-    {"name":"user-id","field":"UserID","type":"int","help":"対象ユーザー ID。操作対象を確認して指定してください。","required":true}
+    {
+      "name": "user-id",
+      "field": "UserID",
+      "type": "int",
+      "help": "対象ユーザー ID。操作対象を確認して指定してください。",
+      "required": true
+    }
   ],
   "imports": {
     "v1": "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
@@ -12,43 +18,71 @@
     {
       "name": "DeactivateOTP",
       "help": "指定したユーザーの OTP を無効化します。ログイン方法に影響するため、--user-id で対象を確認してください。",
-      "method": "DeactivateOTP"
+      "method": "DeactivateOTP",
+      "command_name": "deactivate-otp"
     },
     {
       "name": "ListTrustedDevices",
       "help": "指定したユーザーの信頼済みデバイスを一覧表示します。",
       "method": "ListTrustedDevices",
-      "response_type": "*v1.ListTrustedDevicesOK"
+      "response_type": "*v1.ListTrustedDevicesOK",
+      "command_name": "list-trusted-devices"
     },
     {
       "name": "DeleteTrustedDevice",
       "help": "指定したユーザーの信頼済みデバイスを削除します。",
       "method": "DeleteTrustedDevice",
-      "arguments": [{"name":"trusted-device-id","field":"TrustedDeviceID","type":"int","help":"削除する信頼済みデバイス ID。"}]
+      "arguments": [
+        {
+          "name": "trusted-device-id",
+          "field": "TrustedDeviceID",
+          "type": "int",
+          "help": "削除する信頼済みデバイス ID。"
+        }
+      ],
+      "command_name": "delete-trusted-device"
     },
     {
       "name": "ClearTrustedDevices",
       "help": "指定したユーザーの信頼済みデバイスをすべて削除します。--user-id で対象を確認してください。",
-      "method": "ClearTrustedDevices"
+      "method": "ClearTrustedDevices",
+      "command_name": "clear-trusted-devices"
     },
     {
       "name": "ListSecurityKeys",
       "help": "指定したユーザーのセキュリティキーを一覧表示します。",
       "method": "ListSecurityKeys",
-      "response_type": "*v1.ListSecurityKeysOK"
+      "response_type": "*v1.ListSecurityKeysOK",
+      "command_name": "list-security-keys"
     },
     {
       "name": "ReadSecurityKey",
       "help": "ID を指定してセキュリティキーを読み取ります。",
       "method": "ReadSecurityKey",
       "response_type": "*v1.UserSecurityKey",
-      "arguments": [{"name":"security-key-id","field":"SecurityKeyID","type":"int","help":"読み取るセキュリティキー ID。"}]
+      "arguments": [
+        {
+          "name": "security-key-id",
+          "field": "SecurityKeyID",
+          "type": "int",
+          "help": "読み取るセキュリティキー ID。"
+        }
+      ],
+      "command_name": "read-security-key"
     },
     {
       "name": "DeleteSecurityKey",
       "help": "指定したユーザーのセキュリティキーを削除します。",
       "method": "DeleteSecurityKey",
-      "arguments": [{"name":"security-key-id","field":"SecurityKeyID","type":"int","help":"削除するセキュリティキー ID。"}]
+      "arguments": [
+        {
+          "name": "security-key-id",
+          "field": "SecurityKeyID",
+          "type": "int",
+          "help": "削除するセキュリティキー ID。"
+        }
+      ],
+      "command_name": "delete-security-key"
     }
   ],
   "wiring_target": "IAMAPI.User2FA",

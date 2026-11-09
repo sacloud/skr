@@ -13,10 +13,10 @@ import (
 )
 
 type OrganizationCommands struct {
-	Read                OrganizationReadCommand                "cmd:\"\" help:\"IAM 組織の情報を参照します。\""
-	Update              OrganizationUpdateCommand              "cmd:\"\" help:\"IAM 組織名を更新します。\""
-	ReadServicePolicy   OrganizationReadServicePolicyCommand   "cmd:\"\" help:\"組織のサービス利用ポリシーを参照します。\""
-	UpdateServicePolicy OrganizationUpdateServicePolicyCommand "cmd:\"\" help:\"組織のサービス利用ポリシー全体を更新します。設定はサービス操作に影響するため、変更前に read-service-policy で現在の設定を確認してください。\""
+	Read                OrganizationReadCommand                "cmd:\"\" name:\"read-organization\" help:\"IAM 組織の情報を参照します。\""
+	Update              OrganizationUpdateCommand              "cmd:\"\" name:\"update-organization\" help:\"IAM 組織名を更新します。\""
+	ReadServicePolicy   OrganizationReadServicePolicyCommand   "cmd:\"\" name:\"read-organization-service-policy\" help:\"組織のサービス利用ポリシーを参照します。\""
+	UpdateServicePolicy OrganizationUpdateServicePolicyCommand "cmd:\"\" name:\"update-organization-service-policy\" help:\"組織のサービス利用ポリシー全体を更新します。設定はサービス操作に影響するため、変更前に read-organization-service-policy で現在の設定を確認してください。\""
 }
 
 type OrganizationAPI interface {

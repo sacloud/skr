@@ -13,11 +13,11 @@ import (
 )
 
 type ProjectAPIKeyCommands struct {
-	List   ProjectAPIKeyListCommand   "cmd:\"\" help:\"プロジェクト API キーを一覧表示します。\""
-	Create ProjectAPIKeyCreateCommand "cmd:\"\" help:\"プロジェクト API キーを作成します。レスポンスにアクセストークンとシークレットが含まれるため、出力を安全に保管してください。\""
-	Read   ProjectAPIKeyReadCommand   "cmd:\"\" help:\"ID を指定してプロジェクト API キーを読み取ります。\""
-	Update ProjectAPIKeyUpdateCommand "cmd:\"\" help:\"プロジェクト API キーを更新します。現在の設定を read で確認し、変更後の設定を JSON で指定してください。\""
-	Delete ProjectAPIKeyDeleteCommand "cmd:\"\" help:\"ID を指定してプロジェクト API キーを削除します。\""
+	List   ProjectAPIKeyListCommand   "cmd:\"\" name:\"list-api-keys\" help:\"プロジェクト API キーを一覧表示します。\""
+	Create ProjectAPIKeyCreateCommand "cmd:\"\" name:\"create-api-key\" help:\"プロジェクト API キーを作成します。レスポンスにアクセストークンとシークレットが含まれるため、出力を安全に保管してください。\""
+	Read   ProjectAPIKeyReadCommand   "cmd:\"\" name:\"read-api-key\" help:\"ID を指定してプロジェクト API キーを読み取ります。\""
+	Update ProjectAPIKeyUpdateCommand "cmd:\"\" name:\"update-api-key\" help:\"プロジェクト API キーを更新します。現在の設定を read-api-key で確認し、変更後の設定を JSON で指定してください。\""
+	Delete ProjectAPIKeyDeleteCommand "cmd:\"\" name:\"delete-api-key\" help:\"ID を指定してプロジェクト API キーを削除します。\""
 }
 
 type ProjectAPIKeyAPI interface {

@@ -75,7 +75,7 @@ func runProjectAPIKeyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	run.projectAPIKey.attempted = true
 	// リクエストは秘密情報を含まないため、テスト専用ディレクトリに書き込みます。
 	createFile := writeProjectAPIKeyRequest(t, run, "pak-create", run.projectAPIKey.name, true)
-	data := h.Call(t, "テスト用のproject API keyを作成する", "iam-api", "project-api-key", "create",
+	data := h.Call(t, "テスト用のproject API keyを作成する", "iam-api", "create-api-key",
 		"--request", "@"+createFile, "--query", "{id: .id, name: .name, iam_roles: .iam_roles}")
 	id, name, roles, err := decodeAPIKeyProjection("create-project-api-key", data)
 	require.NoError(t, err, "create-project-api-key: 応答のデコードに失敗しました")
@@ -83,7 +83,7 @@ func runProjectAPIKeyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	require.NoError(t, checkAPIKeyRoles(roles), "create-project-api-key: ロールが期待値と一致すること")
 	run.projectAPIKey.id = id
 
-	data = h.Call(t, "project API keyを読み込む", "iam-api", "project-api-key", "read", run.projectAPIKey.id,
+	data = h.Call(t, "project API keyを読み込む", "iam-api", "read-api-key", run.projectAPIKey.id,
 		"--query", "{id: .id, name: .name, iam_roles: .iam_roles}")
 	id, name, roles, err = decodeAPIKeyProjection("read-project-api-key", data)
 	require.NoError(t, err, "read-project-api-key: 応答のデコードに失敗しました")
@@ -91,7 +91,7 @@ func runProjectAPIKeyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	require.Equal(t, run.projectAPIKey.name, name, "read-project-api-key: 読み込んだキーの名前が一致すること")
 	require.NoError(t, checkAPIKeyRoles(roles), "read-project-api-key: ロールが期待値と一致すること")
 
-	data = h.Call(t, "project API keyの一覧を確認する", "iam-api", "project-api-key", "list", "--query", managedListQuery)
+	data = h.Call(t, "project API keyの一覧を確認する", "iam-api", "list-api-keys", "--query", managedListQuery)
 	found, err := checkManagedListed("list-project-api-keys", data, run.projectAPIKey.id, run.projectAPIKey.name)
 	require.NoError(t, err, "list-project-api-keys: 一覧のデコードに失敗しました")
 	require.True(t, found, "list-project-api-keys: キー %sが一覧に存在すること", run.projectAPIKey.id)
@@ -99,7 +99,7 @@ func runProjectAPIKeyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	renamed := run.projectAPIKey.name + "-renamed"
 	run.projectAPIKey.renamedTo = renamed
 	updateFile := writeProjectAPIKeyRequest(t, run, "pak-update", renamed, false)
-	data = h.Call(t, "project API keyの名前を更新する", "iam-api", "project-api-key", "update", run.projectAPIKey.id,
+	data = h.Call(t, "project API keyの名前を更新する", "iam-api", "update-api-key", run.projectAPIKey.id,
 		"--request", "@"+updateFile, "--query", "{id: .id, name: .name}")
 	_, name, _, err = decodeAPIKeyProjection("update-project-api-key", data)
 	require.NoError(t, err, "update-project-api-key: 応答のデコードに失敗しました")
@@ -107,7 +107,7 @@ func runProjectAPIKeyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	run.projectAPIKey.name = renamed
 	run.projectAPIKey.renamedTo = ""
 
-	h.Call(t, "project API keyを削除する", "iam-api", "project-api-key", "delete", run.projectAPIKey.id)
+	h.Call(t, "project API keyを削除する", "iam-api", "delete-api-key", run.projectAPIKey.id)
 	run.projectAPIKey.deleted = true
 }
 

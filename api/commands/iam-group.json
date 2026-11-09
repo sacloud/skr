@@ -14,7 +14,8 @@
       "request_type": "group.ListParams",
       "request_by_value": true,
       "response_type": "[]v1.Group",
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "list-groups"
     },
     {
       "name": "Create",
@@ -38,7 +39,8 @@
           "required": true,
           "help": "必須: グループの説明。空文字列も指定できます。"
         }
-      ]
+      ],
+      "command_name": "create-group"
     },
     {
       "name": "Read",
@@ -52,7 +54,8 @@
           "type": "int",
           "help": "list の出力にあるグループ ID。"
         }
-      ]
+      ],
+      "command_name": "read-group"
     },
     {
       "name": "Update",
@@ -82,7 +85,8 @@
           "required": true,
           "help": "必須: グループの説明。空文字列も指定できます。"
         }
-      ]
+      ],
+      "command_name": "update-group"
     },
     {
       "name": "Delete",
@@ -95,7 +99,8 @@
           "type": "int",
           "help": "削除するグループ ID。"
         }
-      ]
+      ],
+      "command_name": "delete-group"
     },
     {
       "name": "ReadMemberships",
@@ -109,11 +114,12 @@
           "type": "int",
           "help": "所属ユーザーを確認するグループ ID。"
         }
-      ]
+      ],
+      "command_name": "list-memberships"
     },
     {
       "name": "UpdateMemberships",
-      "help": "グループの所属ユーザーを置き換えます。現在の所属は保持されず、指定した配列で上書きされます。read-memberships で現在の所属を確認できます。",
+      "help": "グループの所属ユーザーを置き換えます。現在の所属は保持されず、指定した配列で上書きされます。list-memberships で現在の所属を確認できます。",
       "method": "UpdateMemberships",
       "request_type": "[]int",
       "request_by_value": true,
@@ -126,7 +132,8 @@
           "type": "int",
           "help": "所属ユーザーを更新するグループ ID。"
         }
-      ]
+      ],
+      "command_name": "update-memberships"
     }
   ],
   "wiring_target": "IAMAPI.Group",

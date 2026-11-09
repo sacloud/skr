@@ -14,7 +14,8 @@
       "request_type": "user.ListParams",
       "request_by_value": true,
       "response_type": "[]v1.User",
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "list-users"
     },
     {
       "name": "Create",
@@ -23,7 +24,8 @@
       "request_type": "user.CreateParams",
       "request_by_value": true,
       "response_type": "*v1.User",
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "create-user"
     },
     {
       "name": "Read",
@@ -37,7 +39,8 @@
           "type": "int",
           "help": "list の出力にあるユーザー ID。"
         }
-      ]
+      ],
+      "command_name": "read-user"
     },
     {
       "name": "Update",
@@ -54,7 +57,8 @@
           "help": "更新するユーザー ID。"
         }
       ],
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "update-user"
     },
     {
       "name": "Delete",
@@ -67,7 +71,8 @@
           "type": "int",
           "help": "削除するユーザー ID。"
         }
-      ]
+      ],
+      "command_name": "delete-user"
     },
     {
       "name": "RegisterEmail",
@@ -88,7 +93,8 @@
           "required": true,
           "help": "必須: 登録するメールアドレス。例: user@example.com"
         }
-      ]
+      ],
+      "command_name": "register-email"
     },
     {
       "name": "UnregisterEmail",
@@ -101,7 +107,8 @@
           "type": "int",
           "help": "メールアドレスの登録を解除するユーザー ID。"
         }
-      ]
+      ],
+      "command_name": "unregister-email"
     }
   ],
   "wiring_target": "IAMAPI.User",

@@ -13,13 +13,13 @@ import (
 )
 
 type SSOCommands struct {
-	List   SSOListCommand   "cmd:\"\" help:\"SSO プロファイルを一覧表示します。\""
-	Create SSOCreateCommand "cmd:\"\" help:\"SSO プロファイルを作成します。IdP の証明書など複数項目を JSON で指定してください。\""
-	Read   SSOReadCommand   "cmd:\"\" help:\"ID を指定して SSO プロファイルを読み取ります。\""
-	Update SSOUpdateCommand "cmd:\"\" help:\"SSO プロファイルを更新します。必要な IdP 設定一式を JSON で指定してください。\""
-	Delete SSODeleteCommand "cmd:\"\" help:\"ID を指定して SSO プロファイルを削除します。\""
-	Link   SSOLinkCommand   "cmd:\"\" help:\"SSO プロファイルを組織で有効にします。有効なプロファイルは一つで、ユーザーのログイン方法に影響するため、IdP 設定と対象ユーザーのメールアドレスを確認してください。\""
-	Unlink SSOUnlinkCommand "cmd:\"\" help:\"SSO プロファイルと組織のリンクを解除します。ユーザーのログイン方法に影響するため、実行前に対象プロファイルを確認してください。\""
+	List   SSOListCommand   "cmd:\"\" name:\"list-sso-profiles\" help:\"SSO プロファイルを一覧表示します。\""
+	Create SSOCreateCommand "cmd:\"\" name:\"create-sso-profile\" help:\"SSO プロファイルを作成します。IdP の証明書など複数項目を JSON で指定してください。\""
+	Read   SSOReadCommand   "cmd:\"\" name:\"read-sso-profile\" help:\"ID を指定して SSO プロファイルを読み取ります。\""
+	Update SSOUpdateCommand "cmd:\"\" name:\"update-sso-profile\" help:\"SSO プロファイルを更新します。必要な IdP 設定一式を JSON で指定してください。\""
+	Delete SSODeleteCommand "cmd:\"\" name:\"delete-sso-profile\" help:\"ID を指定して SSO プロファイルを削除します。\""
+	Link   SSOLinkCommand   "cmd:\"\" name:\"assign-sso-profile\" help:\"SSO プロファイルを組織で有効にします。有効なプロファイルは一つで、ユーザーのログイン方法に影響するため、IdP 設定と対象ユーザーのメールアドレスを確認してください。\""
+	Unlink SSOUnlinkCommand "cmd:\"\" name:\"unassign-sso-profile\" help:\"SSO プロファイルと組織のリンクを解除します。ユーザーのログイン方法に影響するため、実行前に対象プロファイルを確認してください。\""
 }
 
 type SSOAPI interface {

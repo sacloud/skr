@@ -73,17 +73,17 @@ func TestScenarioIAMHierarchy(t *testing.T) {
 func runHierarchyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
 	run.childFolder.attempted = true
-	data := h.Call(t, "テスト用の子folderを作成する", "iam-api", "folder", "create",
+	data := h.Call(t, "テスト用の子folderを作成する", "iam-api", "create-folder",
 		"--name", run.childFolder.name, "--description", run.childFolder.description)
 	created := requireItem(t, data, "create-child-folder")
 	requireIdentity(t, created, run.childFolder)
 	run.childFolder.id = created.id()
 
-	h.Call(t, "子folderをmain folderに移動する", "iam-api", "folder", "move",
+	h.Call(t, "子folderをmain folderに移動する", "iam-api", "move-folders",
 		"--ids", run.childFolder.id, "--parent-id", run.folder.id)
 	checkChildFolderParent(t, h, run)
 
-	h.Call(t, "projectを子folderに移動する", "iam-api", "project", "move",
+	h.Call(t, "projectを子folderに移動する", "iam-api", "move-projects",
 		"--ids", run.project.id, "--parent-folder-id", run.childFolder.id)
 	checkProjectParent(t, h, run)
 }
@@ -92,7 +92,7 @@ func runHierarchyScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 // その親がこの実行の main folder であることを確認します。
 func checkChildFolderParent(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	data := h.Call(t, "移動後の子folderの親を確認する", "iam-api", "folder", "read", run.childFolder.id,
+	data := h.Call(t, "移動後の子folderの親を確認する", "iam-api", "read-folder", run.childFolder.id,
 		"--query", "{id: .id, name: .name, parent_id: .parent_id}")
 	var folder hierarchyFolder
 	require.NoError(t, json.Unmarshal(data, &folder), "read-child-folder: folderのデコードに失敗しました")
@@ -106,7 +106,7 @@ func checkChildFolderParent(t *testing.T, h *helper.Helper, run *iamRun) {
 // その親 folder がこの実行の child folder であることを確認します。
 func checkProjectParent(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
-	data := h.Call(t, "移動後のprojectの親を確認する", "iam-api", "project", "read", run.project.id,
+	data := h.Call(t, "移動後のprojectの親を確認する", "iam-api", "read-project", run.project.id,
 		"--query", "{id: .id, name: .name, parent_folder_id: .parent_folder_id}")
 	var project hierarchyProject
 	require.NoError(t, json.Unmarshal(data, &project), "read-project-moved: projectのデコードに失敗しました")

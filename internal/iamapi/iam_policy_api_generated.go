@@ -12,12 +12,12 @@ import (
 )
 
 type PolicyCommands struct {
-	ReadOrganization   PolicyReadOrganizationCommand   "cmd:\"\" help:\"組織の IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。\""
-	UpdateOrganization PolicyUpdateOrganizationCommand "cmd:\"\" help:\"組織の IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-organization の出力を基に編集してください。\""
-	ReadProject        PolicyReadProjectCommand        "cmd:\"\" help:\"指定したプロジェクトの IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。\""
-	UpdateProject      PolicyUpdateProjectCommand      "cmd:\"\" help:\"指定したプロジェクトの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-project の出力を基に編集してください。\""
-	ReadFolder         PolicyReadFolderCommand         "cmd:\"\" help:\"指定したフォルダの IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。\""
-	UpdateFolder       PolicyUpdateFolderCommand       "cmd:\"\" help:\"指定したフォルダの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-folder の出力を基に編集してください。\""
+	ReadOrganization   PolicyReadOrganizationCommand   "cmd:\"\" name:\"read-organization-iam-policy\" help:\"組織の IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。\""
+	UpdateOrganization PolicyUpdateOrganizationCommand "cmd:\"\" name:\"update-organization-iam-policy\" help:\"組織の IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-organization-iam-policy の出力を基に編集してください。\""
+	ReadProject        PolicyReadProjectCommand        "cmd:\"\" name:\"read-project-iam-policy\" help:\"指定したプロジェクトの IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。\""
+	UpdateProject      PolicyUpdateProjectCommand      "cmd:\"\" name:\"update-project-iam-policy\" help:\"指定したプロジェクトの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-project-iam-policy の出力を基に編集してください。\""
+	ReadFolder         PolicyReadFolderCommand         "cmd:\"\" name:\"read-folder-iam-policy\" help:\"指定したフォルダの IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。\""
+	UpdateFolder       PolicyUpdateFolderCommand       "cmd:\"\" name:\"update-folder-iam-policy\" help:\"指定したフォルダの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-folder-iam-policy の出力を基に編集してください。\""
 }
 
 type PolicyAPI interface {

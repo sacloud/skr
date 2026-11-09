@@ -107,24 +107,24 @@ func TestScenarioIAMReadOnly(t *testing.T) {
 	checkRoleCatalog(t, h, "iam-role")
 	checkRoleCatalog(t, h, "id-role")
 	// organization の ID ポリシー binding を読み込む
-	readPolicyBindings(t, h, "organizationのIDポリシーbindingを読み込む", "id-policy", "read-organization", "")
+	readPolicyBindings(t, h, "organizationのIDポリシーbindingを読み込む", "read-organization-id-policy", "")
 	// 認証コンテキストを読み込む
 	checkAuthContext(t, h)
 	// 認証条件とパスワードポリシーを読み込む
 	checkAuthConditions(t, h)
 	checkPasswordPolicy(t, h)
 	// organization の IAM ポリシー binding を読み込む
-	readPolicyBindings(t, h, "organizationのIAMポリシーbindingを読み込む", "policy", "read-organization", "")
+	readPolicyBindings(t, h, "organizationのIAMポリシーbindingを読み込む", "read-organization-iam-policy", "")
 	// organization とサービスポリシーを確認する
 	checkOrganization(t, h)
 	checkServicePolicy(t, h)
 }
 
 // checkRoleCatalog は利用可能なロールを一覧表示し、最初の1つを読み込みます。
-// kind は iam-role または id-role です。
+// kind は iam-role または id-role で、コマンド名の接尾辞に使います。
 func checkRoleCatalog(t *testing.T, h *helper.Helper, kind string) {
 	t.Helper()
-	data := h.Call(t, kind+"のロール一覧を取得する", "iam-api", kind, "list")
+	data := h.Call(t, kind+"のロール一覧を取得する", "iam-api", "list-"+kind+"s")
 	var list roleList
 	require.NoError(t, json.Unmarshal(data, &list), "%s-list: ロール一覧のデコードに失敗しました", kind)
 	require.NotEmpty(t, list.Items, "%s-list: ロールカタログが空です", kind)
@@ -132,7 +132,7 @@ func checkRoleCatalog(t *testing.T, h *helper.Helper, kind string) {
 	require.NotEmpty(t, first.ID, "%s-list: 最初のロールにIDが存在すること", kind)
 	require.NotEmpty(t, first.Name, "%s-list: 最初のロールに名前が存在すること", kind)
 
-	readData := h.Call(t, kind+"のロールを読み込む", "iam-api", kind, "read", first.ID)
+	readData := h.Call(t, kind+"のロールを読み込む", "iam-api", "read-"+kind, first.ID)
 	var read roleSummary
 	require.NoError(t, json.Unmarshal(readData, &read), "%s-read: ロールのデコードに失敗しました", kind)
 	require.Equal(t, first.ID, read.ID, "%s-read: 読み込んだロールのIDが一覧と一致すること", kind)
@@ -141,9 +141,9 @@ func checkRoleCatalog(t *testing.T, h *helper.Helper, kind string) {
 
 // readPolicyBindings は organization、folder、project の IAM ポリシー binding を読み込みます。
 // organization の場合 resourceID は空です。
-func readPolicyBindings(t *testing.T, h *helper.Helper, description, kind, subcommand, resourceID string) []policyBinding {
+func readPolicyBindings(t *testing.T, h *helper.Helper, description, command, resourceID string) []policyBinding {
 	t.Helper()
-	args := []string{"iam-api", kind, subcommand}
+	args := []string{"iam-api", command}
 	if resourceID != "" {
 		args = append(args, resourceID)
 	}
@@ -158,7 +158,7 @@ func readPolicyBindings(t *testing.T, h *helper.Helper, description, kind, subco
 // principal が特定の project に限定されている場合、その project ID を返します。
 func checkAuthContext(t *testing.T, h *helper.Helper) authContext {
 	t.Helper()
-	data := h.Call(t, "認証コンテキストを読み込む", "iam-api", "auth", "read-auth-context")
+	data := h.Call(t, "認証コンテキストを読み込む", "iam-api", "read-auth-context")
 	var context authContext
 	require.NoError(t, json.Unmarshal(data, &context), "read-auth-context: 認証コンテキストのデコードに失敗しました")
 	require.Positive(t, context.ResourceID, "read-auth-context: resource_idが正の値であること")
@@ -168,7 +168,7 @@ func checkAuthContext(t *testing.T, h *helper.Helper) authContext {
 
 func checkAuthConditions(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	data := h.Call(t, "認証条件を読み込む", "iam-api", "auth", "read-auth-conditions")
+	data := h.Call(t, "認証条件を読み込む", "iam-api", "read-organization-auth-conditions")
 	var conditions authConditions
 	require.NoError(t, json.Unmarshal(data, &conditions), "read-auth-conditions: 認証条件のデコードに失敗しました")
 	require.NotEmpty(t, conditions.IPRestriction.Mode, "read-auth-conditions: ip_restriction.modeが存在すること")
@@ -176,7 +176,7 @@ func checkAuthConditions(t *testing.T, h *helper.Helper) {
 
 func checkPasswordPolicy(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	data := h.Call(t, "パスワードポリシーを読み込む", "iam-api", "auth", "read-password-policy")
+	data := h.Call(t, "パスワードポリシーを読み込む", "iam-api", "read-organization-password-policy")
 	var policy passwordPolicy
 	require.NoError(t, json.Unmarshal(data, &policy), "read-password-policy: パスワードポリシーのデコードに失敗しました")
 	require.Positive(t, policy.MinLength, "read-password-policy: min_lengthが正の値であること")
@@ -184,7 +184,7 @@ func checkPasswordPolicy(t *testing.T, h *helper.Helper) {
 
 func checkOrganization(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	data := h.Call(t, "organizationを読み込む", "iam-api", "organization", "read")
+	data := h.Call(t, "organizationを読み込む", "iam-api", "read-organization")
 	var organization organizationInfo
 	require.NoError(t, json.Unmarshal(data, &organization), "organization-read: organizationのデコードに失敗しました")
 	require.Positive(t, organization.ID, "organization-read: idが正の値であること")
@@ -192,15 +192,15 @@ func checkOrganization(t *testing.T, h *helper.Helper) {
 
 func checkServicePolicy(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	data := h.Call(t, "サービスポリシーの有効状態を確認する", "iam-api", "service-policy", "is-enabled")
+	data := h.Call(t, "サービスポリシーの有効状態を確認する", "iam-api", "check-service-policy-status")
 	var enabled bool
 	require.NoError(t, json.Unmarshal(data, &enabled), "service-policy-is-enabled: 真偽値のデコードに失敗しました")
 
-	data = h.Call(t, "organizationのサービスポリシーのルールを読み込む", "iam-api", "organization", "read-service-policy")
+	data = h.Call(t, "organizationのサービスポリシーのルールを読み込む", "iam-api", "read-organization-service-policy")
 	var rules []json.RawMessage
 	require.NoError(t, json.Unmarshal(data, &rules), "read-service-policy: ルールのデコードに失敗しました")
 
-	data = h.Call(t, "サービスポリシーのルールテンプレート一覧を取得する", "iam-api", "service-policy", "list-rule-templates")
+	data = h.Call(t, "サービスポリシーのルールテンプレート一覧を取得する", "iam-api", "list-service-policy-rule-templates")
 	var templates ruleTemplateList
 	require.NoError(t, json.Unmarshal(data, &templates), "list-rule-templates: ルールテンプレートのデコードに失敗しました")
 	require.NotEmpty(t, templates.Items, "list-rule-templates: ルールテンプレートのカタログが空です")

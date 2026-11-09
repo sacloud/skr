@@ -12,11 +12,11 @@ import (
 )
 
 type AuthCommands struct {
-	ReadPasswordPolicy   AuthReadPasswordPolicyCommand   "cmd:\"\" help:\"組織のパスワードポリシーを参照します。\""
-	UpdatePasswordPolicy AuthUpdatePasswordPolicyCommand "cmd:\"\" help:\"組織のパスワードポリシーを更新します。--request ではすべての項目を含む JSON を指定します。フラグを使う場合も4項目すべてを指定してください。\""
-	ReadAuthConditions   AuthReadAuthConditionsCommand   "cmd:\"\" help:\"組織の認証条件を参照します。\""
-	UpdateAuthConditions AuthUpdateAuthConditionsCommand "cmd:\"\" help:\"組織の認証条件を更新します。現在の設定を read-auth-conditions で確認し、すべての項目を含む JSON を指定してください。\""
-	ReadAuthContext      AuthReadAuthContextCommand      "cmd:\"\" help:\"現在の認証情報に対応する IAM 認証コンテキストを参照します。\""
+	ReadPasswordPolicy   AuthReadPasswordPolicyCommand   "cmd:\"\" name:\"read-organization-password-policy\" help:\"組織のパスワードポリシーを参照します。\""
+	UpdatePasswordPolicy AuthUpdatePasswordPolicyCommand "cmd:\"\" name:\"update-organization-password-policy\" help:\"組織のパスワードポリシーを更新します。--request ではすべての項目を含む JSON を指定します。フラグを使う場合も4項目すべてを指定してください。\""
+	ReadAuthConditions   AuthReadAuthConditionsCommand   "cmd:\"\" name:\"read-organization-auth-conditions\" help:\"組織の認証条件を参照します。\""
+	UpdateAuthConditions AuthUpdateAuthConditionsCommand "cmd:\"\" name:\"update-organization-auth-conditions\" help:\"組織の認証条件を更新します。現在の設定を read-organization-auth-conditions で確認し、すべての項目を含む JSON を指定してください。\""
+	ReadAuthContext      AuthReadAuthContextCommand      "cmd:\"\" name:\"read-auth-context\" help:\"現在の認証情報に対応する IAM 認証コンテキストを参照します。\""
 }
 
 type AuthAPI interface {
@@ -188,7 +188,7 @@ func (c *AuthReadAuthConditionsCommand) Run(ctx *kong.Context) error {
 }
 
 type AuthUpdateAuthConditionsCommand struct {
-	Request *string "help:\"認証条件全体の JSON。直接指定するか @path.json で読み込みます。組織全体のログイン条件を変更するため、更新前に read-auth-conditions で確認してください。\""
+	Request *string "help:\"認証条件全体の JSON。直接指定するか @path.json で読み込みます。組織全体のログイン条件を変更するため、更新前に read-organization-auth-conditions で確認してください。\""
 	factory AuthAPIFactory
 	runtime AuthRuntime
 }

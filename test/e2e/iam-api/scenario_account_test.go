@@ -75,13 +75,13 @@ func runAccountScenario(t *testing.T, h *helper.Helper) {
 // リクエストは読み込んだ応答をそのまま再利用します。
 func updatePasswordPolicy(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	data := h.Call(t, "organizationのパスワードポリシーを読み込む", "iam-api", "auth", "read-password-policy")
+	data := h.Call(t, "organizationのパスワードポリシーを読み込む", "iam-api", "read-organization-password-policy")
 	var policy passwordPolicy
 	require.NoError(t, json.Unmarshal(data, &policy), "account-read-password-policy: パスワードポリシーのデコードに失敗しました")
 	require.Positive(t, policy.MinLength, "account-read-password-policy: min_lengthが正の値であること")
 
 	updated := h.Call(t, "読み込んだ値でパスワードポリシーを更新する",
-		"iam-api", "auth", "update-password-policy", "--request", string(data))
+		"iam-api", "update-organization-password-policy", "--request", string(data))
 	var updatedPolicy passwordPolicy
 	require.NoError(t, json.Unmarshal(updated, &updatedPolicy), "account-update-password-policy: パスワードポリシーのデコードに失敗しました")
 	require.Equal(t, policy, updatedPolicy, "account-update-password-policy: 更新後のポリシーが元の値と一致すること")
@@ -92,13 +92,13 @@ func updatePasswordPolicy(t *testing.T, h *helper.Helper) {
 // この実行でモデル化していない datetime_restriction などのフィールドも保持されます。
 func updateAuthConditions(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	data := h.Call(t, "organizationの認証条件を読み込む", "iam-api", "auth", "read-auth-conditions")
+	data := h.Call(t, "organizationの認証条件を読み込む", "iam-api", "read-organization-auth-conditions")
 	var conditions authConditions
 	require.NoError(t, json.Unmarshal(data, &conditions), "account-read-auth-conditions: 認証条件のデコードに失敗しました")
 	require.NotEmpty(t, conditions.IPRestriction.Mode, "account-read-auth-conditions: ip_restriction.modeが存在すること")
 
 	updated := h.Call(t, "読み込んだ値で認証条件を更新する",
-		"iam-api", "auth", "update-auth-conditions", "--request", string(data))
+		"iam-api", "update-organization-auth-conditions", "--request", string(data))
 	var updatedConditions authConditions
 	require.NoError(t, json.Unmarshal(updated, &updatedConditions), "account-update-auth-conditions: 認証条件のデコードに失敗しました")
 	require.Equal(t, conditions.IPRestriction.Mode, updatedConditions.IPRestriction.Mode,
@@ -109,10 +109,10 @@ func updateAuthConditions(t *testing.T, h *helper.Helper) {
 // これにより割り当ては変更されません。
 func updateIDPolicy(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	original := readPolicyBindings(t, h, "organizationのIDポリシーbindingを読み込む", "id-policy", "read-organization", "")
+	original := readPolicyBindings(t, h, "organizationのIDポリシーbindingを読み込む", "read-organization-id-policy", "")
 	updatePolicyBindings(t, h, "読み込んだ値でIDポリシーbindingを更新する",
-		"id-policy", "update-organization", "", original)
-	restored := readPolicyBindings(t, h, "更新後のIDポリシーbindingを確認する", "id-policy", "read-organization", "")
+		"update-organization-id-policy", "", original)
+	restored := readPolicyBindings(t, h, "更新後のIDポリシーbindingを確認する", "read-organization-id-policy", "")
 	require.Equal(t, original, restored, "account-verify-id-policy: bindingが元の値と一致すること")
 }
 
@@ -120,10 +120,10 @@ func updateIDPolicy(t *testing.T, h *helper.Helper) {
 // 事前に読み込んだ binding で置き換えます。
 func updateOrganizationPolicyBindings(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	original := readPolicyBindings(t, h, "organizationのIAMポリシーbindingを読み込む", "policy", "read-organization", "")
+	original := readPolicyBindings(t, h, "organizationのIAMポリシーbindingを読み込む", "read-organization-iam-policy", "")
 	updatePolicyBindings(t, h, "読み込んだ値でIAMポリシーbindingを更新する",
-		"policy", "update-organization", "", original)
-	restored := readPolicyBindings(t, h, "更新後のIAMポリシーbindingを確認する", "policy", "read-organization", "")
+		"update-organization-iam-policy", "", original)
+	restored := readPolicyBindings(t, h, "更新後のIAMポリシーbindingを確認する", "read-organization-iam-policy", "")
 	require.Equal(t, original, restored, "account-verify-organization-policy: bindingが元の値と一致すること")
 }
 
@@ -131,12 +131,12 @@ func updateOrganizationPolicyBindings(t *testing.T, h *helper.Helper) {
 // これにより表示される organization は変更されません。
 func updateOrganizationName(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	data := h.Call(t, "organizationを読み込む", "iam-api", "organization", "read")
+	data := h.Call(t, "organizationを読み込む", "iam-api", "read-organization")
 	var organization organizationInfo
 	require.NoError(t, json.Unmarshal(data, &organization), "account-read-organization: organizationのデコードに失敗しました")
 
 	updated := h.Call(t, "読み込んだ名前でorganizationを更新する",
-		"iam-api", "organization", "update", "--name", organization.Name)
+		"iam-api", "update-organization", "--name", organization.Name)
 	var updatedOrganization organizationInfo
 	require.NoError(t, json.Unmarshal(updated, &updatedOrganization), "account-update-organization: organizationのデコードに失敗しました")
 	require.Equal(t, organization.Name, updatedOrganization.Name, "account-update-organization: 更新後の名前が元の値と一致すること")
@@ -150,7 +150,7 @@ func updateOrganizationName(t *testing.T, h *helper.Helper) {
 // ポリシーは無効の状態で開始・終了し、defer された復元はステップが失敗してもその状態を保ちます。
 func servicePolicyFlip(t *testing.T, h *helper.Helper) {
 	t.Helper()
-	data := h.Call(t, "organizationのサービスポリシーのルールを読み込む", "iam-api", "organization", "read-service-policy")
+	data := h.Call(t, "organizationのサービスポリシーのルールを読み込む", "iam-api", "read-organization-service-policy")
 	var rules []json.RawMessage
 	require.NoError(t, json.Unmarshal(data, &rules), "account-read-service-policy: ルールのデコードに失敗しました")
 
@@ -165,7 +165,7 @@ func servicePolicyFlip(t *testing.T, h *helper.Helper) {
 
 	checkServicePolicyEnabled(t, h, "有効化後のサービスポリシーの状態を確認する", true)
 	updated := h.Call(t, "読み込んだ値でサービスポリシーのルールを更新する",
-		"iam-api", "organization", "update-service-policy", "--request", string(data))
+		"iam-api", "update-organization-service-policy", "--request", string(data))
 	var updatedRules []json.RawMessage
 	require.NoError(t, json.Unmarshal(updated, &updatedRules), "account-update-service-policy: ルールのデコードに失敗しました")
 	require.Equal(t, rules, updatedRules, "account-update-service-policy: 更新後のルールが元の値と一致すること")
@@ -177,16 +177,16 @@ func servicePolicyFlip(t *testing.T, h *helper.Helper) {
 
 func setServicePolicyEnabled(t *testing.T, h *helper.Helper, description string, enabled bool) {
 	t.Helper()
-	subcommand := "disable"
+	command := "disable-service-policy"
 	if enabled {
-		subcommand = "enable"
+		command = "enable-service-policy"
 	}
-	h.Call(t, description, "iam-api", "service-policy", subcommand)
+	h.Call(t, description, "iam-api", command)
 }
 
 func checkServicePolicyEnabled(t *testing.T, h *helper.Helper, description string, want bool) {
 	t.Helper()
-	data := h.Call(t, description, "iam-api", "service-policy", "is-enabled")
+	data := h.Call(t, description, "iam-api", "check-service-policy-status")
 	var enabled bool
 	require.NoError(t, json.Unmarshal(data, &enabled), "%s: 真偽値のデコードに失敗しました", description)
 	require.Equal(t, want, enabled, "%s: サービスポリシーの有効状態が期待値と一致すること", description)
@@ -201,21 +201,21 @@ func runUser2FAScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
 	checkEmpty2FAPage(t, h, run, "userのtrusted device一覧が空であることを確認する", "list-trusted-devices")
 	checkEmpty2FAPage(t, h, run, "userのsecurity key一覧が空であることを確認する", "list-security-keys")
-	h.Call(t, "userのOTPを無効化する", "iam-api", "user-2fa", "deactivate-otp", "--user-id", run.user.id)
-	h.Call(t, "userのtrusted deviceを解除する", "iam-api", "user-2fa", "clear-trusted-devices", "--user-id", run.user.id)
+	h.Call(t, "userのOTPを無効化する", "iam-api", "deactivate-otp", "--user-id", run.user.id)
+	h.Call(t, "userのtrusted deviceを解除する", "iam-api", "clear-trusted-devices", "--user-id", run.user.id)
 	expectNotFound(t, h, "存在しないsecurity keyの参照がnot-foundになることを確認する",
-		"iam-api", "user-2fa", "read-security-key", "--user-id", run.user.id, missingTwoFactorResourceID)
+		"iam-api", "read-security-key", "--user-id", run.user.id, missingTwoFactorResourceID)
 	expectNotFound(t, h, "存在しないtrusted deviceの削除がnot-foundになることを確認する",
-		"iam-api", "user-2fa", "delete-trusted-device", "--user-id", run.user.id, missingTwoFactorResourceID)
+		"iam-api", "delete-trusted-device", "--user-id", run.user.id, missingTwoFactorResourceID)
 	expectNotFound(t, h, "存在しないsecurity keyの削除がnot-foundになることを確認する",
-		"iam-api", "user-2fa", "delete-security-key", "--user-id", run.user.id, missingTwoFactorResourceID)
+		"iam-api", "delete-security-key", "--user-id", run.user.id, missingTwoFactorResourceID)
 }
 
 // checkEmpty2FAPage は user の 2FA リソースを一覧表示し、
 // そのページが空であることを確認します。
 func checkEmpty2FAPage(t *testing.T, h *helper.Helper, run *iamRun, description, subcommand string) {
 	t.Helper()
-	data := h.Call(t, description, "iam-api", "user-2fa", subcommand, "--user-id", run.user.id)
+	data := h.Call(t, description, "iam-api", subcommand, "--user-id", run.user.id)
 	var page twoFactorPage
 	require.NoError(t, json.Unmarshal(data, &page), "%s: ページのデコードに失敗しました", description)
 	require.Empty(t, page.Items, "%s: 一覧が空であること", description)

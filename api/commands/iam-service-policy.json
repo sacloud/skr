@@ -10,18 +10,21 @@
     {
       "name": "Enable",
       "help": "サービス利用ポリシーを有効化します。サービス操作の制限に影響するため、実行前に設定内容を確認してください。",
-      "method": "Enable"
+      "method": "Enable",
+      "command_name": "enable-service-policy"
     },
     {
       "name": "Disable",
       "help": "サービス利用ポリシーを無効化します。サービス操作の制限に影響するため、実行前に設定内容を確認してください。",
-      "method": "Disable"
+      "method": "Disable",
+      "command_name": "disable-service-policy"
     },
     {
       "name": "IsEnabled",
       "help": "サービス利用ポリシーが有効かどうかを確認します。",
       "method": "IsEnabled",
-      "response_type": "bool"
+      "response_type": "bool",
+      "command_name": "check-service-policy-status"
     },
     {
       "name": "ListRuleTemplates",
@@ -33,12 +36,44 @@
       "request_help": "ルールテンプレートの絞り込み条件 JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListServicePolicyRuleTemplatesOK",
       "flags": [
-        {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
-        {"name":"per-page","field":"PerPage","type":"int","help":"任意: 1 ページあたりの取得件数。","pointer":true},
-        {"name":"name","field":"Name","type":"string","help":"任意: 名前で絞り込みます。","pointer":true},
-        {"name":"code","field":"Code","type":"string","help":"任意: コードで絞り込みます。","pointer":true},
-        {"name":"type","field":"Type","type":"string","help":"任意: 種別で絞り込みます。","pointer":true,"conversion":"v1.ListServicePolicyRuleTemplatesType"}
-      ]
+        {
+          "name": "page",
+          "field": "Page",
+          "type": "int",
+          "help": "任意: 取得するページ番号。",
+          "pointer": true
+        },
+        {
+          "name": "per-page",
+          "field": "PerPage",
+          "type": "int",
+          "help": "任意: 1 ページあたりの取得件数。",
+          "pointer": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 名前で絞り込みます。",
+          "pointer": true
+        },
+        {
+          "name": "code",
+          "field": "Code",
+          "type": "string",
+          "help": "任意: コードで絞り込みます。",
+          "pointer": true
+        },
+        {
+          "name": "type",
+          "field": "Type",
+          "type": "string",
+          "help": "任意: 種別で絞り込みます。",
+          "pointer": true,
+          "conversion": "v1.ListServicePolicyRuleTemplatesType"
+        }
+      ],
+      "command_name": "list-service-policy-rule-templates"
     }
   ],
   "wiring_target": "IAMAPI.ServicePolicy",

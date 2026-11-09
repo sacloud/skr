@@ -44,6 +44,7 @@ var apiCommandNameTargetDomains = []string{
 var apiCommandNameMigratedDomains = []string{
 	"apprun-api",
 	"eventbus-api",
+	"iam-api",
 	"kms-api",
 	"apprun-dedicated-api",
 	"object-storage-api",

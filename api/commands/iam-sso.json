@@ -13,9 +13,22 @@
       "method": "List",
       "response_type": "*v1.ListSsoProfilesOK",
       "arguments": [
-        {"name":"page","field":"Page","type":"*int","help":"任意: 取得するページ番号。","flag":true},
-        {"name":"per-page","field":"PerPage","type":"*int","help":"任意: 1 ページあたりの取得件数。","flag":true}
-      ]
+        {
+          "name": "page",
+          "field": "Page",
+          "type": "*int",
+          "help": "任意: 取得するページ番号。",
+          "flag": true
+        },
+        {
+          "name": "per-page",
+          "field": "PerPage",
+          "type": "*int",
+          "help": "任意: 1 ページあたりの取得件数。",
+          "flag": true
+        }
+      ],
+      "command_name": "list-sso-profiles"
     },
     {
       "name": "Create",
@@ -24,14 +37,23 @@
       "request_type": "sso.CreateParams",
       "request_by_value": true,
       "request_help": "SSO プロファイル作成 JSON（name、description、IdP の entity ID、login/logout URL、X.509 certificate）。直接指定するか @path.json で読み込みます。",
-      "response_type": "*v1.SSOProfile"
+      "response_type": "*v1.SSOProfile",
+      "command_name": "create-sso-profile"
     },
     {
       "name": "Read",
       "help": "ID を指定して SSO プロファイルを読み取ります。",
       "method": "Read",
       "response_type": "*v1.SSOProfile",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"読み取る SSO プロファイル ID。"}]
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "読み取る SSO プロファイル ID。"
+        }
+      ],
+      "command_name": "read-sso-profile"
     },
     {
       "name": "Update",
@@ -41,27 +63,59 @@
       "request_by_value": true,
       "request_help": "SSO プロファイルの更新 JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.SSOProfile",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"更新する SSO プロファイル ID。"}]
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "更新する SSO プロファイル ID。"
+        }
+      ],
+      "command_name": "update-sso-profile"
     },
     {
       "name": "Delete",
       "help": "ID を指定して SSO プロファイルを削除します。",
       "method": "Delete",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"削除する SSO プロファイル ID。"}]
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "削除する SSO プロファイル ID。"
+        }
+      ],
+      "command_name": "delete-sso-profile"
     },
     {
       "name": "Link",
       "help": "SSO プロファイルを組織で有効にします。有効なプロファイルは一つで、ユーザーのログイン方法に影響するため、IdP 設定と対象ユーザーのメールアドレスを確認してください。",
       "method": "Link",
       "response_type": "*v1.SSOProfile",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"リンクする SSO プロファイル ID。"}]
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "リンクする SSO プロファイル ID。"
+        }
+      ],
+      "command_name": "assign-sso-profile"
     },
     {
       "name": "Unlink",
       "help": "SSO プロファイルと組織のリンクを解除します。ユーザーのログイン方法に影響するため、実行前に対象プロファイルを確認してください。",
       "method": "Unlink",
       "response_type": "*v1.SSOProfile",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"リンクを解除する SSO プロファイル ID。"}]
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "リンクを解除する SSO プロファイル ID。"
+        }
+      ],
+      "command_name": "unassign-sso-profile"
     }
   ],
   "wiring_target": "IAMAPI.SSO",

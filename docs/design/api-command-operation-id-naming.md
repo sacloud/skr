@@ -66,7 +66,7 @@ operationId 機械派生に移行する際、この 2 ドメインでは spec �
 | `simple-notification-api` | 21 | 11 | 生成 (2 ファイル、4 操作は手書き) |
 | `object-storage-api` | 34 | 34 | 手書き (`internal/objectstorageapi`) |
 | `apprun-dedicated-api` | 35 | 35 | 手書き (`internal/apprundedicatedapi`) |
-| `iam-api` | 87 | 87 | 生成 (15 ファイル、6 操作は手書き) |
+| `iam-api` | 87 | 87 | 生成 (16 ファイル、6 操作は手書き) |
 | 合計 | 276 | 256 | |
 
 対象外は次のとおりです。

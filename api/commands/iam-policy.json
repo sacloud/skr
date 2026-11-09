@@ -10,16 +10,18 @@
       "name": "ReadOrganization",
       "help": "組織の IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を一覧表示します。",
       "method": "ReadOrganizationPolicy",
-      "response_type": "[]v1.IamPolicy"
+      "response_type": "[]v1.IamPolicy",
+      "command_name": "read-organization-iam-policy"
     },
     {
       "name": "UpdateOrganization",
-      "help": "組織の IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-organization の出力を基に編集してください。",
+      "help": "組織の IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-organization-iam-policy の出力を基に編集してください。",
       "method": "UpdateOrganizationPolicy",
       "request_type": "[]v1.IamPolicy",
       "request_by_value": true,
       "request_help": "現在の割り当ての JSON 配列を直接または @path.json で指定します。各要素は role と principals を持ち、role は type（preset）と id（IAM ロール ID）、principals は type（user など）と id（数値）を指定します。例: --request '[{\"role\":{\"type\":\"preset\",\"id\":\"IAM-ROLE-ID\"},\"principals\":[{\"type\":\"user\",\"id\":123}]}]'",
-      "response_type": "[]v1.IamPolicy"
+      "response_type": "[]v1.IamPolicy",
+      "command_name": "update-organization-iam-policy"
     },
     {
       "name": "ReadProject",
@@ -33,11 +35,12 @@
           "type": "int",
           "help": "対象のプロジェクト ID。"
         }
-      ]
+      ],
+      "command_name": "read-project-iam-policy"
     },
     {
       "name": "UpdateProject",
-      "help": "指定したプロジェクトの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-project の出力を基に編集してください。",
+      "help": "指定したプロジェクトの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-project-iam-policy の出力を基に編集してください。",
       "method": "UpdateProjectPolicy",
       "request_type": "[]v1.IamPolicy",
       "request_by_value": true,
@@ -50,7 +53,8 @@
           "type": "int",
           "help": "対象のプロジェクト ID。"
         }
-      ]
+      ],
+      "command_name": "update-project-iam-policy"
     },
     {
       "name": "ReadFolder",
@@ -64,11 +68,12 @@
           "type": "int",
           "help": "対象のフォルダ ID。"
         }
-      ]
+      ],
+      "command_name": "read-folder-iam-policy"
     },
     {
       "name": "UpdateFolder",
-      "help": "指定したフォルダの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-folder の出力を基に編集してください。",
+      "help": "指定したフォルダの IAM ポリシーバインディングを置き換えます。現在の割り当て全体を --request に JSON 配列で指定します。read-folder-iam-policy の出力を基に編集してください。",
       "method": "UpdateFolderPolicy",
       "request_type": "[]v1.IamPolicy",
       "request_by_value": true,
@@ -81,7 +86,8 @@
           "type": "int",
           "help": "対象のフォルダ ID。"
         }
-      ]
+      ],
+      "command_name": "update-folder-iam-policy"
     }
   ],
   "wiring_target": "IAMAPI.Policy",
