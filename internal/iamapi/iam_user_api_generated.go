@@ -13,13 +13,13 @@ import (
 )
 
 type UserCommands struct {
-	List            UserListCommand            "cmd:\"\" help:\"IAM ユーザーを一覧表示します。--page、--per-page、--ordering で取得範囲と並び順を指定できます。\""
-	Create          UserCreateCommand          "cmd:\"\" help:\"IAM ユーザーを作成します。パスワードは --password-file でファイルまたは標準入力から指定します。\""
-	Read            UserReadCommand            "cmd:\"\" help:\"ID を指定して IAM ユーザーを読み取ります。\""
-	Update          UserUpdateCommand          "cmd:\"\" help:\"IAM ユーザーの名前、説明、パスワードを更新します。名前と説明は必須です。パスワードは --password-file を指定した場合のみ変更します。\""
-	Delete          UserDeleteCommand          "cmd:\"\" help:\"ID を指定して IAM ユーザーを削除します。\""
-	RegisterEmail   UserRegisterEmailCommand   "cmd:\"\" help:\"ユーザーのメールアドレスを登録します。作成時の --email は SSO の外部 IdP ログインで使うメールアドレスで、この操作とは別の項目です。\""
-	UnregisterEmail UserUnregisterEmailCommand "cmd:\"\" help:\"ユーザーのメールアドレスの登録を解除します。\""
+	List            UserListCommand            "cmd:\"\" name:\"list-users\" help:\"IAM ユーザーを一覧表示します。--page、--per-page、--ordering で取得範囲と並び順を指定できます。\""
+	Create          UserCreateCommand          "cmd:\"\" name:\"create-user\" help:\"IAM ユーザーを作成します。パスワードは --password-file でファイルまたは標準入力から指定します。\""
+	Read            UserReadCommand            "cmd:\"\" name:\"read-user\" help:\"ID を指定して IAM ユーザーを読み取ります。\""
+	Update          UserUpdateCommand          "cmd:\"\" name:\"update-user\" help:\"IAM ユーザーの名前、説明、パスワードを更新します。名前と説明は必須です。パスワードは --password-file を指定した場合のみ変更します。\""
+	Delete          UserDeleteCommand          "cmd:\"\" name:\"delete-user\" help:\"ID を指定して IAM ユーザーを削除します。\""
+	RegisterEmail   UserRegisterEmailCommand   "cmd:\"\" name:\"register-email\" help:\"ユーザーのメールアドレスを登録します。作成時の --email は SSO の外部 IdP ログインで使うメールアドレスで、この操作とは別の項目です。\""
+	UnregisterEmail UserUnregisterEmailCommand "cmd:\"\" name:\"unregister-email\" help:\"ユーザーのメールアドレスの登録を解除します。\""
 }
 
 type UserAPI interface {

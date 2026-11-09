@@ -12,13 +12,13 @@ import (
 )
 
 type User2FACommands struct {
-	DeactivateOTP       User2FADeactivateOTPCommand       "cmd:\"\" help:\"指定したユーザーの OTP を無効化します。ログイン方法に影響するため、--user-id で対象を確認してください。\""
-	ListTrustedDevices  User2FAListTrustedDevicesCommand  "cmd:\"\" help:\"指定したユーザーの信頼済みデバイスを一覧表示します。\""
-	DeleteTrustedDevice User2FADeleteTrustedDeviceCommand "cmd:\"\" help:\"指定したユーザーの信頼済みデバイスを削除します。\""
-	ClearTrustedDevices User2FAClearTrustedDevicesCommand "cmd:\"\" help:\"指定したユーザーの信頼済みデバイスをすべて削除します。--user-id で対象を確認してください。\""
-	ListSecurityKeys    User2FAListSecurityKeysCommand    "cmd:\"\" help:\"指定したユーザーのセキュリティキーを一覧表示します。\""
-	ReadSecurityKey     User2FAReadSecurityKeyCommand     "cmd:\"\" help:\"ID を指定してセキュリティキーを読み取ります。\""
-	DeleteSecurityKey   User2FADeleteSecurityKeyCommand   "cmd:\"\" help:\"指定したユーザーのセキュリティキーを削除します。\""
+	DeactivateOTP       User2FADeactivateOTPCommand       "cmd:\"\" name:\"deactivate-otp\" help:\"指定したユーザーの OTP を無効化します。ログイン方法に影響するため、--user-id で対象を確認してください。\""
+	ListTrustedDevices  User2FAListTrustedDevicesCommand  "cmd:\"\" name:\"list-trusted-devices\" help:\"指定したユーザーの信頼済みデバイスを一覧表示します。\""
+	DeleteTrustedDevice User2FADeleteTrustedDeviceCommand "cmd:\"\" name:\"delete-trusted-device\" help:\"指定したユーザーの信頼済みデバイスを削除します。\""
+	ClearTrustedDevices User2FAClearTrustedDevicesCommand "cmd:\"\" name:\"clear-trusted-devices\" help:\"指定したユーザーの信頼済みデバイスをすべて削除します。--user-id で対象を確認してください。\""
+	ListSecurityKeys    User2FAListSecurityKeysCommand    "cmd:\"\" name:\"list-security-keys\" help:\"指定したユーザーのセキュリティキーを一覧表示します。\""
+	ReadSecurityKey     User2FAReadSecurityKeyCommand     "cmd:\"\" name:\"read-security-key\" help:\"ID を指定してセキュリティキーを読み取ります。\""
+	DeleteSecurityKey   User2FADeleteSecurityKeyCommand   "cmd:\"\" name:\"delete-security-key\" help:\"指定したユーザーのセキュリティキーを削除します。\""
 }
 
 type User2FAAPI interface {

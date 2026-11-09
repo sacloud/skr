@@ -12,8 +12,8 @@ import (
 )
 
 type IDPolicyCommands struct {
-	ReadOrganization   IDPolicyReadOrganizationCommand   "cmd:\"\" help:\"組織の ID ポリシーを参照します。\""
-	UpdateOrganization IDPolicyUpdateOrganizationCommand "cmd:\"\" help:\"組織の ID ポリシー全体を置き換えます。変更前に read-organization で現在の設定を保存してください。\""
+	ReadOrganization   IDPolicyReadOrganizationCommand   "cmd:\"\" name:\"read-organization-id-policy\" help:\"組織の ID ポリシーを参照します。\""
+	UpdateOrganization IDPolicyUpdateOrganizationCommand "cmd:\"\" name:\"update-organization-id-policy\" help:\"組織の ID ポリシー全体を置き換えます。変更前に read-organization で現在の設定を保存してください。\""
 }
 
 type IDPolicyAPI interface {

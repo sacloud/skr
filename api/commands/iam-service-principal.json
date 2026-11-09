@@ -18,11 +18,37 @@
       "request_help": "サービスプリンシパル一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListServicePrincipalsOK",
       "flags": [
-        {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
-        {"name":"per-page","field":"PerPage","type":"int","help":"任意: 1 ページあたりの取得件数。","pointer":true},
-        {"name":"project-id","field":"ProjectID","type":"int","help":"任意: プロジェクト ID で絞り込みます。","pointer":true},
-        {"name":"ordering","field":"Ordering","type":"string","help":"任意: 並び順を API の ordering 値で指定します。","pointer":true,"conversion":"v1.ListServicePrincipalsOrdering"}
-      ]
+        {
+          "name": "page",
+          "field": "Page",
+          "type": "int",
+          "help": "任意: 取得するページ番号。",
+          "pointer": true
+        },
+        {
+          "name": "per-page",
+          "field": "PerPage",
+          "type": "int",
+          "help": "任意: 1 ページあたりの取得件数。",
+          "pointer": true
+        },
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "int",
+          "help": "任意: プロジェクト ID で絞り込みます。",
+          "pointer": true
+        },
+        {
+          "name": "ordering",
+          "field": "Ordering",
+          "type": "string",
+          "help": "任意: 並び順を API の ordering 値で指定します。",
+          "pointer": true,
+          "conversion": "v1.ListServicePrincipalsOrdering"
+        }
+      ],
+      "command_name": "list-service-principals"
     },
     {
       "name": "Create",
@@ -33,17 +59,44 @@
       "request_help": "サービスプリンシパル作成 JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ServicePrincipal",
       "flags": [
-        {"name":"project-id","field":"ProjectID","type":"int","help":"必須: 対象プロジェクト ID。","required":true},
-        {"name":"name","field":"Name","type":"string","help":"必須: サービスプリンシパル名。","required":true},
-        {"name":"description","field":"Description","type":"string","help":"必須: サービスプリンシパルの説明。","required":true}
-      ]
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "int",
+          "help": "必須: 対象プロジェクト ID。",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "必須: サービスプリンシパル名。",
+          "required": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "必須: サービスプリンシパルの説明。",
+          "required": true
+        }
+      ],
+      "command_name": "create-service-principal"
     },
     {
       "name": "Read",
       "help": "ID を指定してサービスプリンシパルを読み取ります。",
       "method": "Read",
       "response_type": "*v1.ServicePrincipal",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"読み取るサービスプリンシパル ID。"}]
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "読み取るサービスプリンシパル ID。"
+        }
+      ],
+      "command_name": "read-service-principal"
     },
     {
       "name": "Update",
@@ -53,15 +106,46 @@
       "request_by_value": true,
       "request_help": "更新後のサービスプリンシパル設定を含む JSON。name と description は必須です。直接指定するか @path.json で読み込みます。--request と --name は併用できません。",
       "response_type": "*v1.ServicePrincipal",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"更新するサービスプリンシパル ID。"}],
-      "flags": [{"name":"name","field":"Name","type":"string","help":"必須: 更新後のサービスプリンシパル名。","required":true},
-        {"name":"description","field":"Description","type":"string","help":"必須: 更新後のサービスプリンシパルの説明。","required":true,"conversion":"v1.NewOptString"}]
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "更新するサービスプリンシパル ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "必須: 更新後のサービスプリンシパル名。",
+          "required": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "必須: 更新後のサービスプリンシパルの説明。",
+          "required": true,
+          "conversion": "v1.NewOptString"
+        }
+      ],
+      "command_name": "update-service-principal"
     },
     {
       "name": "Delete",
       "help": "ID を指定してサービスプリンシパルを削除します。",
       "method": "Delete",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"削除するサービスプリンシパル ID。"}]
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "削除するサービスプリンシパル ID。"
+        }
+      ],
+      "command_name": "delete-service-principal"
     },
     {
       "name": "ListKeys",
@@ -72,12 +156,39 @@
       "request_optional": true,
       "request_help": "キー一覧のページング・並び順条件 JSON。直接指定するか @path.json で読み込みます。--request と個別フラグは併用できません。",
       "response_type": "*v1.ListServicePrincipalKeysOK",
-      "arguments": [{"name":"id","field":"ID","type":"int","help":"キーを一覧表示するサービスプリンシパル ID。"}],
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "キーを一覧表示するサービスプリンシパル ID。"
+        }
+      ],
       "flags": [
-        {"name":"page","field":"Page","type":"int","help":"任意: 取得するページ番号。","pointer":true},
-        {"name":"per-page","field":"PerPage","type":"int","help":"任意: 1 ページあたりの取得件数。","pointer":true},
-        {"name":"ordering","field":"Ordering","type":"string","help":"任意: 並び順を API の ordering 値で指定します。","pointer":true,"conversion":"v1.ListServicePrincipalKeysOrdering"}
-      ]
+        {
+          "name": "page",
+          "field": "Page",
+          "type": "int",
+          "help": "任意: 取得するページ番号。",
+          "pointer": true
+        },
+        {
+          "name": "per-page",
+          "field": "PerPage",
+          "type": "int",
+          "help": "任意: 1 ページあたりの取得件数。",
+          "pointer": true
+        },
+        {
+          "name": "ordering",
+          "field": "Ordering",
+          "type": "string",
+          "help": "任意: 並び順を API の ordering 値で指定します。",
+          "pointer": true,
+          "conversion": "v1.ListServicePrincipalKeysOrdering"
+        }
+      ],
+      "command_name": "list-service-principal-keys"
     },
     {
       "name": "UploadKey",
@@ -86,9 +197,20 @@
       "handwritten": true,
       "response_type": "*v1.ServicePrincipalKey",
       "arguments": [
-        {"name":"id","field":"ID","type":"int","help":"公開鍵を登録するサービスプリンシパル ID。"},
-        {"name":"public-key","field":"PublicKey","type":"v1.ServiceprincipalKeyPublicKey","help":"登録する公開鍵。コマンド実装ではファイルから読み込みます。"}
-      ]
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "公開鍵を登録するサービスプリンシパル ID。"
+        },
+        {
+          "name": "public-key",
+          "field": "PublicKey",
+          "type": "v1.ServiceprincipalKeyPublicKey",
+          "help": "登録する公開鍵。コマンド実装ではファイルから読み込みます。"
+        }
+      ],
+      "command_name": "upload-service-principal-key"
     },
     {
       "name": "EnableKey",
@@ -96,9 +218,20 @@
       "method": "EnableKey",
       "response_type": "*v1.ServicePrincipalKey",
       "arguments": [
-        {"name":"id","field":"ID","type":"int","help":"サービスプリンシパル ID。"},
-        {"name":"key-id","field":"KeyID","type":"uuid.UUID","help":"有効化するキー ID。"}
-      ]
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "サービスプリンシパル ID。"
+        },
+        {
+          "name": "key-id",
+          "field": "KeyID",
+          "type": "uuid.UUID",
+          "help": "有効化するキー ID。"
+        }
+      ],
+      "command_name": "enable-service-principal-key"
     },
     {
       "name": "DisableKey",
@@ -106,26 +239,56 @@
       "method": "DisableKey",
       "response_type": "*v1.ServicePrincipalKey",
       "arguments": [
-        {"name":"id","field":"ID","type":"int","help":"サービスプリンシパル ID。"},
-        {"name":"key-id","field":"KeyID","type":"uuid.UUID","help":"無効化するキー ID。"}
-      ]
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "サービスプリンシパル ID。"
+        },
+        {
+          "name": "key-id",
+          "field": "KeyID",
+          "type": "uuid.UUID",
+          "help": "無効化するキー ID。"
+        }
+      ],
+      "command_name": "disable-service-principal-key"
     },
     {
       "name": "DeleteKey",
       "help": "指定したサービスプリンシパルキーを削除します。",
       "method": "DeleteKey",
       "arguments": [
-        {"name":"id","field":"ID","type":"int","help":"サービスプリンシパル ID。"},
-        {"name":"key-id","field":"KeyID","type":"uuid.UUID","help":"削除するキー ID。"}
-      ]
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int",
+          "help": "サービスプリンシパル ID。"
+        },
+        {
+          "name": "key-id",
+          "field": "KeyID",
+          "type": "uuid.UUID",
+          "help": "削除するキー ID。"
+        }
+      ],
+      "command_name": "delete-service-principal-key"
     },
     {
       "name": "IssueToken",
       "help": "登録済み公開鍵に対応する秘密鍵で署名した JWT アサーションからアクセストークンを発行します。アサーションは --assertion-file で読み込み、発行されたトークンは秘密情報として扱います。",
       "method": "IssueToken",
-      "arguments": [{"name":"assertion","field":"Assertion","type":"string","help":"アサーション。コマンド実装ではファイルから読み込みます。"}],
+      "arguments": [
+        {
+          "name": "assertion",
+          "field": "Assertion",
+          "type": "string",
+          "help": "アサーション。コマンド実装ではファイルから読み込みます。"
+        }
+      ],
       "response_type": "*v1.ServicePrincipalOAuth2AccessToken",
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "issue-service-principal-token"
     }
   ],
   "wiring_target": "IAMAPI.ServicePrincipal",

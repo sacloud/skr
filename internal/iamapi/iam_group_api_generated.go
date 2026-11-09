@@ -13,13 +13,13 @@ import (
 )
 
 type GroupCommands struct {
-	List              GroupListCommand              "cmd:\"\" help:\"IAM グループを一覧表示します。--user-id で指定したユーザーが所属するグループに絞り込めます。\""
-	Create            GroupCreateCommand            "cmd:\"\" help:\"IAM グループを作成します。作成後、update-memberships でユーザーを所属させてください。\""
-	Read              GroupReadCommand              "cmd:\"\" help:\"ID を指定して IAM グループを読み取ります。\""
-	Update            GroupUpdateCommand            "cmd:\"\" help:\"IAM グループの名前と説明を更新します。どちらも必須で、指定しない項目は空で上書きされます。\""
-	Delete            GroupDeleteCommand            "cmd:\"\" help:\"ID を指定して IAM グループを削除します。\""
-	ReadMemberships   GroupReadMembershipsCommand   "cmd:\"\" help:\"グループに所属するユーザーを一覧表示します。\""
-	UpdateMemberships GroupUpdateMembershipsCommand "cmd:\"\" help:\"グループの所属ユーザーを置き換えます。現在の所属は保持されず、指定した配列で上書きされます。read-memberships で現在の所属を確認できます。\""
+	List              GroupListCommand              "cmd:\"\" name:\"list-groups\" help:\"IAM グループを一覧表示します。--user-id で指定したユーザーが所属するグループに絞り込めます。\""
+	Create            GroupCreateCommand            "cmd:\"\" name:\"create-group\" help:\"IAM グループを作成します。作成後、update-memberships でユーザーを所属させてください。\""
+	Read              GroupReadCommand              "cmd:\"\" name:\"read-group\" help:\"ID を指定して IAM グループを読み取ります。\""
+	Update            GroupUpdateCommand            "cmd:\"\" name:\"update-group\" help:\"IAM グループの名前と説明を更新します。どちらも必須で、指定しない項目は空で上書きされます。\""
+	Delete            GroupDeleteCommand            "cmd:\"\" name:\"delete-group\" help:\"ID を指定して IAM グループを削除します。\""
+	ReadMemberships   GroupReadMembershipsCommand   "cmd:\"\" name:\"list-memberships\" help:\"グループに所属するユーザーを一覧表示します。\""
+	UpdateMemberships GroupUpdateMembershipsCommand "cmd:\"\" name:\"update-memberships\" help:\"グループの所属ユーザーを置き換えます。現在の所属は保持されず、指定した配列で上書きされます。list-memberships で現在の所属を確認できます。\""
 }
 
 type GroupAPI interface {

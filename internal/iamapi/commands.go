@@ -33,22 +33,24 @@ import (
 )
 
 type Commands struct {
-	User             UserCommands             `cmd:"" help:"IAM ユーザーを作成・管理します。ユーザー ID は list で確認できます。"`
-	Group            GroupCommands            `cmd:"" help:"IAM グループを作成・管理します。グループへの所属は update-memberships で行います。"`
-	Policy           PolicyCommands           `cmd:"" help:"IAM ポリシーバインディング（ロールとプリンシパルの割り当て）を参照・更新します。更新は現在の割り当て全体を置き換えます。"`
-	Auth             AuthCommands             `cmd:"" help:"組織の認証条件とパスワードポリシーを参照・更新します。"`
-	Folder           FolderCommands           `cmd:"" help:"IAM フォルダを管理します。"`
-	IAMRole          IAMRoleCommands          `cmd:"" name:"iam-role" help:"利用可能な IAM ロールを参照します。"`
-	IDPolicy         IDPolicyCommands         `cmd:"" name:"id-policy" help:"組織の ID ポリシーを参照・更新します。"`
-	IDRole           IDRoleCommands           `cmd:"" name:"id-role" help:"利用可能な ID ロールを参照します。"`
-	Organization     OrganizationCommands     `cmd:"" help:"IAM 組織とサービス利用ポリシーを参照・管理します。"`
-	Project          ProjectCommands          `cmd:"" help:"IAM プロジェクトを管理します。"`
-	ProjectAPIKey    ProjectAPIKeyCommands    `cmd:"" name:"project-api-key" help:"プロジェクト API キーを管理します。作成時の秘密情報を安全に扱ってください。"`
-	SCIM             ScimCommands             `cmd:"" help:"ユーザープロビジョニング設定を管理します。"`
-	ServicePolicy    ServicePolicyCommands    `cmd:"" name:"service-policy" help:"サービス利用ポリシーの有効状態とルールテンプレートを管理します。"`
-	ServicePrincipal ServicePrincipalCommands `cmd:"" name:"service-principal" help:"サービスプリンシパルと公開鍵を管理します。"`
-	SSO              SSOCommands              `cmd:"" help:"SSO プロファイルを管理します。"`
-	User2FA          User2FACommands          `cmd:"" name:"user-2fa" help:"ユーザーの OTP、信頼済みデバイス、セキュリティキーを管理します。"`
+	// operationId 派生名への移行 (ADR 0074) に合わせ、グループ階層を Kong の embed で
+	// 展開して 1 階層のフラット構造にしています。
+	User             UserCommands             `embed:""`
+	Group            GroupCommands            `embed:""`
+	Policy           PolicyCommands           `embed:""`
+	Auth             AuthCommands             `embed:""`
+	Folder           FolderCommands           `embed:""`
+	IAMRole          IAMRoleCommands          `embed:"" name:"iam-role"`
+	IDPolicy         IDPolicyCommands         `embed:"" name:"id-policy"`
+	IDRole           IDRoleCommands           `embed:"" name:"id-role"`
+	Organization     OrganizationCommands     `embed:""`
+	Project          ProjectCommands          `embed:""`
+	ProjectAPIKey    ProjectAPIKeyCommands    `embed:"" name:"project-api-key"`
+	SCIM             ScimCommands             `embed:""`
+	ServicePolicy    ServicePolicyCommands    `embed:"" name:"service-policy"`
+	ServicePrincipal ServicePrincipalCommands `embed:"" name:"service-principal"`
+	SSO              SSOCommands              `embed:""`
+	User2FA          User2FACommands          `embed:"" name:"user-2fa"`
 }
 
 type UserListCommand struct {

@@ -13,12 +13,12 @@ import (
 )
 
 type FolderCommands struct {
-	List   FolderListCommand   "cmd:\"\" help:\"IAM フォルダを一覧表示します。ページングや絞り込みには --request または対応する個別フラグを指定します。\""
-	Create FolderCreateCommand "cmd:\"\" help:\"IAM フォルダを作成します。親フォルダを指定する場合は --parent-id を指定してください。\""
-	Read   FolderReadCommand   "cmd:\"\" help:\"ID を指定して IAM フォルダを読み取ります。\""
-	Update FolderUpdateCommand "cmd:\"\" help:\"IAM フォルダの名前と説明を更新します。説明を変更しない場合は --description を省略します。\""
-	Move   FolderMoveCommand   "cmd:\"\" help:\"指定したフォルダを親フォルダへ移動します。移動先が有効な階層になることを確認してください。\""
-	Delete FolderDeleteCommand "cmd:\"\" help:\"ID を指定して IAM フォルダを削除します。\""
+	List   FolderListCommand   "cmd:\"\" name:\"list-folders\" help:\"IAM フォルダを一覧表示します。ページングや絞り込みには --request または対応する個別フラグを指定します。\""
+	Create FolderCreateCommand "cmd:\"\" name:\"create-folder\" help:\"IAM フォルダを作成します。親フォルダを指定する場合は --parent-id を指定してください。\""
+	Read   FolderReadCommand   "cmd:\"\" name:\"read-folder\" help:\"ID を指定して IAM フォルダを読み取ります。\""
+	Update FolderUpdateCommand "cmd:\"\" name:\"update-folder\" help:\"IAM フォルダの名前と説明を更新します。説明を変更しない場合は --description を省略します。\""
+	Move   FolderMoveCommand   "cmd:\"\" name:\"move-folders\" help:\"指定したフォルダを親フォルダへ移動します。移動先が有効な階層になることを確認してください。\""
+	Delete FolderDeleteCommand "cmd:\"\" name:\"delete-folder\" help:\"ID を指定して IAM フォルダを削除します。\""
 }
 
 type FolderAPI interface {

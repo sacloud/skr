@@ -40,27 +40,12 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr gslb-api` | GSLB の検索、参照、作成、更新、削除 |
 | `skr simplemq-api` | キューの管理、メッセージ数の確認、キュー内メッセージの削除、メッセージの送信、受信、タイムアウト延長、削除 |
 | `skr simple-notification-api` | 通知先、通知先グループ、ルーティング設定の管理、送信可否ステータスの確認、通知送信、順序変更、通知履歴の参照 |
-| `skr eventbus-api process-configuration` | 実行設定の管理、実行先サービス用シークレットの登録 |
-| `skr eventbus-api schedule` | スケジュールの管理 |
-| `skr eventbus-api trigger` | イベントトリガーの管理 |
+| `skr eventbus-api` | 実行設定、スケジュール、トリガーの管理、実行先サービス用シークレットの登録 |
 | `skr apprun-dedicated-api` | AppRun 専有型のクラスタ、アプリケーション、ワーカノードなどの管理 |
 | `skr apprun-api` | AppRun 共用型のアプリケーション、バージョン、トラフィック分散、パケットフィルター、ユーザー情報の管理 |
 | `skr container-registry-api registry` | コンテナレジストリと認証ユーザーの管理 |
 | `skr object-storage-api` | サイト、サイトアカウント、バケット、パーミッションの管理 |
-| `skr iam-api user` | IAM ユーザーの作成、参照、更新、削除、メールアドレスの登録と解除 |
-| `skr iam-api group` | IAM グループの管理とメンバーシップの更新 |
-| `skr iam-api policy` | 組織・プロジェクト・フォルダの IAM ポリシーバインディングの参照と更新 |
-| `skr iam-api auth` | 組織の認証条件とパスワードポリシーの参照・更新 |
-| `skr iam-api folder` / `project` | IAM フォルダとプロジェクトの管理・移動 |
-| `skr iam-api organization` | 組織情報とサービス利用ポリシーの管理 |
-| `skr iam-api iam-role` / `id-role` | IAM ロールと ID ロールの参照 |
-| `skr iam-api id-policy` | 組織の ID ポリシーの参照・更新 |
-| `skr iam-api project-api-key` | プロジェクト API キーの管理 |
-| `skr iam-api service-principal` | サービスプリンシパルと公開鍵の管理、アクセストークンの発行 |
-| `skr iam-api service-policy` | サービス利用ポリシーの状態とルールテンプレートの操作 |
-| `skr iam-api scim` | ユーザープロビジョニング設定の管理 |
-| `skr iam-api sso` | SSO プロファイルの管理 |
-| `skr iam-api user-2fa` | ユーザーの OTP、信頼済みデバイス、セキュリティキーの管理 |
+| `skr iam-api` | IAM ユーザー、グループ、フォルダ、プロジェクト、組織、ポリシーバインディング、認証設定、API キー、サービスプリンシパル、SSO、SCIM、2 要素認証の管理 |
 | `skr security-control-api` | セキュリティコントロールの有効化、評価ルールと自動アクションの管理 |
 | `skr http <url>` | SDK の認証情報を使った任意の HTTPS エンドポイントへのリクエスト |
 | `skr config current` | 現在選択されているプロファイル名の確認 |

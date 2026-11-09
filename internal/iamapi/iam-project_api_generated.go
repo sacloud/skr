@@ -13,12 +13,12 @@ import (
 )
 
 type ProjectCommands struct {
-	List   ProjectListCommand   "cmd:\"\" help:\"IAM プロジェクトを一覧表示します。\""
-	Create ProjectCreateCommand "cmd:\"\" help:\"IAM プロジェクトを作成します。既存のフォルダ内に作成する場合は --parent-folder-id を指定してください。\""
-	Read   ProjectReadCommand   "cmd:\"\" help:\"ID を指定して IAM プロジェクトを読み取ります。\""
-	Update ProjectUpdateCommand "cmd:\"\" help:\"IAM プロジェクトの名前と説明を更新します。両方の値を指定してください。\""
-	Move   ProjectMoveCommand   "cmd:\"\" help:\"指定したプロジェクトをフォルダへ移動します。\""
-	Delete ProjectDeleteCommand "cmd:\"\" help:\"ID を指定して IAM プロジェクトを削除します。\""
+	List   ProjectListCommand   "cmd:\"\" name:\"list-projects\" help:\"IAM プロジェクトを一覧表示します。\""
+	Create ProjectCreateCommand "cmd:\"\" name:\"create-project\" help:\"IAM プロジェクトを作成します。既存のフォルダ内に作成する場合は --parent-folder-id を指定してください。\""
+	Read   ProjectReadCommand   "cmd:\"\" name:\"read-project\" help:\"ID を指定して IAM プロジェクトを読み取ります。\""
+	Update ProjectUpdateCommand "cmd:\"\" name:\"update-project\" help:\"IAM プロジェクトの名前と説明を更新します。両方の値を指定してください。\""
+	Move   ProjectMoveCommand   "cmd:\"\" name:\"move-projects\" help:\"指定したプロジェクトをフォルダへ移動します。\""
+	Delete ProjectDeleteCommand "cmd:\"\" name:\"delete-project\" help:\"ID を指定して IAM プロジェクトを削除します。\""
 }
 
 type ProjectAPI interface {

@@ -57,14 +57,14 @@ func TestScenarioIAMScim(t *testing.T) {
 func runScimScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	t.Helper()
 	run.scim.attempted = true
-	data := h.Call(t, "テスト用のSCIM設定を作成する", "iam-api", "scim", "create",
+	data := h.Call(t, "テスト用のSCIM設定を作成する", "iam-api", "create-scim-configuration",
 		"--name", run.scim.name, "--query", "{id: .id, name: .name}")
 	id, name, err := decodeNamedResource("create-scim", data)
 	require.NoError(t, err, "create-scim: 応答のデコードに失敗しました")
 	require.Equal(t, run.scim.name, name, "create-scim: 作成後の名前がリクエストと一致すること")
 	run.scim.id = id
 
-	data = h.Call(t, "SCIM設定を読み込む", "iam-api", "scim", "read", run.scim.id,
+	data = h.Call(t, "SCIM設定を読み込む", "iam-api", "read-scim-configuration", run.scim.id,
 		"--query", "{id: .id, name: .name, base_url: .base_url}")
 	read, err := decodeScimConfiguration("read-scim", data)
 	require.NoError(t, err, "read-scim: 応答のデコードに失敗しました")
@@ -74,7 +74,7 @@ func runScimScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 
 	renamed := run.scim.name + "-renamed"
 	run.scim.renamedTo = renamed
-	data = h.Call(t, "SCIM設定の名前を更新する", "iam-api", "scim", "update", run.scim.id,
+	data = h.Call(t, "SCIM設定の名前を更新する", "iam-api", "update-scim-configuration", run.scim.id,
 		"--name", renamed, "--query", "{id: .id, name: .name}")
 	_, name, err = decodeNamedResource("update-scim", data)
 	require.NoError(t, err, "update-scim: 応答のデコードに失敗しました")
@@ -82,20 +82,20 @@ func runScimScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	run.scim.name = renamed
 	run.scim.renamedTo = ""
 
-	data = h.Call(t, "SCIM設定の一覧を確認する", "iam-api", "scim", "list", "--query", managedListQuery)
+	data = h.Call(t, "SCIM設定の一覧を確認する", "iam-api", "list-scim-configurations", "--query", managedListQuery)
 	found, err := checkManagedListed("list-scim", data, run.scim.id, run.scim.name)
 	require.NoError(t, err, "list-scim: 一覧のデコードに失敗しました")
 	require.True(t, found, "list-scim: 設定 %sが一覧に存在すること", run.scim.id)
 
 	// 応答には秘密トークンが含まれるため、
 	// query はその長さのみを投影し、実行記録にはトークン自体が保存されない。
-	data = h.Call(t, "SCIMトークンを再発行する", "iam-api", "scim", "regenerate-token", run.scim.id,
+	data = h.Call(t, "SCIMトークンを再発行する", "iam-api", "regenerate-scim-configuration-token", run.scim.id,
 		"--query", "{token_length: (.secret_token | length)}")
 	var token secretTokenLength
 	require.NoError(t, json.Unmarshal(data, &token), "regenerate-scim-token: トークン長のデコードに失敗しました")
 	require.Positive(t, token.TokenLength, "regenerate-scim-token: トークン長が正の値であること")
 
-	h.Call(t, "SCIM設定を削除する", "iam-api", "scim", "delete", run.scim.id)
+	h.Call(t, "SCIM設定を削除する", "iam-api", "delete-scim-configuration", run.scim.id)
 	run.scim.deleted = true
 }
 

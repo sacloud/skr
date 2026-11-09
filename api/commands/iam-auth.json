@@ -10,7 +10,8 @@
       "name": "ReadPasswordPolicy",
       "help": "組織のパスワードポリシーを参照します。",
       "method": "ReadPasswordPolicy",
-      "response_type": "*v1.PasswordPolicy"
+      "response_type": "*v1.PasswordPolicy",
+      "command_name": "read-organization-password-policy"
     },
     {
       "name": "UpdatePasswordPolicy",
@@ -21,31 +22,59 @@
       "request_help": "パスワードポリシー全体の JSON。直接指定するか @path.json で読み込みます。組織全体の設定を変更するため、更新前に read-password-policy で確認してください。--request と個別フラグは併用できません。",
       "response_type": "*v1.PasswordPolicy",
       "flags": [
-        {"name":"min-length","field":"MinLength","type":"int","help":"必須: パスワードの最小文字数。","required":true},
-        {"name":"require-uppercase","field":"RequireUppercase","type":"bool","help":"必須: 大文字を必須にします。","required":true},
-        {"name":"require-lowercase","field":"RequireLowercase","type":"bool","help":"必須: 小文字を必須にします。","required":true},
-        {"name":"require-symbols","field":"RequireSymbols","type":"bool","help":"必須: 記号を必須にします。","required":true}
-      ]
+        {
+          "name": "min-length",
+          "field": "MinLength",
+          "type": "int",
+          "help": "必須: パスワードの最小文字数。",
+          "required": true
+        },
+        {
+          "name": "require-uppercase",
+          "field": "RequireUppercase",
+          "type": "bool",
+          "help": "必須: 大文字を必須にします。",
+          "required": true
+        },
+        {
+          "name": "require-lowercase",
+          "field": "RequireLowercase",
+          "type": "bool",
+          "help": "必須: 小文字を必須にします。",
+          "required": true
+        },
+        {
+          "name": "require-symbols",
+          "field": "RequireSymbols",
+          "type": "bool",
+          "help": "必須: 記号を必須にします。",
+          "required": true
+        }
+      ],
+      "command_name": "update-organization-password-policy"
     },
     {
       "name": "ReadAuthConditions",
       "help": "組織の認証条件を参照します。",
       "method": "ReadAuthConditions",
-      "response_type": "*v1.AuthConditions"
+      "response_type": "*v1.AuthConditions",
+      "command_name": "read-organization-auth-conditions"
     },
     {
       "name": "UpdateAuthConditions",
-      "help": "組織の認証条件を更新します。現在の設定を read-auth-conditions で確認し、すべての項目を含む JSON を指定してください。",
+      "help": "組織の認証条件を更新します。現在の設定を read-organization-auth-conditions で確認し、すべての項目を含む JSON を指定してください。",
       "method": "UpdateAuthConditions",
       "request_type": "v1.AuthConditions",
-      "request_help": "認証条件全体の JSON。直接指定するか @path.json で読み込みます。組織全体のログイン条件を変更するため、更新前に read-auth-conditions で確認してください。",
-      "response_type": "*v1.AuthConditions"
+      "request_help": "認証条件全体の JSON。直接指定するか @path.json で読み込みます。組織全体のログイン条件を変更するため、更新前に read-organization-auth-conditions で確認してください。",
+      "response_type": "*v1.AuthConditions",
+      "command_name": "update-organization-auth-conditions"
     },
     {
       "name": "ReadAuthContext",
       "help": "現在の認証情報に対応する IAM 認証コンテキストを参照します。",
       "method": "ReadAuthContext",
-      "response_type": "*v1.ReadAuthContextOK"
+      "response_type": "*v1.ReadAuthContextOK",
+      "command_name": "read-auth-context"
     }
   ],
   "wiring_target": "IAMAPI.Auth",

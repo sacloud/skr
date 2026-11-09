@@ -36,7 +36,7 @@
 | `test/e2e/secretmanager-api` | vault 5操作、secret 4操作(9) | 全コマンド実装済み。2026-10-30 に testing.T ベースのシナリオでテスト専用の KMS キーを使い、Vault 作成から削除後の不在までをライブ検証済み。`secret unveil` の出力は秘密情報のため実行記録から非表示にする |
 | `test/e2e/service-endpoint-gateway-api` | appliance 10操作(10) | 全コマンド実装済み。2026-10-31 に testing.T ベースのシナリオでライブ実行し、スイッチ接続ゲートウェイの作成から削除後の不在までを確認済み。`seg-interface-get-interface` はライブ検証外で [#189](https://github.com/sacloud/skr/issues/189) で管理 |
 | `test/e2e/database` | database 13操作(13) | 全コマンド実装済み。testing.T ベースのシナリオ (`test/e2e/database/scenario_database_test.go`) でライブ実行し、作成 (起動待ち合わせ) → read → list-parameter → find → Monitor 4種 → update → shutdown → boot → reset → delete → 削除後の不在まで確認済み (2026-11-02)。create / update は api 層の操作に移行済み |
-| `test/e2e/iam-api` | 9シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | testing.T ベースのシナリオに移行済み。ライブは57コマンドの正常実行を確認済みで、sso link/unlink の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
+| `test/e2e/iam-api` | 9シナリオで59コマンド(読み取り15、リソーススコープ29、アカウント系15) | testing.T ベースのシナリオに移行済み。2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の operationId 由来のフラット名へ移行済み。ライブは57コマンドの正常実行を確認済みで、sso の link/unlink (`assign-sso-profile` / `unassign-sso-profile`) の2操作は [#144](https://github.com/sacloud/skr/issues/144) で管理 |
 
 `config` は CLI のメタコマンドとして上表に含めます。`version` は `test/e2e/version` の testing.T ベースのシナリオテストで検証します。
 
@@ -83,6 +83,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
     - user-2fa は使い捨ての一時ユーザーに対して、空ページの参照と `deactivate-otp`・`clear-trusted-devices` の正常終了、存在しない ID の操作が 404 で分類されることを確認します。
 - `group update` は 2026-10-29 に testing.T ベースのシナリオへの移行時に整備しました。group update は未指定項目を空で上書きするため、名前と説明を毎回指定して更新し、応答と元の名前に戻した後の読み込みで反映を確認します。
 - 期待どおりの失敗を確認するステップは、testing.T ベースのシナリオでは `require.Error` と stderr の分類で確認します。
+- 2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行で operationId 派生名に変更したコマンド (例: `list-users`、`update-organization-iam-policy`、`assign-sso-profile` など) で 9 シナリオをすべて再実行しました。57 コマンドの正常応答を新しいコマンド名で再確認しています。sso の link/unlink (`assign-sso-profile` / `unassign-sso-profile`) は引き続き [#144](https://github.com/sacloud/skr/issues/144) で管理します。
 - ライブ実行では一時的なネットワークエラーが頻発したため、`SAKURACLOUD_RETRY_MAX=3` と `SAKURACLOUD_RETRY_WAIT_MIN=1`、`SAKURACLOUD_RETRY_WAIT_MAX=30` を実行時に指定しました。プロファイルの `RetryMax = 0` は変更していません。
 
 ### タスク4: apprun-dedicated-api

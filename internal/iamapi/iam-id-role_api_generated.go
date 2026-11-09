@@ -12,8 +12,8 @@ import (
 )
 
 type IDRoleCommands struct {
-	List IDRoleListCommand "cmd:\"\" help:\"利用可能な ID ロールを一覧表示します。\""
-	Read IDRoleReadCommand "cmd:\"\" help:\"ID を指定して ID ロールを読み取ります。\""
+	List IDRoleListCommand "cmd:\"\" name:\"list-id-roles\" help:\"利用可能な ID ロールを一覧表示します。\""
+	Read IDRoleReadCommand "cmd:\"\" name:\"read-id-role\" help:\"ID を指定して ID ロールを読み取ります。\""
 }
 
 type IDRoleAPI interface {

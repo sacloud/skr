@@ -73,14 +73,14 @@ func runSSOScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	certificateFile := writeIdPCertificate(t)
 
 	createFile := writeSSORequest(t, run, "sso-create", run.ssoProfile.name, certificateFile)
-	data := h.Call(t, "テスト用のSSO profileを作成する", "iam-api", "sso", "create",
+	data := h.Call(t, "テスト用のSSO profileを作成する", "iam-api", "create-sso-profile",
 		"--request", "@"+createFile, "--query", "{id: .id, name: .name}")
 	id, name, err := decodeNamedResource("create-sso", data)
 	require.NoError(t, err, "create-sso: 応答のデコードに失敗しました")
 	require.Equal(t, run.ssoProfile.name, name, "create-sso: 作成後の名前がリクエストと一致すること")
 	run.ssoProfile.id = id
 
-	data = h.Call(t, "SSO profileを読み込む", "iam-api", "sso", "read", run.ssoProfile.id,
+	data = h.Call(t, "SSO profileを読み込む", "iam-api", "read-sso-profile", run.ssoProfile.id,
 		"--query", "{id: (.id | tostring), name: .name, description: .description, sp_entity_id: .sp_entity_id, sp_acs_url: .sp_acs_url, assigned: .assigned}")
 	read, err := decodeSSOProfile("read-sso", data)
 	require.NoError(t, err, "read-sso: 応答のデコードに失敗しました")
@@ -91,7 +91,7 @@ func runSSOScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	require.NotNil(t, read.Assigned, "read-sso: assignedが存在すること")
 	require.False(t, *read.Assigned, "read-sso: 作成したprofileがorganizationに割り当てられていないこと")
 
-	data = h.Call(t, "SSO profileの一覧を確認する", "iam-api", "sso", "list", "--query", managedListQuery)
+	data = h.Call(t, "SSO profileの一覧を確認する", "iam-api", "list-sso-profiles", "--query", managedListQuery)
 	found, err := checkManagedListed("list-sso", data, run.ssoProfile.id, run.ssoProfile.name)
 	require.NoError(t, err, "list-sso: 一覧のデコードに失敗しました")
 	require.True(t, found, "list-sso: profile %sが一覧に存在すること", run.ssoProfile.id)
@@ -99,7 +99,7 @@ func runSSOScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	renamed := run.ssoProfile.name + "-renamed"
 	run.ssoProfile.renamedTo = renamed
 	updateFile := writeSSORequest(t, run, "sso-update", renamed, certificateFile)
-	data = h.Call(t, "SSO profileの名前を更新する", "iam-api", "sso", "update", run.ssoProfile.id,
+	data = h.Call(t, "SSO profileの名前を更新する", "iam-api", "update-sso-profile", run.ssoProfile.id,
 		"--request", "@"+updateFile, "--query", "{id: .id, name: .name}")
 	_, name, err = decodeNamedResource("update-sso", data)
 	require.NoError(t, err, "update-sso: 応答のデコードに失敗しました")
@@ -107,7 +107,7 @@ func runSSOScenario(t *testing.T, h *helper.Helper, run *iamRun) {
 	run.ssoProfile.name = renamed
 	run.ssoProfile.renamedTo = ""
 
-	h.Call(t, "SSO profileを削除する", "iam-api", "sso", "delete", run.ssoProfile.id)
+	h.Call(t, "SSO profileを削除する", "iam-api", "delete-sso-profile", run.ssoProfile.id)
 	run.ssoProfile.deleted = true
 }
 

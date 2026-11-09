@@ -150,7 +150,7 @@ func requestInput(input string) ([]byte, error) {
 		return data, nil
 	}
 	if strings.HasPrefix(input, "@") {
-		//nolint:gosec // パスは --request 経由でユーザーが明示的に指定したものです。
+
 		data, err := os.ReadFile(strings.TrimPrefix(input, "@"))
 		if err != nil {
 			return nil, fmt.Errorf("read request file: %w", err)

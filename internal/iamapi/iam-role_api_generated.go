@@ -12,8 +12,8 @@ import (
 )
 
 type IAMRoleCommands struct {
-	List IAMRoleListCommand "cmd:\"\" help:\"利用可能な IAM ロールを一覧表示します。\""
-	Read IAMRoleReadCommand "cmd:\"\" help:\"ID を指定して IAM ロールを読み取ります。\""
+	List IAMRoleListCommand "cmd:\"\" name:\"list-iam-roles\" help:\"利用可能な IAM ロールを一覧表示します。\""
+	Read IAMRoleReadCommand "cmd:\"\" name:\"read-iam-role\" help:\"ID を指定して IAM ロールを読み取ります。\""
 }
 
 type IAMRoleAPI interface {

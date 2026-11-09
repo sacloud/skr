@@ -13,12 +13,12 @@ import (
 )
 
 type ScimCommands struct {
-	List            ScimListCommand            "cmd:\"\" help:\"ユーザープロビジョニング設定を一覧表示します。\""
-	Create          ScimCreateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を作成します。\""
-	Read            ScimReadCommand            "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を読み取ります。\""
-	Update          ScimUpdateCommand          "cmd:\"\" help:\"ユーザープロビジョニング設定を更新します。更新後の設定名を --name または --request JSON の name に指定してください。\""
-	Delete          ScimDeleteCommand          "cmd:\"\" help:\"ID を指定してユーザープロビジョニング設定を削除します。プロビジョニングされたユーザーとグループをすべて削除してから実行してください。\""
-	RegenerateToken ScimRegenerateTokenCommand "cmd:\"\" help:\"ユーザープロビジョニング設定の秘密トークンを再発行します。再発行後は古いトークンが使えなくなるため、連携先を更新できる場合にのみ実行してください。\""
+	List            ScimListCommand            "cmd:\"\" name:\"list-scim-configurations\" help:\"ユーザープロビジョニング設定を一覧表示します。\""
+	Create          ScimCreateCommand          "cmd:\"\" name:\"create-scim-configuration\" help:\"ユーザープロビジョニング設定を作成します。\""
+	Read            ScimReadCommand            "cmd:\"\" name:\"read-scim-configuration\" help:\"ID を指定してユーザープロビジョニング設定を読み取ります。\""
+	Update          ScimUpdateCommand          "cmd:\"\" name:\"update-scim-configuration\" help:\"ユーザープロビジョニング設定を更新します。更新後の設定名を --name または --request JSON の name に指定してください。\""
+	Delete          ScimDeleteCommand          "cmd:\"\" name:\"delete-scim-configuration\" help:\"ID を指定してユーザープロビジョニング設定を削除します。プロビジョニングされたユーザーとグループをすべて削除してから実行してください。\""
+	RegenerateToken ScimRegenerateTokenCommand "cmd:\"\" name:\"regenerate-scim-configuration-token\" help:\"ユーザープロビジョニング設定の秘密トークンを再発行します。再発行後は古いトークンが使えなくなるため、連携先を更新できる場合にのみ実行してください。\""
 }
 
 type ScimAPI interface {

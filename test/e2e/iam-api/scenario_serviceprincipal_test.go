@@ -106,7 +106,7 @@ func updateServicePrincipalName(t *testing.T, h *helper.Helper, run *iamRun, des
 		"name":        name,
 		"description": run.servicePrincipal.description,
 	})
-	data := h.Call(t, description, "iam-api", "service-principal", "update", run.servicePrincipal.id,
+	data := h.Call(t, description, "iam-api", "update-service-principal", run.servicePrincipal.id,
 		"--request", request, "--query", "{id: .id, name: .name}")
 	_, updatedName, err := decodeNamedResource("update-service-principal", data)
 	require.NoError(t, err, "%s: 応答のデコードに失敗しました", description)
@@ -122,7 +122,7 @@ func runServicePrincipalKeysScenario(t *testing.T, h *helper.Helper, run *iamRun
 	require.NoError(t, err, "サービスプリンシパルのキーペアを生成できること")
 	publicKeyFile := writePublicKeyFile(t, keyPair)
 
-	data := h.Call(t, "生成した公開鍵をservice principalに登録する", "iam-api", "service-principal", "upload-key",
+	data := h.Call(t, "生成した公開鍵をservice principalに登録する", "iam-api", "upload-service-principal-key",
 		"--public-key-file", publicKeyFile, run.servicePrincipal.id,
 		"--query", "{id: .id, kid: .kid, status: .status}")
 	key, err := decodeServicePrincipalKey("upload-key", data)
@@ -131,7 +131,7 @@ func runServicePrincipalKeysScenario(t *testing.T, h *helper.Helper, run *iamRun
 	require.NotEmpty(t, key.Kid, "upload-key: kidが存在すること")
 	require.NotEmpty(t, key.ID, "upload-key: IDが存在すること")
 
-	data = h.Call(t, "service principalのキー一覧を確認する", "iam-api", "service-principal", "list-keys", run.servicePrincipal.id,
+	data = h.Call(t, "service principalのキー一覧を確認する", "iam-api", "list-service-principal-keys", run.servicePrincipal.id,
 		"--query", "{items: [.items[] | {id: .id, kid: .kid, status: .status}]}")
 	found, err := checkServicePrincipalKey("list-keys", data, key)
 	require.NoError(t, err, "list-keys: キー一覧のデコードに失敗しました")
@@ -142,10 +142,10 @@ func runServicePrincipalKeysScenario(t *testing.T, h *helper.Helper, run *iamRun
 		method      string
 		status      string
 	}{
-		{description: "キーを無効化する", method: "disable-key", status: "disabled"},
-		{description: "キーを有効化する", method: "enable-key", status: "enabled"},
+		{description: "キーを無効化する", method: "disable", status: "disabled"},
+		{description: "キーを有効化する", method: "enable", status: "enabled"},
 	} {
-		data = h.Call(t, transition.description, "iam-api", "service-principal", transition.method,
+		data = h.Call(t, transition.description, "iam-api", transition.method+"-service-principal-key",
 			run.servicePrincipal.id, key.ID, "--query", "{id: .id, status: .status}")
 		updated, err := decodeServicePrincipalKey(transition.method, data)
 		require.NoError(t, err, "%s: 応答のデコードに失敗しました", transition.method)
@@ -155,9 +155,9 @@ func runServicePrincipalKeysScenario(t *testing.T, h *helper.Helper, run *iamRun
 
 	issueServicePrincipalToken(t, h, run, keyPair, key.Kid)
 
-	h.Call(t, "キーを削除する", "iam-api", "service-principal", "delete-key",
+	h.Call(t, "キーを削除する", "iam-api", "delete-service-principal-key",
 		run.servicePrincipal.id, key.ID)
-	data = h.Call(t, "削除後のキー一覧を確認する", "iam-api", "service-principal", "list-keys", run.servicePrincipal.id,
+	data = h.Call(t, "削除後のキー一覧を確認する", "iam-api", "list-service-principal-keys", run.servicePrincipal.id,
 		"--query", "{items: [.items[] | {id: .id, kid: .kid, status: .status}]}")
 	found, err = checkServicePrincipalKey("list-keys-after-delete", data, key)
 	require.NoError(t, err, "list-keys-after-delete: キー一覧のデコードに失敗しました")
@@ -189,7 +189,7 @@ func issueServicePrincipalToken(t *testing.T, h *helper.Helper, run *iamRun, pri
 	assertionFile := filepath.Join(t.TempDir(), "assertion")
 	require.NoError(t, os.WriteFile(assertionFile, []byte(assertion), 0o600), "assertionファイルの書き込みに失敗しました")
 
-	data := h.Call(t, "JWT assertionからaccess tokenを発行する", "iam-api", "service-principal", "issue-token",
+	data := h.Call(t, "JWT assertionからaccess tokenを発行する", "iam-api", "issue-service-principal-token",
 		"--assertion-file", assertionFile, "--query", "{token_type: .token_type, expires_in: .expires_in}")
 	var summary accessTokenSummary
 	require.NoError(t, json.Unmarshal(data, &summary), "issue-token: トークンサマリーのデコードに失敗しました")
