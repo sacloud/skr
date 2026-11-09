@@ -38,20 +38,20 @@ $ echo "$CLOUDIMG_ARCHIVE_ID, $DISK_PLAN_ID"
 ```console
 $ skr networking-suite-api --help
 $ skr iaas-api archive read --help
-$ skr networking-suite-api subnet-group list --help
-$ skr networking-suite-api subnet-group read --help
-$ skr networking-suite-api subnet-group create --help
-$ skr networking-suite-api subnet-group update --help
-$ skr networking-suite-api subnet-group delete --help
-$ skr networking-suite-api subnet list --help
-$ skr networking-suite-api subnet read --help
-$ skr networking-suite-api subnet create --help
-$ skr networking-suite-api subnet update --help
-$ skr networking-suite-api subnet delete --help
-$ skr networking-suite-api interface-connection create --help
-$ skr networking-suite-api interface-connection delete --help
-$ skr networking-suite-api address list --help
-$ skr networking-suite-api address read --help
+$ skr networking-suite-api list-subnet-groups --help
+$ skr networking-suite-api read-subnet-group --help
+$ skr networking-suite-api create-subnet-group --help
+$ skr networking-suite-api update-subnet-group --help
+$ skr networking-suite-api delete-subnet-group --help
+$ skr networking-suite-api list-subnets --help
+$ skr networking-suite-api read-subnet --help
+$ skr networking-suite-api create-subnet --help
+$ skr networking-suite-api update-subnet --help
+$ skr networking-suite-api delete-subnet --help
+$ skr networking-suite-api create-interface-connection --help
+$ skr networking-suite-api delete-interface-connection --help
+$ skr networking-suite-api list-addresses --help
+$ skr networking-suite-api read-address --help
 $ skr iaas-api server create --help
 $ skr iaas-api server boot --help
 $ skr iaas-api server read --help
@@ -216,7 +216,7 @@ EOF
 
 ```console
 $ GROUP_NAME="skr-nws-tutorial-$RUN_ID"
-$ skr networking-suite-api subnet-group create \
+$ skr networking-suite-api create-subnet-group \
     --name "$GROUP_NAME" \
     --description "$DESCRIPTION" \
     --ipv4-address-range-cidr 10.0.0.0/16 \
@@ -227,20 +227,20 @@ $ skr networking-suite-api subnet-group create \
 
 ```console
 $ GROUP_SRN=SUBNET_GROUP_SRN
-$ skr networking-suite-api subnet-group update "$GROUP_SRN" \
+$ skr networking-suite-api update-subnet-group "$GROUP_SRN" \
     --name "$GROUP_NAME-updated" --description "$DESCRIPTION"
-$ skr networking-suite-api subnet-group read "$GROUP_SRN" \
+$ skr networking-suite-api read-subnet-group "$GROUP_SRN" \
     --query '{SRN,Name,Description,IPv4AddressRangeCIDR,Region}'
 ```
 
 次に、同じ `/16` 内で重複しない `/24` サブネットを2つ作成します。
 
 ```console
-$ skr networking-suite-api subnet create \
+$ skr networking-suite-api create-subnet \
     --name "$GROUP_NAME-subnet-1" --description "$DESCRIPTION" \
     --ipv4-address-range-cidr 10.0.1.0/24 --zone is1b \
     --subnet-group-srn "$GROUP_SRN"
-$ skr networking-suite-api subnet create \
+$ skr networking-suite-api create-subnet \
     --name "$GROUP_NAME-subnet-2" --description "$DESCRIPTION" \
     --ipv4-address-range-cidr 10.0.2.0/24 --zone is1b \
     --subnet-group-srn "$GROUP_SRN"
@@ -251,9 +251,9 @@ $ skr networking-suite-api subnet create \
 ```console
 $ ENTRY_SUBNET_SRN=FIRST_SUBNET_SRN
 $ PEER_SUBNET_SRN=SECOND_SUBNET_SRN
-$ skr networking-suite-api subnet update "$ENTRY_SUBNET_SRN" \
+$ skr networking-suite-api update-subnet "$ENTRY_SUBNET_SRN" \
     --name "$GROUP_NAME-subnet-1-updated" --description "$DESCRIPTION"
-$ skr networking-suite-api subnet list "$GROUP_SRN" \
+$ skr networking-suite-api list-subnets "$GROUP_SRN" \
     --query 'map({SRN,Name,Description,IPv4AddressRangeCIDR,Zone,SubnetGroup})'
 ```
 
@@ -287,9 +287,9 @@ NIC の SRN は、ゾーンと `server read` で確認した NIC ID から組み
 ```console
 $ ENTRY_INTERFACE_SRN="srnv1:sakura-is1b:sakura.iaas.interface:$ENTRY_NIC_ID"
 $ PEER_INTERFACE_SRN="srnv1:sakura-is1b:sakura.iaas.interface:$PEER_NIC_ID"
-$ skr networking-suite-api interface-connection create \
+$ skr networking-suite-api create-interface-connection \
     --interface-srn "$ENTRY_INTERFACE_SRN" --subnet-srn "$ENTRY_SUBNET_SRN"
-$ skr networking-suite-api interface-connection create \
+$ skr networking-suite-api create-interface-connection \
     --interface-srn "$PEER_INTERFACE_SRN" --subnet-srn "$PEER_SUBNET_SRN"
 ```
 
@@ -308,14 +308,14 @@ Create の応答にはインターフェースコネクションの SRN と割�
 $ ENTRY_CONNECTION_SRN=ENTRY_INTERFACE_CONNECTION_SRN
 $ PEER_CONNECTION_SRN=PEER_INTERFACE_CONNECTION_SRN
 $ PEER_NWS_IP=PEER_EPHEMERAL_IPV4_ADDRESS
-$ skr networking-suite-api address list "$ENTRY_SUBNET_SRN" \
+$ skr networking-suite-api list-addresses "$ENTRY_SUBNET_SRN" \
     --interface-connection-srn "$ENTRY_CONNECTION_SRN" \
     --query 'map({SRN,IPAddress,Subnet})'
-$ skr networking-suite-api address list "$PEER_SUBNET_SRN" \
+$ skr networking-suite-api list-addresses "$PEER_SUBNET_SRN" \
     --interface-connection-srn "$PEER_CONNECTION_SRN" \
     --query 'map({SRN,IPAddress,Subnet})'
 $ PEER_ADDRESS_SRN=PEER_ADDRESS_SRN
-$ skr networking-suite-api address read "$PEER_ADDRESS_SRN" \
+$ skr networking-suite-api read-address "$PEER_ADDRESS_SRN" \
     --query '{SRN,IPAddress,Subnet}'
 ```
 
@@ -392,11 +392,11 @@ $ ssh -i "$KEY_PATH" -o IdentitiesOnly=yes \
 両 Server の `InstanceStatus` が停止状態になったら、接続を解除し、アドレスが残っていないことを確認します。
 
 ```console
-$ skr networking-suite-api interface-connection delete "$PEER_CONNECTION_SRN"
-$ skr networking-suite-api interface-connection delete "$ENTRY_CONNECTION_SRN"
-$ skr networking-suite-api address list "$PEER_SUBNET_SRN" \
+$ skr networking-suite-api delete-interface-connection "$PEER_CONNECTION_SRN"
+$ skr networking-suite-api delete-interface-connection "$ENTRY_CONNECTION_SRN"
+$ skr networking-suite-api list-addresses "$PEER_SUBNET_SRN" \
     --query 'map({SRN,IPAddress,Subnet})'
-$ skr networking-suite-api address list "$ENTRY_SUBNET_SRN" \
+$ skr networking-suite-api list-addresses "$ENTRY_SUBNET_SRN" \
     --query 'map({SRN,IPAddress,Subnet})'
 ```
 
@@ -435,9 +435,9 @@ $ skr iaas-api server find --zone is1b --name "$ENTRY_NAME" \
 両 Server が見つからないことを確認してから、サブネットを削除します。
 
 ```console
-$ skr networking-suite-api subnet delete "$PEER_SUBNET_SRN"
-$ skr networking-suite-api subnet delete "$ENTRY_SUBNET_SRN"
-$ skr networking-suite-api subnet list "$GROUP_SRN" \
+$ skr networking-suite-api delete-subnet "$PEER_SUBNET_SRN"
+$ skr networking-suite-api delete-subnet "$ENTRY_SUBNET_SRN"
+$ skr networking-suite-api list-subnets "$GROUP_SRN" \
     --query 'map({SRN,Name,Description,IPv4AddressRangeCIDR,Zone,SubnetGroup})'
 ```
 
@@ -448,8 +448,8 @@ $ skr networking-suite-api subnet list "$GROUP_SRN" \
 ```
 
 ```console
-$ skr networking-suite-api subnet-group delete "$GROUP_SRN"
-$ skr networking-suite-api subnet-group list \
+$ skr networking-suite-api delete-subnet-group "$GROUP_SRN"
+$ skr networking-suite-api list-subnet-groups \
     --query "map(select(.SRN == \"$GROUP_SRN\") | {SRN,Name,Description,IPv4AddressRangeCIDR,Region})"
 ```
 

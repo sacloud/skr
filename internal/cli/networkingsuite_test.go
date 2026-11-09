@@ -29,26 +29,28 @@ func TestRunNetworkingSuiteAPIHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"networking-suite-api", "--help"},
-			want: []string{"subnet-group", "subnet", "interface-connection", "address", "JSON", "SAKURA_ENDPOINTS_NETWORKING_SUITE"},
+			want: []string{
+				"list-subnet-groups", "read-subnet-group", "create-subnet-group", "update-subnet-group", "delete-subnet-group",
+				"list-subnets", "read-subnet", "create-subnet", "update-subnet", "delete-subnet",
+				"create-interface-connection", "delete-interface-connection",
+				"list-addresses", "read-address",
+				"JSON", "SAKURA_ENDPOINTS_NETWORKING_SUITE",
+			},
 		},
 		{
-			args: []string{"networking-suite-api", "subnet-group", "--help"},
-			want: []string{"list", "read", "create", "update", "delete"},
+			args: []string{"networking-suite-api", "create-subnet-group", "--help"},
+			want: []string{"--request", "--name", "--description", "--ipv4-address-range-cidr", "--region", "@path.json", "標準入力", "併用できません", "例: skr networking-suite-api create-subnet-group"},
 		},
 		{
-			args: []string{"networking-suite-api", "subnet-group", "create", "--help"},
-			want: []string{"--request", "--name", "--description", "--ipv4-address-range-cidr", "--region", "@path.json", "標準入力", "併用できません", "例: skr networking-suite-api subnet-group create"},
-		},
-		{
-			args: []string{"networking-suite-api", "subnet", "create", "--help"},
+			args: []string{"networking-suite-api", "create-subnet", "--help"},
 			want: []string{"--zone", "--subnet-group-srn", "IPv4AddressRangeCIDR"},
 		},
 		{
-			args: []string{"networking-suite-api", "interface-connection", "create", "--help"},
+			args: []string{"networking-suite-api", "create-interface-connection", "--help"},
 			want: []string{"--interface-srn", "--subnet-srn", "--ephemeral-ipv4-address", "自動割り当て", "srnv1:sakura-ZONE:sakura.iaas.interface:ID"},
 		},
 		{
-			args: []string{"networking-suite-api", "address", "list", "--help"},
+			args: []string{"networking-suite-api", "list-addresses", "--help"},
 			want: []string{"<subnet-srn>", "--interface-connection-srn"},
 		},
 	} {

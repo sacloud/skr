@@ -99,6 +99,10 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 
 2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行で operationId 派生名に変更したコマンド (`seg-*`) でシナリオを再実行しました。既存のライブ検証結果を再確認し、baseline を新名のまま `live` に維持しました。`seg-interface-get-interface` は引き続き [#189](https://github.com/sacloud/skr/issues/189) で管理します。
 
+### タスク7: networking-suite-api
+
+2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行で operationId 派生名に変更したコマンドでシナリオを再実行しました。14 末端コマンドすべての正常応答と後片付けを再確認し、baseline を新名のまま `live` に維持しました。再実行時に `iaas-api server create` 応答の `Disks` が空で返るケースを確認したため、scenario は server read で取り直して接続ディスクの ID を確定するように堅牢化しました (詳細は [networking-suite-api](networking-suite-api.md))。
+
 ### 横断タスク
 
 - コマンドツリーとシナリオの対応を検査する網羅テストは完了です。[ADR 0065](../adr/0065-e2e-command-coverage-baseline.md) に従い、`internal/cli` の `LeafCommandPaths` が末端コマンドを列挙し、`test/e2e/command-coverage/baseline.txt` への登録を網羅テストが強制します。実行記録から抽出したコマンドが baseline の状況と一致しない場合も網羅テストが失敗します。要求は [ADR 0058](../adr/0058-live-e2e-command-coverage.md) に記載しています。

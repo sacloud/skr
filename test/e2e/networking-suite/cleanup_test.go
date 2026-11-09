@@ -66,7 +66,7 @@ func cleanupNetworkingSuite(t *testing.T, h *helper.Helper, servers *serverSDK.S
 			}
 			if _, _, err := h.CallAllowingFailure(t,
 				fmt.Sprintf("インターフェース接続%dを解除する", i+1),
-				"networking-suite-api", "interface-connection", "delete", run.connects[i].SRN); err != nil {
+				"networking-suite-api", "delete-interface-connection", run.connects[i].SRN); err != nil {
 				result = errors.Join(result, err)
 			}
 		}
@@ -267,7 +267,7 @@ func deleteSubnetsAndGroup(t *testing.T, h *helper.Helper, run *networkingRun) (
 		// 割り当て済みアドレスが残っていれば削除しない
 		data, _, err := h.CallAllowingFailure(t,
 			fmt.Sprintf("サブネット%dの IP アドレスが残っていないことを確認する", i+1),
-			"networking-suite-api", "address", "list", item.SRN,
+			"networking-suite-api", "list-addresses", item.SRN,
 			"--query", "map({SRN,IPAddress,Subnet})",
 		)
 		if err != nil {
@@ -303,7 +303,7 @@ func deleteSubnetsAndGroup(t *testing.T, h *helper.Helper, run *networkingRun) (
 		}
 		if _, _, err := h.CallAllowingFailure(t,
 			fmt.Sprintf("テスト用のサブネット%dを削除する", i+1),
-			"networking-suite-api", "subnet", "delete", item.SRN); err != nil {
+			"networking-suite-api", "delete-subnet", item.SRN); err != nil {
 			result = errors.Join(result, err)
 		}
 	}
@@ -314,7 +314,7 @@ func deleteSubnetsAndGroup(t *testing.T, h *helper.Helper, run *networkingRun) (
 	}
 	data, _, err := h.CallAllowingFailure(t,
 		"サブネットグループのサブネット一覧が空になったことを確認する",
-		"networking-suite-api", "subnet", "list", run.group.SRN,
+		"networking-suite-api", "list-subnets", run.group.SRN,
 		"--query", "map({SRN,Name,Description,IPv4AddressRangeCIDR,Zone,SubnetGroup})",
 	)
 	if err != nil {
@@ -341,7 +341,7 @@ func deleteSubnetsAndGroup(t *testing.T, h *helper.Helper, run *networkingRun) (
 		}
 	}
 	if _, _, err := h.CallAllowingFailure(t, "テスト用のサブネットグループを削除する",
-		"networking-suite-api", "subnet-group", "delete", run.group.SRN); err != nil {
+		"networking-suite-api", "delete-subnet-group", run.group.SRN); err != nil {
 		return errors.Join(result, err)
 	}
 	// 削除後の不在を確認する。他のグループは削除しません
@@ -391,7 +391,7 @@ func findTemporarySubnet(t *testing.T, h *helper.Helper, index int, run *network
 	}
 	data, _, err := h.CallAllowingFailure(t,
 		"応答を失った可能性があるテスト用サブネットを検索する",
-		"networking-suite-api", "subnet", "list", run.group.SRN,
+		"networking-suite-api", "list-subnets", run.group.SRN,
 		"--query", "map({SRN,Name,Description,IPv4AddressRangeCIDR,Zone,SubnetGroup})",
 	)
 	if err != nil {
@@ -462,7 +462,7 @@ func listGroupsViaCLI(t *testing.T, h *helper.Helper, step string) ([]groupItem,
 	t.Helper()
 
 	data, _, err := h.CallAllowingFailure(t, step,
-		"networking-suite-api", "subnet-group", "list",
+		"networking-suite-api", "list-subnet-groups",
 		"--query", "map({SRN,Name,Description,IPv4AddressRangeCIDR,Region})",
 	)
 	if err != nil {
@@ -476,7 +476,7 @@ func readGroupViaCLI(t *testing.T, h *helper.Helper, srn string) (groupItem, err
 	t.Helper()
 
 	data, _, err := h.CallAllowingFailure(t, "サブネットグループを参照して識別情報を確認する",
-		"networking-suite-api", "subnet-group", "read", srn,
+		"networking-suite-api", "read-subnet-group", srn,
 		"--query", "{SRN,Name,Description,IPv4AddressRangeCIDR,Region}",
 	)
 	if err != nil {
@@ -494,7 +494,7 @@ func readSubnetViaCLI(t *testing.T, h *helper.Helper, srn string) (subnetItem, e
 	t.Helper()
 
 	data, _, err := h.CallAllowingFailure(t, "サブネットを参照して識別情報を確認する",
-		"networking-suite-api", "subnet", "read", srn,
+		"networking-suite-api", "read-subnet", srn,
 		"--query", "{SRN,Name,Description,IPv4AddressRangeCIDR,Zone,SubnetGroup}",
 	)
 	if err != nil {
