@@ -41,43 +41,53 @@ type Runtime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
+// Commands はオブジェクトストレージ管理 API の手書きコマンド集合です。
+// operationId 派生名への移行 (ADR 0074) に合わせ、site / account / bucket / permission の
+// グループ階層を Kong の embed で展開して 1 階層のフラット構造にしています。
+// サブコマンド名は OpenAPI の operationId から機械派生した名前です。
 type Commands struct {
-	Site       SiteCommands       `cmd:"" help:"オブジェクトストレージのサイト、プラン、状態を確認します。"`
-	Account    AccountCommands    `cmd:"" help:"サイトアカウントとアカウントアクセスキーを管理します。"`
-	Bucket     BucketCommands     `cmd:"" help:"バケットを作成・一覧・削除し、暗号化やレプリケーションを管理します。"`
-	Permission PermissionCommands `cmd:"" help:"バケットごとのアクセス権限とアクセスキーを管理します。"`
-	factory    APIFactory
-	runtime    Runtime
+	Site       SiteCommands       `embed:""`
+	Account    AccountCommands    `embed:""`
+	Bucket     BucketCommands     `embed:""`
+	Permission PermissionCommands `embed:""`
 }
 
 func NewCommands(runtime Runtime, factory APIFactory) Commands {
-	commands := Commands{
-		Site:       SiteCommands{factory: factory, runtime: runtime},
-		Account:    AccountCommands{factory: factory, runtime: runtime},
-		Bucket:     BucketCommands{factory: factory, runtime: runtime},
-		Permission: PermissionCommands{factory: factory, runtime: runtime},
-		factory:    factory,
-		runtime:    runtime,
+	return Commands{
+		Site:       newSiteCommands(runtime, factory),
+		Account:    newAccountCommands(runtime, factory),
+		Bucket:     newBucketCommands(runtime, factory),
+		Permission: newPermissionCommands(runtime, factory),
 	}
-	commands.initialize()
-	return commands
 }
 
 type SiteCommands struct {
-	List    SiteListCommand   `cmd:"" help:"利用可能なサイトを一覧表示します。"`
-	Read    SiteReadCommand   `cmd:"" help:"サイトの情報を取得します。"`
-	Plans   SitePlansCommand  `cmd:"" help:"サイトで選択できるバケットプランを一覧表示します。"`
-	Status  SiteStatusCommand `cmd:"" help:"サイトの状態、クォータ、バケット利用量を確認します。"`
+	GetClusters       SiteGetClustersCommand       `cmd:"" name:"get-clusters" help:"利用可能なサイトを一覧表示します。"`
+	GetCluster        SiteGetClusterCommand        `cmd:"" name:"get-cluster" help:"サイトの情報を取得します。"`
+	GetPlans          SiteGetPlansCommand          `cmd:"" name:"get-plans" help:"サイトで選択できるバケットプランを一覧表示します。"`
+	GetStatus         SiteGetStatusCommand         `cmd:"" name:"get-status" help:"サイトの状態を取得します。"`
+	GetQuota          SiteGetQuotaCommand          `cmd:"" name:"get-quota" help:"サイトのクォータを取得します。"`
+	GetBucketMetering SiteGetBucketMeteringCommand `cmd:"" name:"get-bucket-metering" help:"期間を指定してバケットの利用量を取得します。"`
+}
+
+func newSiteCommands(runtime Runtime, factory APIFactory) SiteCommands {
+	commands := SiteCommands{
+		GetClusters:       SiteGetClustersCommand{factory: factory, runtime: runtime},
+		GetCluster:        SiteGetClusterCommand{factory: factory, runtime: runtime},
+		GetPlans:          SiteGetPlansCommand{factory: factory, runtime: runtime},
+		GetStatus:         SiteGetStatusCommand{factory: factory, runtime: runtime},
+		GetQuota:          SiteGetQuotaCommand{factory: factory, runtime: runtime},
+		GetBucketMetering: SiteGetBucketMeteringCommand{factory: factory, runtime: runtime},
+	}
+	return commands
+}
+
+type SiteGetClustersCommand struct {
 	factory APIFactory
 	runtime Runtime
 }
 
-type SiteListCommand struct {
-	factory APIFactory
-	runtime Runtime
-}
-
-func (c *SiteListCommand) Run(ctx *kong.Context) error {
+func (c *SiteGetClustersCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
@@ -92,13 +102,13 @@ func (c *SiteListCommand) Run(ctx *kong.Context) error {
 	return c.runtime.writeOutput(ctx, result)
 }
 
-type SiteReadCommand struct {
-	SiteID  string `arg:"" name:"site-id" help:"情報を取得するサイト ID。サイト ID は site list の結果から確認します。"`
+type SiteGetClusterCommand struct {
+	SiteID  string `arg:"" name:"site-id" help:"情報を取得するサイト ID。サイト ID は get-clusters の結果から確認します。"`
 	factory APIFactory
 	runtime Runtime
 }
 
-func (c *SiteReadCommand) Run(ctx *kong.Context) error {
+func (c *SiteGetClusterCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
@@ -113,13 +123,13 @@ func (c *SiteReadCommand) Run(ctx *kong.Context) error {
 	return c.runtime.writeOutput(ctx, result)
 }
 
-type SitePlansCommand struct {
+type SiteGetPlansCommand struct {
 	SiteID  string `arg:"" name:"site-id" help:"プランを確認するサイト ID。"`
 	factory APIFactory
 	runtime Runtime
 }
 
-func (c *SitePlansCommand) Run(ctx *kong.Context) error {
+func (c *SiteGetPlansCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
@@ -134,21 +144,13 @@ func (c *SitePlansCommand) Run(ctx *kong.Context) error {
 	return c.runtime.writeOutput(ctx, result)
 }
 
-type SiteStatusCommand struct {
-	Read           SiteStatusReadCommand           `cmd:"" help:"サイトの状態を取得します。"`
-	Quota          SiteStatusQuotaCommand          `cmd:"" help:"サイトのクォータを取得します。"`
-	BucketMetering SiteStatusBucketMeteringCommand `cmd:"" name:"bucket-metering" help:"期間を指定してバケットの利用量を取得します。"`
-	factory        APIFactory
-	runtime        Runtime
-}
-
-type SiteStatusReadCommand struct {
+type SiteGetStatusCommand struct {
 	SiteID  string `arg:"" name:"site-id" help:"状態を取得するサイト ID。"`
 	factory APIFactory
 	runtime Runtime
 }
 
-func (c *SiteStatusReadCommand) Run(ctx *kong.Context) error {
+func (c *SiteGetStatusCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
@@ -163,13 +165,13 @@ func (c *SiteStatusReadCommand) Run(ctx *kong.Context) error {
 	return c.runtime.writeOutput(ctx, result)
 }
 
-type SiteStatusQuotaCommand struct {
+type SiteGetQuotaCommand struct {
 	SiteID  string `arg:"" name:"site-id" help:"クォータを取得するサイト ID。"`
 	factory APIFactory
 	runtime Runtime
 }
 
-func (c *SiteStatusQuotaCommand) Run(ctx *kong.Context) error {
+func (c *SiteGetQuotaCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
@@ -184,7 +186,7 @@ func (c *SiteStatusQuotaCommand) Run(ctx *kong.Context) error {
 	return c.runtime.writeOutput(ctx, result)
 }
 
-type SiteStatusBucketMeteringCommand struct {
+type SiteGetBucketMeteringCommand struct {
 	SiteID     string `arg:"" name:"site-id" help:"利用量を確認するサイト ID。"`
 	BucketName string `arg:"" name:"bucket-name" help:"利用量を確認するバケット名。"`
 	From       string `name:"from" required:"" help:"必須: RFC3339 形式の開始時刻。"`
@@ -193,7 +195,7 @@ type SiteStatusBucketMeteringCommand struct {
 	runtime    Runtime
 }
 
-func (c *SiteStatusBucketMeteringCommand) Run(ctx *kong.Context) error {
+func (c *SiteGetBucketMeteringCommand) Run(ctx *kong.Context) error {
 	if err := c.runtime.validateOutput(ctx); err != nil {
 		return err
 	}
@@ -217,12 +219,25 @@ func (c *SiteStatusBucketMeteringCommand) Run(ctx *kong.Context) error {
 }
 
 type AccountCommands struct {
-	Create    AccountCreateCommand     `cmd:"" help:"サイトアカウントを作成します。"`
-	Read      AccountReadCommand       `cmd:"" help:"サイトアカウントを取得します。"`
-	Delete    AccountDeleteCommand     `cmd:"" help:"サイトアカウントを削除します。"`
-	AccessKey AccountAccessKeyCommands `cmd:"" name:"access-key" help:"サイトアカウントのアクセスキーを管理します。"`
-	factory   APIFactory
-	runtime   Runtime
+	CreateAccount    AccountCreateCommand          `cmd:"" name:"create-account" help:"サイトアカウントを作成します。"`
+	GetAccount       AccountReadCommand            `cmd:"" name:"get-account" help:"サイトアカウントを取得します。"`
+	DeleteAccount    AccountDeleteCommand          `cmd:"" name:"delete-account" help:"サイトアカウントを削除します。サイト内のバケットなどを先に削除してください。"`
+	GetAccountKeys   AccountAccessKeyListCommand   `cmd:"" name:"get-account-keys" help:"サイトアカウントのアクセスキーを一覧表示します。"`
+	CreateAccountKey AccountAccessKeyCreateCommand `cmd:"" name:"create-account-key" help:"アクセスキーを発行します。シークレットは作成時の応答にのみ含まれます。"`
+	GetAccountKey    AccountAccessKeyReadCommand   `cmd:"" name:"get-account-key" help:"アクセスキーの情報を取得します。"`
+	DeleteAccountKey AccountAccessKeyDeleteCommand `cmd:"" name:"delete-account-key" help:"アクセスキーを削除します。"`
+}
+
+func newAccountCommands(runtime Runtime, factory APIFactory) AccountCommands {
+	return AccountCommands{
+		CreateAccount:    AccountCreateCommand{factory: factory, runtime: runtime},
+		GetAccount:       AccountReadCommand{factory: factory, runtime: runtime},
+		DeleteAccount:    AccountDeleteCommand{factory: factory, runtime: runtime},
+		GetAccountKeys:   AccountAccessKeyListCommand{factory: factory, runtime: runtime},
+		CreateAccountKey: AccountAccessKeyCreateCommand{factory: factory, runtime: runtime},
+		GetAccountKey:    AccountAccessKeyReadCommand{factory: factory, runtime: runtime},
+		DeleteAccountKey: AccountAccessKeyDeleteCommand{factory: factory, runtime: runtime},
+	}
 }
 
 type AccountCreateCommand struct {
@@ -282,15 +297,6 @@ func (c *AccountDeleteCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 	return api.Account.Delete(context.Background())
-}
-
-type AccountAccessKeyCommands struct {
-	List    AccountAccessKeyListCommand   `cmd:"" help:"サイトアカウントのアクセスキーを一覧表示します。"`
-	Create  AccountAccessKeyCreateCommand `cmd:"" help:"アクセスキーを発行します。シークレットは作成時の応答にのみ含まれます。"`
-	Read    AccountAccessKeyReadCommand   `cmd:"" help:"アクセスキーの情報を取得します。"`
-	Delete  AccountAccessKeyDeleteCommand `cmd:"" help:"アクセスキーを削除します。"`
-	factory APIFactory
-	runtime Runtime
 }
 
 type AccountAccessKeyListCommand struct {
@@ -376,16 +382,36 @@ func (c *AccountAccessKeyDeleteCommand) Run(ctx *kong.Context) error {
 }
 
 type BucketCommands struct {
-	List        BucketListCommand         `cmd:"" help:"サイト内のバケットを一覧表示します。"`
-	Create      BucketCreateCommand       `cmd:"" help:"バケットを作成します。現在利用できるサイトは isk01、tky01、arc02 です。arc02 では --plan を指定します。作成完了後からバケットの基本料金が発生します。"`
-	Delete      BucketDeleteCommand       `cmd:"" help:"指定サイトに所属するバケットを削除します。所属を確認できない場合は拒否します。バケット内のオブジェクトを事前に削除してください。"`
-	Encryption  BucketEncryptionCommands  `cmd:"" help:"バケット暗号化を管理します。"`
-	Replication BucketReplicationCommands `cmd:"" help:"バケットのリージョン間レプリケーションを管理します。送信元バケットの指定サイトへの所属を確認できない場合は拒否します。"`
-	Penalty     BucketPenaltyCommand      `cmd:"" help:"バケットのペナルティ情報を取得します。"`
-	Usage       BucketUsageCommand        `cmd:"" help:"バケットの利用量を取得します。"`
-	Quota       BucketQuotaCommand        `cmd:"" help:"バケットのクォータを取得します。"`
-	factory     APIFactory
-	runtime     Runtime
+	ListBuckets             BucketListCommand               `cmd:"" name:"list-buckets" help:"サイト内のバケットを一覧表示します。"`
+	CreateBucket            BucketCreateCommand             `cmd:"" name:"create-bucket" help:"バケットを作成します。現在利用できるサイトは isk01、tky01、arc02 です。arc02 では --plan を指定します。作成完了後からバケットの基本料金が発生します。"`
+	DeleteBucket            BucketDeleteCommand             `cmd:"" name:"delete-bucket" help:"指定サイトに所属するバケットを削除します。所属を確認できない場合は拒否します。バケット内のオブジェクトを事前に削除してください。"`
+	GetBucketEncryption     BucketEncryptionReadCommand     `cmd:"" name:"get-bucket-encryption" help:"暗号化設定を取得します。"`
+	PutBucketEncryption     BucketEncryptionEnableCommand   `cmd:"" name:"put-bucket-encryption" help:"KMS キーを指定して暗号化を有効にします。"`
+	DeleteBucketEncryption  BucketEncryptionDisableCommand  `cmd:"" name:"delete-bucket-encryption" help:"バケット暗号化を無効にします。"`
+	GetBucketReplication    BucketReplicationReadCommand    `cmd:"" name:"get-bucket-replication" help:"レプリケーション設定を取得します。"`
+	PostBucketReplication   BucketReplicationEnableCommand  `cmd:"" name:"post-bucket-replication" help:"別サイトのバケットを宛先にしてレプリケーションを有効にします。"`
+	DeleteBucketReplication BucketReplicationDisableCommand `cmd:"" name:"delete-bucket-replication" help:"レプリケーションを無効にします。"`
+	GetBucketPenalty        BucketPenaltyCommand            `cmd:"" name:"get-bucket-penalty" help:"バケットのペナルティ情報を取得します。"`
+	GetBucketUsage          BucketUsageCommand              `cmd:"" name:"get-bucket-usage" help:"バケットの利用量を取得します。"`
+	GetBucketQuota          BucketQuotaCommand              `cmd:"" name:"get-bucket-quota" help:"バケットのクォータを取得します。"`
+}
+
+func newBucketCommands(runtime Runtime, factory APIFactory) BucketCommands {
+	commands := BucketCommands{
+		ListBuckets:             BucketListCommand{factory: factory, runtime: runtime},
+		CreateBucket:            BucketCreateCommand{factory: factory, runtime: runtime},
+		DeleteBucket:            BucketDeleteCommand{factory: factory, runtime: runtime},
+		GetBucketEncryption:     BucketEncryptionReadCommand{factory: factory, runtime: runtime},
+		PutBucketEncryption:     BucketEncryptionEnableCommand{factory: factory, runtime: runtime},
+		DeleteBucketEncryption:  BucketEncryptionDisableCommand{factory: factory, runtime: runtime},
+		GetBucketReplication:    BucketReplicationReadCommand{factory: factory, runtime: runtime},
+		PostBucketReplication:   BucketReplicationEnableCommand{factory: factory, runtime: runtime},
+		DeleteBucketReplication: BucketReplicationDisableCommand{factory: factory, runtime: runtime},
+		GetBucketPenalty:        BucketPenaltyCommand{factory: factory, runtime: runtime},
+		GetBucketUsage:          BucketUsageCommand{factory: factory, runtime: runtime},
+		GetBucketQuota:          BucketQuotaCommand{factory: factory, runtime: runtime},
+	}
+	return commands
 }
 
 type BucketListCommand struct {
@@ -412,7 +438,7 @@ func (c *BucketListCommand) Run(ctx *kong.Context) error {
 type BucketCreateCommand struct {
 	SiteID  string  `arg:"" name:"site-id" help:"バケットを作成するサイト ID。"`
 	Bucket  string  `arg:"" name:"bucket-name" help:"作成する一意のバケット名。半角小文字英字・数字・ハイフンを使用できます。"`
-	Plan    *string `name:"plan" help:"アーカイブプラン用サイト arc02 で必須です。site plans の service_class_path の末尾にあるプラン値を指定します。"`
+	Plan    *string `name:"plan" help:"アーカイブプラン用サイト arc02 で必須です。get-plans の service_class_path の末尾にあるプラン値を指定します。"`
 	factory APIFactory
 	runtime Runtime
 }
@@ -473,14 +499,6 @@ func (c *BucketDeleteCommand) Run(ctx *kong.Context) error {
 	return api.Bucket.Delete(context.Background(), c.Bucket)
 }
 
-type BucketEncryptionCommands struct {
-	Read    BucketEncryptionReadCommand    `cmd:"" help:"暗号化設定を取得します。"`
-	Enable  BucketEncryptionEnableCommand  `cmd:"" help:"KMS キーを指定して暗号化を有効にします。"`
-	Disable BucketEncryptionDisableCommand `cmd:"" help:"バケット暗号化を無効にします。"`
-	factory APIFactory
-	runtime Runtime
-}
-
 type BucketEncryptionReadCommand struct {
 	SiteID  string `arg:"" name:"site-id" help:"バケットが属するサイト ID。"`
 	Bucket  string `arg:"" name:"bucket-name" help:"設定を取得するバケット名。"`
@@ -538,14 +556,6 @@ func (c *BucketEncryptionDisableCommand) Run(ctx *kong.Context) error {
 		return err
 	}
 	return api.BucketExtra(c.Bucket).DisableEncryption(context.Background())
-}
-
-type BucketReplicationCommands struct {
-	Read    BucketReplicationReadCommand    `cmd:"" help:"レプリケーション設定を取得します。"`
-	Enable  BucketReplicationEnableCommand  `cmd:"" help:"別サイトのバケットを宛先にしてレプリケーションを有効にします。"`
-	Disable BucketReplicationDisableCommand `cmd:"" help:"レプリケーションを無効にします。"`
-	factory APIFactory
-	runtime Runtime
 }
 
 type BucketReplicationReadCommand struct {
@@ -687,14 +697,29 @@ func (c *BucketQuotaCommand) Run(ctx *kong.Context) error {
 }
 
 type PermissionCommands struct {
-	List      PermissionListCommand       `cmd:"" help:"サイトのパーミッションを一覧表示します。"`
-	Create    PermissionCreateCommand     `cmd:"" help:"バケット制御を指定してパーミッションを作成します。"`
-	Read      PermissionReadCommand       `cmd:"" help:"パーミッションを取得します。"`
-	Update    PermissionUpdateCommand     `cmd:"" help:"パーミッション名とバケット制御を更新します。"`
-	Delete    PermissionDeleteCommand     `cmd:"" help:"パーミッションを削除します。"`
-	AccessKey PermissionAccessKeyCommands `cmd:"" name:"access-key" help:"パーミッションのアクセスキーを管理します。シークレットは作成時の応答にのみ含まれます。"`
-	factory   APIFactory
-	runtime   Runtime
+	GetPermissions      PermissionListCommand            `cmd:"" name:"get-permissions" help:"サイトのパーミッションを一覧表示します。"`
+	CreatePermission    PermissionCreateCommand          `cmd:"" name:"create-permission" help:"バケット制御を指定してパーミッションを作成します。"`
+	GetPermission       PermissionReadCommand            `cmd:"" name:"get-permission" help:"パーミッションを取得します。"`
+	UpdatePermission    PermissionUpdateCommand          `cmd:"" name:"update-permission" help:"パーミッション名とバケット制御を更新します。"`
+	DeletePermission    PermissionDeleteCommand          `cmd:"" name:"delete-permission" help:"パーミッションを削除します。"`
+	GetPermissionKeys   PermissionAccessKeyListCommand   `cmd:"" name:"get-permission-keys" help:"パーミッションのアクセスキーを一覧表示します。"`
+	CreatePermissionKey PermissionAccessKeyCreateCommand `cmd:"" name:"create-permission-key" help:"パーミッションのアクセスキーを発行します。シークレットは作成時の応答にのみ含まれます。"`
+	GetPermissionKey    PermissionAccessKeyReadCommand   `cmd:"" name:"get-permission-key" help:"パーミッションのアクセスキーの情報を取得します。"`
+	DeletePermissionKey PermissionAccessKeyDeleteCommand `cmd:"" name:"delete-permission-key" help:"パーミッションのアクセスキーを削除します。"`
+}
+
+func newPermissionCommands(runtime Runtime, factory APIFactory) PermissionCommands {
+	return PermissionCommands{
+		GetPermissions:      PermissionListCommand{factory: factory, runtime: runtime},
+		CreatePermission:    PermissionCreateCommand{factory: factory, runtime: runtime},
+		GetPermission:       PermissionReadCommand{factory: factory, runtime: runtime},
+		UpdatePermission:    PermissionUpdateCommand{factory: factory, runtime: runtime},
+		DeletePermission:    PermissionDeleteCommand{factory: factory, runtime: runtime},
+		GetPermissionKeys:   PermissionAccessKeyListCommand{factory: factory, runtime: runtime},
+		CreatePermissionKey: PermissionAccessKeyCreateCommand{factory: factory, runtime: runtime},
+		GetPermissionKey:    PermissionAccessKeyReadCommand{factory: factory, runtime: runtime},
+		DeletePermissionKey: PermissionAccessKeyDeleteCommand{factory: factory, runtime: runtime},
+	}
 }
 
 type PermissionListCommand struct {
@@ -811,15 +836,6 @@ func (c *PermissionDeleteCommand) Run(ctx *kong.Context) error {
 	return api.Permission.Delete(context.Background(), c.PermissionID)
 }
 
-type PermissionAccessKeyCommands struct {
-	List    PermissionAccessKeyListCommand   `cmd:"" help:"アクセスキーを一覧表示します。"`
-	Create  PermissionAccessKeyCreateCommand `cmd:"" help:"アクセスキーを発行します。シークレットは作成時の応答にのみ含まれます。"`
-	Read    PermissionAccessKeyReadCommand   `cmd:"" help:"アクセスキーの情報を取得します。"`
-	Delete  PermissionAccessKeyDeleteCommand `cmd:"" help:"アクセスキーを削除します。"`
-	factory APIFactory
-	runtime Runtime
-}
-
 type PermissionAccessKeyListCommand struct {
 	SiteID       string `arg:"" name:"site-id" help:"パーミッションが属するサイト ID。"`
 	PermissionID string `arg:"" name:"permission-id" help:"アクセスキーを一覧表示するパーミッション ID。"`
@@ -906,73 +922,12 @@ func (c *PermissionAccessKeyDeleteCommand) Run(ctx *kong.Context) error {
 	return api.Permission.DeleteAccessKey(context.Background(), c.PermissionID, c.KeyID)
 }
 
-func (c *SiteStatusCommand) setChildren() {
-	c.Read.factory = c.factory
-	c.Read.runtime = c.runtime
-	c.Quota.factory = c.factory
-	c.Quota.runtime = c.runtime
-	c.BucketMetering.factory = c.factory
-	c.BucketMetering.runtime = c.runtime
-}
-
-func (c *AccountCommands) setChildren() {
-	c.AccessKey.factory = c.factory
-	c.AccessKey.runtime = c.runtime
-	c.AccessKey.List.factory = c.factory
-	c.AccessKey.List.runtime = c.runtime
-	c.AccessKey.Create.factory = c.factory
-	c.AccessKey.Create.runtime = c.runtime
-	c.AccessKey.Read.factory = c.factory
-	c.AccessKey.Read.runtime = c.runtime
-	c.AccessKey.Delete.factory = c.factory
-	c.AccessKey.Delete.runtime = c.runtime
-}
-
-func (c *BucketCommands) setChildren() {
-	c.Encryption.factory = c.factory
-	c.Encryption.runtime = c.runtime
-	c.Encryption.Read.factory = c.factory
-	c.Encryption.Read.runtime = c.runtime
-	c.Encryption.Enable.factory = c.factory
-	c.Encryption.Enable.runtime = c.runtime
-	c.Encryption.Disable.factory = c.factory
-	c.Encryption.Disable.runtime = c.runtime
-	c.Replication.factory = c.factory
-	c.Replication.runtime = c.runtime
-	c.Replication.Read.factory = c.factory
-	c.Replication.Read.runtime = c.runtime
-	c.Replication.Enable.factory = c.factory
-	c.Replication.Enable.runtime = c.runtime
-	c.Replication.Disable.factory = c.factory
-	c.Replication.Disable.runtime = c.runtime
-}
-
-func (c *PermissionCommands) setChildren() {
-	c.AccessKey.factory = c.factory
-	c.AccessKey.runtime = c.runtime
-	c.AccessKey.List.factory = c.factory
-	c.AccessKey.List.runtime = c.runtime
-	c.AccessKey.Create.factory = c.factory
-	c.AccessKey.Create.runtime = c.runtime
-	c.AccessKey.Read.factory = c.factory
-	c.AccessKey.Read.runtime = c.runtime
-	c.AccessKey.Delete.factory = c.factory
-	c.AccessKey.Delete.runtime = c.runtime
-}
-
-func (c *Commands) initialize() {
-	c.Site.initialize()
-	c.Account.initialize()
-	c.Bucket.initialize()
-	c.Permission.initialize()
-}
-
-func (c *SiteListCommand) open(siteID string) (API, error)        { return openAPI(c.factory, siteID) }
-func (c *SiteReadCommand) open(siteID string) (API, error)        { return openAPI(c.factory, siteID) }
-func (c *SitePlansCommand) open(siteID string) (API, error)       { return openAPI(c.factory, siteID) }
-func (c *SiteStatusReadCommand) open(siteID string) (API, error)  { return openAPI(c.factory, siteID) }
-func (c *SiteStatusQuotaCommand) open(siteID string) (API, error) { return openAPI(c.factory, siteID) }
-func (c *SiteStatusBucketMeteringCommand) open(siteID string) (API, error) {
+func (c *SiteGetClustersCommand) open(siteID string) (API, error) { return openAPI(c.factory, siteID) }
+func (c *SiteGetClusterCommand) open(siteID string) (API, error)  { return openAPI(c.factory, siteID) }
+func (c *SiteGetPlansCommand) open(siteID string) (API, error)    { return openAPI(c.factory, siteID) }
+func (c *SiteGetStatusCommand) open(siteID string) (API, error)   { return openAPI(c.factory, siteID) }
+func (c *SiteGetQuotaCommand) open(siteID string) (API, error)    { return openAPI(c.factory, siteID) }
+func (c *SiteGetBucketMeteringCommand) open(siteID string) (API, error) {
 	return openAPI(c.factory, siteID)
 }
 func (c *AccountCreateCommand) open(siteID string) (API, error) { return openAPI(c.factory, siteID) }
@@ -1082,56 +1037,4 @@ func (r Runtime) validateOutput(ctx *kong.Context) error {
 
 func (r Runtime) writeOutput(ctx *kong.Context, value any) error {
 	return r.WriteOutput(ctx, value)
-}
-
-func (c *SiteCommands) initialize() {
-	c.List.factory = c.factory
-	c.List.runtime = c.runtime
-	c.Read.factory = c.factory
-	c.Read.runtime = c.runtime
-	c.Plans.factory = c.factory
-	c.Plans.runtime = c.runtime
-	c.Status.factory = c.factory
-	c.Status.runtime = c.runtime
-	c.Status.setChildren()
-}
-
-func (c *AccountCommands) initialize() {
-	c.Create.factory = c.factory
-	c.Create.runtime = c.runtime
-	c.Read.factory = c.factory
-	c.Read.runtime = c.runtime
-	c.Delete.factory = c.factory
-	c.Delete.runtime = c.runtime
-	c.setChildren()
-}
-
-func (c *BucketCommands) initialize() {
-	c.List.factory = c.factory
-	c.List.runtime = c.runtime
-	c.Create.factory = c.factory
-	c.Create.runtime = c.runtime
-	c.Delete.factory = c.factory
-	c.Delete.runtime = c.runtime
-	c.Penalty.factory = c.factory
-	c.Penalty.runtime = c.runtime
-	c.Usage.factory = c.factory
-	c.Usage.runtime = c.runtime
-	c.Quota.factory = c.factory
-	c.Quota.runtime = c.runtime
-	c.setChildren()
-}
-
-func (c *PermissionCommands) initialize() {
-	c.List.factory = c.factory
-	c.List.runtime = c.runtime
-	c.Create.factory = c.factory
-	c.Create.runtime = c.runtime
-	c.Read.factory = c.factory
-	c.Read.runtime = c.runtime
-	c.Update.factory = c.factory
-	c.Update.runtime = c.runtime
-	c.Delete.factory = c.factory
-	c.Delete.runtime = c.runtime
-	c.setChildren()
 }

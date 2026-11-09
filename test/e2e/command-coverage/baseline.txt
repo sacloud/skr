@@ -269,40 +269,40 @@ networking-suite-api read-subnet live
 networking-suite-api read-subnet-group live
 networking-suite-api update-subnet live
 networking-suite-api update-subnet-group live
-object-storage-api account access-key create live
-object-storage-api account access-key delete live
-object-storage-api account access-key list live
-object-storage-api account access-key read live
-object-storage-api account create live
-object-storage-api account delete live
-object-storage-api account read live
-object-storage-api bucket create live
-object-storage-api bucket delete live
-object-storage-api bucket encryption disable live
-object-storage-api bucket encryption enable live
-object-storage-api bucket encryption read live
-object-storage-api bucket list live
-object-storage-api bucket penalty deferred #142 API がエラーを返すため
-object-storage-api bucket quota live
-object-storage-api bucket replication disable live
-object-storage-api bucket replication enable live
-object-storage-api bucket replication read live
-object-storage-api bucket usage live
-object-storage-api permission access-key create live
-object-storage-api permission access-key delete live
-object-storage-api permission access-key list live
-object-storage-api permission access-key read live
-object-storage-api permission create live
-object-storage-api permission delete live
-object-storage-api permission list live
-object-storage-api permission read live
-object-storage-api permission update live
-object-storage-api site list live
-object-storage-api site plans live
-object-storage-api site read live
-object-storage-api site status bucket-metering deferred #142 API がエラーを返すため
-object-storage-api site status quota live
-object-storage-api site status read live
+object-storage-api create-account-key live
+object-storage-api create-account live
+object-storage-api create-bucket live
+object-storage-api create-permission-key live
+object-storage-api create-permission live
+object-storage-api delete-account-key live
+object-storage-api delete-account live
+object-storage-api delete-bucket-encryption live
+object-storage-api delete-bucket live
+object-storage-api delete-bucket-replication live
+object-storage-api delete-permission-key live
+object-storage-api delete-permission live
+object-storage-api get-account-key live
+object-storage-api get-account-keys live
+object-storage-api get-account live
+object-storage-api get-bucket-encryption live
+object-storage-api get-bucket-metering deferred #142 API がエラーを返すため
+object-storage-api get-bucket-penalty deferred #142 API がエラーを返すため
+object-storage-api get-bucket-quota live
+object-storage-api get-bucket-replication live
+object-storage-api get-bucket-usage live
+object-storage-api get-cluster live
+object-storage-api get-clusters live
+object-storage-api get-permission-key live
+object-storage-api get-permission-keys live
+object-storage-api get-permission live
+object-storage-api get-permissions live
+object-storage-api get-plans live
+object-storage-api get-quota live
+object-storage-api get-status live
+object-storage-api list-buckets live
+object-storage-api post-bucket-replication live
+object-storage-api put-bucket-encryption live
+object-storage-api update-permission live
 proxylb-api create live
 proxylb-api delete live
 proxylb-api delete-certificates live

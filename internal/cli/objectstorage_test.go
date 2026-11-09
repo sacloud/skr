@@ -33,10 +33,10 @@ func TestRunObjectStorageAPIHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	require.Equal(t, 0, run([]string{"object-storage-api", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
 	for _, text := range []string{
-		"object-storage-api site list",
-		"object-storage-api account access-key create",
-		"object-storage-api bucket encryption enable",
-		"object-storage-api permission access-key create",
+		"object-storage-api get-clusters",
+		"object-storage-api create-account-key",
+		"object-storage-api put-bucket-encryption",
+		"object-storage-api create-permission-key",
 		"オブジェクト本体の転送ではなく",
 		"作成完了後からバケットの基本料金が発生します",
 	} {
@@ -46,7 +46,7 @@ func TestRunObjectStorageAPIHelp(t *testing.T) {
 
 func TestRunObjectStoragePermissionCreateHelpDocumentsJSONInput(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.Equal(t, 0, run([]string{"object-storage-api", "permission", "create", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Equal(t, 0, run([]string{"object-storage-api", "create-permission", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
 
 	for _, text := range []string{"--request", "display_name", "bucket_controls", "@path.json"} {
 		require.Contains(t, stdout.String(), text, "help output does not contain %q", text)
@@ -100,22 +100,22 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 		ID         string `json:"id"`
 		ResourceID string `json:"resource_id"`
 	}
-	sites := decodeObjectStorageResult[[]identity](t, runCommand("site", "list"))
+	sites := decodeObjectStorageResult[[]identity](t, runCommand("get-clusters"))
 	require.Len(t, sites, 3, "site count = %d, want 3", len(sites))
 	accounts := map[string]string{}
 	for _, site := range []string{"tky01", "isk01", "arc02"} {
-		got := decodeObjectStorageResult[identity](t, runCommand("site", "read", site))
+		got := decodeObjectStorageResult[identity](t, runCommand("get-cluster", site))
 		require.Equal(t, site, got.ID, "site read returned ID %q, want %q", got.ID, site)
-		requireAbsent("account", "read", site)
-		created := decodeObjectStorageResult[identity](t, runCommand("account", "create", site))
-		read := decodeObjectStorageResult[identity](t, runCommand("account", "read", site))
+		requireAbsent("get-account", site)
+		created := decodeObjectStorageResult[identity](t, runCommand("create-account", site))
+		read := decodeObjectStorageResult[identity](t, runCommand("get-account", site))
 		require.NotEmpty(t, created.ResourceID, "account resource ID was missing or changed")
 		require.Equal(t, created.ResourceID, read.ResourceID, "unexpected value")
 		accounts[site] = created.ResourceID
 		plans := decodeObjectStorageResult[[]struct {
 			ClusterID string `json:"cluster_id"`
 			Path      string `json:"service_class_path"`
-		}](t, runCommand("site", "plans", site))
+		}](t, runCommand("get-plans", site))
 		require.NotEmpty(t, plans, "site returned no plans")
 		for _, plan := range plans {
 			if plan.ClusterID != site || !strings.HasPrefix(plan.Path, "objectstorage/"+site+"/bucket") {
@@ -127,10 +127,10 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 		ID     string `json:"id"`
 		Secret string `json:"secret"`
 	}
-	checkKeys := func(path []string, target ...string) {
+	checkKeys := func(names map[string]string, target ...string) {
 		t.Helper()
 		args := func(operation string, id ...string) []string {
-			result := append(append([]string{}, path...), operation)
+			result := append([]string{}, names[operation])
 			result = append(result, target...)
 			return append(result, id...)
 		}
@@ -150,7 +150,7 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 		keys2 := decodeObjectStorageResult[[]key](t, runCommand(args("list")...))
 		require.Len(t, keys2, 0, "key remains after deletion")
 	}
-	checkKeys([]string{"account", "access-key"}, "tky01")
+	checkKeys(map[string]string{"list": "get-account-keys", "create": "create-account-key", "read": "get-account-key", "delete": "delete-account-key"}, "tky01")
 
 	type bucket struct {
 		Name       string `json:"name"`
@@ -170,7 +170,7 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 	}
 	for i := range buckets {
 		item := &buckets[i]
-		args := []string{"bucket", "create", item.site, item.name}
+		args := []string{"create-bucket", item.site, item.name}
 		wantPath, wantType := "objectstorage/"+item.site+"/bucket", "standard"
 		if item.plan != "" {
 			args = append(args, "--plan", item.plan)
@@ -181,7 +181,7 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 		require.Equal(t, item.site, created.ClusterID, "unexpected value")
 		require.Equal(t, wantPath, created.Plan.Path, "unexpected value")
 		require.Equal(t, wantType, created.Plan.Type, "unexpected value")
-		list := decodeObjectStorageResult[[]bucket](t, runCommand("bucket", "list", item.site, "--query", "map({name,resource_id})"))
+		list := decodeObjectStorageResult[[]bucket](t, runCommand("list-buckets", item.site, "--query", "map({name,resource_id})"))
 		require.Len(t, list, 1, "bucket list omitted the new bucket identity")
 		require.Equal(t, item.name, list[0].Name, "unexpected value")
 		require.NotEmpty(t, list[0].ResourceID, "should not be empty")
@@ -202,22 +202,22 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 	body := `{"display_name":"skr-test","bucket_controls":[{"bucket_name":"skr-test-source","can_read":true,"can_write":true}]}`
 	err := os.WriteFile(request, []byte(body), 0o600)
 	require.NoError(t, err)
-	created := decodeObjectStorageResult[permission](t, runCommand("permission", "create", "tky01", "--request", "@"+request))
+	created := decodeObjectStorageResult[permission](t, runCommand("create-permission", "tky01", "--request", "@"+request))
 	if created.ID <= 0 || created.DisplayName != "skr-test" || len(created.Controls) != 1 ||
 		created.Controls[0] != (control{BucketName: "skr-test-source", CanRead: true, CanWrite: true}) {
 		t.Fatal("permission creation did not preserve bucket controls")
 	}
 	permissionID := strconv.FormatInt(created.ID, 10)
-	listed := decodeObjectStorageResult[[]permission](t, runCommand("permission", "list", "tky01"))
+	listed := decodeObjectStorageResult[[]permission](t, runCommand("get-permissions", "tky01"))
 	require.Len(t, listed, 1, "permission list omitted the created ID")
 	require.Equal(t, created.ID, listed[0].ID, "unexpected value")
-	read := decodeObjectStorageResult[permission](t, runCommand("permission", "read", "tky01", permissionID))
+	read := decodeObjectStorageResult[permission](t, runCommand("get-permission", "tky01", permissionID))
 	require.Equal(t, created.ID, read.ID, "permission read did not preserve identity")
 	require.Equal(t, created.DisplayName, read.DisplayName, "unexpected value")
-	checkKeys([]string{"permission", "access-key"}, "tky01", permissionID)
+	checkKeys(map[string]string{"list": "get-permission-keys", "create": "create-permission-key", "read": "get-permission-key", "delete": "delete-permission-key"}, "tky01", permissionID)
 	updatedBody := strings.Replace(body, `"can_write":true`, `"can_write":false`, 1)
-	updated := decodeObjectStorageResult[permission](t, runCommand("permission", "update", "tky01", permissionID, "--request", updatedBody))
-	read = decodeObjectStorageResult[permission](t, runCommand("permission", "read", "tky01", permissionID))
+	updated := decodeObjectStorageResult[permission](t, runCommand("update-permission", "tky01", permissionID, "--request", updatedBody))
+	read = decodeObjectStorageResult[permission](t, runCommand("get-permission", "tky01", permissionID))
 	for _, value := range []permission{updated, read} {
 		if value.ID != created.ID || value.DisplayName != created.DisplayName || len(value.Controls) != 1 ||
 			value.Controls[0] != (control{BucketName: "skr-test-source", CanRead: true, CanWrite: false}) {
@@ -225,36 +225,36 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 		}
 	}
 	for _, args := range [][]string{
-		{"site", "status", "read", "tky01"},
-		{"site", "status", "quota", "tky01"},
-		{"bucket", "penalty", "tky01", "skr-test-source"},
-		{"bucket", "usage", "tky01", "skr-test-source"},
-		{"bucket", "quota", "tky01", "skr-test-source"},
+		{"get-status", "tky01"},
+		{"get-quota", "tky01"},
+		{"get-bucket-penalty", "tky01", "skr-test-source"},
+		{"get-bucket-usage", "tky01", "skr-test-source"},
+		{"get-bucket-quota", "tky01", "skr-test-source"},
 	} {
 		result := decodeObjectStorageResult[map[string]json.RawMessage](t, runCommand(args...))
 		require.NotEmpty(t, result, "%v returned no fields", args)
 	}
-	metering := decodeObjectStorageResult[[]json.RawMessage](t, runCommand("site", "status", "bucket-metering", "tky01", "skr-test-source",
+	metering := decodeObjectStorageResult[[]json.RawMessage](t, runCommand("get-bucket-metering", "tky01", "skr-test-source",
 		"--from", "2026-09-01T00:00:00Z", "--to", "2026-10-01T00:00:00Z"))
 	require.Len(t, metering, 0, "sakumock returned unexpected usage history")
 
 	// kms_key_id は Object Storage API の ResourceID (数値) 形式に従う
 	const keyID = "123456789012"
-	runCommand("bucket", "encryption", "enable", "tky01", "skr-test-source", "--kms-key-id", keyID)
+	runCommand("put-bucket-encryption", "tky01", "skr-test-source", "--kms-key-id", keyID)
 	encryption := decodeObjectStorageResult[struct {
 		KeyID string `json:"kms_key_id"`
-	}](t, runCommand("bucket", "encryption", "read", "tky01", "skr-test-source"))
+	}](t, runCommand("get-bucket-encryption", "tky01", "skr-test-source"))
 	require.Equal(t, keyID, encryption.KeyID, "encryption read did not preserve the selected key ID")
-	runCommand("bucket", "encryption", "disable", "tky01", "skr-test-source")
-	requireAbsent("bucket", "encryption", "read", "tky01", "skr-test-source")
+	runCommand("delete-bucket-encryption", "tky01", "skr-test-source")
+	requireAbsent("get-bucket-encryption", "tky01", "skr-test-source")
 	type replication struct {
 		Source bucket `json:"source_bucket"`
 		Target bucket `json:"dest_bucket"`
 		Status string `json:"config_status"`
 	}
-	for _, operation := range []string{"enable", "read"} {
-		args := []string{"bucket", "replication", operation, "tky01", "skr-test-source"}
-		if operation == "enable" {
+	for _, operation := range []string{"post-bucket-replication", "get-bucket-replication"} {
+		args := []string{operation, "tky01", "skr-test-source"}
+		if operation == "post-bucket-replication" {
 			args = append(args, "--target-bucket", "skr-test-target")
 		}
 		setting := decodeObjectStorageResult[replication](t, runCommand(args...))
@@ -263,24 +263,24 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 			t.Fatal("replication source, destination, or status did not match")
 		}
 	}
-	runCommand("bucket", "replication", "disable", "tky01", "skr-test-source")
-	requireAbsent("bucket", "replication", "read", "tky01", "skr-test-source")
-	runCommand("permission", "delete", "tky01", permissionID)
-	list := decodeObjectStorageResult[[]permission](t, runCommand("permission", "list", "tky01"))
+	runCommand("delete-bucket-replication", "tky01", "skr-test-source")
+	requireAbsent("get-bucket-replication", "tky01", "skr-test-source")
+	runCommand("delete-permission", "tky01", permissionID)
+	list := decodeObjectStorageResult[[]permission](t, runCommand("get-permissions", "tky01"))
 	require.Len(t, list, 0, "permission remains after deletion")
 	for _, item := range buckets {
-		list := decodeObjectStorageResult[[]bucket](t, runCommand("bucket", "list", item.site))
+		list := decodeObjectStorageResult[[]bucket](t, runCommand("list-buckets", item.site))
 		require.Len(t, list, 1, "bucket identity changed before deletion")
 		require.Equal(t, item.id, list[0].ResourceID, "unexpected value")
-		runCommand("bucket", "delete", item.site, item.name)
-		list2 := decodeObjectStorageResult[[]bucket](t, runCommand("bucket", "list", item.site))
+		runCommand("delete-bucket", item.site, item.name)
+		list2 := decodeObjectStorageResult[[]bucket](t, runCommand("list-buckets", item.site))
 		require.Len(t, list2, 0, "bucket remains after deletion")
-		account := decodeObjectStorageResult[identity](t, runCommand("account", "read", item.site))
+		account := decodeObjectStorageResult[identity](t, runCommand("get-account", item.site))
 		if account.ResourceID != accounts[item.site] {
 			t.Fatal("account identity changed before deletion")
 		}
-		runCommand("account", "delete", item.site)
-		requireAbsent("account", "read", item.site)
+		runCommand("delete-account", item.site)
+		requireAbsent("get-account", item.site)
 	}
 
 	commands := objectstorageapi.NewCommands(objectstorageapi.Runtime{}, nil)
@@ -310,7 +310,7 @@ func TestObjectStorageAPIWithSakumock(t *testing.T) {
 func TestObjectStorageSakumockErrorPropagation(t *testing.T) {
 	newObjectStorageMock(t, objectstoragemock.Config{Fault: []string{"403:1"}})
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"object-storage-api", "site", "list"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"object-storage-api", "get-clusters"}, &stdout, &stderr), "run should fail")
 
 	require.EqualValues(t, 0, stdout.Len(), "API error was hidden or produced success-shaped output")
 	require.Contains(t, stderr.String(), "403", "missing expected text %q", "403")
@@ -318,64 +318,66 @@ func TestObjectStorageSakumockErrorPropagation(t *testing.T) {
 
 func TestObjectStorageInvalidQueryBeforeAPIFactory(t *testing.T) {
 	var commands [][]string
-	for _, operation := range []string{"list", "read", "plans"} {
-		args := []string{"site", operation}
-		if operation != "list" {
+	// 34 末端コマンドそれぞれについて、API ファクトリを呼ぶ前の --query 検証を確認します
+	siteCommands := []string{"get-clusters", "get-cluster", "get-plans", "get-status", "get-quota", "get-bucket-metering"}
+	for _, name := range siteCommands {
+		args := []string{name}
+		if name != "get-clusters" {
 			args = append(args, "tky01")
 		}
-		commands = append(commands, args)
-	}
-	for _, operation := range []string{"read", "quota", "bucket-metering"} {
-		args := []string{"site", "status", operation, "tky01"}
-		if operation == "bucket-metering" {
+		if name == "get-bucket-metering" {
 			args = append(args, "test-bucket", "--from", "2026-09-01T00:00:00Z", "--to", "2026-10-01T00:00:00Z")
 		}
 		commands = append(commands, args)
 	}
-	for _, operation := range []string{"create", "read", "delete"} {
-		commands = append(commands, []string{"account", operation, "tky01"})
+	for _, name := range []string{"create-account", "get-account", "delete-account"} {
+		commands = append(commands, []string{name, "tky01"})
 	}
-	for _, operation := range []string{"list", "create", "delete", "penalty", "usage", "quota"} {
-		args := []string{"bucket", operation, "tky01"}
-		if operation != "list" {
+	for _, name := range []string{"list-buckets", "create-bucket", "delete-bucket", "get-bucket-penalty", "get-bucket-usage", "get-bucket-quota"} {
+		args := []string{name, "tky01"}
+		if name != "list-buckets" {
 			args = append(args, "test-bucket")
 		}
 		commands = append(commands, args)
 	}
-	for _, resource := range []string{"encryption", "replication"} {
-		for _, operation := range []string{"read", "enable", "disable"} {
-			args := []string{"bucket", resource, operation, "tky01", "test-bucket"}
-			if operation == "enable" {
-				flag := "--kms-key-id"
-				if resource == "replication" {
-					flag = "--target-bucket"
-				}
-				args = append(args, flag, "test-target")
-			}
-			commands = append(commands, args)
-		}
+	encryptionReplication := map[string]string{
+		"get-bucket-encryption":     "--kms-key-id",
+		"put-bucket-encryption":     "--kms-key-id",
+		"delete-bucket-encryption":  "--kms-key-id",
+		"get-bucket-replication":    "--target-bucket",
+		"post-bucket-replication":   "--target-bucket",
+		"delete-bucket-replication": "--target-bucket",
 	}
-	for _, operation := range []string{"list", "create", "read", "update", "delete"} {
-		args := []string{"permission", operation, "tky01"}
-		if operation == "read" || operation == "update" || operation == "delete" {
+	for _, name := range []string{"get-bucket-encryption", "put-bucket-encryption", "delete-bucket-encryption", "get-bucket-replication", "post-bucket-replication", "delete-bucket-replication"} {
+		args := []string{name, "tky01", "test-bucket"}
+		if flag := encryptionReplication[name]; name == "put-bucket-encryption" || name == "post-bucket-replication" {
+			args = append(args, flag, "test-target")
+		}
+		commands = append(commands, args)
+	}
+	for _, name := range []string{"get-permissions", "create-permission", "get-permission", "update-permission", "delete-permission"} {
+		args := []string{name, "tky01"}
+		if name == "get-permission" || name == "update-permission" || name == "delete-permission" {
 			args = append(args, "1001")
 		}
-		if operation == "create" || operation == "update" {
+		if name == "create-permission" || name == "update-permission" {
 			args = append(args, "--request", `{"display_name":"test","bucket_controls":[]}`)
 		}
 		commands = append(commands, args)
 	}
-	for _, resource := range []string{"account", "permission"} {
-		for _, operation := range []string{"list", "create", "read", "delete"} {
-			args := []string{resource, "access-key", operation, "tky01"}
-			if resource == "permission" {
-				args = append(args, "1001")
-			}
-			if operation == "read" || operation == "delete" {
-				args = append(args, "test-key")
-			}
-			commands = append(commands, args)
-		}
+	accountKeys := map[string][]string{
+		"get-account-keys":      nil,
+		"create-account-key":    nil,
+		"get-account-key":       {"test-key"},
+		"delete-account-key":    {"test-key"},
+		"get-permission-keys":   {"1001"},
+		"create-permission-key": {"1001"},
+		"get-permission-key":    {"1001", "test-key"},
+		"delete-permission-key": {"1001", "test-key"},
+	}
+	for _, name := range []string{"get-account-keys", "create-account-key", "get-account-key", "delete-account-key", "get-permission-keys", "create-permission-key", "get-permission-key", "delete-permission-key"} {
+		args := append([]string{name, "tky01"}, accountKeys[name]...)
+		commands = append(commands, args)
 	}
 	require.Len(t, commands, 34, "query regression coverage = %d, want 34", len(commands))
 	for _, args := range commands {
@@ -414,30 +416,30 @@ func TestObjectStorageSakumockRejectsWrongSite(t *testing.T) {
 		return stdout.Bytes()
 	}
 	for _, site := range []string{"isk01", "tky01"} {
-		call(true, "account", "create", site)
+		call(true, "create-account", site)
 	}
-	call(true, "bucket", "create", "isk01", "skr-site-source")
-	call(true, "bucket", "create", "tky01", "skr-site-target")
-	call(true, "bucket", "replication", "enable", "isk01", "skr-site-source", "--target-bucket", "skr-site-target")
-	for _, operation := range []string{"read", "enable", "disable"} {
-		args := []string{"bucket", "replication", operation, "tky01", "skr-site-source"}
-		if operation == "enable" {
+	call(true, "create-bucket", "isk01", "skr-site-source")
+	call(true, "create-bucket", "tky01", "skr-site-target")
+	call(true, "post-bucket-replication", "isk01", "skr-site-source", "--target-bucket", "skr-site-target")
+	for _, operation := range []string{"get-bucket-replication", "post-bucket-replication", "delete-bucket-replication"} {
+		args := []string{operation, "tky01", "skr-site-source"}
+		if operation == "post-bucket-replication" {
 			args = append(args, "--target-bucket", "skr-site-target")
 		}
 		call(false, args...)
 	}
-	call(false, "bucket", "delete", "tky01", "skr-site-source")
+	call(false, "delete-bucket", "tky01", "skr-site-source")
 	setting := decodeObjectStorageResult[struct {
 		Target struct {
 			Name string `json:"name"`
 		} `json:"dest_bucket"`
-	}](t, call(true, "bucket", "replication", "read", "isk01", "skr-site-source"))
+	}](t, call(true, "get-bucket-replication", "isk01", "skr-site-source"))
 	if setting.Target.Name != "skr-site-target" {
 		t.Fatal("wrong-site operation changed replication")
 	}
 	buckets := decodeObjectStorageResult[[]struct {
 		Name string `json:"name"`
-	}](t, call(true, "bucket", "list", "isk01"))
+	}](t, call(true, "list-buckets", "isk01"))
 	require.Len(t, buckets, 1, "wrong-site operation deleted the source bucket")
 	require.Equal(t, "skr-site-source", buckets[0].Name, "unexpected value")
 }
