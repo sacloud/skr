@@ -48,13 +48,13 @@ func createEncryptionKmsKey(t *testing.T, h *helper.Helper) encryptionKmsKey {
 
 	// 作成前に同名キーが存在しないことを確認する
 	output := h.Call(t, "作成前に同名 KMS キーが存在しないことを確認する",
-		"kms-api", "key", "list", "--query", `map(select(.Name == "`+name+`") | {ID,Name})`)
+		"kms-api", "list-keys", "--query", `map(select(.Name == "`+name+`") | {ID,Name})`)
 	var existing []encryptionKmsKey
 	require.NoError(t, json.Unmarshal(output, &existing), "decode KMS key list")
 	require.Empty(t, existing, "KMS key %s already exists; refusing to modify it", name)
 
 	output = h.Call(t, "テスト専用の KMS キーを作成する",
-		"kms-api", "key", "create", "--name", name,
+		"kms-api", "create-key", "--name", name,
 		"--description", "object-storage-api encryption scenario")
 	var created encryptionKmsKey
 	require.NoError(t, json.Unmarshal(output, &created), "decode created KMS key")
@@ -66,9 +66,9 @@ func createEncryptionKmsKey(t *testing.T, h *helper.Helper) encryptionKmsKey {
 func deleteEncryptionKmsKey(t *testing.T, h *helper.Helper, keyID string) {
 	t.Helper()
 
-	h.Call(t, "作成した KMS キーを削除する", "kms-api", "key", "delete", keyID)
+	h.Call(t, "作成した KMS キーを削除する", "kms-api", "delete-key", keyID)
 	output := h.Call(t, "削除後に KMS キーが一覧に残っていないことを確認する",
-		"kms-api", "key", "list", "--query", `map(select(.ID == "`+keyID+`") | {ID,Name})`)
+		"kms-api", "list-keys", "--query", `map(select(.ID == "`+keyID+`") | {ID,Name})`)
 	var remaining []encryptionKmsKey
 	require.NoError(t, json.Unmarshal(output, &remaining), "decode KMS key list")
 	require.Empty(t, remaining, "KMS key %s remains after deletion", keyID)
