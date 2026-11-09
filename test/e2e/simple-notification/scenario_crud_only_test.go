@@ -92,7 +92,7 @@ func TestScenarioSimpleNotificationCRUDOnly(t *testing.T) {
 
 	// 一時通知先の状態を確認する（確認メールへの応答は要求せず、IsValid の有無だけを確認する）
 	data := h.Call(t, "一時通知先の状態を確認する",
-		"simple-notification-api", "destination", "read-status", destination.item.ID)
+		"simple-notification-api", "check-notification-destination-status", destination.item.ID)
 	var status struct {
 		NotificationStatus *struct {
 			IsValid *bool `json:"IsValid"`
@@ -165,7 +165,7 @@ func TestScenarioSimpleNotificationCRUDOnly(t *testing.T) {
 func notificationSourceID(t *testing.T, h *helper.Helper) string {
 	t.Helper()
 
-	data := h.Call(t, "通知元のリソースを確認する", "simple-notification-api", "routing", "list-source")
+	data := h.Call(t, "通知元のリソースを確認する", "simple-notification-api", "list-notification-sources")
 	var sources struct {
 		Sources []struct {
 			ID string `json:"id"`
@@ -192,7 +192,7 @@ func createCRUDItem(t *testing.T, h *helper.Helper, created *[]*crudResource, ki
 	item := crudItem{Name: name, Description: description, Tags: []string{"skr-e2e", suffix}, Settings: settings}
 	requestPath := h.WriteRequestJSONFile(t, "create-"+kind, crudResponse{CommonServiceItem: item})
 	response := parseCRUDResponse(t, h.Call(t, fmt.Sprintf("一時%sを作成する", label),
-		"simple-notification-api", kind, "create", "--request", "@"+requestPath),
+		"simple-notification-api", "create-common-service-item", "--provider-class", providerClass(kind), "--request", "@"+requestPath),
 		fmt.Sprintf("一時%sを作成する", label))
 
 	if kind == "routing" {
@@ -236,7 +236,7 @@ func updateCRUDItem(t *testing.T, h *helper.Helper, r *crudResource, description
 	item.Tags = []string{"skr-e2e", r.suffix, "updated"}
 	requestPath := h.WriteRequestJSONFile(t, "update-"+r.kind, crudResponse{CommonServiceItem: item})
 	_ = parseCRUDResponse(t, h.Call(t, description,
-		"simple-notification-api", r.kind, "update", r.item.ID, "--request", "@"+requestPath), description)
+		"simple-notification-api", "update-common-service-item", "--provider-class", providerClass(r.kind), r.item.ID, "--request", "@"+requestPath), description)
 	r.item.Tags = item.Tags
 	if settings != nil {
 		r.item.Settings = settings
@@ -252,7 +252,7 @@ func reorderRouting(t *testing.T, h *helper.Helper, r *crudResource, rank int) {
 		"Orders": []any{map[string]any{"RoutingID": r.item.ID, "PriorityRank": rank}},
 	})
 	data := h.Call(t, fmt.Sprintf("一時ルーティングの優先順位を %d に変更する", rank),
-		"simple-notification-api", "routing", "reorder", "--request", "@"+requestPath)
+		"simple-notification-api", "reorder-notification-routing", "--request", "@"+requestPath)
 	var result struct {
 		IsOK bool `json:"is_ok"`
 	}
@@ -293,7 +293,7 @@ func cleanupCRUDItems(t *testing.T, h *helper.Helper, created []*crudResource, n
 		r := created[i]
 		label := kindName(r.kind)
 		_, stderr, deleteErr := h.CallAllowingFailure(t, fmt.Sprintf("一時%sを削除する", label),
-			"simple-notification-api", r.kind, "delete", r.item.ID)
+			"simple-notification-api", "delete-common-service-item", "--provider-class", providerClass(r.kind), r.item.ID)
 		if deleteErr != nil {
 			t.Errorf("delete temporary %s: %v\n%s", r.kind, deleteErr, stderr)
 		}

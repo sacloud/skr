@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -33,9 +34,7 @@ func TestSimpleNotificationGeneratedCodeMatchesConfig(t *testing.T) {
 		config string
 		output string
 	}{
-		{"api/commands/simple-notification-destination.json", "internal/simplenotificationapi/simple_notification_destination_api_generated.go"},
-		{"api/commands/simple-notification-group.json", "internal/simplenotificationapi/simple_notification_group_api_generated.go"},
-		{"api/commands/simple-notification-routing.json", "internal/simplenotificationapi/simple_notification_routing_api_generated.go"},
+		{"api/commands/simple-notification.json", "internal/simplenotificationapi/simple_notification_common_service_item_api_generated.go"},
 		{"api/commands/simple-notification-history.json", "internal/simplenotificationapi/simple_notification_history_api_generated.go"},
 	} {
 		configData, err := os.ReadFile(repositoryPath(test.config))
@@ -57,31 +56,41 @@ func TestRunSimpleNotificationAPIHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"simple-notification-api", "--help"},
-			want: []string{"destination", "group", "routing", "history", "通知の到達は保証されず"},
+			want: []string{
+				"list-common-service-items", "read-common-service-item", "create-common-service-item",
+				"update-common-service-item", "delete-common-service-item",
+				"check-notification-destination-status", "send-notification", "reorder-notification-routing",
+				"list-notification-sources", "list-notification-histories", "read-notification-history",
+				"通知の到達は保証されず",
+			},
 		},
 		{
-			args: []string{"simple-notification-api", "destination", "--help"},
-			want: []string{"list", "read", "create", "update", "delete", "read-status"},
+			args: []string{"simple-notification-api", "list-common-service-items", "--help"},
+			want: []string{"--provider-class", "saknoticedestination", "saknoticegroup", "saknoticerouting"},
 		},
 		{
-			args: []string{"simple-notification-api", "destination", "create", "--help"},
-			want: []string{"--request", "@path.json", "Type", "email", "webhook", "ServiceClass"},
+			args: []string{"simple-notification-api", "create-common-service-item", "--help"},
+			want: []string{"--provider-class", "--request", "@path.json", "Type", "email", "webhook", "Provider.Class", "ServiceClass"},
 		},
 		{
-			args: []string{"simple-notification-api", "group", "create", "--help"},
-			want: []string{"Destinations", "通知先 ID の配列", "Provider.Class"},
+			args: []string{"simple-notification-api", "update-common-service-item", "--help"},
+			want: []string{"--provider-class", "--request", "@path.json", "Name、Description、Tags、Icon", "通知先アドレスは変更できません"},
 		},
 		{
-			args: []string{"simple-notification-api", "group", "send-message", "--help"},
-			want: []string{"GROUP-ID", "--message", "--request", "併用できません", "到達を保証しません"},
+			args: []string{"simple-notification-api", "send-notification", "--help"},
+			want: []string{"--message", "--request", "併用できません", "到達を保証しません", "--provider-class は不要"},
 		},
 		{
-			args: []string{"simple-notification-api", "routing", "--help"},
-			want: []string{"reorder", "list-source"},
+			args: []string{"simple-notification-api", "check-notification-destination-status", "--help"},
+			want: []string{"通知先専用の操作", "--provider-class は不要"},
 		},
 		{
-			args: []string{"simple-notification-api", "history", "--help"},
-			want: []string{"list", "read"},
+			args: []string{"simple-notification-api", "reorder-notification-routing", "--help"},
+			want: []string{"--request", "@path.json", "ルーティング設定専用の操作"},
+		},
+		{
+			args: []string{"simple-notification-api", "list-notification-histories", "--help"},
+			want: []string{"通知履歴を一覧表示します"},
 		},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -112,7 +121,7 @@ func TestSimpleNotificationTraceUsesParsedFlag(t *testing.T) {
 	for _, trace := range []bool{false, true} {
 		var output, stderr, logs bytes.Buffer
 		log.SetOutput(&logs)
-		args := []string{"simple-notification-api", "destination", "list"}
+		args := []string{"simple-notification-api", "list-common-service-items", "--provider-class", "saknoticedestination"}
 		if trace {
 			args = append([]string{"--trace"}, args...)
 		}
@@ -137,21 +146,74 @@ func TestDestinationSDKValidationDoesNotExposeFileValues(t *testing.T) {
 	t.Setenv("SAKURA_ENDPOINTS_SIMPLE_NOTIFICATION", server.URL+"/")
 	const webhookURL = "https://example.invalid/private-webhook-value"
 	path := filepath.Join(t.TempDir(), "request.json")
-	for _, operation := range []string{"create", "update"} {
-		data := `{"CommonServiceItem":{"Name":"test","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"` + webhookURL + `","Value":"webhook"}}}`
-		err := os.WriteFile(path, []byte(data), 0o600)
-		require.NoError(t, err)
-		args := []string{"simple-notification-api", "destination", operation}
-		if operation == "update" {
-			args = append(args, "123456789012")
-		}
-		args = append(args, "--request", "@"+path)
-		var output, stderr bytes.Buffer
-		code := run(args, &output, &stderr)
-		require.EqualValues(t, 1, code, "%s exit = %d, want 1", operation, code)
-		if strings.Contains(stderr.String()+output.String(), webhookURL) || stderr.Len() == 0 {
-			t.Fatalf("%s did not return a nonempty safe error", operation)
-		}
+	for _, test := range []struct {
+		name string
+		args []string
+		data string
+	}{
+		{
+			name: "create",
+			args: []string{"simple-notification-api", "create-common-service-item", "--provider-class", "saknoticedestination"},
+			data: `{"CommonServiceItem":{"Name":"test","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"` + webhookURL + `","Value":"webhook"}}}`,
+		},
+		{
+			name: "update",
+			args: []string{"simple-notification-api", "update-common-service-item", "--provider-class", "saknoticedestination", "123456789012"},
+			data: `{"CommonServiceItem":{"Name":"test","Description":"","Tags":[],"Icon":null,"Settings":{"Type":"` + webhookURL + `","Value":"webhook"}}}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := os.WriteFile(path, []byte(test.data), 0o600)
+			require.NoError(t, err)
+			args := append(slices.Clone(test.args), "--request", "@"+path)
+			var output, stderr bytes.Buffer
+			code := run(args, &output, &stderr)
+			require.EqualValues(t, 1, code, "exit = %d, want 1", code)
+			require.NotContains(t, stderr.String()+output.String(), webhookURL, "error must not contain the protected address")
+			require.NotEmpty(t, stderr.String(), "error output is empty")
+		})
 	}
 	require.EqualValues(t, 0, calls, "invalid request reached the server %d times", calls)
+}
+
+func TestDestinationInlineRequestsAreRejected(t *testing.T) {
+	const webhookURL = "https://example.invalid/private-webhook-value"
+	for _, test := range []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "create",
+			args: []string{"simple-notification-api", "create-common-service-item", "--provider-class", "saknoticedestination",
+				"--request", `{"CommonServiceItem":{"Name":"test","Settings":{"Type":"webhook","Value":"` + webhookURL + `"}}}`},
+		},
+		{
+			name: "update with settings",
+			args: []string{"simple-notification-api", "update-common-service-item", "--provider-class", "saknoticedestination", "123456789012",
+				"--request", `{"CommonServiceItem":{"Name":"test","Settings":{"Type":"webhook","Value":"` + webhookURL + `"}}}`},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := run(test.args, &stdout, &stderr)
+			require.EqualValues(t, 1, code, "exit = %d, want 1", code)
+			combined := stderr.String() + stdout.String()
+			require.NotContains(t, combined, webhookURL, "error must not contain the protected address")
+			require.Contains(t, combined, "@path.json")
+		})
+	}
+}
+
+func TestCommonServiceItemRequiresProviderClass(t *testing.T) {
+	for _, args := range [][]string{
+		{"simple-notification-api", "list-common-service-items"},
+		{"simple-notification-api", "create-common-service-item", "--request", "{}"},
+		{"simple-notification-api", "update-common-service-item", "123456789012", "--request", "{}"},
+	} {
+		var stdout, stderr bytes.Buffer
+		code := run(args, &stdout, &stderr)
+		require.EqualValues(t, 1, code, "args = %v, exit = %d, want 1", args, code)
+		combined := stderr.String() + stdout.String()
+		require.Contains(t, combined, "--provider-class")
+	}
 }

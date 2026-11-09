@@ -345,27 +345,17 @@ service-endpoint-gateway-api seg-status-get-power-status live
 service-endpoint-gateway-api seg-status-reset-power-status live
 service-endpoint-gateway-api seg-status-update-power-status live
 service-endpoint-gateway-api seg-update live
-simple-notification-api destination create live
-simple-notification-api destination delete live
-simple-notification-api destination list live
-simple-notification-api destination read live
-simple-notification-api destination read-status live
-simple-notification-api destination update live
-simple-notification-api group create live
-simple-notification-api group delete live
-simple-notification-api group list live
-simple-notification-api group read live
-simple-notification-api group send-message live
-simple-notification-api group update live
-simple-notification-api history list live
-simple-notification-api history read live
-simple-notification-api routing create live
-simple-notification-api routing delete live
-simple-notification-api routing list live
-simple-notification-api routing list-source live
-simple-notification-api routing read live
-simple-notification-api routing reorder live
-simple-notification-api routing update live
+simple-notification-api check-notification-destination-status live
+simple-notification-api create-common-service-item live
+simple-notification-api delete-common-service-item live
+simple-notification-api list-common-service-items live
+simple-notification-api list-notification-histories live
+simple-notification-api list-notification-sources live
+simple-notification-api read-common-service-item live
+simple-notification-api read-notification-history live
+simple-notification-api reorder-notification-routing live
+simple-notification-api send-notification live
+simple-notification-api update-common-service-item live
 simplemq-api clear-queue live
 simplemq-api create-queue live
 simplemq-api delete-message live

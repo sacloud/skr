@@ -109,10 +109,9 @@ func TestGeneratedWiringMatchesConfig(t *testing.T) {
 		{
 			name: "SimpleNotification",
 			configs: []string{
-				"simple-notification-destination.json",
-				"simple-notification-group.json",
+				// Makefile の wildcard (api/commands/simple-notification*) と同じ順序に揃えます
 				"simple-notification-history.json",
-				"simple-notification-routing.json",
+				"simple-notification.json",
 			},
 			mode:     apigen.ModeOgen,
 			expected: "internal/cli/simple_notification_wiring_generated.go",

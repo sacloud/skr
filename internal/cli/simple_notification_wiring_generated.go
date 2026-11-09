@@ -2,10 +2,8 @@
 //
 // internal/cli の配線コードです。設定を変更した場合は再生成してください (ADR 0068)。
 // 設定:
-//   api/commands/simple-notification-destination.json
-//   api/commands/simple-notification-group.json
 //   api/commands/simple-notification-history.json
-//   api/commands/simple-notification-routing.json
+//   api/commands/simple-notification.json
 
 package cli
 
@@ -14,20 +12,6 @@ import (
 )
 
 func (c *cli) initSimpleNotificationAPI() {
-	c.SimpleNotificationAPI.Destination = simplenotificationapi.NewDestinationCommands(simplenotificationapi.DestinationRuntime{
-		DecodeRequest:  simplenotificationapi.DecodeDestinationRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}, func() (simplenotificationapi.DestinationAPI, error) {
-		return simplenotificationapi.NewDestinationAPI(c.Trace)
-	})
-	c.SimpleNotificationAPI.Group = simplenotificationapi.NewGroupCommands(simplenotificationapi.GroupRuntime{
-		DecodeRequest:  simplenotificationapi.DecodeGroupRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}, func() (simplenotificationapi.GroupAPI, error) {
-		return simplenotificationapi.NewGroupAPI(c.Trace)
-	})
 	c.SimpleNotificationAPI.History = simplenotificationapi.NewHistoryCommands(simplenotificationapi.HistoryRuntime{
 		DecodeRequest:  decodeRequest,
 		ValidateOutput: validateOutput,
@@ -35,11 +19,12 @@ func (c *cli) initSimpleNotificationAPI() {
 	}, func() (simplenotificationapi.HistoryAPI, error) {
 		return simplenotificationapi.NewHistoryAPI(c.Trace)
 	})
-	c.SimpleNotificationAPI.Routing = simplenotificationapi.NewRoutingCommands(simplenotificationapi.RoutingRuntime{
-		DecodeRequest:  simplenotificationapi.DecodeRoutingRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}, func() (simplenotificationapi.RoutingAPI, error) {
-		return simplenotificationapi.NewRoutingAPI(c.Trace)
+	c.SimpleNotificationAPI.CommonServiceItem = simplenotificationapi.NewCommonServiceItemCommands(simplenotificationapi.CommonServiceItemRuntime{
+		DecodeRequest:                 simplenotificationapi.DecodeRequest,
+		ValidateOutput:                validateOutput,
+		WriteOutput:                   writeOutput,
+		SetCreateRequestProviderInput: simplenotificationapi.SetCreateRequestProviderInput,
+	}, func(ProviderClass string) (simplenotificationapi.CommonServiceItemAPI, error) {
+		return simplenotificationapi.NewCommonServiceItemAPI(c.Trace, ProviderClass)
 	})
 }

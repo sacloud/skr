@@ -31,6 +31,19 @@ const destinationIDEnv = "SKR_E2E_SIMPLE_NOTIFICATION_DESTINATION_ID"
 // crudListQuery はリソース共通の一覧を射影する --query です。
 const crudListQuery = ".CommonServiceItems | map({ID,Name,Description,Tags,Settings,Icon})"
 
+// providerClass はリソース種別の CLI 用 --provider-class 値を返します。
+func providerClass(kind string) string {
+	switch kind {
+	case "destination":
+		return "saknoticedestination"
+	case "group":
+		return "saknoticegroup"
+	case "routing":
+		return "saknoticerouting"
+	}
+	return kind
+}
+
 // crudItem は --query で射影した CommonServiceItem です。
 // Settings はリソースごとに構造が異なるため map で扱います。
 type crudItem struct {
@@ -76,7 +89,8 @@ func destinationIDFromEnv(t *testing.T) string {
 func listCRUDItems(t *testing.T, h *helper.Helper, description, resource string) []crudItem {
 	t.Helper()
 
-	data := h.Call(t, description, "simple-notification-api", resource, "list", "--query", crudListQuery)
+	data := h.Call(t, description, "simple-notification-api", "list-common-service-items",
+		"--provider-class", providerClass(resource), "--query", crudListQuery)
 	var items []crudItem
 	err := json.Unmarshal(data, &items)
 	require.NoError(t, err, "%s: decode list: %v", description, err)
@@ -90,7 +104,7 @@ func listCRUDItemsAllowingFailure(t *testing.T, h *helper.Helper, description, r
 	t.Helper()
 
 	data, stderr, err := h.CallAllowingFailure(t, description,
-		"simple-notification-api", resource, "list", "--query", crudListQuery)
+		"simple-notification-api", "list-common-service-items", "--provider-class", providerClass(resource), "--query", crudListQuery)
 	if err != nil {
 		t.Errorf("%s: %v\n%s", description, err, stderr)
 		return nil
@@ -107,7 +121,8 @@ func listCRUDItemsAllowingFailure(t *testing.T, h *helper.Helper, description, r
 func readCRUDItem(t *testing.T, h *helper.Helper, description, resource, id string) crudItem {
 	t.Helper()
 
-	data := h.Call(t, description, "simple-notification-api", resource, "read", id)
+	data := h.Call(t, description, "simple-notification-api", "read-common-service-item",
+		"--provider-class", providerClass(resource), id)
 	var response crudResponse
 	err := json.Unmarshal(data, &response)
 	require.NoError(t, err, "%s: decode resource: %v", description, err)

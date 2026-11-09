@@ -16,7 +16,7 @@
 | `test/e2e/c0nfig` | config の current / list / show / create / edit / use(6) | 全コマンド実装済み |
 | `test/e2e/http` | http(1) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/simplemq` | queue 8操作、message 4操作(12) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
-| `test/e2e/simple-notification` | destination 6、group 6、history 2、routing 7(21) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
+| `test/e2e/simple-notification` | CommonServiceItem 5、専用操作 4、履歴 2(11) | 全コマンド実装済み。2026-10-27 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み。2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の operationId 由来のフラット名へ移行し、ライブで再確認済み |
 | `test/e2e/container-registry-api` | registry 5操作、user 4操作(9) | 全コマンド実装済み |
 | `test/e2e/networking-suite` | subnet-group 5、subnet 5、interface-connection 2、address 2(14) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答を確認済み |
 | `test/e2e/gslb` | find / read / create / update / delete(5) | 全コマンド実装済み。2026-10-28 に testing.T ベースのシナリオテストへ移行し、ライブで正常応答と ping 監視による切り替え・復帰を確認済み |

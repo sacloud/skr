@@ -63,7 +63,7 @@ operationId 機械派生に移行する際、この 2 ドメインでは spec �
 | `networking-suite-api` | 14 | 14 | 手書き (`internal/networkingsuiteapi`) |
 | `eventbus-api` | 16 | 6 | 生成 (3 ファイル、1 操作は手書き) |
 | `apprun-api` | 16 | 16 | 生成 (5 ファイル) |
-| `simple-notification-api` | 21 | 11 | 生成 (4 ファイル) |
+| `simple-notification-api` | 21 | 11 | 生成 (2 ファイル、4 操作は手書き) |
 | `object-storage-api` | 34 | 34 | 手書き (`internal/objectstorageapi`) |
 | `apprun-dedicated-api` | 35 | 35 | 手書き (`internal/apprundedicatedapi`) |
 | `iam-api` | 87 | 87 | 生成 (15 ファイル、6 操作は手書き) |

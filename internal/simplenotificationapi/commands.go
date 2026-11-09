@@ -15,49 +15,36 @@
 package simplenotificationapi
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"os"
-	"strings"
 
+	"github.com/alecthomas/kong"
 	simplenotification "github.com/sacloud/sacloud-sdk-go/api/simple-notification"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/simple-notification/apis/v1"
 	clientconfig "github.com/sacloud/skr/internal/saclient"
 )
 
+// Commands は Simple Notification API のコマンド群です。CommonServiceItem 操作は
+// Kong の embed で展開して、1 階層のフラットなコマンド構造にしています。
 type Commands struct {
-	Destination DestinationCommands `cmd:"" help:"メールアドレスまたは Webhook の通知先を管理します。"`
-	Group       GroupCommands       `cmd:"" help:"通知先をまとめるグループと通知送信を管理します。"`
-	Routing     RoutingCommands     `cmd:"" help:"通知ルーティング設定を管理します。"`
-	History     HistoryCommands     `cmd:"" help:"通知履歴を参照します。"`
+	CommonServiceItem CommonServiceItemCommands `embed:""`
+	History           HistoryCommands           `embed:""`
 }
 
-// NewDestinationAPI は通知先の API 操作を構築します。SDK のエラーを入力値を含まない
-// メッセージへ変換する adapter で包んで返します。
-func NewDestinationAPI(trace bool) (DestinationAPI, error) {
+// NewCommonServiceItemAPI は --provider-class で指定された種別に対応する API 操作を返します。
+// 種別ごとの SDK 操作は、一覧操作の Provider.Class 絞り込みと、作成・更新時の
+// リクエストへの Provider.Class 設定を行います。読み取りと削除は ID で直接操作するため
+// 種別に依存しません。
+func NewCommonServiceItemAPI(trace bool, providerClass string) (CommonServiceItemAPI, error) {
+	class, err := parseProviderClass(providerClass)
+	if err != nil {
+		return nil, err
+	}
 	client, err := NewClient(trace)
 	if err != nil {
 		return nil, err
 	}
-	return destinationAdapter{simplenotification.NewDestinationOp(client)}, nil
-}
-
-// NewGroupAPI は通知先グループの API 操作を構築します。
-func NewGroupAPI(trace bool) (GroupAPI, error) {
-	client, err := NewClient(trace)
-	if err != nil {
-		return nil, err
-	}
-	return simplenotification.NewGroupOp(client), nil
-}
-
-// NewRoutingAPI は通知ルーティング設定の API 操作を構築します。
-func NewRoutingAPI(trace bool) (RoutingAPI, error) {
-	client, err := NewClient(trace)
-	if err != nil {
-		return nil, err
-	}
-	return simplenotification.NewRoutingOp(client), nil
+	return selectCommonServiceItemOp(class, client), nil
 }
 
 // NewHistoryAPI は通知履歴の API 操作を構築します。
@@ -69,141 +56,236 @@ func NewHistoryAPI(trace bool) (HistoryAPI, error) {
 	return simplenotification.NewHistoryOp(client), nil
 }
 
-// DecodeDestinationRequest は通知先のリクエストを読み込みます。メールアドレスや Webhook URL を
-// 保護するため、Settings を含むリクエストは @path.json 形式での入力を要求します。
-func DecodeDestinationRequest(input string, destination any) error {
-	return decodeDestinationRequest(input, destination,
-		string(v1.CommonServiceItemProviderClassSaknoticedestination),
-		string(v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticedestination2))
-}
-
-// DecodeGroupRequest は通知先グループのリクエストを読み込みます。作成リクエストには
-// Provider.Class と ServiceClass を自動設定します。
-func DecodeGroupRequest(input string, destination any) error {
-	return decodeResourceRequest(input, destination,
-		string(v1.CommonServiceItemProviderClassSaknoticegroup),
-		string(v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticegroup2))
-}
-
-// DecodeRoutingRequest は通知ルーティング設定のリクエストを読み込みます。作成リクエストには
-// Provider.Class と ServiceClass を自動設定します。
-func DecodeRoutingRequest(input string, destination any) error {
-	return decodeResourceRequest(input, destination,
-		string(v1.CommonServiceItemProviderClassSaknoticerouting),
-		string(v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticerouting2))
-}
-
-func decodeDestinationRequest(input string, destination any, provider string, serviceClass string) error {
-	requiresFile := false
-	switch destination.(type) {
-	case *v1.PostCommonServiceItemRequest:
-		requiresFile = true
-	case *v1.PutCommonServiceItemRequest:
-		if !strings.HasPrefix(input, "@") {
-			var request struct {
-				CommonServiceItem struct {
-					Settings json.RawMessage `json:"Settings"`
-				} `json:"CommonServiceItem"`
-			}
-			if err := json.Unmarshal([]byte(input), &request); err != nil {
-				return fmt.Errorf("通知先リクエストを読み込めません。JSON の形式と入力ファイルを確認してください")
-			}
-			if len(request.CommonServiceItem.Settings) != 0 {
-				requiresFile = true
-			}
-		}
+// parseProviderClass は --provider-class の値を ProviderClass に変換し、
+// 未対応の値をエラーにします。
+func parseProviderClass(value string) (v1.CommonServiceItemProviderClass, error) {
+	switch v1.CommonServiceItemProviderClass(value) {
+	case v1.CommonServiceItemProviderClassSaknoticedestination,
+		v1.CommonServiceItemProviderClassSaknoticegroup,
+		v1.CommonServiceItemProviderClassSaknoticerouting:
+		return v1.CommonServiceItemProviderClass(value), nil
+	default:
+		return "", fmt.Errorf("--provider-class には saknoticedestination、saknoticegroup、saknoticerouting のいずれかを指定してください")
 	}
-	if requiresFile && !strings.HasPrefix(input, "@") {
-		return fmt.Errorf("通知先のメールアドレスやWebhook URLを保護するため、--request は @path.json で指定してください")
-	}
-	return protectDestinationError("通知先リクエストを読み込めません。JSON の形式と入力ファイルを確認してください",
-		decodeResourceRequest(input, destination, provider, serviceClass))
 }
 
-func decodeResourceRequest(input string, destination any, provider string, serviceClass string) error {
-	data, err := requestData(input)
+// selectCommonServiceItemOp は種別に対応する SDK 操作を選択します。通知先は
+// メールアドレスや Webhook URL が含まれ得るエラーを保護する adapter で包みます。
+func selectCommonServiceItemOp(class v1.CommonServiceItemProviderClass, client *v1.Client) CommonServiceItemAPI {
+	switch class {
+	case v1.CommonServiceItemProviderClassSaknoticedestination:
+		return destinationAdapter{simplenotification.NewDestinationOp(client)}
+	case v1.CommonServiceItemProviderClassSaknoticegroup:
+		return simplenotification.NewGroupOp(client)
+	default:
+		return simplenotification.NewRoutingOp(client)
+	}
+}
+
+// commonServiceItemStatusReader は通知先のステータス確認をサポートする API 操作が
+// 実装するメソッドです。ステータス確認は通知先のみに存在するため、共通の API
+// interface には含まれません。
+type commonServiceItemStatusReader interface {
+	ReadStatus(context.Context, string) (*v1.CheckDestinationStatusResponse, error)
+}
+
+// notificationMessageSender はメッセージ送信をサポートする API 操作が実装するメソッドです。
+// メッセージ送信は通知先グループのみに存在するため、共通の API interface には含まれません。
+type notificationMessageSender interface {
+	SendMessage(context.Context, string, v1.SendNotificationRequest) (*v1.SendNotificationResponse, error)
+}
+
+// routingReorderer はルーティング順序の変更をサポートする API 操作が実装するメソッドです。
+// 順序変更はルーティング設定のみに存在するため、共通の API interface には含まれません。
+type routingReorderer interface {
+	Reorder(context.Context, v1.ReorderNotificationRoutingRequest) (*v1.ReorderNotificationRoutingAccepted, error)
+}
+
+// notificationSourceLister は通知元の一覧取得をサポートする API 操作が実装するメソッドです。
+// 通知元の一覧はルーティング設定のみに存在するため、共通の API interface には含まれません。
+type notificationSourceLister interface {
+	ListSource(context.Context) (*v1.ListNotificationSourcesResponse, error)
+}
+
+// CommonServiceItemReadStatusCommand は通知先の送信可否ステータスを取得します。
+// ステータス確認は通知先専用の操作のため --provider-class を付けず、
+// 種別を saknoticedestination に固定します。
+type CommonServiceItemReadStatusCommand struct {
+	ID      string `arg:"" help:"ステータスを確認する通知先 ID。"`
+	factory CommonServiceItemAPIFactory
+	runtime CommonServiceItemRuntime
+}
+
+func (c *CommonServiceItemReadStatusCommand) Run(ctx *kong.Context) error {
+	if c.runtime.ValidateOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
+		return err
+	}
+	if c.factory == nil {
+		return fmt.Errorf("API クライアントが設定されていません")
+	}
+	op, err := c.factory(string(v1.CommonServiceItemProviderClassSaknoticedestination))
 	if err != nil {
 		return err
 	}
-	if _, isCreateRequest := destination.(*v1.PostCommonServiceItemRequest); !isCreateRequest {
-		return decodeJSON(data, destination)
+	statusOp, ok := op.(commonServiceItemStatusReader)
+	if !ok {
+		return fmt.Errorf("ステータスの確認は通知先 (saknoticedestination) に対してのみ実行できます")
 	}
-	var request map[string]json.RawMessage
-	if err := json.Unmarshal(data, &request); err != nil {
-		return fmt.Errorf("decode request JSON: %w", err)
-	}
-	var item map[string]json.RawMessage
-	if err := json.Unmarshal(request["CommonServiceItem"], &item); err != nil {
-		return fmt.Errorf("decode CommonServiceItem: %w", err)
-	}
-	if item == nil {
-		return fmt.Errorf("decode CommonServiceItem: expected JSON object")
-	}
-	providerJSON, err := json.Marshal(map[string]string{"Class": provider})
+	result, err := statusOp.ReadStatus(context.Background(), c.ID)
 	if err != nil {
-		return fmt.Errorf("encode notification provider: %w", err)
+		return err
 	}
-	serviceClassJSON, err := json.Marshal(serviceClass)
-	if err != nil {
-		return fmt.Errorf("encode notification service class: %w", err)
+	if c.runtime.WriteOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
 	}
-	for key, value := range map[string]json.RawMessage{
-		"Description": json.RawMessage(`""`),
-		"Icon":        json.RawMessage("null"),
-		"Tags":        json.RawMessage("[]"),
-	} {
-		if _, exists := item[key]; !exists {
-			item[key] = value
+	return c.runtime.WriteOutput(ctx, result)
+}
+
+// CommonServiceItemSendMessageCommand は通知先グループにメッセージを送信します。
+// メッセージ送信は通知先グループ専用の操作のため --provider-class を付けず、
+// 種別を saknoticegroup に固定します。
+type CommonServiceItemSendMessageCommand struct {
+	ID      string  `arg:"" help:"送信先の通知先グループ ID。通知先 ID ではありません。"`
+	Request *string `help:"Message を含む JSON を直接または @path.json で指定するか、--message を指定します。--request と個別フラグは併用できません。例: send-notification GROUP-ID --message 'テスト通知'"`
+	Message *string `name:"message" help:"必須: 通知するメッセージ。API の Message フィールドに対応します。"`
+	factory CommonServiceItemAPIFactory
+	runtime CommonServiceItemRuntime
+}
+
+func (c *CommonServiceItemSendMessageCommand) Run(ctx *kong.Context) error {
+	flagsSet := false
+	flagsSet = flagsSet || c.Message != nil
+	if c.Request != nil && flagsSet {
+		return fmt.Errorf("--request と個別フラグは併用できません")
+	}
+	request := &v1.SendNotificationRequest{}
+	if c.Request != nil {
+		if c.runtime.DecodeRequest == nil {
+			return fmt.Errorf("API リクエスト処理が設定されていません")
 		}
+		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
+			return err
+		}
+	} else {
+		if !flagsSet {
+			return fmt.Errorf("--request または個別フラグが必要です")
+		}
+		if c.Message == nil {
+			return fmt.Errorf("--message が必要です")
+		}
+		request.Message = *c.Message
 	}
-	item["Provider"] = providerJSON
-	item["ServiceClass"] = serviceClassJSON
-	request["CommonServiceItem"], err = json.Marshal(item)
+	if c.runtime.ValidateOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
+		return err
+	}
+	if c.factory == nil {
+		return fmt.Errorf("API クライアントが設定されていません")
+	}
+	op, err := c.factory(string(v1.CommonServiceItemProviderClassSaknoticegroup))
 	if err != nil {
-		return fmt.Errorf("encode CommonServiceItem: %w", err)
+		return err
 	}
-	data, err = json.Marshal(request)
+	sendOp, ok := op.(notificationMessageSender)
+	if !ok {
+		return fmt.Errorf("メッセージの送信は通知先グループ (saknoticegroup) に対してのみ実行できます")
+	}
+	result, err := sendOp.SendMessage(context.Background(), c.ID, *request)
 	if err != nil {
-		return fmt.Errorf("encode create request: %w", err)
+		return err
 	}
-	return decodeJSON(data, destination)
+	if c.runtime.WriteOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	return c.runtime.WriteOutput(ctx, result)
 }
 
-// decodeJSON はリクエスト JSON を destination へ展開します。
-func decodeJSON(data []byte, destination any) error {
-	if err := json.Unmarshal(data, destination); err != nil {
-		return fmt.Errorf("decode request JSON: %w", err)
-	}
-	return nil
+// CommonServiceItemReorderCommand はルーティング設定の順序を変更します。
+// 順序変更はルーティング設定専用の操作のため --provider-class を付けず、
+// 種別を saknoticerouting に固定します。
+type CommonServiceItemReorderCommand struct {
+	Request *string `help:"ルーティング順序の変更に使う JSON を直接または @path.json で指定します。"`
+	factory CommonServiceItemAPIFactory
+	runtime CommonServiceItemRuntime
 }
 
-func requestData(input string) ([]byte, error) {
-	if !strings.HasPrefix(input, "@") {
-		return []byte(input), nil
+func (c *CommonServiceItemReorderCommand) Run(ctx *kong.Context) error {
+	if c.Request == nil {
+		return fmt.Errorf("--request が必要です")
 	}
-	data, err := os.ReadFile(strings.TrimPrefix(input, "@"))
+	if c.runtime.DecodeRequest == nil {
+		return fmt.Errorf("API リクエスト処理が設定されていません")
+	}
+	request := &v1.ReorderNotificationRoutingRequest{}
+	if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
+		return err
+	}
+	if c.runtime.ValidateOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
+		return err
+	}
+	if c.factory == nil {
+		return fmt.Errorf("API クライアントが設定されていません")
+	}
+	op, err := c.factory(string(v1.CommonServiceItemProviderClassSaknoticerouting))
 	if err != nil {
-		return nil, fmt.Errorf("read request file: %w", err)
+		return err
 	}
-	return data, nil
+	reorderOp, ok := op.(routingReorderer)
+	if !ok {
+		return fmt.Errorf("順序の変更はルーティング設定 (saknoticerouting) に対してのみ実行できます")
+	}
+	result, err := reorderOp.Reorder(context.Background(), *request)
+	if err != nil {
+		return err
+	}
+	if c.runtime.WriteOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	return c.runtime.WriteOutput(ctx, result)
 }
 
-func SetDestinationProvider(request *v1.PostCommonServiceItemRequest) error {
-	request.CommonServiceItem.Provider.Class = v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticedestination
-	request.CommonServiceItem.ServiceClass = v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticedestination2
-	return nil
+// CommonServiceItemListSourceCommand はルーティング設定に利用できる通知元を一覧表示します。
+// 通知元の一覧はルーティング設定専用の操作のため --provider-class を付けず、
+// 種別を saknoticerouting に固定します。
+type CommonServiceItemListSourceCommand struct {
+	factory CommonServiceItemAPIFactory
+	runtime CommonServiceItemRuntime
 }
 
-func SetGroupProvider(request *v1.PostCommonServiceItemRequest) error {
-	request.CommonServiceItem.Provider.Class = v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticegroup
-	request.CommonServiceItem.ServiceClass = v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticegroup2
-	return nil
-}
-
-func SetRoutingProvider(request *v1.PostCommonServiceItemRequest) error {
-	request.CommonServiceItem.Provider.Class = v1.PostCommonServiceItemRequestCommonServiceItemProviderClassSaknoticerouting
-	request.CommonServiceItem.ServiceClass = v1.PostCommonServiceItemRequestCommonServiceItemServiceClassCloudSaknoticerouting2
-	return nil
+func (c *CommonServiceItemListSourceCommand) Run(ctx *kong.Context) error {
+	if c.runtime.ValidateOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	if err := c.runtime.ValidateOutput(ctx); err != nil {
+		return err
+	}
+	if c.factory == nil {
+		return fmt.Errorf("API クライアントが設定されていません")
+	}
+	op, err := c.factory(string(v1.CommonServiceItemProviderClassSaknoticerouting))
+	if err != nil {
+		return err
+	}
+	listOp, ok := op.(notificationSourceLister)
+	if !ok {
+		return fmt.Errorf("通知元の一覧はルーティング設定 (saknoticerouting) に対してのみ実行できます")
+	}
+	result, err := listOp.ListSource(context.Background())
+	if err != nil {
+		return err
+	}
+	if c.runtime.WriteOutput == nil {
+		return fmt.Errorf("API 出力処理が設定されていません")
+	}
+	return c.runtime.WriteOutput(ctx, result)
 }
 
 func NewClient(trace bool) (*v1.Client, error) {
