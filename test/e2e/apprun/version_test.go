@@ -84,7 +84,7 @@ func runVersionScenario(t *testing.T, h *helper.Helper, appID, appName string) {
 		},
 	})
 	updatedApp := parseApp(t, h.Call(t, "アプリケーションを更新する",
-		"apprun-api", "application", "update", appID, "--request", "@"+updateRequest))
+		"apprun-api", "patch-application", appID, "--request", "@"+updateRequest))
 	require.Equal(t, appID, updatedApp.ID, "updated application ID should match the application created by this run")
 	require.Equal(t, appName, updatedApp.Name, "updated application name should match the name requested by this run")
 	require.Len(t, updatedApp.Components, 1, "updated application should have one component")
@@ -93,7 +93,7 @@ func runVersionScenario(t *testing.T, h *helper.Helper, appID, appName string) {
 
 	// 更新後のアプリケーションを参照する
 	readApp := parseApp(t, h.Call(t, "更新後のアプリケーションを参照する",
-		"apprun-api", "application", "read", appID))
+		"apprun-api", "read-application", appID))
 	require.Equal(t, updatedMaxCPU, readApp.Components[0].MaxCPU, "read application max_cpu should match the value requested by this run")
 	require.Equal(t, updatedMaxMemory, readApp.Components[0].MaxMemory, "read application max_memory should match the value requested by this run")
 
@@ -107,7 +107,7 @@ func runVersionScenario(t *testing.T, h *helper.Helper, appID, appName string) {
 
 	// バージョン詳細を参照する
 	detail := parseVersionDetail(t, h.Call(t, "バージョンを参照する",
-		"apprun-api", "version", "read", "--application-id", appID, "--version-id", latest.ID), latest.ID)
+		"apprun-api", "read-application-version", "--application-id", appID, "--version-id", latest.ID), latest.ID)
 	require.Equal(t, port, detail.Port, "version port should match the port requested by this run")
 	require.Equal(t, 0, detail.MinScale, "version min_scale should match the value requested by this run")
 	require.Equal(t, 1, detail.MaxScale, "version max_scale should match the value requested by this run")
@@ -124,7 +124,7 @@ func runVersionScenario(t *testing.T, h *helper.Helper, appID, appName string) {
 		map[string]any{"is_latest_version": true, "percent": allTrafficPercent},
 	})
 	_ = h.Call(t, "トラフィックを新しいバージョンへ振り分ける",
-		"apprun-api", "traffic", "update", appID, "--request", "@"+trafficRequest)
+		"apprun-api", "update-application-traffic", appID, "--request", "@"+trafficRequest)
 	entries := listTraffic(t, h, "更新後のトラフィック分散設定を参照する", appID)
 	total := 0
 	latestPercent := 0
@@ -139,7 +139,7 @@ func runVersionScenario(t *testing.T, h *helper.Helper, appID, appName string) {
 
 	// 前のバージョンを削除する
 	_ = h.Call(t, "前のバージョンを削除する",
-		"apprun-api", "version", "delete", "--application-id", appID, "--version-id", previous.ID)
+		"apprun-api", "delete-application-version", "--application-id", appID, "--version-id", previous.ID)
 
 	// 削除後に残りのバージョンを確認する
 	remaining := listVersions(t, h, "削除後にバージョン一覧を取得する", appID)
@@ -152,7 +152,7 @@ func listVersions(t *testing.T, h *helper.Helper, description, appID string) []v
 	t.Helper()
 
 	data := h.Call(t, description,
-		"apprun-api", "version", "list", "--application-id", appID, "--query", ".data")
+		"apprun-api", "list-application-versions", "--application-id", appID, "--query", ".data")
 	var versions []versionSummary
 	err := json.Unmarshal(data, &versions)
 	require.NoError(t, err, "%s: decode AppRun version list: %v", description, err)
@@ -165,7 +165,7 @@ func listTraffic(t *testing.T, h *helper.Helper, description, appID string) []tr
 	t.Helper()
 
 	data := h.Call(t, description,
-		"apprun-api", "traffic", "list", appID, "--query", ".data")
+		"apprun-api", "list-application-traffic", appID, "--query", ".data")
 	var entries []trafficEntry
 	err := json.Unmarshal(data, &entries)
 	require.NoError(t, err, "%s: decode AppRun traffic list: %v", description, err)
@@ -191,7 +191,7 @@ func waitVersionHealthy(t *testing.T, h *helper.Helper, appID, versionID string)
 	deadline := time.Now().Add(versionWaitLimit)
 	for {
 		data := h.CallWithTimeout(t, 60*time.Second, "バージョンのステータスを取得する",
-			"apprun-api", "version", "status", "--application-id", appID, "--version-id", versionID)
+			"apprun-api", "read-application-version-status", "--application-id", appID, "--version-id", versionID)
 		var status struct {
 			Status string `json:"status"`
 		}

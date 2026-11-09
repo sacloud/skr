@@ -12,12 +12,12 @@ import (
 )
 
 type ApplicationCommands struct {
-	List   ApplicationListCommand   "cmd:\"\" help:\"アプリケーション一覧を取得します。ページングと並び順はフラグで指定できます。\""
-	Read   ApplicationReadCommand   "cmd:\"\" help:\"アプリケーションの設定と公開 URL を取得します。\""
-	Create ApplicationCreateCommand "cmd:\"\" help:\"コンテナイメージからアプリケーションを作成します。コンテナイメージの設定にはコンポーネント名、CPU、メモリ、レジストリ設定が必要です。認証情報を含む可能性があるためリクエストは保護したファイルまたは標準入力から読み込みます。例: skr apprun-api application create --request @application.json\""
-	Update ApplicationUpdateCommand "cmd:\"\" help:\"アプリケーションを部分更新します。リソース構成の変更により新しいバージョンが作成されます。認証情報を含む JSON は保護したファイルまたは標準入力から渡してください。\""
-	Delete ApplicationDeleteCommand "cmd:\"\" help:\"アプリケーションを削除します。削除前に対象 ID を確認してください。\""
-	Status ApplicationStatusCommand "cmd:\"\" help:\"アプリケーションのステータスを取得します。\""
+	List   ApplicationListCommand   "cmd:\"\" name:\"list-applications\" help:\"アプリケーション一覧を取得します。ページングと並び順はフラグで指定できます。\""
+	Read   ApplicationReadCommand   "cmd:\"\" name:\"read-application\" help:\"アプリケーションの設定と公開 URL を取得します。\""
+	Create ApplicationCreateCommand "cmd:\"\" name:\"create-application\" help:\"コンテナイメージからアプリケーションを作成します。コンテナイメージの設定にはコンポーネント名、CPU、メモリ、レジストリ設定が必要です。認証情報を含む可能性があるためリクエストは保護したファイルまたは標準入力から読み込みます。例: skr apprun-api create-application --request @application.json\""
+	Update ApplicationUpdateCommand "cmd:\"\" name:\"patch-application\" help:\"アプリケーションを部分更新します。リソース構成の変更により新しいバージョンが作成されます。認証情報を含む JSON は保護したファイルまたは標準入力から渡してください。\""
+	Delete ApplicationDeleteCommand "cmd:\"\" name:\"delete-application\" help:\"アプリケーションを削除します。削除前に対象 ID を確認してください。\""
+	Status ApplicationStatusCommand "cmd:\"\" name:\"read-application-status\" help:\"アプリケーションのステータスを取得します。\""
 }
 
 type ApplicationAPI interface {

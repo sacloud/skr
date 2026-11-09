@@ -54,7 +54,8 @@
           "help": "並び順。asc または desc。",
           "conversion": "NewOptVersionSortOrder"
         }
-      ]
+      ],
+      "command_name": "list-application-versions"
     },
     {
       "name": "Read",
@@ -78,7 +79,8 @@
           "flag": true,
           "required": true
         }
-      ]
+      ],
+      "command_name": "read-application-version"
     },
     {
       "name": "Delete",
@@ -101,7 +103,8 @@
           "flag": true,
           "required": true
         }
-      ]
+      ],
+      "command_name": "delete-application-version"
     },
     {
       "name": "Status",
@@ -125,7 +128,8 @@
           "flag": true,
           "required": true
         }
-      ]
+      ],
+      "command_name": "read-application-version-status"
     }
   ],
   "wiring_target": "AppRunAPI.Version",

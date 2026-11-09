@@ -12,8 +12,8 @@ import (
 )
 
 type PacketFilterCommands struct {
-	Read   PacketFilterReadCommand   "cmd:\"\" help:\"アプリケーションのパケットフィルターを取得します。\""
-	Update PacketFilterUpdateCommand "cmd:\"\" help:\"パケットフィルターの有効状態と IPv4 アドレス設定を更新します。\""
+	Read   PacketFilterReadCommand   "cmd:\"\" name:\"read-application-packet-filter\" help:\"アプリケーションのパケットフィルターを取得します。\""
+	Update PacketFilterUpdateCommand "cmd:\"\" name:\"patch-application-packet-filter\" help:\"パケットフィルターの有効状態と IPv4 アドレス設定を更新します。\""
 }
 
 type PacketFilterAPI interface {

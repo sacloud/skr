@@ -15,9 +15,12 @@
 package apprunapi
 
 type Commands struct {
-	Application  ApplicationCommands  `cmd:"" help:"AppRun アプリケーションを管理します。"`
-	Version      VersionCommands      `cmd:"" help:"アプリケーションのバージョンを確認・削除します。"`
-	PacketFilter PacketFilterCommands `cmd:"" name:"packet-filter" help:"アプリケーションのパケットフィルターを確認・変更します。"`
-	Traffic      TrafficCommands      `cmd:"" help:"アプリケーションのバージョン間でトラフィックを分散します。"`
-	User         UserCommands         `cmd:"" help:"AppRun のユーザー情報を確認します。"`
+	// 生成・手書きコマンド集合です。operationId 派生名への移行 (ADR 0074) に合わせ、
+	// application / version / packet-filter / traffic / user のグループ階層を
+	// Kong の embed で展開して 1 階層のフラット構造にしています。
+	Application  ApplicationCommands  `embed:""`
+	Version      VersionCommands      `embed:""`
+	PacketFilter PacketFilterCommands `embed:""`
+	Traffic      TrafficCommands      `embed:""`
+	User         UserCommands         `embed:""`
 }

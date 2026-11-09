@@ -18,7 +18,8 @@
           "type": "string",
           "help": "対象アプリケーション ID。"
         }
-      ]
+      ],
+      "command_name": "list-application-traffic"
     },
     {
       "name": "Update",
@@ -34,7 +35,8 @@
           "type": "string",
           "help": "対象アプリケーション ID。"
         }
-      ]
+      ],
+      "command_name": "update-application-traffic"
     }
   ],
   "wiring_target": "AppRunAPI.Traffic",

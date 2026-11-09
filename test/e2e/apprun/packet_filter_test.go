@@ -43,7 +43,7 @@ func runPacketFilterScenario(t *testing.T, h *helper.Helper, appID string) {
 
 	// 更新前にパケットフィルターが無効であることを確認する
 	initial := parsePacketFilter(t, h.Call(t, "パケットフィルターを参照する",
-		"apprun-api", "packet-filter", "read", appID), appID)
+		"apprun-api", "read-application-packet-filter", appID), appID)
 	require.False(t, initial.IsEnabled, "packet filter is already enabled for %s; refusing to modify it", appID)
 
 	// パケットフィルターを有効にする
@@ -52,11 +52,11 @@ func runPacketFilterScenario(t *testing.T, h *helper.Helper, appID string) {
 		"settings":   []any{map[string]any{"from_ip": filterAddress, "from_ip_prefix_length": 32}},
 	})
 	_ = h.Call(t, "パケットフィルターを有効にする",
-		"apprun-api", "packet-filter", "update", appID, "--request", "@"+updateRequest)
+		"apprun-api", "patch-application-packet-filter", appID, "--request", "@"+updateRequest)
 
 	// 有効化した設定がパケットフィルターの参照に反映されていることを確認する
 	updated := parsePacketFilter(t, h.Call(t, "更新後のパケットフィルターを参照する",
-		"apprun-api", "packet-filter", "read", appID), appID)
+		"apprun-api", "read-application-packet-filter", appID), appID)
 	require.True(t, updated.IsEnabled, "packet filter should be enabled after the update")
 	require.Len(t, updated.Settings, 1, "packet filter should have the setting requested by this run")
 	require.Equal(t, filterAddress, updated.Settings[0].FromIP, "packet filter from_ip should match the value requested by this run")
@@ -65,11 +65,11 @@ func runPacketFilterScenario(t *testing.T, h *helper.Helper, appID string) {
 	// パケットフィルターを無効状態に戻す
 	restoreRequest := h.WriteRequestJSONFile(t, "packet-filter-restore", map[string]any{"is_enabled": false})
 	_ = h.Call(t, "パケットフィルターを無効状態に戻す",
-		"apprun-api", "packet-filter", "update", appID, "--request", "@"+restoreRequest)
+		"apprun-api", "patch-application-packet-filter", appID, "--request", "@"+restoreRequest)
 
 	// 無効状態に戻ったことを確認する
 	restored := parsePacketFilter(t, h.Call(t, "元に戻ったパケットフィルターを参照する",
-		"apprun-api", "packet-filter", "read", appID), appID)
+		"apprun-api", "read-application-packet-filter", appID), appID)
 	require.False(t, restored.IsEnabled, "packet filter should be restored to the disabled state")
 }
 

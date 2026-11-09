@@ -36,7 +36,7 @@ func runUserScenario(t *testing.T, h *helper.Helper) {
 	t.Helper()
 
 	stdout, _, createErr := h.CallAllowingFailure(t, "AppRun ユーザーへサインアップする",
-		"apprun-api", "user", "create")
+		"apprun-api", "create-user")
 	signedUpNow := createErr == nil
 	var signedUp userLimitResponse
 	if signedUpNow {
@@ -49,7 +49,7 @@ func runUserScenario(t *testing.T, h *helper.Helper) {
 	}
 
 	// サインアップ後のユーザー情報を参照する
-	read := parseUserLimit(t, h.Call(t, "AppRun ユーザーを参照する", "apprun-api", "user", "read"))
+	read := parseUserLimit(t, h.Call(t, "AppRun ユーザーを参照する", "apprun-api", "read-user"))
 	require.Positive(t, read.Limit.ApplicationCount, "AppRun user limit application_count should be positive")
 	if signedUpNow {
 		require.Equal(t, signedUp.Limit.ApplicationCount, read.Limit.ApplicationCount,

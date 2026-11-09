@@ -100,17 +100,17 @@ func TestScenarioAppRun(t *testing.T) {
 		},
 	})
 	data := h.Call(t, "アプリケーションを作成する",
-		"apprun-api", "application", "create", "--request", "@"+createRequest)
+		"apprun-api", "create-application", "--request", "@"+createRequest)
 	createdApp := parseApp(t, data)
 	requireAppIdentity(t, createdApp, createdApp.ID, name)
 
 	defer func() {
 		// アプリケーションを削除し、一覧に残っていないことを確認する
 		// 削除前に今回の作成物と設定を再照合し、一致しない場合は削除しない
-		data = h.Call(t, "削除前にアプリケーションを再取得する", "apprun-api", "application", "read", createdApp.ID)
+		data = h.Call(t, "削除前にアプリケーションを再取得する", "apprun-api", "read-application", createdApp.ID)
 		currentApp := parseApp(t, data)
 		requireAppIdentity(t, currentApp, createdApp.ID, name)
-		_ = h.Call(t, "アプリケーションを削除する", "apprun-api", "application", "delete", createdApp.ID)
+		_ = h.Call(t, "アプリケーションを削除する", "apprun-api", "delete-application", createdApp.ID)
 		remaining := findApplicationsByID(t, h, "削除後にアプリケーションが一覧に残っていないことを確認する", createdApp.ID)
 		require.Empty(t, remaining, "application %s should not remain after deletion", createdApp.ID)
 	}()
@@ -121,7 +121,7 @@ func TestScenarioAppRun(t *testing.T) {
 	require.Equal(t, name, listed[0].Name, "the listed application name should match the name requested by this run")
 
 	// アプリケーションを参照する
-	data = h.Call(t, "アプリケーションを参照する", "apprun-api", "application", "read", createdApp.ID)
+	data = h.Call(t, "アプリケーションを参照する", "apprun-api", "read-application", createdApp.ID)
 	readApp := parseApp(t, data)
 	requireAppIdentity(t, readApp, createdApp.ID, name)
 
@@ -149,7 +149,7 @@ func listApplicationSummaries(t *testing.T, h *helper.Helper, description string
 	items := make([]appSummary, 0)
 	for page := 1; ; page++ {
 		data := h.CallWithTimeout(t, 60*time.Second, fmt.Sprintf("%s（%d ページ目）", description, page),
-			"apprun-api", "application", "list",
+			"apprun-api", "list-applications",
 			"--page-num", strconv.Itoa(page), "--page-size", "100",
 			"--query", ".data | map({id,name})")
 		var batch []appSummary
@@ -221,7 +221,7 @@ func waitApplicationHealthy(t *testing.T, h *helper.Helper, appID string) {
 	deadline := time.Now().Add(appStatusWaitLimit)
 	for {
 		data := h.CallWithTimeout(t, 60*time.Second, "アプリケーションのステータスを取得する",
-			"apprun-api", "application", "status", appID)
+			"apprun-api", "read-application-status", appID)
 		var status struct {
 			Status string `json:"status"`
 		}

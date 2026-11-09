@@ -69,7 +69,7 @@ cluster 5操作、application 6操作、version 4操作、auto-scaling-group 4�
 - `eventbus-api` の schedule 5コマンドと process-configuration update、trigger update(7コマンド): 完了。2026-10-23 にライブで正常実行を確認しました。2026-10-27 に `test/e2e/eventbus-api/` を [ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) に従い testing.T ベースのシナリオテストへ移行し、同じシナリオ内で再実行しました。schedule は現在時刻の1年後に1日周期で発火する設定を作成し、テスト時間内に発火しません。process-configuration の update はメッセージ内容を更新し、その内容を SimpleMQ 待ち受けが受信することでライブ更新を証明します。trigger の update は説明のみを更新して復元します。2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) に従い、派生名への移行後のコマンドで全工程をライブ再実行しました。実行記録は `test/e2e/eventbus-api/e2e-output/eventbus-api-20261109151050.md` です。
 - `apprun` の application update と version の list / read / status / delete(5コマンド): 完了。`test/e2e/apprun/` に application update で 1 vCPU / 2Gi の新バージョンを作成して Healthy 待ち、traffic を最新バージョンに100%割り当ててから前バージョンを削除するシナリオを追加します。2026-10-23 にライブで正常実行を確認しました。
 - application update は新しいバージョンを作るため、version 操作と組み合わせて作成・参照・削除まで確認します。
-- `apprun` の traffic と packet-filter、user の create / read(6コマンド): 完了。application のライフサイクルと同じシナリオに追加します。packet-filter は有効化＋設定を確認してから無効化に戻します。2026-10-23 にライブで正常実行を確認しました。
+- `apprun` の traffic と packet-filter、user の create / read(6コマンド): 完了。application のライフサイクルと同じシナリオに追加します。packet-filter は有効化＋設定を確認してから無効化に戻します。2026-10-23 にライブで正常実行を確認しました。2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) に従い、派生名への移行後のコマンドで全工程をライブ再実行しました。実行記録は `test/e2e/apprun/e2e-output/apprun-api-20261109152619.md` です。
 - `apprun user create`(1コマンド): 完了。サインアップはアカウント単位で取り消せないため、create の失敗を「サインアップ済み」として許容し、Read で `limit.application_count` を確認します。2026-10-23 にライブで正常実行を確認しました。
 - vCPU とメモリの組み合わせは API 側で検証されます(0.5/1Gi、1/2Gi、2/4Gi)。update では 1 vCPU / 2Gi を使用します。
 
