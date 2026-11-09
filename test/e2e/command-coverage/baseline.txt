@@ -345,18 +345,18 @@ simple-notification-api routing list-source live
 simple-notification-api routing read live
 simple-notification-api routing reorder live
 simple-notification-api routing update live
-simplemq-api delete-message live
-simplemq-api extend-message-timeout live
-simplemq-api receive-message live
-simplemq-api send-message live
-simplemq-api clear-queue live
-simplemq-api update-queue live
-simplemq-api read-message-count live
-simplemq-api create-queue live
-simplemq-api delete-queue live
-simplemq-api list-queues live
-simplemq-api read-queue live
-simplemq-api rotate-api-key live
+simplemq-api delete-message implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api extend-message-timeout implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api receive-message implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api send-message implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api clear-queue implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api update-queue implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api read-message-count implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api create-queue implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api delete-queue implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api list-queues implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api read-queue implemented #208 operationId 派生名への移行後にライブ再実行する
+simplemq-api rotate-api-key implemented #208 operationId 派生名への移行後にライブ再実行する
 service-endpoint-gateway-api appliance apply live
 service-endpoint-gateway-api appliance create live
 service-endpoint-gateway-api appliance delete live
