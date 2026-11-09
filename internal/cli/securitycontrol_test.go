@@ -34,50 +34,43 @@ func TestRunSecurityControlAPIHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"security-control-api", "--help"},
-			want: []string{"activation", "evaluation-rule", "automated-action", "manual.sakura.ad.jp/cloud/controlpanel/eventlog/security-control.html"},
+			want: []string{
+				"project-activation-create", "project-activation-read", "project-activation-update",
+				"evaluation-rules-list", "evaluation-rules-read", "evaluation-rules-update",
+				"automated-actions-list", "automated-actions-read", "automated-actions-create", "automated-actions-update", "automated-actions-delete",
+				"manual.sakura.ad.jp/cloud/controlpanel/eventlog/security-control.html",
+			},
 		},
 		{
-			args: []string{"security-control-api", "activation", "--help"},
-			want: []string{"create", "read", "update"},
-		},
-		{
-			args: []string{"security-control-api", "activation", "create", "--help"},
+			args: []string{"security-control-api", "project-activation-create", "--help"},
 			want: []string{"--service-principal-id", "サービスプリンシパル", "評価対象リソース"},
 		},
 		{
-			args: []string{"security-control-api", "activation", "update", "--help"},
+			args: []string{"security-control-api", "project-activation-update", "--help"},
 			want: []string{"--service-principal-id", "--is-active", "両方とも API に送信"},
 		},
 		{
-			args: []string{"security-control-api", "evaluation-rule", "--help"},
-			want: []string{"list", "read", "update"},
-		},
-		{
-			args: []string{"security-control-api", "evaluation-rule", "list", "--help"},
+			args: []string{"security-control-api", "evaluation-rules-list", "--help"},
 			want: []string{"--page-size", "--next", "--prev"},
 		},
 		{
-			args: []string{"security-control-api", "evaluation-rule", "read", "--help"},
+			args: []string{"security-control-api", "evaluation-rules-read", "--help"},
 			want: []string{"rule-id", "iamRolesRequired", "isEnabled"},
 		},
 		{
-			args: []string{"security-control-api", "evaluation-rule", "update", "--help"},
+			args: []string{"security-control-api", "evaluation-rules-update", "--help"},
 			want: []string{"--request", "@path.json", "--service-principal-id", "--is-enabled", "--targets", "個別フラグと併用できません"},
 		},
 		{
-			args: []string{"security-control-api", "automated-action", "--help"},
-			want: []string{"list", "read", "create", "update", "delete"},
-		},
-		{
-			args: []string{"security-control-api", "automated-action", "create", "--help"},
+			args: []string{"security-control-api", "automated-actions-create", "--help"},
 			want: []string{"--name", "--execution-condition", "--is-enabled", "--service-principal-id", "--notification-group-id", "--workflow-id", "--revision-id", "--revision-alias", "--workflow-name", "--args", "--request", "simpleNotification または workflows", "@path で保護したファイルから、- で標準入力から読み込みます", "JSON を直接指定することはできません"},
 		},
 		{
-			args: []string{"security-control-api", "automated-action", "update", "--help"},
+			args: []string{"security-control-api", "automated-actions-update", "--help"},
 			want: []string{"--request", "@path.json または - (標準入力)", "全体を置き換える", "JSON を直接指定することはできません"},
 		},
 		{
-			args: []string{"security-control-api", "automated-action", "delete", "--help"},
+			args: []string{"security-control-api", "automated-actions-delete", "--help"},
 			want: []string{"action-id", "削除"},
 		},
 	} {
@@ -94,32 +87,32 @@ func TestRunSecurityControlAPIHelp(t *testing.T) {
 
 func TestRunSecurityControlAPIRejectsMissingServicePrincipalID(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"security-control-api", "activation", "create"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"security-control-api", "project-activation-create"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "missing flags: --service-principal-id", "error = %q", stderr.String())
 }
 
 func TestRunSecurityControlAPIRejectsActivationUpdateWithSingleFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"security-control-api", "activation", "update", "--service-principal-id", "112700012345"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"security-control-api", "project-activation-update", "--service-principal-id", "112700012345"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "missing flags: --is-active", "error = %q", stderr.String())
 }
 
 func TestRunSecurityControlAPIRejectsUnknownEvaluationRuleID(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"security-control-api", "evaluation-rule", "update", "unknown-rule", "--is-enabled=true"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"security-control-api", "evaluation-rules-update", "unknown-rule", "--is-enabled=true"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "unknown-rule", "error = %q", stderr.String())
 }
 
 func TestRunSecurityControlAPIRejectsEvaluationRuleRequestAndFlags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"security-control-api", "evaluation-rule", "update", "server-no-public-ip", "--request", `{"isEnabled":true}`, "--is-enabled=true"}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"security-control-api", "evaluation-rules-update", "server-no-public-ip", "--request", `{"isEnabled":true}`, "--is-enabled=true"}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "--request と個別フラグは併用できません", "error = %q", stderr.String())
 }
 
 func TestRunSecurityControlAPIRejectsAutomatedActionBothTargets(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	args := []string{
-		"security-control-api", "automated-action", "create",
+		"security-control-api", "automated-actions-create",
 		"--name", "my-action", "--execution-condition", "event.evaluationResult.status == \"REJECTED\"",
 		"--is-enabled=true", "--service-principal-id", "112700012345",
 		"--notification-group-id", "112700056789", "--workflow-id", "workflow-1",
@@ -131,7 +124,7 @@ func TestRunSecurityControlAPIRejectsAutomatedActionBothTargets(t *testing.T) {
 func TestRunSecurityControlAPIRejectsAutomatedActionRequestAndFlags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	args := []string{
-		"security-control-api", "automated-action", "create",
+		"security-control-api", "automated-actions-create",
 		"--request", `{"name":"my-action"}`, "--name", "my-action",
 	}
 	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
@@ -140,7 +133,7 @@ func TestRunSecurityControlAPIRejectsAutomatedActionRequestAndFlags(t *testing.T
 
 func TestRunSecurityControlAPIRejectsInlineAutomatedActionRequest(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{"security-control-api", "automated-action", "create", "--request", `{"name":"my-action"}`}, &stdout, &stderr), "run should fail")
+	require.NotEqual(t, 0, run([]string{"security-control-api", "automated-actions-create", "--request", `{"name":"my-action"}`}, &stdout, &stderr), "run should fail")
 	require.Contains(t, stderr.String(), "--request には @path または - (標準入力) を指定してください", "error = %q", stderr.String())
 	require.Contains(t, stderr.String(), "JSON を直接指定することはできません", "error = %q", stderr.String())
 }
@@ -148,7 +141,7 @@ func TestRunSecurityControlAPIRejectsInlineAutomatedActionRequest(t *testing.T) 
 func TestRunSecurityControlAPIRejectsInlineAutomatedActionArgs(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	args := []string{
-		"security-control-api", "automated-action", "create",
+		"security-control-api", "automated-actions-create",
 		"--name", "workflow-action", "--execution-condition", "condition",
 		"--is-enabled=false", "--service-principal-id", "112700012345",
 		"--workflow-id", "workflow-1", "--args", `{"server_id": 12345}`,
@@ -161,7 +154,7 @@ func TestRunSecurityControlAPIRejectsInlineAutomatedActionArgs(t *testing.T) {
 func TestRunSecurityControlAPIRejectsEvaluationRuleRequestWithEmptyTargets(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	args := []string{
-		"security-control-api", "evaluation-rule", "update", "server-no-public-ip",
+		"security-control-api", "evaluation-rules-update", "server-no-public-ip",
 		"--request", `{"isEnabled":true}`, "--targets=",
 	}
 	require.NotEqual(t, 0, run(args, &stdout, &stderr), "run should fail")
@@ -187,7 +180,7 @@ func TestRunSecurityControlAPIAutomatedActionCreateWithRequestFile(t *testing.T)
 	require.NoError(t, os.WriteFile(requestFile, []byte(requestJSON), 0o600))
 
 	var stdout, stderr bytes.Buffer
-	require.Equal(t, 0, run([]string{"security-control-api", "automated-action", "create", "--request", "@" + requestFile}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Equal(t, 0, run([]string{"security-control-api", "automated-actions-create", "--request", "@" + requestFile}, &stdout, &stderr), "stderr: %s", stderr.String())
 	require.Contains(t, stdout.String(), `"automatedActionId": "action-1"`)
 
 	body, err := json.Marshal(gotCreateBody)
@@ -232,17 +225,17 @@ func TestRunSecurityControlAPIActivationLifecycle(t *testing.T) {
 	_ = server
 
 	var stdout, stderr bytes.Buffer
-	require.Equal(t, 0, run([]string{"security-control-api", "activation", "create", "--service-principal-id", servicePrincipalID}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Equal(t, 0, run([]string{"security-control-api", "project-activation-create", "--service-principal-id", servicePrincipalID}, &stdout, &stderr), "stderr: %s", stderr.String())
 	require.Equal(t, map[string]any{"servicePrincipalId": servicePrincipalID}, gotActivationCreate)
 	require.Contains(t, stdout.String(), `"servicePrincipalId": "`+servicePrincipalID+`"`)
 	require.Contains(t, stdout.String(), `"isActive": true`)
 
 	stdout.Reset()
-	require.Equal(t, 0, run([]string{"security-control-api", "activation", "read"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Equal(t, 0, run([]string{"security-control-api", "project-activation-read"}, &stdout, &stderr), "stderr: %s", stderr.String())
 	require.Contains(t, stdout.String(), `"automatedActionLimit": 1`)
 
 	stdout.Reset()
-	require.Equal(t, 0, run([]string{"security-control-api", "activation", "update", "--service-principal-id", servicePrincipalID, "--is-active=false"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Equal(t, 0, run([]string{"security-control-api", "project-activation-update", "--service-principal-id", servicePrincipalID, "--is-active=false"}, &stdout, &stderr), "stderr: %s", stderr.String())
 	require.Equal(t, map[string]any{"servicePrincipalId": servicePrincipalID, "isActive": false}, gotActivationUpdate)
 	require.Contains(t, stdout.String(), `"isActive": false`)
 }
@@ -262,7 +255,7 @@ func TestRunSecurityControlAPIEvaluationRuleUpdateWithFlags(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	args := []string{
-		"security-control-api", "evaluation-rule", "update", "server-no-public-ip",
+		"security-control-api", "evaluation-rules-update", "server-no-public-ip",
 		"--service-principal-id", "112700012345", "--targets", "is1b", "--is-enabled=true",
 	}
 	require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
@@ -286,7 +279,7 @@ func TestRunSecurityControlAPIEvaluationRuleList(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	require.Equal(t, 0, run([]string{"security-control-api", "evaluation-rule", "list"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Equal(t, 0, run([]string{"security-control-api", "evaluation-rules-list"}, &stdout, &stderr), "stderr: %s", stderr.String())
 	require.Contains(t, stdout.String(), `"evaluationRuleId": "server-no-public-ip"`)
 }
 
@@ -306,7 +299,7 @@ func TestRunSecurityControlAPIAutomatedActionCreateWithFlags(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	args := []string{
-		"security-control-api", "automated-action", "create",
+		"security-control-api", "automated-actions-create",
 		"--name", "evaluation-rejected",
 		"--execution-condition", `event.evaluationResult.status == "REJECTED"`,
 		"--is-enabled=true", "--service-principal-id", "112700012345",
@@ -336,5 +329,5 @@ func TestRunSecurityControlAPIAutomatedActionDelete(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	require.Equal(t, 0, run([]string{"security-control-api", "automated-action", "delete", "action-1"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Equal(t, 0, run([]string{"security-control-api", "automated-actions-delete", "action-1"}, &stdout, &stderr), "stderr: %s", stderr.String())
 }

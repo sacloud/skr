@@ -48,7 +48,7 @@ func TestScenarioActivation(t *testing.T) {
 	// create は未アクティベートのプロジェクトでのみ成功するため、既にアクティベート済みの
 	// このプロジェクトでは 409 で拒否されることを確認する
 	_, stderr, err := h.CallAllowingFailure(t, "アクティベート済みのプロジェクトでの create が拒否されることを確認する",
-		"security-control-api", "activation", "create",
+		"security-control-api", "project-activation-create",
 		"--service-principal-id", sp,
 	)
 	require.Error(t, err, "create on an activated project should fail: %s", stderr)
@@ -71,7 +71,7 @@ type activationOutput struct {
 func readActivation(t *testing.T, h *helper.Helper, description string) activationOutput {
 	t.Helper()
 
-	data := h.Call(t, description, "security-control-api", "activation", "read")
+	data := h.Call(t, description, "security-control-api", "project-activation-read")
 	var out activationOutput
 	require.NoError(t, json.Unmarshal(data, &out), "decode activation read response: %s", string(data))
 	return out
@@ -84,7 +84,7 @@ func updateActivation(t *testing.T, h *helper.Helper, sp string, active bool, de
 	t.Helper()
 
 	data := h.Call(t, description,
-		"security-control-api", "activation", "update",
+		"security-control-api", "project-activation-update",
 		"--service-principal-id", sp,
 		"--is-active="+strconv.FormatBool(active),
 	)

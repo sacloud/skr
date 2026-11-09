@@ -377,15 +377,15 @@ secretmanager-api delete-vault live
 secretmanager-api list-vaults live
 secretmanager-api read-vault live
 secretmanager-api update-vault live
-security-control-api activation create deferred #200 正常系には未アクティベートのプロジェクトが必要で、アクティベート済みプロジェクトでの 409 拒否のみ確認済み
-security-control-api activation read live
-security-control-api activation update live
-security-control-api automated-action create live
-security-control-api automated-action delete live
-security-control-api automated-action list live
-security-control-api automated-action read live
-security-control-api automated-action update live
-security-control-api evaluation-rule list live
-security-control-api evaluation-rule read live
-security-control-api evaluation-rule update live
+security-control-api project-activation-create deferred #200 正常系には未アクティベートのプロジェクトが必要で、アクティベート済みプロジェクトでの 409 拒否のみ確認済み
+security-control-api project-activation-read live
+security-control-api project-activation-update live
+security-control-api automated-actions-create live
+security-control-api automated-actions-delete live
+security-control-api automated-actions-list live
+security-control-api automated-actions-read live
+security-control-api automated-actions-update live
+security-control-api evaluation-rules-list live
+security-control-api evaluation-rules-read live
+security-control-api evaluation-rules-update live
 version live

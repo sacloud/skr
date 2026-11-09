@@ -150,7 +150,7 @@ func appliedEvaluationRuleState(rule evaluationRuleItem, servicePrincipalID stri
 func listEvaluationRules(t *testing.T, h *helper.Helper, description string) []evaluationRuleItem {
 	t.Helper()
 
-	data := h.Call(t, description, "security-control-api", "evaluation-rule", "list")
+	data := h.Call(t, description, "security-control-api", "evaluation-rules-list")
 	var out struct {
 		Items []evaluationRuleItem `json:"items"`
 	}
@@ -162,7 +162,7 @@ func listEvaluationRules(t *testing.T, h *helper.Helper, description string) []e
 func readEvaluationRule(t *testing.T, h *helper.Helper, ruleID string, description string) evaluationRuleItem {
 	t.Helper()
 
-	data := h.Call(t, description, "security-control-api", "evaluation-rule", "read", ruleID)
+	data := h.Call(t, description, "security-control-api", "evaluation-rules-read", ruleID)
 	var out evaluationRuleItem
 	require.NoError(t, json.Unmarshal(data, &out), "decode evaluation-rule read response: %s", string(data))
 	require.Equal(t, ruleID, out.Rule.EvaluationRuleId, "read response should have the requested rule ID: %s", string(data))
@@ -174,7 +174,7 @@ func updateEvaluationRuleWithFlags(t *testing.T, h *helper.Helper, ruleID string
 	t.Helper()
 
 	data := h.Call(t, description,
-		"security-control-api", "evaluation-rule", "update", ruleID,
+		"security-control-api", "evaluation-rules-update", ruleID,
 		"--is-enabled",
 		"--targets", evaluationRuleTargetZone,
 	)
@@ -190,7 +190,7 @@ func restoreEvaluationRule(t *testing.T, h *helper.Helper, ruleID string) {
 	t.Helper()
 
 	h.Call(t, "ルールを元の状態 (無効・parameter なし) に戻す",
-		"security-control-api", "evaluation-rule", "update", ruleID,
+		"security-control-api", "evaluation-rules-update", ruleID,
 		"--request", `{"rule":{"evaluationRuleId":"`+ruleID+`"},"isEnabled":false}`,
 	)
 }

@@ -541,10 +541,10 @@ func TestCommandsReferenceAllGroups(t *testing.T) {
 	}
 	joined := strings.Join(names, "\n")
 	for _, path := range []string{
-		"activation create", "activation read", "activation update",
-		"evaluation-rule list", "evaluation-rule read", "evaluation-rule update",
-		"automated-action list", "automated-action read", "automated-action create",
-		"automated-action update", "automated-action delete",
+		"project-activation-create", "project-activation-read", "project-activation-update",
+		"evaluation-rules-list", "evaluation-rules-read", "evaluation-rules-update",
+		"automated-actions-list", "automated-actions-read", "automated-actions-create",
+		"automated-actions-update", "automated-actions-delete",
 	} {
 		require.Contains(t, joined, path)
 	}

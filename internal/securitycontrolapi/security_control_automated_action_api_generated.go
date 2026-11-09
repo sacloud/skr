@@ -12,11 +12,11 @@ import (
 )
 
 type AutomatedActionCommands struct {
-	List   AutomatedActionListCommand   "cmd:\"\" help:\"自動アクションの一覧を取得します。--page-size、--next、--prev でページングできます。\""
-	Read   AutomatedActionReadCommand   "cmd:\"\" help:\"自動アクション ID を指定してアクション設定を読み取ります。automatedActionId、name、action、executionCondition、isEnabled を出力します。\""
-	Create AutomatedActionCreateCommand "cmd:\"\" help:\"自動アクションを作成します。--request または個別フラグで入力します。アクションの実行先は simpleNotification (--notification-group-id) または workflows (--workflow-id) のどちらか一方で選択します。個別フラグでは name、execution-condition、is-enabled、service-principal-id が必須です。作成可能なアクション数は activation read の automatedActionLimit で確認できます。\""
-	Update AutomatedActionUpdateCommand "cmd:\"\" help:\"自動アクション ID を指定してアクション設定を置き換えます。--request または個別フラグで入力します。name、action、executionCondition、isEnabled は自動アクション全体を置き換えるため、維持したい項目は参照結果から再指定してください。\""
-	Delete AutomatedActionDeleteCommand "cmd:\"\" help:\"自動アクション ID を指定してアクションを削除します。削除前に対象 ID を確認してください。\""
+	List   AutomatedActionListCommand   "cmd:\"\" name:\"automated-actions-list\" help:\"自動アクションの一覧を取得します。--page-size、--next、--prev でページングできます。\""
+	Read   AutomatedActionReadCommand   "cmd:\"\" name:\"automated-actions-read\" help:\"自動アクション ID を指定してアクション設定を読み取ります。automatedActionId、name、action、executionCondition、isEnabled を出力します。\""
+	Create AutomatedActionCreateCommand "cmd:\"\" name:\"automated-actions-create\" help:\"自動アクションを作成します。--request または個別フラグで入力します。アクションの実行先は simpleNotification (--notification-group-id) または workflows (--workflow-id) のどちらか一方で選択します。個別フラグでは name、execution-condition、is-enabled、service-principal-id が必須です。作成可能なアクション数は project-activation-read の automatedActionLimit で確認できます。\""
+	Update AutomatedActionUpdateCommand "cmd:\"\" name:\"automated-actions-update\" help:\"自動アクション ID を指定してアクション設定を置き換えます。--request または個別フラグで入力します。name、action、executionCondition、isEnabled は自動アクション全体を置き換えるため、維持したい項目は参照結果から再指定してください。\""
+	Delete AutomatedActionDeleteCommand "cmd:\"\" name:\"automated-actions-delete\" help:\"自動アクション ID を指定してアクションを削除します。削除前に対象 ID を確認してください。\""
 }
 
 type AutomatedActionAPI interface {
@@ -115,7 +115,7 @@ func (c *AutomatedActionListCommand) Run(ctx *kong.Context) error {
 }
 
 type AutomatedActionReadCommand struct {
-	ID      string "arg:\"\" name:\"action-id\" help:\"参照する自動アクション ID。list の出力にある automatedActionId。\""
+	ID      string "arg:\"\" name:\"action-id\" help:\"参照する自動アクション ID。automated-actions-list の出力にある automatedActionId。\""
 	factory AutomatedActionAPIFactory
 	runtime AutomatedActionRuntime
 }
@@ -145,7 +145,7 @@ func (c *AutomatedActionReadCommand) Run(ctx *kong.Context) error {
 }
 
 type AutomatedActionDeleteCommand struct {
-	ID      string "arg:\"\" name:\"action-id\" help:\"削除する自動アクション ID。list の出力にある automatedActionId。\""
+	ID      string "arg:\"\" name:\"action-id\" help:\"削除する自動アクション ID。automated-actions-list の出力にある automatedActionId。\""
 	factory AutomatedActionAPIFactory
 	runtime AutomatedActionRuntime
 }

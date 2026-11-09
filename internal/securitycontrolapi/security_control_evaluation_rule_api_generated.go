@@ -12,9 +12,9 @@ import (
 )
 
 type EvaluationRuleCommands struct {
-	List   EvaluationRuleListCommand   "cmd:\"\" help:\"評価ルールの一覧を取得します。--page-size、--next、--prev でページングできます。\""
-	Read   EvaluationRuleReadCommand   "cmd:\"\" help:\"評価ルール ID を指定してルール設定を読み取ります。rule、description、iamRolesRequired、isEnabled を出力します。\""
-	Update EvaluationRuleUpdateCommand "cmd:\"\" help:\"評価ルール ID を指定してルール設定を更新します。--request または個別フラグで入力します。--service-principal-id と --targets はルールのパラメータを構成し、--is-enabled はルールの有効状態です。--request では API の rule (evaluationRuleId と parameter) と isEnabled を含む JSON を指定します。\""
+	List   EvaluationRuleListCommand   "cmd:\"\" name:\"evaluation-rules-list\" help:\"評価ルールの一覧を取得します。--page-size、--next、--prev でページングできます。\""
+	Read   EvaluationRuleReadCommand   "cmd:\"\" name:\"evaluation-rules-read\" help:\"評価ルール ID を指定してルール設定を読み取ります。rule、description、iamRolesRequired、isEnabled を出力します。\""
+	Update EvaluationRuleUpdateCommand "cmd:\"\" name:\"evaluation-rules-update\" help:\"評価ルール ID を指定してルール設定を更新します。--request または個別フラグで入力します。--service-principal-id と --targets はルールのパラメータを構成し、--is-enabled はルールの有効状態です。--request では API の rule (evaluationRuleId と parameter) と isEnabled を含む JSON を指定します。\""
 }
 
 type EvaluationRuleAPI interface {
@@ -107,7 +107,7 @@ func (c *EvaluationRuleListCommand) Run(ctx *kong.Context) error {
 }
 
 type EvaluationRuleReadCommand struct {
-	ID      string "arg:\"\" name:\"rule-id\" help:\"参照する評価ルール ID。list の出力にある evaluationRuleId。例: server-no-public-ip\""
+	ID      string "arg:\"\" name:\"rule-id\" help:\"参照する評価ルール ID。evaluation-rules-list の出力にある evaluationRuleId。例: server-no-public-ip\""
 	factory EvaluationRuleAPIFactory
 	runtime EvaluationRuleRuntime
 }

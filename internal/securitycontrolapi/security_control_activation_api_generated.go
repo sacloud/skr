@@ -12,9 +12,9 @@ import (
 )
 
 type ActivationCommands struct {
-	Create ActivationCreateCommand "cmd:\"\" help:\"現在のプロジェクトでセキュリティコントロールを有効化します。評価対象リソースへのアクセス権限を付与するサービスプリンシパル ID を指定します。有効化の状態は read で確認できます。\""
-	Read   ActivationReadCommand   "cmd:\"\" help:\"現在のプロジェクトのセキュリティコントロール有効化の状態を読み取ります。servicePrincipalId、isActive、automatedActionLimit を出力します。automatedActionLimit は登録可能な自動アクションの最大数です。\""
-	Update ActivationUpdateCommand "cmd:\"\" help:\"セキュリティコントロールのサービスプリンシパルと有効状態を更新します。servicePrincipalId と is-active は両方とも API に送信されるため、両方を指定してください。\""
+	Create ActivationCreateCommand "cmd:\"\" name:\"project-activation-create\" help:\"現在のプロジェクトでセキュリティコントロールを有効化します。評価対象リソースへのアクセス権限を付与するサービスプリンシパル ID を指定します。有効化の状態は project-activation-read で確認できます。\""
+	Read   ActivationReadCommand   "cmd:\"\" name:\"project-activation-read\" help:\"現在のプロジェクトのセキュリティコントロール有効化の状態を読み取ります。servicePrincipalId、isActive、automatedActionLimit を出力します。automatedActionLimit は登録可能な自動アクションの最大数です。\""
+	Update ActivationUpdateCommand "cmd:\"\" name:\"project-activation-update\" help:\"セキュリティコントロールのサービスプリンシパルと有効状態を更新します。servicePrincipalId と is-active は両方とも API に送信されるため、両方を指定してください。\""
 }
 
 type ActivationAPI interface {

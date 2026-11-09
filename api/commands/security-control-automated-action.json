@@ -36,7 +36,8 @@
           "conversion": "v1.NewOptString",
           "help": "任意: 前回の list 出力の prevPageToken。前ページを取得します。"
         }
-      ]
+      ],
+      "command_name": "automated-actions-list"
     },
     {
       "name": "Read",
@@ -48,17 +49,19 @@
           "name": "action-id",
           "field": "ID",
           "type": "string",
-          "help": "参照する自動アクション ID。list の出力にある automatedActionId。"
+          "help": "参照する自動アクション ID。automated-actions-list の出力にある automatedActionId。"
         }
-      ]
+      ],
+      "command_name": "automated-actions-read"
     },
     {
       "name": "Create",
-      "help": "自動アクションを作成します。--request または個別フラグで入力します。アクションの実行先は simpleNotification (--notification-group-id) または workflows (--workflow-id) のどちらか一方で選択します。個別フラグでは name、execution-condition、is-enabled、service-principal-id が必須です。作成可能なアクション数は activation read の automatedActionLimit で確認できます。",
+      "help": "自動アクションを作成します。--request または個別フラグで入力します。アクションの実行先は simpleNotification (--notification-group-id) または workflows (--workflow-id) のどちらか一方で選択します。個別フラグでは name、execution-condition、is-enabled、service-principal-id が必須です。作成可能なアクション数は project-activation-read の automatedActionLimit で確認できます。",
       "method": "Create",
       "request_type": "v1.AutomatedActionInput",
       "response_type": "*v1.AutomatedActionOutput",
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "automated-actions-create"
     },
     {
       "name": "Update",
@@ -71,10 +74,11 @@
           "name": "action-id",
           "field": "ID",
           "type": "string",
-          "help": "更新する自動アクション ID。list の出力にある automatedActionId。"
+          "help": "更新する自動アクション ID。automated-actions-list の出力にある automatedActionId。"
         }
       ],
-      "handwritten": true
+      "handwritten": true,
+      "command_name": "automated-actions-update"
     },
     {
       "name": "Delete",
@@ -85,9 +89,10 @@
           "name": "action-id",
           "field": "ID",
           "type": "string",
-          "help": "削除する自動アクション ID。list の出力にある automatedActionId。"
+          "help": "削除する自動アクション ID。automated-actions-list の出力にある automatedActionId。"
         }
-      ]
+      ],
+      "command_name": "automated-actions-delete"
     }
   ],
   "wiring_target": "SecurityControlAPI.AutomatedAction",

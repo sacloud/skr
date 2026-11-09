@@ -25,17 +25,17 @@
 ```console
 $ skr config current
 $ skr security-control-api --help
-$ skr security-control-api activation read --help
-$ skr security-control-api activation create --help
-$ skr security-control-api activation update --help
-$ skr security-control-api evaluation-rule list --help
-$ skr security-control-api evaluation-rule read --help
-$ skr security-control-api evaluation-rule update --help
-$ skr security-control-api automated-action list --help
-$ skr security-control-api automated-action read --help
-$ skr security-control-api automated-action create --help
-$ skr security-control-api automated-action update --help
-$ skr security-control-api automated-action delete --help
+$ skr security-control-api project-activation-read --help
+$ skr security-control-api project-activation-create --help
+$ skr security-control-api project-activation-update --help
+$ skr security-control-api evaluation-rules-list --help
+$ skr security-control-api evaluation-rules-read --help
+$ skr security-control-api evaluation-rules-update --help
+$ skr security-control-api automated-actions-list --help
+$ skr security-control-api automated-actions-read --help
+$ skr security-control-api automated-actions-create --help
+$ skr security-control-api automated-actions-update --help
+$ skr security-control-api automated-actions-delete --help
 ```
 
 認証は選択中の SDK プロファイルを使います。`SERVICE-PRINCIPAL-ID` は、以降のコマンドで同じサービスプリンシパル ID に置き換えてください。
@@ -45,7 +45,7 @@ $ skr security-control-api automated-action delete --help
 現在の有効化状態を確認します。プロジェクトがまだ一度も有効化されていない場合は `404` が返ります。
 
 ```console
-$ skr security-control-api activation read
+$ skr security-control-api project-activation-read
 ```
 
 ```json
@@ -58,11 +58,11 @@ $ skr security-control-api activation read
 
 未有効化のプロジェクトでは `404` が返ります。この場合、次のコマンドで有効化します。
 既に有効な場合はこの手順を飛ばし、後片付けで有効化状態を変更しません。
-一度でも有効化したプロジェクトでは、`update --is-active=false` で無効化した後も `create` は `409` で拒否されます。
-無効化した状態から再度有効化する場合は `create` ではなく `update` を使います。
+一度でも有効化したプロジェクトでは、`update --is-active=false` で無効化した後も `project-activation-create` は `409` で拒否されます。
+無効化した状態から再度有効化する場合は `project-activation-create` ではなく `project-activation-update` を使います。
 
 ```console
-$ skr security-control-api activation create --service-principal-id 'SERVICE-PRINCIPAL-ID'
+$ skr security-control-api project-activation-create --service-principal-id 'SERVICE-PRINCIPAL-ID'
 ```
 
 ```json
@@ -73,12 +73,12 @@ $ skr security-control-api activation create --service-principal-id 'SERVICE-PRI
 }
 ```
 
-有効化した場合は、後片付け (Step 6) で `activation update` を実行します。
+有効化した場合は、後片付け (Step 6) で `project-activation-update` を実行します。
 
 ## Step 3: 評価ルールの一覧を確認して 1 件を参照する
 
 ```console
-$ skr security-control-api evaluation-rule list
+$ skr security-control-api evaluation-rules-list
 ```
 
 ```json
@@ -99,15 +99,15 @@ $ skr security-control-api evaluation-rule list
 出力が長い場合は `--query` で絞り込めます。
 
 ```console
-$ skr security-control-api evaluation-rule list --query '.items | map(select(.isEnabled) | {id: .rule.evaluationRuleId})'
+$ skr security-control-api evaluation-rules-list --query '.items | map(select(.isEnabled) | {id: .rule.evaluationRuleId})'
 ```
 
 ルール ID をシェル変数に取り込み、1 件を参照します。`--query` の結果も JSON 出力のため文字列には引用符が付きます。`jq -er '.'` で引用符を取り除いて取り込みます。評価ルールの ID は固定のため、以降の手順では `server-no-public-ip` を使います。
 
 ```console
-$ RULE_ID=$(skr security-control-api evaluation-rule list --query '.items[] | select(.rule.evaluationRuleId == "server-no-public-ip") | .rule.evaluationRuleId' | jq -er '.')
+$ RULE_ID=$(skr security-control-api evaluation-rules-list --query '.items[] | select(.rule.evaluationRuleId == "server-no-public-ip") | .rule.evaluationRuleId' | jq -er '.')
 $ echo "$RULE_ID"
-$ skr security-control-api evaluation-rule read "$RULE_ID"
+$ skr security-control-api evaluation-rules-read "$RULE_ID"
 ```
 
 ```json
@@ -123,7 +123,7 @@ $ skr security-control-api evaluation-rule read "$RULE_ID"
 後片付けと復元のために、更新するルールの `rule` と `isEnabled` 全体をシェル変数に保存します。保存した JSON を `--request` で送り返すことで、ゾーン対象ルールの `parameter.zones`、オブジェクトストレージ対象ルールの `parameter.sites` も含めて元の状態へ戻せます。
 
 ```console
-$ RULE_BACKUP=$(skr security-control-api evaluation-rule read "$RULE_ID" --query '{rule, isEnabled}')
+$ RULE_BACKUP=$(skr security-control-api evaluation-rules-read "$RULE_ID" --query '{rule, isEnabled}')
 $ echo "$RULE_BACKUP"
 ```
 
@@ -139,9 +139,9 @@ $ NEXT=""
 $ FAILED=""
 $ while :; do
       if [ -n "$NEXT" ]; then
-          PAGE=$(skr security-control-api automated-action list --next "$NEXT") || { FAILED=1; break; }
+          PAGE=$(skr security-control-api automated-actions-list --next "$NEXT") || { FAILED=1; break; }
       else
-          PAGE=$(skr security-control-api automated-action list) || { FAILED=1; break; }
+          PAGE=$(skr security-control-api automated-actions-list) || { FAILED=1; break; }
       fi
       COUNT=$(echo "$PAGE" | jq '[.items[] | select(.isEnabled)] | length') || { FAILED=1; break; }
       NEXT=$(echo "$PAGE" | jq -r '.nextPageToken // ""') || { FAILED=1; break; }
@@ -152,7 +152,7 @@ $ [ -z "$FAILED" ] && [ "$ENABLED_COUNT" -eq 0 ] && echo "有効な自動アク�
 ```
 
 ```console
-$ skr security-control-api evaluation-rule update "$RULE_ID" --is-enabled=true --targets is1b
+$ skr security-control-api evaluation-rules-update "$RULE_ID" --is-enabled=true --targets is1b
 ```
 
 ```json
@@ -175,8 +175,8 @@ $ skr security-control-api evaluation-rule update "$RULE_ID" --is-enabled=true -
 復元の前に、現在値が今回の設定と一致することを再照合します。読み取りが失敗する場合や、`isEnabled` が `true` 以外、`parameter.zones` が今回指定した値と一致しない場合は、別の操作がルールを変更した可能性があるため、復元コマンドを実行しないでください。一致を確認したら、Step 3 で保存した JSON を `--request` で送り返して元の状態に戻します。
 
 ```console
-$ skr security-control-api evaluation-rule read "$RULE_ID"
-$ skr security-control-api evaluation-rule update "$RULE_ID" --request "$RULE_BACKUP"
+$ skr security-control-api evaluation-rules-read "$RULE_ID"
+$ skr security-control-api evaluation-rules-update "$RULE_ID" --request "$RULE_BACKUP"
 ```
 
 保存した JSON を引用符付きで `--request` に渡すため、シェル変数は必ず二重引用符で囲ってください。
@@ -184,7 +184,7 @@ $ skr security-control-api evaluation-rule update "$RULE_ID" --request "$RULE_BA
 複雑な設定を 1 度に指定する場合は、`--request` で JSON を指定できます。`--request` と個別フラグは併用できません。JSON はファイル (`@path.json`) でも指定できます。
 
 ```console
-$ skr security-control-api evaluation-rule update "$RULE_ID" --request '{"rule":{"evaluationRuleId":"server-no-public-ip","parameter":{"zones":[]}},"isEnabled":true}'
+$ skr security-control-api evaluation-rules-update "$RULE_ID" --request '{"rule":{"evaluationRuleId":"server-no-public-ip","parameter":{"zones":[]}},"isEnabled":true}'
 ```
 
 ## Step 5: 自動アクションを作成し、確認してから削除する
@@ -215,7 +215,7 @@ $ echo "$GROUP_ID"
 
 ```console
 $ ACTION_NAME="security-control-tutorial-action"
-$ ACTION_ID=$(skr security-control-api automated-action create --name "$ACTION_NAME" --execution-condition 'event.evaluationResult.status == "REJECTED"' --is-enabled=false --service-principal-id 'SERVICE-PRINCIPAL-ID' --notification-group-id "$GROUP_ID" --query '.automatedActionId' | jq -er '.')
+$ ACTION_ID=$(skr security-control-api automated-actions-create --name "$ACTION_NAME" --execution-condition 'event.evaluationResult.status == "REJECTED"' --is-enabled=false --service-principal-id 'SERVICE-PRINCIPAL-ID' --notification-group-id "$GROUP_ID" --query '.automatedActionId' | jq -er '.')
 $ echo "$ACTION_ID"
 ```
 
@@ -236,37 +236,37 @@ $ echo "$ACTION_ID"
 }
 ```
 
-作成コマンドがエラーになり `automatedActionId` を取得できなかった場合は、名前だけを手掛かりに削除しないでください。`automated-action list` で対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
+作成コマンドがエラーになり `automatedActionId` を取得できなかった場合は、名前だけを手掛かりに削除しないでください。`automated-actions-list` で対象の ID と内容を確認し、安全に特定できるまで操作を止めてください。
 
 作成したアクションを読み取りと一覧で確認します。一覧では保持した ID で絞り込みます。
 
 ```console
-$ skr security-control-api automated-action read "$ACTION_ID"
-$ skr security-control-api automated-action list --query ".items[] | select(.automatedActionId == \"$ACTION_ID\") | {name, isEnabled}"
+$ skr security-control-api automated-actions-read "$ACTION_ID"
+$ skr security-control-api automated-actions-list --query ".items[] | select(.automatedActionId == \"$ACTION_ID\") | {name, isEnabled}"
 ```
 
-更新の例として、アクション全体を同じ内容で置き換えます。ここでも無効状態を維持します。`update` は `name`、`action`、`executionCondition`、`isEnabled` を自動アクション全体として置き換えます。維持したい項目は `read` の結果から再指定してください。
+更新の例として、アクション全体を同じ内容で置き換えます。ここでも無効状態を維持します。`automated-actions-update` は `name`、`action`、`executionCondition`、`isEnabled` を自動アクション全体として置き換えます。維持したい項目は `automated-actions-read` の結果から再指定してください。
 
 ```console
-$ skr security-control-api automated-action update "$ACTION_ID" --name "$ACTION_NAME" --execution-condition 'event.evaluationResult.status == "REJECTED"' --is-enabled=false --service-principal-id 'SERVICE-PRINCIPAL-ID' --notification-group-id "$GROUP_ID"
+$ skr security-control-api automated-actions-update "$ACTION_ID" --name "$ACTION_NAME" --execution-condition 'event.evaluationResult.status == "REJECTED"' --is-enabled=false --service-principal-id 'SERVICE-PRINCIPAL-ID' --notification-group-id "$GROUP_ID"
 ```
 
 削除の直前に、読み取りで ID・名称・実行先・実行条件・有効状態を再照合します。出力が今回指定した内容と一致しない場合や、読み取りが失敗する場合は、別の操作がアクションを変更した可能性があるため、削除コマンドを実行しないでください。
 
 ```console
-$ skr security-control-api automated-action read "$ACTION_ID"
-$ skr security-control-api automated-action delete "$ACTION_ID"
+$ skr security-control-api automated-actions-read "$ACTION_ID"
+$ skr security-control-api automated-actions-delete "$ACTION_ID"
 ```
 
 `--args` はワークフロー実行時に渡す引数の JSON で、`--workflow-id` と併用する場合だけ指定できます。引数に秘密情報を含められるため、値を直接指定できない点に注意してください。`@path` で保護したファイルから、`-` で標準入力から読み込みます。`--request` JSON も同様に `@path.json` か `-` で指定してください。
 
 ## Step 6: 後片付け
 
-Step 2 で `create` を実行した場合は、有効化状態を元に戻します。無効化の直前に `read` で現在値を確認し、`servicePrincipalId` が手順で指定した SERVICE-PRINCIPAL-ID と一致し、`isActive` が `true` のときだけ、次のコマンドで無効化します。不一致や読み取りが失敗する場合は、別の操作が有効化状態を変更した可能性があるため、操作を止めて現在の状態を確認してください。
+Step 2 で `project-activation-create` を実行した場合は、有効化状態を元に戻します。無効化の直前に `project-activation-read` で現在値を確認し、`servicePrincipalId` が手順で指定した SERVICE-PRINCIPAL-ID と一致し、`isActive` が `true` のときだけ、次のコマンドで無効化します。不一致や読み取りが失敗する場合は、別の操作が有効化状態を変更した可能性があるため、操作を止めて現在の状態を確認してください。
 
 ```console
-$ skr security-control-api activation read
-$ skr security-control-api activation update --service-principal-id 'SERVICE-PRINCIPAL-ID' --is-active=false
+$ skr security-control-api project-activation-read
+$ skr security-control-api project-activation-update --service-principal-id 'SERVICE-PRINCIPAL-ID' --is-active=false
 ```
 
 Step 4 で評価ルールを変更した場合は、Step 3 で保存した `RULE_BACKUP` を `--request` で送り返して元の状態に戻してください (Step 4 の復元手順を参照)。
