@@ -2,9 +2,7 @@
 //
 // internal/cli の配線コードです。設定を変更した場合は再生成してください (ADR 0068)。
 // 設定:
-//   api/commands/eventbus-process-c0nfiguration.json
-//   api/commands/eventbus-schedule.json
-//   api/commands/eventbus-trigger.json
+//   api/commands/eventbus.json
 
 package cli
 
@@ -13,25 +11,13 @@ import (
 )
 
 func (c *cli) initEventbusAPI() {
-	c.EventbusAPI.ProcessConfiguration = eventbusapi.NewProcessConfigurationCommands(eventbusapi.ProcessConfigurationRuntime{
-		DecodeRequest:  eventbusapi.DecodeRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}, func() (eventbusapi.ProcessConfigurationAPI, error) {
-		return eventbusapi.NewProcessConfigurationAPI(c.Trace)
-	})
-	c.EventbusAPI.Schedule = eventbusapi.NewScheduleCommands(eventbusapi.ScheduleRuntime{
-		DecodeRequest:  eventbusapi.DecodeRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}, func() (eventbusapi.ScheduleAPI, error) {
-		return eventbusapi.NewScheduleAPI(c.Trace)
-	})
-	c.EventbusAPI.Trigger = eventbusapi.NewTriggerCommands(eventbusapi.TriggerRuntime{
-		DecodeRequest:  eventbusapi.DecodeRequest,
-		ValidateOutput: validateOutput,
-		WriteOutput:    writeOutput,
-	}, func() (eventbusapi.TriggerAPI, error) {
-		return eventbusapi.NewTriggerAPI(c.Trace)
+	c.EventbusAPI.CommonServiceItem = eventbusapi.NewCommonServiceItemCommands(eventbusapi.CommonServiceItemRuntime{
+		DecodeRequest:                 decodeRequest,
+		ValidateOutput:                validateOutput,
+		WriteOutput:                   writeOutput,
+		SetCreateRequestProviderInput: eventbusapi.SetCreateRequestProviderInput,
+		SetUpdateRequestProviderInput: eventbusapi.SetUpdateRequestProviderInput,
+	}, func(ProviderClass string) (eventbusapi.CommonServiceItemAPI, error) {
+		return eventbusapi.NewCommonServiceItemAPI(c.Trace, ProviderClass)
 	})
 }

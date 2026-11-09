@@ -37,9 +37,7 @@ func TestSimpleMQGeneratedCodeMatchesConfig(t *testing.T) {
 	}{
 		{config: "api/commands/simplemq-queue.json", output: "internal/simplemqapi/simplemq_queue_api_generated.go"},
 		{config: "api/commands/simplemq-message.json", output: "internal/simplemqapi/simplemq_message_api_generated.go"},
-		{config: "api/commands/eventbus-process-c0nfiguration.json", output: "internal/eventbusapi/eventbus_process_c0nfiguration_api_generated.go"},
-		{config: "api/commands/eventbus-schedule.json", output: "internal/eventbusapi/eventbus_schedule_api_generated.go"},
-		{config: "api/commands/eventbus-trigger.json", output: "internal/eventbusapi/eventbus_trigger_api_generated.go"},
+		{config: "api/commands/eventbus.json", output: "internal/eventbusapi/eventbus_common_service_item_api_generated.go"},
 		{config: "api/commands/iam-user.json", output: "internal/iamapi/iam_user_api_generated.go"},
 		{config: "api/commands/iam-group.json", output: "internal/iamapi/iam_group_api_generated.go"},
 		{config: "api/commands/iam-policy.json", output: "internal/iamapi/iam_policy_api_generated.go"},

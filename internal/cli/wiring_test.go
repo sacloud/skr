@@ -62,9 +62,7 @@ func TestGeneratedWiringMatchesConfig(t *testing.T) {
 		{
 			name: "Eventbus",
 			configs: []string{
-				"eventbus-process-c0nfiguration.json",
-				"eventbus-schedule.json",
-				"eventbus-trigger.json",
+				"eventbus.json",
 			},
 			mode:     apigen.ModeOgen,
 			expected: "internal/cli/eventbus_wiring_generated.go",

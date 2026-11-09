@@ -122,13 +122,31 @@ func kindName(kind string) string {
 	}
 }
 
+// providerClassArgs は kind に対応する --provider-class の値を返します。
+func providerClassArgs(kind string) ([]string, error) {
+	switch kind {
+	case "process-configuration":
+		return []string{"--provider-class", "eventbusprocessconfiguration"}, nil
+	case "schedule":
+		return []string{"--provider-class", "eventbusschedule"}, nil
+	case "trigger":
+		return []string{"--provider-class", "eventbustrigger"}, nil
+	default:
+		return nil, fmt.Errorf("unknown resource kind %q", kind)
+	}
+}
+
 // listArgs は kind に対応する一覧取得のコマンド引数を返します。
 func listArgs(kind string) ([]string, error) {
 	switch kind {
 	case "queue":
 		return []string{"simplemq-api", "list-queues"}, nil
 	case "process-configuration", "trigger", "schedule":
-		return []string{"eventbus-api", kind, "list"}, nil
+		class, err := providerClassArgs(kind)
+		if err != nil {
+			return nil, err
+		}
+		return append([]string{"eventbus-api", "list-common-service-items"}, class...), nil
 	case "switch":
 		return []string{"iaas-api", "switch", "find", "--zone", zone}, nil
 	default:
@@ -142,7 +160,11 @@ func readArgs(kind, id string) ([]string, error) {
 	case "queue":
 		return []string{"simplemq-api", "read-queue", id}, nil
 	case "process-configuration", "trigger", "schedule":
-		return []string{"eventbus-api", kind, "read", id}, nil
+		class, err := providerClassArgs(kind)
+		if err != nil {
+			return nil, err
+		}
+		return append([]string{"eventbus-api", "read-common-service-item", id}, class...), nil
 	case "switch":
 		return []string{"iaas-api", "switch", "read", "--zone", zone, "--id", id}, nil
 	default:
@@ -157,7 +179,11 @@ func deleteArgs(kind, id string) ([]string, error) {
 	case "queue":
 		return []string{"simplemq-api", "delete-queue", id}, nil
 	case "process-configuration", "trigger", "schedule":
-		return []string{"eventbus-api", kind, "delete", id}, nil
+		class, err := providerClassArgs(kind)
+		if err != nil {
+			return nil, err
+		}
+		return append([]string{"eventbus-api", "delete-common-service-item", id}, class...), nil
 	case "switch":
 		return []string{"iaas-api", "switch", "delete", "--zone", zone, "--id", id, "--fail-if-not-found=true"}, nil
 	default:

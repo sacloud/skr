@@ -304,13 +304,18 @@ func buildWiringCommand(config Config, mode Mode, imports map[string]importSpec)
 		}
 	}
 	for _, operation := range config.Operations {
-		if operation.RequestTransform == "" {
-			continue
+		if operation.RequestTransform != "" {
+			spec.Transforms = append(spec.Transforms, wiringTransformSpec{
+				Field: operation.RequestTransform,
+				Expr:  pkg + "." + operation.RequestTransform,
+			})
 		}
-		spec.Transforms = append(spec.Transforms, wiringTransformSpec{
-			Field: operation.RequestTransform,
-			Expr:  pkg + "." + operation.RequestTransform,
-		})
+		if operation.RequestInputTransform != "" {
+			spec.Transforms = append(spec.Transforms, wiringTransformSpec{
+				Field: operation.RequestInputTransform,
+				Expr:  pkg + "." + operation.RequestInputTransform,
+			})
+		}
 	}
 	return spec, nil
 }

@@ -68,22 +68,12 @@ container-registry-api registry user add live
 container-registry-api registry user delete live
 container-registry-api registry user list live
 container-registry-api registry user update live
-eventbus-api process-configuration create live
-eventbus-api process-configuration delete live
-eventbus-api process-configuration list live
-eventbus-api process-configuration read live
-eventbus-api process-configuration update live
-eventbus-api process-configuration update-secret live
-eventbus-api schedule create live
-eventbus-api schedule delete live
-eventbus-api schedule list live
-eventbus-api schedule read live
-eventbus-api schedule update live
-eventbus-api trigger create live
-eventbus-api trigger delete live
-eventbus-api trigger list live
-eventbus-api trigger read live
-eventbus-api trigger update live
+eventbus-api create-common-service-item live
+eventbus-api delete-common-service-item live
+eventbus-api list-common-service-items live
+eventbus-api read-common-service-item live
+eventbus-api update-common-service-item live
+eventbus-api set-process-configuration-secret live
 gslb-api create live
 gslb-api delete live
 gslb-api find live

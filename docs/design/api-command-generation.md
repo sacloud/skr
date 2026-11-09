@@ -86,12 +86,10 @@ $ make generate-api API_CONFIG=api/commands/simplemq-queue.json API_OUTPUT=inter
 $ make generate-api API_CONFIG=api/commands/simplemq-message.json API_OUTPUT=internal/simplemqapi/simplemq_message_api_generated.go
 ```
 
-EventBus の実行設定、スケジュール、トリガーコマンドも `internal/eventbusapi/` に再生成します。実行設定の `update-secret`、Provider クラス補完、SDK クライアント生成は同じ内部パッケージの手書きコードに置きます。ユーザー向けコマンド名は `process-configuration` のままにし、生成設定と生成先のファイル名だけは編集ツールが誤判定しにくいよう `c0nfiguration` 表記にします。
+EventBus のコマンドも `internal/eventbusapi/` に再生成します。実行設定のシークレット更新 (`set-process-configuration-secret`)、Provider クラス補完、SDK クライアント生成は同じ内部パッケージの手書きコードに置きます。実行設定・スケジュール・トリガーは CommonServiceItem として統合し、`--provider-class` で種別を選択します (詳細は [api-command-operation-id-naming.md](api-command-operation-id-naming.md) を参照)。
 
 ```console
-$ make generate-api API_CONFIG=api/commands/eventbus-process-c0nfiguration.json API_OUTPUT=internal/eventbusapi/eventbus_process_c0nfiguration_api_generated.go
-$ make generate-api API_CONFIG=api/commands/eventbus-schedule.json API_OUTPUT=internal/eventbusapi/eventbus_schedule_api_generated.go
-$ make generate-api API_CONFIG=api/commands/eventbus-trigger.json API_OUTPUT=internal/eventbusapi/eventbus_trigger_api_generated.go
+$ make generate-api API_CONFIG=api/commands/eventbus.json API_OUTPUT=internal/eventbusapi/eventbus_common_service_item_api_generated.go
 ```
 
 生成器は操作名とフィールド名を Go 識別子として扱います。Kong のコマンド名は既定で Go フィールド名から生成し、略語など既定表記が適切でない場合は設定の `command_name` で明示します。フラグ型は `string`、`bool`、`int`、`int64` に加えて、IaaS API のトップレベル `Tags` 専用の `[]string`、日時の `time.Time` をサポートします。配列フラグは `name: "tags"`、`field: "Tags"`、`type: "[]string"`、`separator: ","` の組み合わせだけを受け付けます。これは配列入力全般をフラグ化するものではなく、他の配列は JSON 経路に残します。`time.Time` フラグは Kong が RFC3339 形式でデコードし、形式が不正な値は CLI の解析エラーとして拒否します。モニタリングの開始・終了日時など、API リクエストの単純なスカラー日時項目に使います。この拡張は [ADR 0066](../adr/0066-internet-monitor-router-flags.md) に記録しています。`pointer: true` は明示指定された値だけをリクエストのポインター項目へ設定します。更新時の `Tags` がポインター型なら `pointer: true` を指定し、省略時の未指定状態を維持します。`conversion` を指定すると、その型へ変換してから設定します。`required: true` はフラグ経路での指定有無を検証します。`request_validator` を指定すると、JSON／フラグからリクエストを構築した後、SDK 呼び出し前にサービス固有の検証関数を実行します。
@@ -168,6 +166,8 @@ $ make generate-wiring
 これは Server Create の設定の抜粋です。実際のヘルプでは対応キー、必須条件、値の形式を説明します。`repeated_flags` は `name`、`field`、`help` を持ち、コマンドに `[]string` の入力フィールドを生成します。各指定の文字列を分割・補正せず、空文字列も含めて指定順に保持します。API リクエストの同名フィールドへ直接代入する設定ではありません。反復入力の指定も `--request` と相互排他です。
 
 `request_transform` は生成する Runtime callback の公開フィールド名です。Server Create では `TransformCreateRequest func(*CreateCommand, *server.CreateRequest) error` を生成し、`internal/cli` が `serverapi.TransformCreateRequest` を接続します。生成器は callback の型を明示し、関数の実装を探索しません。Runtime の既存フィールドや他の callback と同じ名前は拒否します。反復入力には変換を必須とし、`handwritten: true` またはリクエストのない操作では使えません。
+
+`request_input_transform` は `--request` の生 JSON を、生成コードによるデコードの前に調整する callback の公開フィールド名です。`func(*CommandType, string) (string, error)` を生成し、手書きの実装をドメイン package に置きます。SDK がデコード時に必須項目を検証する場合など、デコード後の `request_transform` では間に合わない入力補完に使います。eventbus-api では `--provider-class` の値で `--request` の `CommonServiceItem.Provider.Class` を設定するために使用します (詳細は [api-command-operation-id-naming.md](api-command-operation-id-naming.md) を参照)。
 
 フラグ経路では必須入力の確認とスカラー値の代入後に変換し、その後で `request_validator` と API 呼び出しへ進みます。反復入力のない指定でも変換は実行します。変換エラーは API 呼び出し前に返します。JSON 経路は変換を通らず、デコード後に同じ検証関数を直接呼び出します。
 

@@ -69,20 +69,29 @@ type Config struct {
 }
 
 type Operation struct {
-	Name             string         `json:"name"`
-	CommandName      string         `json:"command_name,omitempty"`
-	Help             string         `json:"help"`
-	Method           string         `json:"method"`
-	RequestType      string         `json:"request_type,omitempty"`
-	RequestByValue   bool           `json:"request_by_value,omitempty"`
-	RequestOptional  bool           `json:"request_optional,omitempty"`
-	RequestFileOnly  bool           `json:"request_file_only,omitempty"`
-	ResponseType     string         `json:"response_type,omitempty"`
-	RequestHelp      string         `json:"request_help,omitempty"`
-	RequestValidator string         `json:"request_validator,omitempty"`
-	ValidateZone     bool           `json:"validate_zone,omitempty"`
-	RequestTransform string         `json:"request_transform,omitempty"`
-	Handwritten      bool           `json:"handwritten,omitempty"`
+	Name             string `json:"name"`
+	CommandName      string `json:"command_name,omitempty"`
+	Help             string `json:"help"`
+	Method           string `json:"method"`
+	RequestType      string `json:"request_type,omitempty"`
+	RequestByValue   bool   `json:"request_by_value,omitempty"`
+	RequestOptional  bool   `json:"request_optional,omitempty"`
+	RequestFileOnly  bool   `json:"request_file_only,omitempty"`
+	ResponseType     string `json:"response_type,omitempty"`
+	RequestHelp      string `json:"request_help,omitempty"`
+	RequestValidator string `json:"request_validator,omitempty"`
+	ValidateZone     bool   `json:"validate_zone,omitempty"`
+	RequestTransform string `json:"request_transform,omitempty"`
+	// RequestInputTransform は --request の入力をデコード前に調整する手書き関数です。
+	// 入力は --request の値 (@path、-、インライン JSON) です。API のリクエスト型が
+	// Provider のような必須項目をデコード時に要求し、フラグの値から生 JSON に設定する
+	// 必要がある場合に使います。手書き操作でのみ指定できます。
+	RequestInputTransform string `json:"request_input_transform,omitempty"`
+	Handwritten           bool   `json:"handwritten,omitempty"`
+	// InterfaceExclude は API interface からこの操作を除外します。手書き操作が
+	// 種別ごとの SDK 操作に存在しないメソッド (eventbus の UpdateSecret など) で
+	// 使います。手書き操作でのみ指定できます。
+	InterfaceExclude bool           `json:"interface_exclude,omitempty"`
 	Arguments        []Argument     `json:"arguments,omitempty"`
 	Flags            []Flag         `json:"flags,omitempty"`
 	RepeatedFlags    []RepeatedFlag `json:"repeated_flags,omitempty"`
@@ -210,7 +219,9 @@ type {{.CommandsType}} struct {
 
 type {{.APIType}} interface {
 {{- range .Operations }}
+{{- if not .InterfaceExclude }}
 	{{.Method}}(context.Context{{range .Arguments}}, {{.Type}}{{end}}{{if .RequestType}}, {{if not .RequestByValue}}*{{end}}{{.RequestType}}{{end}}) {{if .ResponseType}}({{.ResponseType}}, error){{else}}error{{end}}
+{{- end }}
 {{- end }}
 }
 
@@ -223,6 +234,9 @@ type {{.RuntimeType}} struct {
 {{- range .Operations }}
 {{- if .RequestTransform }}
 	{{.RequestTransform}} func(*{{.CommandType}}, *{{.RequestType}}) error
+{{- end }}
+{{- if .RequestInputTransform }}
+	{{.RequestInputTransform}} func(*{{.CommandType}}, string) (string, error)
 {{- end }}
 {{- end }}
 }
@@ -284,9 +298,22 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 		if c.runtime.DecodeRequest == nil {
 			return fmt.Errorf("API リクエスト処理が設定されていません")
 		}
+{{- if .RequestInputTransform }}
+		if c.runtime.{{.RequestInputTransform}} == nil {
+			return fmt.Errorf("API リクエスト入力調整が設定されていません")
+		}
+		adjusted, err := c.runtime.{{.RequestInputTransform}}(c, *c.Request)
+		if err != nil {
+			return err
+		}
+		if err := c.runtime.DecodeRequest(adjusted, request); err != nil {
+			return err
+		}
+{{- else }}
 		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
 			return err
 		}
+{{- end }}
 	} else {
 {{- if or .Flags .RepeatedFlags }}
 		if !flagsSet {
@@ -538,6 +565,11 @@ func (c Config) Validate(mode Mode) error {
 		if operation.ValidateZone && (operation.RequestType == "" || operation.Handwritten) {
 			return fmt.Errorf("operation %q validate_zone requires a generated request operation", operation.Name)
 		}
+		// interface_exclude は、手書き操作が SDK 操作ごとに存在しない場合 (eventbus の
+		// UpdateSecret など) に API interface への組み込みを避けるために使います。
+		if operation.InterfaceExclude && !operation.Handwritten {
+			return fmt.Errorf("operation %q interface_exclude requires handwritten", operation.Name)
+		}
 		if err := validateType(operation.ResponseType); err != nil {
 			return fmt.Errorf("operation %q response_type: %w", operation.Name, err)
 		}
@@ -571,6 +603,20 @@ func (c Config) Validate(mode Mode) error {
 				return fmt.Errorf("duplicate runtime field name %q", operation.RequestTransform)
 			}
 			runtimeFields[operation.RequestTransform] = true
+		}
+		// request_input_transform はデコード前に --request の生 JSON を調整する手書き関数です。
+		// 手書き操作はリクエスト処理を自身で実装するため対象外です。
+		if operation.RequestInputTransform != "" {
+			if !token.IsIdentifier(operation.RequestInputTransform) || !token.IsExported(operation.RequestInputTransform) {
+				return fmt.Errorf("operation %q request_input_transform must be an exported Go identifier", operation.Name)
+			}
+			if operation.RequestType == "" || operation.Handwritten {
+				return fmt.Errorf("operation %q request_input_transform requires a generated request operation", operation.Name)
+			}
+			if runtimeFields[operation.RequestInputTransform] {
+				return fmt.Errorf("duplicate runtime field name %q", operation.RequestInputTransform)
+			}
+			runtimeFields[operation.RequestInputTransform] = true
 		}
 		if len(operation.RepeatedFlags) > 0 && operation.RequestTransform == "" {
 			return fmt.Errorf("operation %q repeated_flags requires request_transform", operation.Name)
