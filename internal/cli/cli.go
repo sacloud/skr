@@ -25,6 +25,7 @@ import (
 	"github.com/sacloud/skr/internal/apprunapi"
 	"github.com/sacloud/skr/internal/apprundedicatedapi"
 	"github.com/sacloud/skr/internal/containerregistryapi"
+	"github.com/sacloud/skr/internal/eventbus"
 	"github.com/sacloud/skr/internal/eventbusapi"
 	"github.com/sacloud/skr/internal/gslbapi"
 	"github.com/sacloud/skr/internal/iamapi"
@@ -50,6 +51,7 @@ type cli struct {
 	GSLBAPI                   gslbapi.Commands                   `cmd:"" name:"gslb-api" help:"さくらのクラウド GSLB を操作します。実サーバーへのヘルスチェックを行い、DNS 応答先を制御します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/gslb/index.html"`
 	ProxyLBAPI                proxylbapi.Commands                `cmd:"" name:"proxylb-api" help:"さくらのクラウド エンハンスドロードバランサ (ProxyLB) を操作します。複数の配下サーバーへのロードバランス、HTTPS 対応、ソーリーサーバーなどを設定できます。エンハンスドロードバランサはグローバルリソースで、ゾーンの指定は不要です。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/enhanced-lb/index.html"`
 	EventbusAPI               eventbusapi.Commands               `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。CommonServiceItem 操作は --provider-class で種別 (eventbusprocessconfiguration、eventbusschedule、eventbustrigger) を指定します。実行先を eventbusprocessconfiguration で定義し、スケジュールまたはトリガーから参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。--query で必要な項目を抽出できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
+	Eventbus                  eventbus.Commands                  `cmd:"" name:"eventbus" help:"EventBus の実行設定、スケジュール、トリガーを操作します。実行設定でジョブの宛先を定義し、スケジュール (開始日時からの繰り返し) またはトリガー (イベント検知) から実行します。宛先別の個別フラグで入力し、完全な JSON 入力が必要なときは eventbus-api を使ってください。実行設定の secret は --secret-file で指定した保護したファイルまたは標準入力から読み込みます。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
 	SimpleMQAPI               simplemqapi.Commands               `cmd:"" name:"simplemq-api" help:"SimpleMQ のキュー管理 API とメッセージ API を操作します。キュー管理 API は SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。メッセージ API はキューの API キーを --api-key-file から読み込みます。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
 	SimpleNotificationAPI     simplenotificationapi.Commands     `cmd:"" name:"simple-notification-api" help:"さくらのクラウド シンプル通知の通知先、通知先グループ、ルーティング設定、通知履歴を操作します。グループへの通知送信は実際の通知を発生させます。通知の到達は保証されず、結果は通知履歴でも確認してください。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/simplenotification/about.html"`
 	NetworkingSuiteAPI        networkingsuiteapi.Commands        `cmd:"" name:"networking-suite-api" help:"ネットワークスイートのサブネットグループ、サブネット、サーバ NIC 接続、IP アドレスを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。API エンドポイントは SDK の既定値を使います。対象ゾーンに合わせる場合は SAKURA_ENDPOINTS_NETWORKING_SUITE を設定してください。Create/Update はフラグまたは --request JSON で入力します。SRN はリソース一覧や参照結果から取得します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/network/networking-suite/index.html"`
@@ -112,6 +114,7 @@ func newCLI() *cli {
 	result.initGSLBAPI()
 	result.initProxyLBAPI()
 	result.initEventbusAPI()
+	result.initEventbus()
 	result.initSimpleMQAPI()
 	result.initSimpleNotificationAPI()
 	result.initNetworkingSuiteAPI()

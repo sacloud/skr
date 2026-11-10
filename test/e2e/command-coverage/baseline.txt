@@ -74,6 +74,22 @@ eventbus-api list-common-service-items live
 eventbus-api read-common-service-item live
 eventbus-api set-process-configuration-secret live
 eventbus-api update-common-service-item live
+eventbus process-configuration create live
+eventbus process-configuration delete live
+eventbus process-configuration list live
+eventbus process-configuration read live
+eventbus process-configuration set-secret live
+eventbus process-configuration update live
+eventbus schedule create live
+eventbus schedule delete live
+eventbus schedule list live
+eventbus schedule read live
+eventbus schedule update live
+eventbus trigger create live
+eventbus trigger delete live
+eventbus trigger list live
+eventbus trigger read live
+eventbus trigger update live
 gslb-api create live
 gslb-api delete live
 gslb-api find live
