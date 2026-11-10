@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package eventbus の高レベルコマンド層です。
+// Package eventbus は EventBus の高レベルコマンド層です。
 // 実行設定 (process-configuration)、スケジュール (schedule)、トリガー (trigger) の
 // 操作を宛先別の個別入力と反復可能なオプションで提供します。
+//
+// service 層は service/eventbus-service-go モジュールに切り出してあり (ADR 0077)、
+// このパッケージは kong コマンドとリクエストの組み立て、出力処理だけを持ちます。
 // このファイルは手書きで、低レベルの eventbus-api と JSON 入力の経路には
 // 変更を加えません (ADR 0075、ADR 0076)。
 package eventbus
@@ -29,6 +32,8 @@ import (
 
 	"github.com/alecthomas/kong"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
+
+	eventbusapi "github.com/sacloud/skr/service/eventbus-service-go"
 )
 
 // deref は未指定のフラグを空文字列へ変換します。
@@ -46,13 +51,14 @@ type Runtime struct {
 	WriteOutput    func(*kong.Context, any) error
 }
 
-// ServiceFactory は API クライアントを構築して Service を返します。
-type ServiceFactory func() (*Service, error)
+// ServiceFactory は API クライアントを構築して service/eventbus-service-go の
+// Service を返します。
+type ServiceFactory func() (*eventbusapi.Service, error)
 
 // SecretServiceFactory は set-secret 専用の Service を返します。
 // secret を扱う操作では実行前にトレース設定を検査するため、
 // 通常の操作と別の factory を受け取ります。
-type SecretServiceFactory func() (*Service, error)
+type SecretServiceFactory func() (*eventbusapi.Service, error)
 
 func (r Runtime) validateOutput(kongCtx *kong.Context) error {
 	if r.ValidateOutput == nil {
@@ -69,7 +75,8 @@ func (r Runtime) writeOutput(kongCtx *kong.Context, value any) error {
 }
 
 // newService は factory から Service を構築します。
-func newService(factory ServiceFactory) (*Service, error) {
+// newService は factory から service/eventbus-service-go の Service を構築します。
+func newService(factory ServiceFactory) (*eventbusapi.Service, error) {
 	if factory == nil {
 		return nil, fmt.Errorf("API クライアントが設定されていません")
 	}
@@ -77,7 +84,8 @@ func newService(factory ServiceFactory) (*Service, error) {
 }
 
 // newSecretService は set-secret 用の factory から Service を構築します。
-func newSecretService(factory SecretServiceFactory) (*Service, error) {
+// newSecretService は set-secret 用の factory から Service を構築します。
+func newSecretService(factory SecretServiceFactory) (*eventbusapi.Service, error) {
 	if factory == nil {
 		return nil, fmt.Errorf("API クライアントが設定されていません")
 	}
@@ -157,9 +165,9 @@ func (c *ProcessListCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	projected := make([]*ProcessConfigurationOutput, 0, len(items))
+	projected := make([]*eventbusapi.ProcessConfigurationOutput, 0, len(items))
 	for i := range items {
-		output, err := ProjectProcessConfiguration(&items[i])
+		output, err := eventbusapi.ProjectProcessConfiguration(&items[i])
 		if err != nil {
 			return err
 		}
@@ -185,11 +193,11 @@ func (c *ProcessReadCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.ReadProcessConfiguration(ctx, &ReadRequest{ID: c.ID})
+	item, err := svc.ReadProcessConfiguration(ctx, &eventbusapi.ReadRequest{ID: c.ID})
 	if err != nil {
 		return err
 	}
-	output, err := ProjectProcessConfiguration(item)
+	output, err := eventbusapi.ProjectProcessConfiguration(item)
 	if err != nil {
 		return err
 	}
@@ -221,10 +229,10 @@ func (c *ProcessCreateCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.CreateProcessConfiguration(ctx, &CreateProcessConfigurationRequest{
+	item, err := svc.CreateProcessConfiguration(ctx, &eventbusapi.CreateProcessConfigurationRequest{
 		Name:        c.Name,
 		Description: deref(c.Description),
-		Settings: ProcessConfigurationSettings{
+		Settings: eventbusapi.ProcessConfigurationSettings{
 			Destination: c.Destination,
 			GroupID:     c.GroupID,
 			Message:     c.Message,
@@ -237,7 +245,7 @@ func (c *ProcessCreateCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	output, err := ProjectProcessConfiguration(item)
+	output, err := eventbusapi.ProjectProcessConfiguration(item)
 	return writeCreateUpdateOutput(c.runtime, kongCtx, item, output, err)
 }
 
@@ -245,7 +253,7 @@ func (c *ProcessCreateCommand) Run(kongCtx *kong.Context) error {
 type ProcessUpdateCommand struct {
 	ID          string  `arg:"" name:"id" help:"更新する実行設定 ID。skr eventbus process-configuration list の出力で確認できます。"`
 	Name        *string `help:"新しい名前。未指定のときは現状維持します。"`
-	Description *string `help:"新しい説明。未指定のときは現状維持します。空文字列は null として送信します。"`
+	Description *string `help:"新しい説明。未指定のときは現状維持します。空文字列はそのまま送信します (作成時と異なり null にはなりません)。"`
 	Destination *string `help:"新しい宛先。simplenotification、simplemq、autoscale のいずれか。変更した場合、旧宛先のパラメーターは引き継がれません。"`
 	GroupID     *string `help:"--destination simplenotification のときのグループ ID。"`
 	Message     *string `help:"--destination simplenotification のときのメッセージ。"`
@@ -267,7 +275,7 @@ func (c *ProcessUpdateCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.UpdateProcessConfiguration(ctx, &UpdateProcessConfigurationRequest{
+	item, err := svc.UpdateProcessConfiguration(ctx, &eventbusapi.UpdateProcessConfigurationRequest{
 		ID:          c.ID,
 		Name:        c.Name,
 		Description: c.Description,
@@ -282,7 +290,7 @@ func (c *ProcessUpdateCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	output, err := ProjectProcessConfiguration(item)
+	output, err := eventbusapi.ProjectProcessConfiguration(item)
 	return writeCreateUpdateOutput(c.runtime, kongCtx, item, output, err)
 }
 
@@ -300,7 +308,7 @@ func (c *ProcessDeleteCommand) Run(_ *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	return svc.DeleteProcessConfiguration(ctx, &DeleteRequest{ID: c.ID})
+	return svc.DeleteProcessConfiguration(ctx, &eventbusapi.DeleteRequest{ID: c.ID})
 }
 
 // ProcessSetSecretCommand は実行設定へ secret を登録します。
@@ -323,7 +331,7 @@ func (c *ProcessSetSecretCommand) Run(_ *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := svc.SetProcessConfigurationSecret(ctx, &SetProcessConfigurationSecretRequest{
+	if err := svc.SetProcessConfigurationSecret(ctx, &eventbusapi.SetProcessConfigurationSecretRequest{
 		ID:     c.ID,
 		Secret: secret,
 	}); err != nil {
@@ -374,9 +382,9 @@ func (c *ScheduleListCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	projected := make([]*ScheduleOutput, 0, len(items))
+	projected := make([]*eventbusapi.ScheduleOutput, 0, len(items))
 	for i := range items {
-		output, err := ProjectSchedule(&items[i])
+		output, err := eventbusapi.ProjectSchedule(&items[i])
 		if err != nil {
 			return err
 		}
@@ -402,11 +410,11 @@ func (c *ScheduleReadCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.ReadSchedule(ctx, &ReadRequest{ID: c.ID})
+	item, err := svc.ReadSchedule(ctx, &eventbusapi.ReadRequest{ID: c.ID})
 	if err != nil {
 		return err
 	}
-	output, err := ProjectSchedule(item)
+	output, err := eventbusapi.ProjectSchedule(item)
 	if err != nil {
 		return err
 	}
@@ -418,7 +426,7 @@ type ScheduleCreateCommand struct {
 	Name                   string  `required:"" help:"スケジュールの名前。"`
 	Description            *string `help:"説明。空文字列は null として送信します。"`
 	ProcessConfigurationID string  `required:"" help:"実行する実行設定の ID。skr eventbus process-configuration list の出力で確認できます。"`
-	StartsAt               string  `required:"" help:"実行を開始する日時。RFC3339 形式 (例: 2030-01-10T09:00:00+09:00) で指定し、API へはエポックミリ秒で送信します。"`
+	StartsAt               string  `required:"" help:"実行を開始する日時。RFC3339 形式 (例: 2030-01-10T09:00:00+09:00、小数秒はミリ秒まで) で指定し、API へはエポックミリ秒で送信します。"`
 	RecurringStep          *int    `help:"繰り返しの間隔。--recurring-unit と組み合わせます。"`
 	RecurringUnit          *string `help:"繰り返しの単位。min、hour、day のいずれか。--recurring-step と組み合わせます。"`
 	Crontab                *string `help:"繰り返しを Crontab 形式で指定します。--recurring-step、--recurring-unit と同時に指定できません。"`
@@ -440,10 +448,10 @@ func (c *ScheduleCreateCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.CreateSchedule(ctx, &CreateScheduleRequest{
+	item, err := svc.CreateSchedule(ctx, &eventbusapi.CreateScheduleRequest{
 		Name:        c.Name,
 		Description: deref(c.Description),
-		Settings: ScheduleSettings{
+		Settings: eventbusapi.ScheduleSettings{
 			ProcessConfigurationID: c.ProcessConfigurationID,
 			StartsAt:               startsAt,
 			RecurringStep:          c.RecurringStep,
@@ -454,7 +462,7 @@ func (c *ScheduleCreateCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	output, err := ProjectSchedule(item)
+	output, err := eventbusapi.ProjectSchedule(item)
 	return writeCreateUpdateOutput(c.runtime, kongCtx, item, output, err)
 }
 
@@ -462,9 +470,9 @@ func (c *ScheduleCreateCommand) Run(kongCtx *kong.Context) error {
 type ScheduleUpdateCommand struct {
 	ID                     string  `arg:"" name:"id" help:"更新するスケジュール ID。skr eventbus schedule list の出力で確認できます。"`
 	Name                   *string `help:"新しい名前。未指定のときは現状維持します。"`
-	Description            *string `help:"新しい説明。未指定のときは現状維持します。空文字列は null として送信します。"`
+	Description            *string `help:"新しい説明。未指定のときは現状維持します。空文字列はそのまま送信します (作成時と異なり null にはなりません)。"`
 	ProcessConfigurationID *string `help:"実行する実行設定の新しい ID。未指定のときは現状維持します。"`
-	StartsAt               *string `help:"実行を開始する新しい日時。RFC3339 形式 (例: 2030-01-10T09:00:00+09:00) で指定し、API へはエポックミリ秒で送信します。"`
+	StartsAt               *string `help:"実行を開始する新しい日時。RFC3339 形式 (例: 2030-01-10T09:00:00+09:00、小数秒はミリ秒まで) で指定し、API へはエポックミリ秒で送信します。"`
 	RecurringStep          *int    `help:"繰り返しの新しい間隔。--recurring-unit と組み合わせます。片方だけの変更はエラーになります。"`
 	RecurringUnit          *string `help:"繰り返しの新しい単位。min、hour、day のいずれか。--recurring-step と組み合わせます。片方だけの変更はエラーになります。"`
 	Crontab                *string `help:"繰り返しを Crontab 形式で指定します。指定すると間隔指定 (step と unit) は解除されます。--recurring-step、--recurring-unit と同時に指定できません。"`
@@ -486,7 +494,7 @@ func (c *ScheduleUpdateCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.UpdateSchedule(ctx, &UpdateScheduleRequest{
+	item, err := svc.UpdateSchedule(ctx, &eventbusapi.UpdateScheduleRequest{
 		ID:                     c.ID,
 		Name:                   c.Name,
 		Description:            c.Description,
@@ -499,7 +507,7 @@ func (c *ScheduleUpdateCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	output, err := ProjectSchedule(item)
+	output, err := eventbusapi.ProjectSchedule(item)
 	return writeCreateUpdateOutput(c.runtime, kongCtx, item, output, err)
 }
 
@@ -517,7 +525,7 @@ func (c *ScheduleDeleteCommand) Run(_ *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	return svc.DeleteSchedule(ctx, &DeleteRequest{ID: c.ID})
+	return svc.DeleteSchedule(ctx, &eventbusapi.DeleteRequest{ID: c.ID})
 }
 
 // TriggerCommands はトリガーのコマンド群です。
@@ -549,9 +557,9 @@ func (c *TriggerListCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	projected := make([]*TriggerOutput, 0, len(items))
+	projected := make([]*eventbusapi.TriggerOutput, 0, len(items))
 	for i := range items {
-		output, err := ProjectTrigger(&items[i])
+		output, err := eventbusapi.ProjectTrigger(&items[i])
 		if err != nil {
 			return err
 		}
@@ -577,11 +585,11 @@ func (c *TriggerReadCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.ReadTrigger(ctx, &ReadRequest{ID: c.ID})
+	item, err := svc.ReadTrigger(ctx, &eventbusapi.ReadRequest{ID: c.ID})
 	if err != nil {
 		return err
 	}
-	output, err := ProjectTrigger(item)
+	output, err := eventbusapi.ProjectTrigger(item)
 	if err != nil {
 		return err
 	}
@@ -614,10 +622,10 @@ func (c *TriggerCreateCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.CreateTrigger(ctx, &CreateTriggerRequest{
+	item, err := svc.CreateTrigger(ctx, &eventbusapi.CreateTriggerRequest{
 		Name:        c.Name,
 		Description: deref(c.Description),
-		Settings: TriggerSettings{
+		Settings: eventbusapi.TriggerSettings{
 			Source:                 c.Source,
 			Types:                  c.Type,
 			Conditions:             conditions,
@@ -627,7 +635,7 @@ func (c *TriggerCreateCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	output, err := ProjectTrigger(item)
+	output, err := eventbusapi.ProjectTrigger(item)
 	return writeCreateUpdateOutput(c.runtime, kongCtx, item, output, err)
 }
 
@@ -635,7 +643,7 @@ func (c *TriggerCreateCommand) Run(kongCtx *kong.Context) error {
 type TriggerUpdateCommand struct {
 	ID                     string   `arg:"" name:"id" help:"更新するトリガー ID。skr eventbus trigger list の出力で確認できます。"`
 	Name                   *string  `help:"新しい名前。未指定のときは現状維持します。"`
-	Description            *string  `help:"新しい説明。未指定のときは現状維持します。空文字列は null として送信します。"`
+	Description            *string  `help:"新しい説明。未指定のときは現状維持します。空文字列はそのまま送信します (作成時と異なり null にはなりません)。"`
 	Source                 *string  `help:"送信元イベントの新しい URI。//eventbus.sakura.ad.jp/eventlog または //eventbus.sakura.ad.jp/monitoringsuite/alert のいずれか。未指定のときは現状維持します。"`
 	Type                   []string `sep:"none" help:"対象の新しいイベントタイプ。反復可能で、指定時に既存値の全体を置き換えます。未指定のときは現状維持します。"`
 	Condition              []string `sep:"none" help:"イベントの新しい一致条件。key=名前,op=eq|in,value=値 の形式で指定します。value は反復可能です。反復可能で、指定時に既存の条件全体を置き換えます。未指定のときは現状維持します。"`
@@ -658,7 +666,7 @@ func (c *TriggerUpdateCommand) Run(kongCtx *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	item, err := svc.UpdateTrigger(ctx, &UpdateTriggerRequest{
+	item, err := svc.UpdateTrigger(ctx, &eventbusapi.UpdateTriggerRequest{
 		ID:                     c.ID,
 		Name:                   c.Name,
 		Description:            c.Description,
@@ -670,7 +678,7 @@ func (c *TriggerUpdateCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	output, err := ProjectTrigger(item)
+	output, err := eventbusapi.ProjectTrigger(item)
 	return writeCreateUpdateOutput(c.runtime, kongCtx, item, output, err)
 }
 
@@ -688,7 +696,7 @@ func (c *TriggerDeleteCommand) Run(_ *kong.Context) error {
 	}
 	ctx, cancel := commandContext()
 	defer cancel()
-	return svc.DeleteTrigger(ctx, &DeleteRequest{ID: c.ID})
+	return svc.DeleteTrigger(ctx, &eventbusapi.DeleteRequest{ID: c.ID})
 }
 
 // parseStartsAt は --starts-at の RFC3339 形式を解析します。

@@ -22,50 +22,65 @@ import (
 	v1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 )
 
-// ProcessConfigurationOutput は実行設定の応答を宛先別の個別入力と対応づけて出力します。
+// ProcessConfigurationOutput は実行設定の出力です。
+// ProjectProcessConfiguration が API の応答から変換します。
 type ProcessConfigurationOutput struct {
 	ID          string
 	Name        string
 	Description *string
+	// Destination はジョブの宛先です。simplenotification、simplemq、autoscale の
+	// いずれかです。
 	Destination string
-	Parameters  map[string]string
-	Tags        []string
-	CreatedAt   time.Time
-	ModifiedAt  time.Time
+	// Parameters は宛先対応表にある非秘密フィールドだけを含みます。
+	// simplenotification は group_id と message、simplemq は queue_name と content、
+	// autoscale は action と resource_id です。対応表にない既存のキーは公開しません。
+	Parameters map[string]string
+	Tags       []string
+	CreatedAt  time.Time
+	ModifiedAt time.Time
 }
 
-// ScheduleOutput はスケジュールの応答を出力します。
-// StartsAt はエポックミリ秒をミリ秒精度を失わない RFC3339 形式 (UTC) の文字列へ変換します。
+// ScheduleOutput はスケジュールの出力です。
+// ProjectSchedule が API の応答から変換します。
 type ScheduleOutput struct {
-	ID                     string
-	Name                   string
-	Description            *string
+	ID          string
+	Name        string
+	Description *string
+	// ProcessConfigurationID は実行する実行設定の ID です。
 	ProcessConfigurationID string
-	StartsAt               string
-	RecurringStep          *int
-	RecurringUnit          *string
-	Crontab                *string
-	Tags                   []string
-	CreatedAt              time.Time
-	ModifiedAt             time.Time
+	// StartsAt は実行を開始する日時です。API はエポックミリ秒で保持するため、
+	// ミリ秒精度の UTC です。
+	StartsAt      time.Time
+	RecurringStep *int
+	RecurringUnit *string
+	Crontab       *string
+	Tags          []string
+	CreatedAt     time.Time
+	ModifiedAt    time.Time
 }
 
-// TriggerOutput はトリガーの応答を出力します。
-// Conditions は条件の sum 型を等号・包含の形へ射影します。
+// TriggerOutput はトリガーの出力です。
+// ProjectTrigger が API の応答から変換します。
 type TriggerOutput struct {
-	ID                     string
-	Name                   string
-	Description            *string
-	Source                 string
-	Types                  []string
-	Conditions             []TriggerConditionOutput
+	ID          string
+	Name        string
+	Description *string
+	// Source は送信元イベントの URI です。
+	Source string
+	// Types は対象のイベントタイプです。未設定または null のときは nil になり、
+	// それ以外は指定した値全体です。
+	Types      []string
+	Conditions []TriggerConditionOutput
+	// ProcessConfigurationID は実行する実行設定の ID です。
 	ProcessConfigurationID string
 	Tags                   []string
 	CreatedAt              time.Time
 	ModifiedAt             time.Time
 }
 
-// TriggerConditionOutput はトリガー条件の等号または包含を表します。
+// TriggerConditionOutput はトリガー条件の出力です。
+// API の条件の sum 型を等号 (eq) または包含 (in) の形へ射影します。
+// 対応していない種別を API が返した場合は ProjectTrigger がエラーを返します。
 type TriggerConditionOutput struct {
 	Key    string
 	Op     string
@@ -73,8 +88,11 @@ type TriggerConditionOutput struct {
 }
 
 // ProjectProcessConfiguration は実行設定の応答を出力用へ変換します。
-// 宛先ごとの対応表にある非秘密フィールドだけを出力し、未知のキーや秘密情報の
-// おそれのある値は公開しません。
+//
+// 応答の ID・リソース種別・Settings の種別を検証し、宛先対応表にある非秘密フィールド
+// だけを出力します。未知のキーや秘密情報のおそれのある値は公開しません。ID が空、
+// 種別が一致しない、Parameters が JSON オブジェクトでない、宛先が不明な場合は
+// エラーを返します。
 func ProjectProcessConfiguration(item *v1.CommonServiceItem) (*ProcessConfigurationOutput, error) {
 	if err := checkItem(item, "", v1.ProviderClassEventbusprocessconfiguration); err != nil {
 		return nil, err
@@ -101,6 +119,9 @@ func ProjectProcessConfiguration(item *v1.CommonServiceItem) (*ProcessConfigurat
 }
 
 // ProjectSchedule はスケジュールの応答を出力用へ変換します。
+//
+// 応答の ID・リソース種別・Settings の種別を検証します。ID が空、種別が一致しない、
+// StartsAt をエポックミリ秒として解釈できない場合はエラーを返します。
 func ProjectSchedule(item *v1.CommonServiceItem) (*ScheduleOutput, error) {
 	if err := checkItem(item, "", v1.ProviderClassEventbusschedule); err != nil {
 		return nil, err
@@ -115,7 +136,7 @@ func ProjectSchedule(item *v1.CommonServiceItem) (*ScheduleOutput, error) {
 		Name:                   item.Name,
 		Description:            optNilStringPointer(item.Description),
 		ProcessConfigurationID: settings.ProcessConfigurationID,
-		StartsAt:               time.UnixMilli(millis).UTC().Format(time.RFC3339Nano),
+		StartsAt:               time.UnixMilli(millis).UTC(),
 		Tags:                   normalizeTags(item.Tags),
 		CreatedAt:              item.CreatedAt,
 		ModifiedAt:             item.ModifiedAt,
@@ -136,6 +157,10 @@ func ProjectSchedule(item *v1.CommonServiceItem) (*ScheduleOutput, error) {
 }
 
 // ProjectTrigger はトリガーの応答を出力用へ変換します。
+//
+// 応答の ID・リソース種別・Settings の種別を検証します。ID が空、種別が一致しない、
+// Conditions に対応していない条件種別が含まれる場合はエラーを返します。Types と
+// Conditions が未設定または null の場合は nil になります。
 func ProjectTrigger(item *v1.CommonServiceItem) (*TriggerOutput, error) {
 	if err := checkItem(item, "", v1.ProviderClassEventbustrigger); err != nil {
 		return nil, err
@@ -207,8 +232,8 @@ func optNilStringPointer(value v1.OptNilString) *string {
 	if !value.IsSet() || value.IsNull() {
 		return nil
 	}
-	copyed := value.Value
-	return &copyed
+	copied := value.Value
+	return &copied
 }
 
 // normalizeTags は Tags の null を空配列として出力します。

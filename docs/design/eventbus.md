@@ -13,7 +13,7 @@ EventBus の高レベルコマンド `skr eventbus` を設計します。`eventb
 
 この文書の対象は次のとおりです。
 
-- `internal/eventbus` パッケージの service 層 (eventbus-service 相当) と CLI コマンド
+- service 層を切り出した `service/eventbus-service-go` モジュールと、`internal/eventbus` の CLI コマンド層 ([ADR 0077](../adr/0077-eventbus-service-library.md))
 - 実行設定 (process-configuration)、スケジュール (schedule)、トリガー (trigger) の操作
 
 対象外は次のとおりです。
@@ -25,22 +25,27 @@ EventBus の高レベルコマンド `skr eventbus` を設計します。`eventb
 
 ### パッケージ構成
 
-`internal/eventbus` (package `eventbus`) に、service 層と CLI コマンドを置きます。
+service 層は `service/eventbus-service-go` 配下の独立モジュール (package `eventbus`) に、CLI コマンド層は `internal/eventbus` に置きます ([ADR 0077](../adr/0077-eventbus-service-library.md))。
 
 ```text
-internal/eventbus/
-  service.go               # Service 構造体、New(caller)、共通の変換
+service/eventbus-service-go/
+  service.go                # Service 構造体、New(caller)、共通の変換
   process_c0nfiguration.go  # 実行設定のリクエスト型、検証、変換、操作
-  schedule.go              # スケジュール
-  trigger.go               # トリガー (TriggerCondition を含む)
-  commands.go              # kong コマンド (service のリクエストを組み立てる)
-  output.go                # 出力射影
+  schedule.go               # スケジュール
+  trigger.go                # トリガー (TriggerCondition を含む)
+  output.go                 # 出力射影
+  example_test.go           # コンパイル検証される利用例
+  *_test.go
+internal/eventbus/
+  commands.go               # kong コマンド (ライブラリのリクエストを組み立てる)
+  condition.go              # --condition の構文解析 (CLI 固有)
+  secret_input.go           # secret の入力読み込み (CLI 固有)
   *_test.go
 ```
 
 ### 依存規律
 
-service 層のファイル (`service.go`、`process_c0nfiguration.go`、`schedule.go`、`trigger.go`) は `sacloud-sdk-go` と標準ライブラリのみに依存し、kong、CLI の Runtime、出力処理には依存しません。同じパッケージ内でも CLI 側の型やヘルパーは参照しません。ファイル名は `config` を `c0nfig` に置き換えるリポジトリの規則に従います。
+service 層は独立モジュール `service/eventbus-service-go` で、`sacloud-sdk-go` と標準ライブラリのみに依存し、kong、CLI の Runtime、出力処理には依存しません。出力射影もライブラリが提供します。CLI 固有の処理 (--condition の構文解析、secret の入力読み込み、Runtime、ServiceFactory) は `internal/eventbus` に残り、ライブラリの型を参照します。ファイル名は `config` を `c0nfig` に置き換えるリポジトリの規則に従います。
 
 `internal/cli` が `NewCommands(runtime, factory)` でコマンド群の依存を一括注入し、SDK クライアントの生成と共通の出力処理を接続します。`internal/eventbus` から `internal/cli` には依存せず、段階的な setter 初期化は行いません。
 
@@ -50,14 +55,14 @@ service 層は SDK の service 層の構成 ([service/iaas/swytch](https://githu
 
 - `Service` 構造体は SDK の公開操作 interface (`eventbus.ProcessConfigurationAPI`、`eventbus.ScheduleAPI`、`eventbus.TriggerAPI`) を保持します。`New(caller *v1.Client)` が種別ごとの操作を構築します。同じパッケージの単体テストでは各 interface に fake を注入します。
 - 操作ごとのリクエスト型が、検証と API リクエスト (`v1.CreateCommonServiceItemRequest` など) への変換を持ちます。
-- 戻り値は SDK の応答モデル (`*v1.CommonServiceItem` など) とします。出力射影は行いません。
+- 戻り値は SDK の応答モデル (`*v1.CommonServiceItem` など) とします。利用者向けの形状への変換は、同じライブラリの出力射影 (`ProjectProcessConfiguration` など) が担います。
 
 ### SDK への移植手順
 
-SDK に `service/eventbus` が追加された場合は、次の事項を確認して切り替えを判断します。SDK 側への提案・採用や、ファイル移動だけでの移植は保証しません。
+service 層は既に独立モジュール `service/eventbus-service-go` として切り出してあります ([ADR 0077](../adr/0077-eventbus-service-library.md))。SDK に `service/eventbus` が追加された場合は、次の事項を確認して切り替えを判断します。SDK 側への提案・採用や、モジュール移動だけでの移植は保証しません。
 
-1. SDK の公開 API、検証、未指定値、マージ、エラー、context の扱いを本設計と照合します。
-2. CLI の入力・出力契約を維持できる場合に、factory とリクエスト変換を SDK へ接続し替え、不要になった service 層の実装を削除します。
+1. SDK の公開 API、検証、未指定値、マージ、エラー、context の扱いを本設計とライブラリの実装で照合します。ライブラリの doc comment と README が仕様の記録です。
+2. CLI の入力・出力契約を維持できる場合に、factory とリクエスト変換を SDK へ接続し替え、不要になったライブラリの実装を削除します。
 3. 単体テストと実際の SDK を通す通信テストで差異を検証し、必要なライブ E2E を承認後に再実行します。
 4. 本設計文書と ADR を更新します。
 
@@ -186,7 +191,7 @@ type ScheduleSettings struct {
 - 周期指定 (`RecurringStep`、`RecurringUnit` の組) は `Crontab` と排他です。どちらか一方だけを完全に指定します。両方を指定した場合、周期指定の片方だけを指定した場合はエラーにします。
 - `RecurringUnit` は `min`、`hour`、`day` のいずれかであることを検証します。
 
-`StartsAt` は `time.Time` として受け付け、service 層が API リクエスト用のエポックミリ秒 (整数) に変換します。CLI は `--starts-at` に RFC3339 形式を受け付け、`time.Time` に変換して渡します。日時は利用者が意図した時点 (タイムゾーン付き) として扱います。ミリ秒未満は切り捨てます。`Crontab` は API への受け渡しと読み戻しに対応し、クライアントでの時差補正は行いません。
+`StartsAt` は `time.Time` として受け付け、service 層が API リクエスト用のエポックミリ秒 (整数) に変換します。CLI は `--starts-at` に RFC3339 形式を受け付け、`time.Time` に変換して渡します。日時は利用者が意図した時点 (タイムゾーン付き) として扱います。API はエポックミリ秒で保持するため、ミリ秒未満の小数秒は指定できず、エラーを返します。`Crontab` は API への受け渡しと読み戻しに対応し、クライアントでの時差補正は行いません。
 
 評価タイムゾーンについては、JST (日本標準時、UTC+09:00) であるとの利用者の確認結果を受領しています。公開ヘルプとチュートリアルへの記載時には一次情報の参照を追加します。StartsAt との発火上の関係は引き続き未確認です。ライブでの実発火検証は今回の対象に追加しません。
 
@@ -392,12 +397,12 @@ create では周期指定 (`--recurring-step` と `--recurring-unit` の組) と
 
 出力は JSON 専用で、`--query` による絞り込みを低レベル層と同じ方式で受け付けます ([ADR 0030](../adr/0030-remove-table-output.md))。list はオブジェクトの配列、read、create、update は単一オブジェクトを出力します。delete と set-secret は出力しません。
 
-出力は CommonServiceItem を種別ごとのリソース形状に射影します。射影の内容は次のとおりです。
+出力は CommonServiceItem を種別ごとのリソース形状に射影します。射影は service/eventbus-service-go ライブラリが提供し、CLI は結果をそのまま出力します。射影の内容は次のとおりです。
 
 - `ID`、`Name`、`Description`、`Tags`、`CreatedAt`、`ModifiedAt` を出力します。
 - `Settings` の内容を、種別ごとのフィールドへ展開します。
 - `Parameters` は JSON 文字列からオブジェクトへ変換し、宛先ごとの対応表にある非秘密フィールドだけを出力します。未知のキーは更新時には保持しますが、自動的には公開しません。低レベル層では生の応答を確認できます。
-- `StartsAt` はエポックミリ秒の整数・整数文字列のどちらも受け取り、ミリ秒精度を失わない RFC3339 形式 (UTC、`time.RFC3339Nano`) の文字列へ変換します。解釈できない値を生の値に切り替えて成功扱いにせず、エラーを返します。
+- `StartsAt` はエポックミリ秒の整数・整数文字列のどちらも受け取り、ミリ秒精度の UTC の `time.Time` へ変換します。CLI の JSON 出力は RFC3339 形式 (UTC) になります。解釈できない値を生の値に切り替えて成功扱いにせず、エラーを返します。
 - `Description` の null は null のまま出力します。
 - `SettingsHash`、`Status`、`ServiceClass`、`Availability`、`Provider`、`Icon` は出力しません。EventBus の操作手順で用途が確認できていないためです。用途が確認できた時点で追加を検討します。
 
@@ -464,16 +469,18 @@ create では周期指定 (`--recurring-step` と `--recurring-unit` の組) と
 
 ### service 層の単体テスト
 
+テストは service/eventbus-service-go モジュールに置き、CLI 入出力に依存しません。
+
 - 操作 interface を fake に差し替えて、検証、変換、マージ規則を検証します。
 - 正常系: 各宛先の `Parameters` 組み立て、`StartsAt` のエポックミリ秒変換、`Conditions` の変換、update のマージ (各リソース)。
-- エラー系: 必須項目の欠落、宛先とフラグの不整合、周期指定と Crontab の排他、`key` の pattern 違反、`eq`/`in` の値数違反、現状の取得失敗時に更新 API を呼ばないこと。
+- エラー系: 必須項目の欠落、宛先とフラグの不整合、周期指定と Crontab の排他、`StartsAt` のミリ秒未満の小数秒、`key` の pattern 違反、`eq`/`in` の値数違反、現状の取得失敗時に更新 API を呼ばないこと。
 - 更新の保持: 名前だけの更新で `Settings` を送らないこと、未指定値と明示した空文字列の区別、同じ宛先の未知パラメーター保持、宛先変更時の破棄、周期方式の切り替えと排他を確認します。StartsAt の整数文字列から整数への変換、Types と Conditions の未設定・null・空配列の保持も確認します。
 - 安全性: read・update・delete・set-secret の種別違い、ID 不一致、Read の不正応答・失敗、変更直前のキャンセルでは変更 API を呼び出さないことを確認します。
 
 ### CLI と SDK 通信のテスト
 
-- ドメインパッケージに入力パーサーと出力射影の単体テストを置きます。`internal/cli` にはコマンド登録、factory と Runtime の接続、共通出力と `--query` のテストを置きます。
-- sakumock の EventBus サーバへ実際の SDK を接続し、16 個の末端コマンドそれぞれの正常系と送信本文を検証します。service の fake だけで通信経路の検証を代替しません。sakumock の対応不足があれば、SDK が読むステータスと応答型を再現する HTTP テストサーバーで補います。
+- ライブラリの通信テスト (service/eventbus-service-go/service_sdk_test.go) が sakumock の EventBus サーバへ実際の SDK を接続し、wire 形式と操作の流れを検証します。`internal/cli` にはコマンド登録、factory と Runtime の接続、共通出力と `--query` のテストを置き、sakumock の EventBus サーバで 16 個の末端コマンドそれぞれの正常系を検証します。service の fake だけで通信経路の検証を代替しません。sakumock の対応不足があれば、SDK が読むステータスと応答型を再現する HTTP テストサーバーで補います。
+- CLI 固有の処理 (--condition の構文解析、secret の入力読み込み、Runtime の検査) は `internal/eventbus` の単体テストで検証します。
 - エラー系: `--condition` の構文エラーと検証エラー、`--starts-at` の解析エラー、create で周期指定が両方・片方とも指定なしの場合のエラー、`--destination` と宛先別フラグの不整合。
 - 条件構文: `key`・`op` の重複、`value` の反復、空要素、区切りだけの値、追加の `=` の保持、カンマを含む不正指定、暗黙の空白補正がないこと、Kong が指定を先にカンマ分割しないことを確認します。
 - 出力: `Parameters` の既知フィールドへの射影と未知キーの非表示、StartsAt の整数・整数文字列とミリ秒精度、不正応答のエラー、null と空配列、list の空配列出力、変更成功後の射影失敗を確認します。
@@ -493,7 +500,7 @@ create では周期指定 (`--recurring-step` と `--recurring-unit` の組) と
 - 設定の反映待ちを行って `is1b` の通常スイッチを作成し、SimpleMQ キューへの試験メッセージ到着を期限付きで待ちます。受信ステータス、メッセージ ID、期待する本文を照合し、通信失敗を不在とみなしません。
 - 実行設定の content を update で変更し、読み戻しと反映待ちの後、1個目のスイッチを再照合つきで削除してから別 ID のスイッチを作成して変更後の本文の受信を確認します。同時に保持するスイッチは1個で、ライブ実行で確認したゾーンのリソース数上限を避けます。
 - 実行中に発火しない将来時刻のスケジュールについて create、read、list、update (`--starts-at` の変更)、delete を実行し、不在を確認します。スケジュール発火による配送成功とは区別します。
-- スケジュール、トリガー、実行設定、キューを依存関係の逆順に削除し、不在を確認します。1個目のスイッチは本文更新後に削除済みのため、後片付けではスキップされます。delete もすべて実行記録に残る CLI 経路を使います。
+- スケジュール、トリガー、実行設定、キューを依存関係の逆順に削除し、不在を確認します。後片付けは各リソースの作成直後に独立した defer で登録し、1件の失敗でも他のリソースの後片付けを続けます。1個目のスイッチは本文更新後に削除済みのため、後片付けではスキップされます。delete もすべて実行記録に残る CLI 経路を使います。作成結果から ID を確定できていない対象は同名・同説明でも自動削除せず、候補を報告して手動確認を求めます。削除前の再照合は ID・名前・説明に加え、参照先 (実行設定 ID)・宛先パラメーター・開始日時・繰り返し・送信元・タイプ・条件も、今回設定した値と照合します。テスト中に変更する説明、本文、開始日時は、更新の CLI 呼び出しが成功した直後に追跡します。
 
 作成対象は SimpleMQ キュー1個とその API キー、実行設定1個、トリガー1個、スケジュール1個、通常スイッチ2個 (同時に保持するのは1個) です。キュー操作、イベント配送、スイッチなどに関わる費用は実装前の承認時に確認します。既存シナリオと同額であるとは扱いません。
 

@@ -2,7 +2,7 @@
 
 ## 対象と方針
 
-高レベル `eventbus` を実装しました。実行設定の list / read / create / update / delete / set-secret と、スケジュール・トリガーの list / read / create / update / delete の16末端コマンドを公開しています。`internal/eventbus` の service 層と条件パーサー、CLI 接続、秘密入力処理 (`--secret-file` の `@path` と標準入力)、出力射影を実装し、単体テストと実際の SDK・sakumock を通す通信テストが成功しています。Crontab の受け渡し・読み戻しは通信テストで確認しています。評価タイムゾーンは JST との利用者の確認結果を受領し、公開文書用の一次情報の参照追加を残しています。StartsAt との発火上の関係と実発火は未検証です。ライブ E2E は 2026-11-10 に `test/e2e/eventbus/` のシナリオで成功し、スイッチ作成イベントによる SimpleMQ 配送 (本文更新前後) も確認しました。チュートリアルは [docs/manual/tutorials/eventbus.md](docs/manual/tutorials/eventbus.md) にあります。設計は [EventBus](docs/design/eventbus.md) を参照してください。
+高レベル `eventbus` を実装しました。実行設定の list / read / create / update / delete / set-secret と、スケジュール・トリガーの list / read / create / update / delete の16末端コマンドを公開しています。service 層は CLI 非依存の独立モジュール [service/eventbus-service-go](service/eventbus-service-go/) ([ADR 0077](docs/adr/0077-eventbus-service-library.md)) に切り出してあり、条件パーサー、CLI 接続、秘密入力処理 (`--secret-file` の `@path` と標準入力) は `internal/eventbus` にあります。単体テストと実際の SDK・sakumock を通す通信テストが成功しています。Crontab の受け渡し・読み戻しは通信テストで確認しています。評価タイムゾーンは JST との利用者の確認結果を受領し、公開文書用の一次情報の参照追加を残しています。StartsAt との発火上の関係と実発火は未検証です。ライブ E2E は 2026-11-10 に `test/e2e/eventbus/` のシナリオで成功し、スイッチ作成イベントによる SimpleMQ 配送 (本文更新前後) も確認しました。チュートリアルは [docs/manual/tutorials/eventbus.md](docs/manual/tutorials/eventbus.md) にあります。設計は [EventBus](docs/design/eventbus.md) を参照してください。
 
 対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.5.0](https://github.com/sacloud/sacloud-sdk-go/tree/v0.5.0) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。SDK の配置ではなく実際の API route とドメインに基づいて CLI の境界を決めます。`service/iaas` に含まれる API でも、System API や CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
 

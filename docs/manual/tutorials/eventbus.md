@@ -17,6 +17,7 @@ EventBus はイベントやスケジュールをきっかけにジョブを実�
 
 ## 前提条件
 
+- ID の抽出に `jq` を利用します。事前に導入してください。
 - `skr` が利用でき、対象プロジェクトの SDK プロファイルまたは `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` が設定されていること。
 - EventBus API で実行設定とトリガーを作成・削除できる権限があること（[EventBus API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/eventbus/api.html)）。
 - SimpleMQ キューを作成・削除できる API 認証と、テスト用スイッチを作成・削除できる権限があること。SimpleMQ のキュー管理には「作成・削除」のアクセスレベルが必要です（[SimpleMQ API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/simplemq/api.html)）。
@@ -60,11 +61,11 @@ $ skr iaas-api switch find --zone ZONE --query 'map({ID,Name})'
 
 ## Step 2: SimpleMQ キューと API キーを用意する
 
-`UNIQUE-SUFFIX` は使用していない値に、`QUEUE-NAME` はその値を使った5〜64文字の一意な名前に置き換えます。Step 1 で同じ名前のキューがないことを確認してから作成します。作成結果の `ID` はコマンド置換で `QUEUE_ID` に取り込みます。
+`UNIQUE-SUFFIX` は使用していない値に、`QUEUE-NAME` はその値を使った5〜64文字の一意な名前に置き換えます。Step 1 で同じ名前のキューがないことを確認してから作成します。作成結果の `ID` はコマンド置換で `QUEUE_ID` に取り込みます。`--query` は JSON で出力するため、`jq -er '.'` で文字列をデコードしてから変数に取り込みます (以降の ID 取り込みも同じ手順です)。
 
 ```console
 $ umask 077
-$ QUEUE_ID=$(skr simplemq-api create-queue --name QUEUE-NAME --description eventbus-tutorial/UNIQUE-SUFFIX --query '.ID')
+$ QUEUE_ID=$(skr simplemq-api create-queue --name QUEUE-NAME --description eventbus-tutorial/UNIQUE-SUFFIX --query '.ID' | jq -er '.')
 $ skr simplemq-api list-queues --query 'map({ID,Name})'
 ```
 
@@ -95,7 +96,7 @@ $ chmod 600 eventbus-secret.json simplemq.key
 低レベルの `eventbus-api` では、これらの値を `Parameters` の JSON 文字列として指定します。高レベルコマンドは同じ API への入力を個別フラグとして受け付けます。
 
 ```console
-$ PROCESS_CONFIGURATION_ID=$(skr eventbus process-configuration create --name eventbus-simplemq-job-UNIQUE-SUFFIX --description eventbus-simplemq/UNIQUE-SUFFIX --destination simplemq --queue-name QUEUE-NAME --content EventBusSwitchCreated --query '.ID')
+$ PROCESS_CONFIGURATION_ID=$(skr eventbus process-configuration create --name eventbus-simplemq-job-UNIQUE-SUFFIX --description eventbus-simplemq/UNIQUE-SUFFIX --destination simplemq --queue-name QUEUE-NAME --content EventBusSwitchCreated --query '.ID' | jq -er '.')
 $ skr eventbus process-configuration read "$PROCESS_CONFIGURATION_ID"
 ```
 
@@ -129,7 +130,7 @@ $ skr eventbus process-configuration set-secret "$PROCESS_CONFIGURATION_ID" --se
 条件は `--condition 'key=名前,op=eq|in,value=値'` の形式で指定します。ここでは `zone` がスイッチを作成するゾーンと一致するイベントだけを対象にします。`ZONE` は Step 5 でスイッチを作成するゾーンと同じ値にします。
 
 ```console
-$ TRIGGER_ID=$(skr eventbus trigger create --name eventbus-simplemq-trigger-UNIQUE-SUFFIX --description eventbus-simplemq/UNIQUE-SUFFIX --source //eventbus.sakura.ad.jp/eventlog --type jp.ad.sakura.eventbus.eventlog.IaaS.request.Switch.normal.created --condition 'key=zone,op=eq,value=ZONE' --process-configuration-id "$PROCESS_CONFIGURATION_ID" --query '.ID')
+$ TRIGGER_ID=$(skr eventbus trigger create --name eventbus-simplemq-trigger-UNIQUE-SUFFIX --description eventbus-simplemq/UNIQUE-SUFFIX --source //eventbus.sakura.ad.jp/eventlog --type jp.ad.sakura.eventbus.eventlog.IaaS.request.Switch.normal.created --condition 'key=zone,op=eq,value=ZONE' --process-configuration-id "$PROCESS_CONFIGURATION_ID" --query '.ID' | jq -er '.')
 $ skr eventbus trigger read "$TRIGGER_ID"
 ```
 
@@ -142,8 +143,8 @@ $ skr eventbus trigger read "$TRIGGER_ID"
 対象ゾーンで他の通常スイッチを作成する操作が重ならないことを確認してください。名前には Step 2 と同じ一意な接尾辞を使います。`ZONE` は Step 4 の値に置き換えます。
 
 ```console
-$ SWITCH_ID=$(skr iaas-api switch create --zone ZONE --name eventbus-switch-UNIQUE-SUFFIX --description "Temporary switch for EventBus tutorial" --query '.ID')
-$ skr iaas-api switch read --zone ZONE --id "$SWITCH_ID" --query 'map({ID,Name,Description})'
+$ SWITCH_ID=$(skr iaas-api switch create --zone ZONE --name eventbus-switch-UNIQUE-SUFFIX --description "Temporary switch for EventBus tutorial" --query '.ID' | jq -er '.')
+$ skr iaas-api switch read --zone ZONE --id "$SWITCH_ID" --query '{ID,Name,Description}'
 ```
 
 作成したスイッチを対象にするイベントタイプは通常スイッチの作成です。作成結果の `ID`、`Name`、`Description` を確認し、後で削除するために `SWITCH_ID` を保持してください（[スイッチの概要](https://manual.sakura.ad.jp/cloud/network/switch/about.html)）。
@@ -160,11 +161,11 @@ SimpleMQ は Pull 型で、受信リクエストごとにメッセージを配�
 
 ## Step 7: スケジュールで定期実行を設定する (任意)
 
-トリガー以外に、開始日時からの繰り返しで実行設定を呼び出すスケジュールも作成できます。`--starts-at` に開始日時を RFC3339 形式で指定し、`--recurring-step` と `--recurring-unit` で間隔を指定します。`--recurring-step` と `--recurring-unit` の代わりに `--crontab` で Crontab 形式の繰り返しを指定する方法もありますが、このチュートリアルでは開始日時からの繰り返しを使います。
-`STARTS-AT` は現在より後の日時に置き換えてください。発火させないよう、削除までの時間より十分に後の日時を指定します。作成後、`read` で開始日時と繰り返しの設定を読み戻し、スケジュールを削除します。
+トリガー以外に、開始日時からの繰り返しで実行設定を呼び出すスケジュールも作成できます。`--starts-at` に開始日時を RFC3339 形式 (小数秒はミリ秒まで) で指定し、`--recurring-step` と `--recurring-unit` で間隔を指定します。`--recurring-step` と `--recurring-unit` の代わりに `--crontab` で Crontab 形式の繰り返しを指定する方法もありますが、このチュートリアルでは開始日時からの繰り返しを使います。
+`STARTS-AT` は現在より後の日時に置き換えてください。発火させないよう、削除までの時間より十分に後の日時を指定します。作成後、`read` で ID、名前、開始日時、繰り返しの設定がこの手順で作成したものと一致することを確認し、一致しない場合は削除を中止してください。確認後にスケジュールを削除します。
 
 ```console
-$ SCHEDULE_ID=$(skr eventbus schedule create --name eventbus-simplemq-schedule-UNIQUE-SUFFIX --description eventbus-simplemq/UNIQUE-SUFFIX --process-configuration-id "$PROCESS_CONFIGURATION_ID" --starts-at STARTS-AT --recurring-step 1 --recurring-unit hour --query '.ID')
+$ SCHEDULE_ID=$(skr eventbus schedule create --name eventbus-simplemq-schedule-UNIQUE-SUFFIX --description eventbus-simplemq/UNIQUE-SUFFIX --process-configuration-id "$PROCESS_CONFIGURATION_ID" --starts-at STARTS-AT --recurring-step 1 --recurring-unit hour --query '.ID' | jq -er '.')
 $ skr eventbus schedule read "$SCHEDULE_ID"
 $ skr eventbus schedule delete "$SCHEDULE_ID"
 $ skr eventbus schedule list --query 'map({ID,Name})'
@@ -173,17 +174,19 @@ $ skr eventbus schedule list --query 'map({ID,Name})'
 
 ## Step 8: 作成したリソースを削除する
 
-まずトリガーを削除して以降のイベントで実行設定が起動しないようにします。Step 4 で保持した `TRIGGER_ID` を削除し、一覧に試験用の名前がないことを確認します。
+まずトリガーを削除して以降のイベントで実行設定が起動しないようにします。Step 4 で保持した `TRIGGER_ID` を削除し、一覧に試験用の名前がないことを確認します。削除の前に `read` で ID、名前、説明、`ProcessConfigurationID` がこの手順で作成したものと一致することを確認してください。一致しない場合は別の用途に変更されている可能性があるため、削除を中止してください。
 
 ```console
+$ skr eventbus trigger read "$TRIGGER_ID"
 $ skr eventbus trigger delete "$TRIGGER_ID"
 $ skr eventbus trigger list --query 'map({ID,Name})'
 []
 ```
 
-続けて実行設定を削除し、一覧に試験用の名前がないことを確認します。Step 7 でスケジュールを作成した場合は、削除済みであることを同じ方法で確認してください。
+続けて実行設定を削除し、一覧に試験用の名前がないことを確認します。削除の前に `read` で ID、名前、説明、宛先 (`Destination`) と宛先別のパラメーターがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。Step 7 でスケジュールを作成した場合は、削除済みであることを同じ方法で確認してください。
 
 ```console
+$ skr eventbus process-configuration read "$PROCESS_CONFIGURATION_ID"
 $ skr eventbus process-configuration delete "$PROCESS_CONFIGURATION_ID"
 $ skr eventbus process-configuration list --query 'map({ID,Name})'
 []
@@ -192,7 +195,7 @@ $ skr eventbus process-configuration list --query 'map({ID,Name})'
 スイッチを削除します。削除の前に `read` で ID、名前、説明がこの手順で作成したものと一致することを確認してください。一覧から消失したことも確認します。
 
 ```console
-$ skr iaas-api switch read --zone ZONE --id "$SWITCH_ID" --query 'map({ID,Name,Description})'
+$ skr iaas-api switch read --zone ZONE --id "$SWITCH_ID" --query '{ID,Name,Description}'
 $ skr iaas-api switch delete --zone ZONE --id "$SWITCH_ID" --fail-if-not-found
 $ skr iaas-api switch find --request='{"Zone":"ZONE","Names":["eventbus-switch-UNIQUE-SUFFIX"]}' --query 'map({ID,Name})'
 []

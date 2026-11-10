@@ -108,7 +108,7 @@ func TestProjectSchedule(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "123", output.ID)
 	require.Equal(t, "456", output.ProcessConfigurationID)
-	require.Equal(t, "2030-03-17T17:46:40.123Z", output.StartsAt)
+	require.Equal(t, time.UnixMilli(1900000000123).UTC(), output.StartsAt)
 	require.NotNil(t, output.RecurringStep)
 	require.Equal(t, 3, *output.RecurringStep)
 	require.NotNil(t, output.RecurringUnit)
@@ -126,7 +126,7 @@ func TestProjectScheduleCrontabMode(t *testing.T) {
 		})}
 	output, err := ProjectSchedule(item)
 	require.NoError(t, err)
-	require.Equal(t, "2030-01-01T00:00:00Z", output.StartsAt)
+	require.Equal(t, time.UnixMilli(1893456000000).UTC(), output.StartsAt)
 	require.NotNil(t, output.Crontab)
 	require.Equal(t, "0 9 * * *", *output.Crontab)
 	require.Nil(t, output.RecurringStep)

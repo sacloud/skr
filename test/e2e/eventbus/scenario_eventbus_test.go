@@ -69,13 +69,13 @@ func TestScenarioEventbus(t *testing.T) {
 	// 作成前に同名リソースが存在しないことを確認する
 	requireNoNameCollision(t, h, queue, process, trigger, schedule, sw1, sw2)
 
-	// 後片付け: 依存関係の逆順で再照合つき削除し、一覧からの消失を確認する
-	defer func() {
-		cleanupEventbusResources(t, h, schedule, trigger, process, sw2, sw1, queue)
-	}()
+	// 後片付けは各リソースの作成と ID 確認の直後に defer で登録する。
+	// 実行順は LIFO で依存関係の逆順になり、1件の後片付けが失敗しても
+	// 残りのリソースの後片付けが続行されます。
 
 	// SimpleMQ キューを作成する
 	queue.attempted = true
+	defer cleanupEventbusResource(t, h, queue)
 	createdQueue := createSimpleMQQueue(t, h, "SimpleMQ キューを作成する", queue)
 	queueID, err := createdQueue.id()
 	require.NoError(t, err, "decode created SimpleMQ queue ID: %v", err)
@@ -92,6 +92,7 @@ func TestScenarioEventbus(t *testing.T) {
 
 	// 実行設定を作成する (simplemq 宛先、キュー名とメッセージ本文を指定する)
 	process.attempted = true
+	defer cleanupEventbusResource(t, h, process)
 	var created processConfigurationItem
 	data := h.Call(t, "実行設定を作成する",
 		"eventbus", "process-configuration", "create",
@@ -105,6 +106,9 @@ func TestScenarioEventbus(t *testing.T) {
 	require.NoError(t, err, "decode created process-configuration ID: %v", err)
 	require.NotEmpty(t, createdID, "process-configuration create should return ID")
 	process.id = createdID
+	// 後片付けの再照合のために、今回設定した宛先とパラメーターを追跡する。
+	process.destination = "simplemq"
+	process.parameters = map[string]string{"queue_name": queue.name, "content": expected}
 	require.NoError(t, checkProcessConfigurationIdentity(created, process, process.id), "created process configuration identity mismatch")
 	require.Equal(t, "simplemq", created.Destination, "destination should be simplemq")
 	require.Equal(t, map[string]string{"queue_name": queue.name, "content": expected},
@@ -123,6 +127,7 @@ func TestScenarioEventbus(t *testing.T) {
 
 	// トリガーを作成する (イベントログのスイッチ作成タイプ、ゾーン条件を指定する)
 	trigger.attempted = true
+	defer cleanupEventbusResource(t, h, trigger)
 	var createdTrigger triggerItem
 	data = h.Call(t, "トリガーを作成する",
 		"eventbus", "trigger", "create",
@@ -137,6 +142,11 @@ func TestScenarioEventbus(t *testing.T) {
 	require.NoError(t, err, "decode created trigger ID: %v", err)
 	require.NotEmpty(t, createdTriggerID, "trigger create should return ID")
 	trigger.id = createdTriggerID
+	// 後片付けの再照合のために、今回設定した送信元・タイプ・条件・参照先を追跡する。
+	trigger.source = eventSource
+	trigger.types = []string{switchCreatedType}
+	trigger.conditions = []triggerConditionItem{{Key: "zone", Op: "eq", Values: []string{zone}}}
+	trigger.processConfigurationID = process.id
 	require.NoError(t, checkTriggerIdentity(createdTrigger, trigger, trigger.id), "created trigger identity mismatch")
 	require.Equal(t, eventSource, createdTrigger.Source, "source should match the given flag")
 	require.Equal(t, []string{switchCreatedType}, createdTrigger.Types, "types should match the given flag")
@@ -161,15 +171,17 @@ func TestScenarioEventbus(t *testing.T) {
 		"eventbus", "trigger", "update", trigger.id,
 		"--name", trigger.name, "--description", updatedDescription)
 	require.NoError(t, decodeJSON(data, &updatedTrigger, false), "decode updated trigger")
+	// update の CLI 呼び出しが成功した時点で説明は更新済みのため、失敗し得る確認の
+	// 前に後片付けの照合用の値を追跡する。説明の復元は行わない。
+	trigger.description = updatedDescription
 	require.Equal(t, updatedDescription, *updatedTrigger.Description, "description should be updated")
 	require.Equal(t, createdTrigger.Types, updatedTrigger.Types, "types should be kept after a description-only update")
 	readTriggerItem = readTrigger(t, h, "更新後のトリガーを再参照する", trigger.id)
 	require.Equal(t, updatedDescription, *readTriggerItem.Description, "read description should keep the update result")
-	// 後片付けの再照合に備えて、現在の説明を追跡する。説明の復元は行わない。
-	trigger.description = updatedDescription
 
 	// スケジュールを作成する (開始日時は 24 時間後、1 時間ごとの繰り返し)
 	schedule.attempted = true
+	defer cleanupEventbusResource(t, h, schedule)
 	startsAt := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
 	var createdSchedule scheduleItem
 	data = h.Call(t, "スケジュールを作成する",
@@ -185,6 +197,11 @@ func TestScenarioEventbus(t *testing.T) {
 	require.NoError(t, err, "decode created schedule ID: %v", err)
 	require.NotEmpty(t, createdScheduleID, "schedule create should return ID")
 	schedule.id = createdScheduleID
+	// 後片付けの再照合のために、今回設定した参照先・開始日時・繰り返しを追跡する。
+	schedule.processConfigurationID = process.id
+	schedule.startsAt = startsAt
+	schedule.recurringStep = 1
+	schedule.recurringUnit = "hour"
 	require.NoError(t, checkScheduleIdentity(createdSchedule, schedule, schedule.id), "created schedule identity mismatch")
 	scheduledProcessID, err := decodeResourceID(createdSchedule.ProcessConfigurationID)
 	require.NoError(t, err, "decode created schedule ProcessConfigurationID: %v", err)
@@ -210,26 +227,25 @@ func TestScenarioEventbus(t *testing.T) {
 		"--name", schedule.name,
 		"--starts-at", updatedStartsAt)
 	require.NoError(t, decodeJSON(data, &updatedSchedule, false), "decode updated schedule")
+	// update の CLI 呼び出しが成功した時点で開始日時は更新済みのため、失敗し得る確認の
+	// 前に後片付けの照合用の値を追跡する。
+	schedule.startsAt = updatedStartsAt
 	requireStartsAtEqual(t, updatedStartsAt, updatedSchedule.StartsAt)
 	require.NotNil(t, updatedSchedule.RecurringStep, "recurring step should be kept after a starts-at-only update")
 	require.Equal(t, 1, *updatedSchedule.RecurringStep, "recurring step should keep the created value")
 	readScheduleItem = readSchedule(t, h, "更新後のスケジュールを再参照する", schedule.id)
 	requireStartsAtEqual(t, updatedStartsAt, readScheduleItem.StartsAt)
 
-	// スケジュールを削除して、一覧から消失することを確認する
-	h.Call(t, "スケジュールを削除する", "eventbus", "schedule", "delete", schedule.id)
-	schedule.deleted = true
-	for _, item := range listSchedules(t, h, "削除後にスケジュールが一覧に残っていないことを確認する") {
-		remaining, err := item.id()
-		require.NoError(t, err, "decode remaining schedule ID: %v", err)
-		require.NotEqual(t, schedule.id, remaining, "schedule %s remains after delete", schedule.id)
-	}
+	// スケジュールを削除して、一覧から消失することを確認する。
+	// 削除前に今回の作成物と識別情報を再照合する安全な手順を使います。
+	cleanupEventbusResource(t, h, schedule)
 
 	// トリガーの設定が反映されるまで待つ
 	h.Sleep(t, "トリガーの設定が反映されるまで待つ", triggerSettleDelay)
 
 	// テスト用のスイッチを作成する (1 個目)
 	sw1.attempted = true
+	defer cleanupEventbusResource(t, h, sw1)
 	createdSwitch := createSwitch(t, h, "テスト用のスイッチを作成する", sw1)
 	sw1.id = requireSwitchID(t, createdSwitch, sw1)
 	require.NoError(t, checkSwitchIdentity(createdSwitch, sw1, sw1.id), "created switch identity mismatch")
@@ -245,6 +261,9 @@ func TestScenarioEventbus(t *testing.T) {
 		"--name", process.name,
 		"--content", updatedExpected)
 	require.NoError(t, decodeJSON(data, &reconfigured, false), "decode reconfigured process configuration")
+	// update の CLI 呼び出しが成功した時点で本文は更新済みのため、失敗し得る確認の
+	// 前に後片付けの照合用の値を追跡する。
+	process.parameters["content"] = updatedExpected
 	require.Equal(t, map[string]string{"queue_name": queue.name, "content": updatedExpected},
 		reconfigured.Parameters, "content should be updated and queue_name kept")
 
@@ -257,6 +276,7 @@ func TestScenarioEventbus(t *testing.T) {
 
 	// テスト用のスイッチを作成する (2 個目)
 	sw2.attempted = true
+	defer cleanupEventbusResource(t, h, sw2)
 	createdSwitch2 := createSwitch(t, h, "変更後の本文を確認するためスイッチを作成する", sw2)
 	sw2.id = requireSwitchID(t, createdSwitch2, sw2)
 	require.NoError(t, checkSwitchIdentity(createdSwitch2, sw2, sw2.id), "created switch identity mismatch")

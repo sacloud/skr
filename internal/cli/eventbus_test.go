@@ -21,9 +21,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	eventbusmock "github.com/sacloud/sakumock/eventbus"
-	"github.com/sacloud/skr/internal/eventbus"
+	eventbusapi "github.com/sacloud/skr/service/eventbus-service-go"
 	"github.com/stretchr/testify/require"
 )
 
@@ -95,7 +96,7 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	}
 
 	// 実行設定を作成します。
-	var process eventbus.ProcessConfigurationOutput
+	var process eventbusapi.ProcessConfigurationOutput
 	err := json.Unmarshal(runCommand("eventbus", "process-configuration", "create",
 		"--name", "mock-process", "--description", "test process",
 		"--destination", "simplemq",
@@ -112,7 +113,7 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.NotEmpty(t, processID, "create should return ID")
 
 	// 一覧と絞り込み出力を確認します。
-	var listed []eventbus.ProcessConfigurationOutput
+	var listed []eventbusapi.ProcessConfigurationOutput
 	err2 := json.Unmarshal(runCommand("eventbus", "process-configuration", "list"), &listed)
 	require.NoError(t, err2)
 	require.Len(t, listed, 1, "list returned %#v, want created process", listed)
@@ -128,13 +129,13 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.Equal(t, processID, projected[0].ID, "unexpected value")
 	require.Equal(t, "mock-process", projected[0].Name, "unexpected value")
 
-	var read eventbus.ProcessConfigurationOutput
+	var read eventbusapi.ProcessConfigurationOutput
 	err4 := json.Unmarshal(runCommand("eventbus", "process-configuration", "read", processID), &read)
 	require.NoError(t, err4)
 	require.Equal(t, "mock-process", read.Name, "unexpected value")
 
 	// 名前だけ更新しても宛先設定を保持します。
-	var renamed eventbus.ProcessConfigurationOutput
+	var renamed eventbusapi.ProcessConfigurationOutput
 	err5 := json.Unmarshal(runCommand("eventbus", "process-configuration", "update", processID,
 		"--name", "renamed-process",
 	), &renamed)
@@ -143,7 +144,7 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.Equal(t, map[string]string{"queue_name": "mock-queue", "content": "hello"}, renamed.Parameters, "unexpected value")
 
 	// 宛先を切り替えると旧宛先のパラメーターは引き継ぎません。
-	var autoscaled eventbus.ProcessConfigurationOutput
+	var autoscaled eventbusapi.ProcessConfigurationOutput
 	err6 := json.Unmarshal(runCommand("eventbus", "process-configuration", "update", processID,
 		"--destination", "autoscale", "--action", "scale_up", "--resource-id", "res-1",
 	), &autoscaled)
@@ -172,6 +173,8 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.NoError(t, err8)
 	originalStdin := os.Stdin
 	os.Stdin = reader
+	// FailNow しても標準入力が置き換わりっぱなしにならないよう、復元を登録する。
+	t.Cleanup(func() { os.Stdin = originalStdin })
 	_, err9 := writer.WriteString(`{"APIKey":"SECRET-STDIN-VALUE"}` + "\n")
 	require.NoError(t, err9)
 	require.NoError(t, writer.Close())
@@ -187,7 +190,7 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.Equal(t, "SECRET-STDIN-VALUE", storedSecret.APIKey, "stored secret = %s", stored)
 
 	// スケジュールを作成します。
-	var schedule eventbus.ScheduleOutput
+	var schedule eventbusapi.ScheduleOutput
 	err10 := json.Unmarshal(runCommand("eventbus", "schedule", "create",
 		"--name", "mock-schedule", "--description", "test schedule",
 		"--process-configuration-id", processID,
@@ -197,7 +200,7 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.NoError(t, err10)
 	require.Equal(t, "mock-schedule", schedule.Name, "create returned %#v, want name", schedule)
 	require.Equal(t, processID, schedule.ProcessConfigurationID, "unexpected value")
-	require.Equal(t, "2030-01-10T00:00:00Z", schedule.StartsAt, "starts-at は UTC の RFC3339 で出力します")
+	require.Equal(t, "2030-01-10T00:00:00Z", schedule.StartsAt.Format(time.RFC3339), "starts-at は UTC の RFC3339 で出力します")
 	require.NotNil(t, schedule.RecurringStep, "unexpected value")
 	require.Equal(t, 5, *schedule.RecurringStep, "unexpected value")
 	require.NotNil(t, schedule.RecurringUnit, "unexpected value")
@@ -207,7 +210,7 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.NotEmpty(t, scheduleID, "create should return ID")
 
 	// crontab へ切り替えると繰り返し設定を解除します。
-	var crontabSchedule eventbus.ScheduleOutput
+	var crontabSchedule eventbusapi.ScheduleOutput
 	err11 := json.Unmarshal(runCommand("eventbus", "schedule", "update", scheduleID,
 		"--name", "mock-schedule", "--crontab", "0 9 * * *",
 	), &crontabSchedule)
@@ -217,9 +220,25 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.Nil(t, crontabSchedule.RecurringStep, "crontab への切り替えで RecurringStep を解除します")
 	require.Nil(t, crontabSchedule.RecurringUnit, "crontab への切り替えで RecurringUnit を解除します")
 
+	// list と read でも更新後の設定を照合します。
+	var scheduleList []eventbusapi.ScheduleOutput
+	err12 := json.Unmarshal(runCommand("eventbus", "schedule", "list"), &scheduleList)
+	require.NoError(t, err12)
+	require.Len(t, scheduleList, 1, "list after create returned %#v, want 1 schedule", scheduleList)
+	require.Equal(t, scheduleID, scheduleList[0].ID, "unexpected value")
+	require.NotNil(t, scheduleList[0].Crontab, "unexpected value")
+	var readSchedule eventbusapi.ScheduleOutput
+	err13 := json.Unmarshal(runCommand("eventbus", "schedule", "read", scheduleID), &readSchedule)
+	require.NoError(t, err13)
+	require.Equal(t, "mock-schedule", readSchedule.Name, "read returned %#v, want name", readSchedule)
+	require.NotNil(t, readSchedule.Crontab, "unexpected value")
+	require.Equal(t, "0 9 * * *", *readSchedule.Crontab, "unexpected value")
+	require.Nil(t, readSchedule.RecurringStep, "unexpected value")
+	require.Nil(t, readSchedule.RecurringUnit, "unexpected value")
+
 	// トリガーを作成します。
-	var trigger eventbus.TriggerOutput
-	err12 := json.Unmarshal(runCommand("eventbus", "trigger", "create",
+	var trigger eventbusapi.TriggerOutput
+	err14 := json.Unmarshal(runCommand("eventbus", "trigger", "create",
 		"--name", "mock-trigger", "--description", "test trigger",
 		"--source", "//eventbus.sakura.ad.jp/eventlog",
 		"--type", "zone.updated",
@@ -228,11 +247,11 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 		"--condition", "key=host,op=in,value=www1,value=www2",
 		"--process-configuration-id", processID,
 	), &trigger)
-	require.NoError(t, err12)
+	require.NoError(t, err14)
 	require.Equal(t, "mock-trigger", trigger.Name, "create returned %#v, want name", trigger)
 	require.Equal(t, processID, trigger.ProcessConfigurationID, "unexpected value")
 	require.Equal(t, []string{"zone.updated", "billing,updated"}, trigger.Types, "カンマを含む値は分割しません")
-	require.Equal(t, []eventbus.TriggerConditionOutput{
+	require.Equal(t, []eventbusapi.TriggerConditionOutput{
 		{Key: "zone", Op: "eq", Values: []string{"is1b"}},
 		{Key: "host", Op: "in", Values: []string{"www1", "www2"}},
 	}, trigger.Conditions, "unexpected value")
@@ -240,12 +259,25 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.NotEmpty(t, triggerID, "create should return ID")
 
 	// Types だけを差し替えます。
-	var typedTrigger eventbus.TriggerOutput
-	err13 := json.Unmarshal(runCommand("eventbus", "trigger", "update", triggerID,
+	var typedTrigger eventbusapi.TriggerOutput
+	err15 := json.Unmarshal(runCommand("eventbus", "trigger", "update", triggerID,
 		"--name", "mock-trigger", "--type", "disk.inserted",
 	), &typedTrigger)
-	require.NoError(t, err13)
+	require.NoError(t, err15)
 	require.Equal(t, []string{"disk.inserted"}, typedTrigger.Types, "unexpected value")
+
+	// list と read でも更新後の設定を照合します。
+	var triggerList []eventbusapi.TriggerOutput
+	err16 := json.Unmarshal(runCommand("eventbus", "trigger", "list"), &triggerList)
+	require.NoError(t, err16)
+	require.Len(t, triggerList, 1, "list after create returned %#v, want 1 trigger", triggerList)
+	require.Equal(t, triggerID, triggerList[0].ID, "unexpected value")
+	require.Equal(t, []string{"disk.inserted"}, triggerList[0].Types, "unexpected value")
+	var readTrigger eventbusapi.TriggerOutput
+	err17 := json.Unmarshal(runCommand("eventbus", "trigger", "read", triggerID), &readTrigger)
+	require.NoError(t, err17)
+	require.Equal(t, "mock-trigger", readTrigger.Name, "read returned %#v, want name", readTrigger)
+	require.Equal(t, []string{"disk.inserted"}, readTrigger.Types, "unexpected value")
 
 	// 削除します。
 	runCommand("eventbus", "schedule", "delete", scheduleID)
@@ -253,16 +285,16 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	runCommand("eventbus", "process-configuration", "delete", processID)
 
 	// process-configuration の一覧が空になります。
-	var empty []eventbus.ProcessConfigurationOutput
-	err14 := json.Unmarshal(runCommand("eventbus", "process-configuration", "list"), &empty)
-	require.NoError(t, err14)
+	var empty []eventbusapi.ProcessConfigurationOutput
+	err18 := json.Unmarshal(runCommand("eventbus", "process-configuration", "list"), &empty)
+	require.NoError(t, err18)
 	require.Len(t, empty, 0, "list after delete returned %#v, want empty", empty)
 	var projectedEmpty []struct {
 		ID   string
 		Name string
 	}
-	err15 := json.Unmarshal(runCommand("eventbus", "process-configuration", "list", "--query", "map({ID,Name})"), &projectedEmpty)
-	require.NoError(t, err15)
+	err19 := json.Unmarshal(runCommand("eventbus", "process-configuration", "list", "--query", "map({ID,Name})"), &projectedEmpty)
+	require.NoError(t, err19)
 	require.Len(t, projectedEmpty, 0, "projected output = %#v, want empty", projectedEmpty)
 }
 

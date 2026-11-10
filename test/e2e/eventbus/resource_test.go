@@ -22,9 +22,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
@@ -49,6 +52,17 @@ type eventbusResource struct {
 	attempted bool
 	// deleted はシナリオ内で削除済みかどうかです。削除済みのリソースは後片付けで変更しません。
 	deleted bool
+	// 以下は削除前の再照合で設定値ごと確認するための、今回の実行で設定した構成です。
+	// テスト中に変更する項目 (説明、本文、開始日時) は、更新の CLI 呼び出しが成功した直後に追跡します。
+	processConfigurationID string
+	destination            string
+	parameters             map[string]string
+	startsAt               string
+	recurringStep          int
+	recurringUnit          string
+	source                 string
+	types                  []string
+	conditions             []triggerConditionItem
 }
 
 // queueItem は SimpleMQ キュー コマンドの JSON 出力を解釈するための構造体です。
@@ -313,6 +327,13 @@ func checkProcessConfigurationIdentity(candidate processConfigurationItem, r *ev
 	if candidate.Description == nil || *candidate.Description != r.description {
 		return fmt.Errorf("実行設定の説明が一致しません (ID %s)", id)
 	}
+	// 宛先と宛先パラメーターも、今回設定した値と照合します。
+	if r.destination != "" && candidate.Destination != r.destination {
+		return fmt.Errorf("実行設定の宛先が一致しません (ID %s)", id)
+	}
+	if r.parameters != nil && !maps.Equal(candidate.Parameters, r.parameters) {
+		return fmt.Errorf("実行設定の宛先パラメーターが一致しません (ID %s)", id)
+	}
 	return nil
 }
 
@@ -327,6 +348,29 @@ func checkScheduleIdentity(candidate scheduleItem, r *eventbusResource, id strin
 	}
 	if candidate.Description == nil || *candidate.Description != r.description {
 		return fmt.Errorf("スケジュールの説明が一致しません (ID %s)", id)
+	}
+	// 参照先・開始日時・繰り返し設定も、今回設定した値と照合します。
+	if r.processConfigurationID != "" {
+		referenced, err := decodeResourceID(candidate.ProcessConfigurationID)
+		if err != nil || referenced != r.processConfigurationID {
+			return fmt.Errorf("スケジュールの実行設定の参照先が一致しません (ID %s)", id)
+		}
+	}
+	if r.startsAt != "" {
+		want, err := time.Parse(time.RFC3339, r.startsAt)
+		if err != nil {
+			return fmt.Errorf("期待する開始日時 %q を解析できません: %w", r.startsAt, err)
+		}
+		got, err := time.Parse(time.RFC3339Nano, candidate.StartsAt)
+		if err != nil || got.Sub(want).Abs() > time.Second {
+			return fmt.Errorf("スケジュールの開始日時が一致しません (ID %s)", id)
+		}
+	}
+	if r.recurringStep != 0 && (candidate.RecurringStep == nil || *candidate.RecurringStep != r.recurringStep) {
+		return fmt.Errorf("スケジュールの繰り返し間隔が一致しません (ID %s)", id)
+	}
+	if r.recurringUnit != "" && (candidate.RecurringUnit == nil || *candidate.RecurringUnit != r.recurringUnit) {
+		return fmt.Errorf("スケジュールの繰り返し単位が一致しません (ID %s)", id)
 	}
 	return nil
 }
@@ -343,7 +387,29 @@ func checkTriggerIdentity(candidate triggerItem, r *eventbusResource, id string)
 	if candidate.Description == nil || *candidate.Description != r.description {
 		return fmt.Errorf("トリガーの説明が一致しません (ID %s)", id)
 	}
+	// 送信元・イベントタイプ・条件・参照先も、今回設定した値と照合します。
+	if r.source != "" && candidate.Source != r.source {
+		return fmt.Errorf("トリガーの送信元が一致しません (ID %s)", id)
+	}
+	if r.types != nil && !slices.Equal(candidate.Types, r.types) {
+		return fmt.Errorf("トリガーのイベントタイプが一致しません (ID %s)", id)
+	}
+	if r.conditions != nil && !slices.EqualFunc(candidate.Conditions, r.conditions, equalTriggerConditions) {
+		return fmt.Errorf("トリガーの条件が一致しません (ID %s)", id)
+	}
+	if r.processConfigurationID != "" {
+		referenced, err := decodeResourceID(candidate.ProcessConfigurationID)
+		if err != nil || referenced != r.processConfigurationID {
+			return fmt.Errorf("トリガーの実行設定の参照先が一致しません (ID %s)", id)
+		}
+	}
 	return nil
+}
+
+// equalTriggerConditions はトリガーの条件のスライス要素を、Key・Op・Values で比較します。
+// triggerConditionItem は Values (スライス) を含むため == で比較できません。
+func equalTriggerConditions(a, b triggerConditionItem) bool {
+	return a.Key == b.Key && a.Op == b.Op && slices.Equal(a.Values, b.Values)
 }
 
 // checkQueueIdentity は SimpleMQ キューの参照結果が、今回の実行で作成したリソースと一致することを確認します。
@@ -412,34 +478,26 @@ func requireNoNameCollision(t *testing.T, h *helper.Helper, resources ...*eventb
 	}
 }
 
-// cleanupEventbusResources は依存関係の逆順に並んだリソースを後片付けします。
-// 失敗しても後続のリソースの後片付けを続け、その失敗をテストの結果へ反映します。
-func cleanupEventbusResources(t *testing.T, h *helper.Helper, resources ...*eventbusResource) {
-	t.Helper()
-
-	for _, r := range resources {
-		if !r.attempted || r.deleted {
-			continue
-		}
-		cleanupEventbusResource(t, h, r)
-	}
-}
-
 // cleanupEventbusResource は1件のリソースを後片付けします。
-// 作成 API を呼び出していないリソースは変更しません。ID が確定できない場合は名前で検索し、
-// 名前と説明が完全一致する今回の実行の作成物だけを削除します。
+// 作成 API を呼び出していないリソースは変更しません。作成結果から ID を確定できて
+// いない対象は同名・同説明でも今回の作成物と断定できないため、自動削除せずに
+// 候補を報告して手動確認を求めます。
 // 削除直前に今回の作成物と識別情報を再照合し、一致しない場合は削除しません。
 func cleanupEventbusResource(t *testing.T, h *helper.Helper, r *eventbusResource) {
 	t.Helper()
 
 	label := kindName(r.kind)
+	if !r.attempted || r.deleted {
+		return
+	}
 	id := r.id
 	if id == "" {
 		// 作成 API がエラーを返しても、サーバー側で作成済みの可能性があります。
-		id = findResourceIDByName(t, h, r)
-		if id == "" {
-			return
+		// 削除は行わず、同名・同説明の候補を報告して手動確認を求めます。
+		if candidate := findResourceIDByName(t, h, r); candidate != "" {
+			t.Errorf("cleanup refused: %s %s の ID が作成結果で確定していないため自動削除しません。同名・同説明の %s を手動で確認してください", label, r.name, candidate)
 		}
+		return
 	}
 
 	// 削除前に今回の作成物と識別情報を再照合する

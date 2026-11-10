@@ -18,6 +18,7 @@ import (
 	eventbussdk "github.com/sacloud/sacloud-sdk-go/api/eventbus"
 	"github.com/sacloud/skr/internal/eventbus"
 	"github.com/sacloud/skr/internal/saclient"
+	eventbusapi "github.com/sacloud/skr/service/eventbus-service-go"
 )
 
 // initEventbus は手書きの高レベル eventbus コマンド群を配線します (ADR 0075)。
@@ -28,17 +29,18 @@ func (c *cli) initEventbus() {
 			ValidateOutput: validateOutput,
 			WriteOutput:    writeOutput,
 		},
-		func() (*eventbus.Service, error) {
+		func() (*eventbusapi.Service, error) {
 			return newEventbusService(c.Trace)
 		},
-		func() (*eventbus.Service, error) {
+		func() (*eventbusapi.Service, error) {
 			return newEventbusSecretService(c.Trace)
 		},
 	)
 }
 
-// newEventbusService は高レベルの eventbus コマンド用の Service を構築します。
-func newEventbusService(trace bool) (*eventbus.Service, error) {
+// newEventbusService は高レベルの eventbus コマンド用に、
+// service/eventbus-service-go の Service を構築します。
+func newEventbusService(trace bool) (*eventbusapi.Service, error) {
 	client, err := saclient.New(trace)
 	if err != nil {
 		return nil, err
@@ -47,13 +49,13 @@ func newEventbusService(trace bool) (*eventbus.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return eventbus.New(v1Client), nil
+	return eventbusapi.New(v1Client), nil
 }
 
 // newEventbusSecretService は set-secret 用の Service を構築します。
 // secret を扱う操作では、実行前に実効トレース設定を検査し、
 // トレースが有効な場合は秘密情報が記録されるおそれがあるため実行しません。
-func newEventbusSecretService(trace bool) (*eventbus.Service, error) {
+func newEventbusSecretService(trace bool) (*eventbusapi.Service, error) {
 	client, err := saclient.New(trace)
 	if err != nil {
 		return nil, err
@@ -65,5 +67,5 @@ func newEventbusSecretService(trace bool) (*eventbus.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return eventbus.New(v1Client), nil
+	return eventbusapi.New(v1Client), nil
 }
