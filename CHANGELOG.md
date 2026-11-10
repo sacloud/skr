@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.1.0](https://github.com/sacloud/skr/compare/v0.0.7...v0.1.0) - 2026-11-10
+
+### 🚀 Changes
+- API コマンド名を operationId から機械派生する方針を ADR と design doc に記録する by @tokuhirom in https://github.com/sacloud/skr/pull/205
+- operationId 機械派生の移行フェーズ 1 として CI と baseline を導入する by @tokuhirom in https://github.com/sacloud/skr/pull/207
+- simplemq-api のコマンド名を operationId 派生名に移行する (フェーズ 2) by @tokuhirom in https://github.com/sacloud/skr/pull/208
+- simplemq-api の operationId 派生名でライブ E2E を再実行した結果を記録する by @tokuhirom in https://github.com/sacloud/skr/pull/209
+- kms-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/210
+- kms-api の operationId 派生名でライブ E2E を再実行した結果を記録する by @tokuhirom in https://github.com/sacloud/skr/pull/211
+- secretmanager-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/212
+- secretmanager-api の operationId 派生名でライブ E2E を再実行した結果を記録する by @tokuhirom in https://github.com/sacloud/skr/pull/213
+- CI の不要なツール準備を削除 by @tokuhirom in https://github.com/sacloud/skr/pull/216
+- security-control-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/215
+- service-endpoint-gateway-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/217
+- networking-suite-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/218
+- eventbus-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/219
+- apprun-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/220
+- simple-notification-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/221
+- object-storage-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/222
+- apprun-dedicated-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/223
+- iam-api のコマンド名を operationId 派生名に移行する (フェーズ 3) by @tokuhirom in https://github.com/sacloud/skr/pull/224
+- ADR 0074 の移行を完了し baseline 機構を廃止する by @tokuhirom in https://github.com/sacloud/skr/pull/225
+### 📦 Dependency Updates
+- ci: bump Songmu/tagpr from 1.21.4 to 1.22.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/226
+
 ## [v0.0.7](https://github.com/sacloud/skr/compare/v0.0.6...v0.0.7) - 2026-11-06
 
 ### 🚀 Changes
