@@ -58,7 +58,8 @@ func (t realTicker) Stop() { t.ticker.Stop() }
 //
 // check がエラーを返した場合は打ち切ってエラーを返します。参照エラーなど打ち切りたく
 // ない一時的な失敗は、check が (false, nil) を返すことで期限まで再試行できます。最初の
-// check は待機せずに即座に行います。期限を超えた場合と context がキャンセルされた
+// check は待機せずに即座に行います。待機はポーリング間隔と期限までの残り時間の短い方
+// までとし、期限を超えて待機しません。期限を超えた場合と context がキャンセルされた
 // 場合はエラーを返します。timeout の零値は DefaultWaitTimeout として扱います。
 func (s *Service) poll(ctx context.Context, timeout time.Duration, check func() (bool, error)) error {
 	if timeout <= 0 {
@@ -75,9 +76,18 @@ func (s *Service) poll(ctx context.Context, timeout time.Duration, check func() 
 		if done {
 			return nil
 		}
-		if !s.clock.Now().Before(deadline) {
+		now := s.clock.Now()
+		if !now.Before(deadline) {
 			return fmt.Errorf("待機がタイムアウトしました (期限: %s)", timeout)
 		}
+		// Ticker の間隔は作成後に変えられないため、期限までの残り時間がポーリング間隔
+		// より短くなったら、残り時間で Ticker を作り直します。
+		wait := DefaultPollInterval
+		if remaining := deadline.Sub(now); remaining < wait {
+			wait = remaining
+		}
+		tk.Stop()
+		tk = s.clock.NewTicker(wait)
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("待機がキャンセルされました: %w", ctx.Err())

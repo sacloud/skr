@@ -224,3 +224,44 @@ func TestPollInterval(t *testing.T) {
 	defer clock.mu.Unlock()
 	require.Equal(t, DefaultPollInterval, clock.lastInterval)
 }
+
+func TestPollWaitBoundedByDeadline(t *testing.T) {
+	t.Run("ポーリング間隔より短い期限でも期限を超えて待機しない", func(t *testing.T) {
+		clock := newFakeClock()
+		s := &Service{clock: clock}
+
+		// 期限までの残り時間だけ待ってからタイムアウトします。
+		var calls int
+		_, err := runWithTicks(t, s, func() (any, error) {
+			return nil, s.poll(t.Context(), time.Second, func() (bool, error) {
+				calls++
+				return false, nil
+			})
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "タイムアウト")
+		require.Equal(t, 2, calls)
+		clock.mu.Lock()
+		defer clock.mu.Unlock()
+		require.Equal(t, time.Second, clock.lastInterval)
+	})
+
+	t.Run("期限が近づくと残り時間で待つ", func(t *testing.T) {
+		clock := newFakeClock()
+		s := &Service{clock: clock}
+
+		// 期限 12 秒に対し、最後の待ちはポーリング間隔 (5 秒) ではなく残り 2 秒です。
+		var calls int
+		_, err := runWithTicks(t, s, func() (any, error) {
+			return nil, s.poll(t.Context(), 12*time.Second, func() (bool, error) {
+				calls++
+				return false, nil
+			})
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "タイムアウト")
+		clock.mu.Lock()
+		defer clock.mu.Unlock()
+		require.Equal(t, 2*time.Second, clock.lastInterval)
+	})
+}
