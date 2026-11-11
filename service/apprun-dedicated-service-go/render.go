@@ -39,6 +39,13 @@ type DiffResult struct {
 // 差分のローカル側と同じ形式です。registryPassword と secret=true の環境変数の値は
 // 出力に含めません (Diff の比較から除外するのと同じ処理です)。
 func (s *Service) Render(def *ApplicationDefinition) (map[string]any, error) {
+	return RenderDefinition(def)
+}
+
+// RenderDefinition は Render と同じ処理を、Service を構築せずに行います。
+// 定義の検証と正規化は API に接続しないオフラインの処理のため、CLI 層はこの
+// 関数を直接使えます。
+func RenderDefinition(def *ApplicationDefinition) (map[string]any, error) {
 	if def == nil {
 		return nil, errors.New("定義が nil です")
 	}

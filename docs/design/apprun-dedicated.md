@@ -44,7 +44,8 @@ service/apprun-dedicated-service-go/
 internal/apprundedicated/
   commands.go               # kong コマンド (定義読み込みと service 呼び出し)
   definition_input.go       # 定義ファイルの読み込み (--app、標準入力、未知フィールド拒否)
-  confirm.go                # 確認プロンプト
+  confirm.go                # 確認プロンプトとトレース設定の検査
+  diff.go                   # unified diff の生成 (LCS、文脈行、色付き出力)
   *_test.go
 ```
 

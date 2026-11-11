@@ -43,6 +43,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr eventbus-api` | 実行設定、スケジュール、トリガーの管理、実行先サービス用シークレットの登録 |
 | `skr eventbus` | 実行設定、スケジュール、トリガーの管理 (宛先別の個別フラグで入力)、実行設定へのシークレット登録 |
 | `skr apprun-dedicated-api` | AppRun 専有型のクラスタ、アプリケーション、ワーカノードなどの管理 |
+| `skr apprun-dedicated` | AppRun 専有型のアプリケーションを定義ファイルでデプロイ・運用 (init、deploy、diff、render、status、versions、containers、rollback、deactivate、delete) |
 | `skr apprun-api` | AppRun 共用型のアプリケーション、バージョン、トラフィック分散、パケットフィルター、ユーザー情報の管理 |
 | `skr container-registry-api registry` | コンテナレジストリと認証ユーザーの管理 |
 | `skr object-storage-api` | サイト、サイトアカウント、バケット、パーミッションの管理 |
@@ -72,6 +73,7 @@ $ skr simple-notification-api --help
 $ skr eventbus-api --help
 $ skr eventbus --help
 $ skr apprun-dedicated-api --help
+$ skr apprun-dedicated --help
 $ skr apprun-api --help
 $ skr container-registry-api --help
 $ skr object-storage-api --help
