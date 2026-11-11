@@ -36,7 +36,7 @@ func TestRunKmsAPIHelp(t *testing.T) {
 		{
 			args: []string{"kms-api", "--help"},
 			want: []string{
-				"list-keys", "read-key", "create-key", "update-key", "delete-key", "rotate-key",
+				"list-keys", "read-key", "create-key", "update-key", "rotate-key",
 				"change-key-status", "schedule-key-destruction", "encrypt-data-with-key", "decrypt-data-with-key",
 				"FIPS 140-3", "AES-256", "削除予約制", "manual.sakura.ad.jp/cloud/appliance/kms/index.html",
 			},
@@ -76,6 +76,9 @@ func TestRunKmsAPIHelp(t *testing.T) {
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			for _, expected := range test.want {
 				require.Contains(t, help, expected, "help does not contain %q:\n%s", expected, help)
+			}
+			if strings.Join(test.args, " ") == "kms-api --help" {
+				require.NotContains(t, help, "delete-key", "immediate KMS key deletion must not be exposed")
 			}
 		})
 	}
@@ -220,11 +223,23 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 	require.NoError(t, json.Unmarshal(runCommand("kms-api", "change-key-status", keyID, "--status", "active"), &canceled))
 	require.Equal(t, "active", canceled, "canceled destruction schedule = %+v", canceled)
 
-	runCommand("kms-api", "delete-key", keyID)
-	runCommand("kms-api", "delete-key", imported.ID)
-	var remaining []struct {
-		ID string `json:"ID"`
+	for _, id := range []string{keyID, imported.ID} {
+		var destruction struct {
+			Status                 string `json:"Status"`
+			DeletionScheduledAfter string `json:"DeletionScheduledAfter"`
+		}
+		require.NoError(t, json.Unmarshal(runCommand("kms-api", "schedule-key-destruction", id, "--pending-days", "7"), &destruction))
+		require.Equal(t, "pending_destruction", destruction.Status)
+		require.NotEmpty(t, destruction.DeletionScheduledAfter)
 	}
-	require.NoError(t, json.Unmarshal(runCommand("kms-api", "list-keys", "--query", `map(select(.ID == "`+keyID+`" or .ID == "`+imported.ID+`"))`), &remaining))
-	require.Len(t, remaining, 0, "deleted keys remain in list: %+v", remaining)
+	var remaining []struct {
+		ID     string `json:"ID"`
+		Status string `json:"Status"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("kms-api", "list-keys", "--query", `map(select(.ID == "`+keyID+`" or .ID == "`+imported.ID+`") | {ID,Status})`), &remaining))
+	require.Len(t, remaining, 2, "keys scheduled for destruction should remain listed: %+v", remaining)
+	for _, key := range remaining {
+		require.Contains(t, []string{keyID, imported.ID}, key.ID)
+		require.Equal(t, "pending_destruction", key.Status)
+	}
 }

@@ -3,7 +3,7 @@
 さくらのクラウド KMS (Key Management Service) は、FIPS 140-3 level 3 認証の HSM と連携した暗号鍵の管理サービスです。対称鍵 AES-256 bit の暗号化・復号を提供し、鍵素材は HSM の外に取り出せません。キーの削除は猶予期間つきの削除予約制です（[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)）。
 
 > [!WARNING]
-> この手順では、KMS キーを 1 件作成し、暗号化と復号、ローテーション、削除予約の取り消しを確認してから削除します。キーは作成から削除まで課金対象です (レガシーキーを除く)。実行前に `skr config current` でプロファイルを確認し、影響範囲について必要な承認を得てください。
+> この手順では、KMS キーを 1 件作成し、暗号化と復号、ローテーション、削除予約の取り消しを確認してから、最後に削除を予約します。キーは作成からサービスによる削除完了まで課金対象です (レガシーキーを除く)。実行前に `skr config current` でプロファイルを確認し、影響範囲について必要な承認を得てください。
 
 ## 前提条件
 
@@ -20,7 +20,7 @@
 3. 平文を暗号化し、暗号文を復号して元の平文と一致することを確認します。
 4. キーをローテーションします。
 5. 削除を予約し、予約を取り消します。
-6. ID と名前を照合したうえで、キーを削除します。
+6. ID と名前を照合したうえで、キーの削除を予約します。
 
 ## Step 1: 対象プロファイルとコマンドを確認する
 
@@ -35,7 +35,6 @@ $ skr kms-api decrypt-data-with-key --help
 $ skr kms-api rotate-key --help
 $ skr kms-api schedule-key-destruction --help
 $ skr kms-api change-key-status --help
-$ skr kms-api delete-key --help
 ```
 
 認証は選択中の SDK プロファイルを使います。`KEY-NAME` は、以降のコマンドと JSON で同じ一意な名前に置き換えてください。
@@ -157,23 +156,28 @@ $ skr kms-api change-key-status KEY-ID --status active
 
 状態は `active` (有効: 暗号化・復号可)、`restricted` (制限中: 復号のみ可)、`suspended` (一時停止中: 操作不可) のいずれかに変更できます。
 
-## Step 7: キーを削除する
+## Step 7: キーの削除を予約する
 
 削除前に `read-key` で ID と名前がこの手順で作成したキーと一致することを再確認します。一致しない場合や ID を確認できない場合は削除しません。
 
 ```console
 $ skr kms-api read-key KEY-ID --query '{ID,Name,Status}'
-$ skr kms-api delete-key KEY-ID
-$ skr kms-api list-keys --query 'map(select(.ID == "KEY-ID") | {ID,Name})'
+$ skr kms-api schedule-key-destruction KEY-ID --pending-days 7
+$ skr kms-api read-key KEY-ID --query '{ID,Name,Status,DeletionScheduledAfter}'
 ```
 
-対象 ID が一覧に残っていない場合の出力は `[]` です。以下は E2E テストで確認している削除後の出力形式です。
+削除予約後もキーは一覧と参照に表示され、状態は `pending_destruction` になります。削除は即時ではなく、`DeletionScheduledAfter` に示された日時を過ぎてから実行されます。削除予約中のキーは利用できず、状態を `active` に戻すと予約を取り消せます。
 
 ```json
-[]
+{
+  "ID": "KEY-ID",
+  "Name": "KEY-NAME",
+  "Status": "pending_destruction",
+  "DeletionScheduledAfter": "DELETION-SCHEDULED-AFTER"
+}
 ```
 
-キーを削除すると、そのキーで暗号化したデータは復号できなくなります。連携リソースがある場合は、削除前に依存関係を確認してください（[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)）。
+サービスによる削除が完了すると、そのキーで暗号化したデータは復号できなくなります。連携リソースがある場合は、削除前に依存関係を確認してください（[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)）。
 
 
 ## 参考資料

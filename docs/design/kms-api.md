@@ -6,15 +6,15 @@
 
 | リソース | 実装操作 |
 | --- | --- |
-| `key` | `list-keys`、`read-key`、`create-key`、`update-key`、`delete-key`、`rotate-key`、`change-key-status`、`schedule-key-destruction`、`encrypt-data-with-key`、`decrypt-data-with-key` |
+| `key` | `list-keys`、`read-key`、`create-key`、`update-key`、`rotate-key`、`change-key-status`、`schedule-key-destruction`、`encrypt-data-with-key`、`decrypt-data-with-key` |
 
-KMS は FIPS 140-3 level 3 認証の HSM と連携し、対称鍵 AES-256 bit の暗号化・復号を提供します。キーは取り出しやバックアップができません。削除は削除予約制で、削除予約中のキーは状態変更で取り消せます。ローテーションは有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。レガシーキー (`cloud/kms/key/legacy`) は課金対象外で、新規作成はできません。キーの作成数や削除の猶予期間などの上限は[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)を参照してください。
+KMS は FIPS 140-3 level 3 認証の HSM と連携し、対称鍵 AES-256 bit の暗号化・復号を提供します。キーは取り出しやバックアップができません。即時削除操作は公開せず、キーの削除には猶予期間つきの削除予約を使います。削除予約中のキーは状態変更で取り消せます。ローテーションは有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。レガシーキー (`cloud/kms/key/legacy`) は課金対象外で、新規作成はできません。キーの作成数や削除の猶予期間などの上限は[KMS 基本情報](https://manual.sakura.ad.jp/cloud/appliance/kms/index.html)を参照してください。
 
 API エンドポイントは `https://secure.sakura.ad.jp/cloud/zone/{ゾーン名}/api/cloud/1.1/kms` で、SDK の既定値は tk1a ゾーンです。コマンドはゾーン引数を持たず、SDK の既定値を使います。エンドポイントは `SAKURA_ENDPOINTS_KMS` 環境変数で変更できます（[KMS API](https://manual.sakura.ad.jp/api/cloud/security-encryption/#tag/kms-key)）。
 
 ## パッケージと生成
 
-操作の大半は `api/commands/kms-key.json` で明示し、`make generate-api` から `internal/kmsapi/kms_key_api_generated.go` に生成します。生成するのは `list-keys`、`read-key`、`update-key`、`delete-key`、`rotate-key`、`schedule-key-destruction` のコマンドと、API interface、factory、Runtime です。`internal/cli/` の配線は `make generate-wiring` から生成し、設定との一致を `internal/cli/wiring_test.go` で確認します。
+操作の大半は `api/commands/kms-key.json` で明示し、`make generate-api` から `internal/kmsapi/kms_key_api_generated.go` に生成します。生成するのは `list-keys`、`read-key`、`update-key`、`rotate-key`、`schedule-key-destruction` のコマンドと、API interface、factory、Runtime です。即時削除 API は CLI に公開しません。`internal/cli/` の配線は `make generate-wiring` から生成し、設定との一致を `internal/cli/wiring_test.go` で確認します。
 
 次の操作は手書きで `internal/kmsapi/commands.go` に実装します。
 
@@ -46,13 +46,13 @@ KMS API の応答フィールドは PascalCase (`ID`、`Name`、`Status`、`KeyO
 
 ## ライブ E2E と後片付け
 
-`test/e2e/kms-api/` はビルド済み CLI を呼び出す testing.T ベースのシナリオテストです（[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)）。シナリオは生成モードのキー作成から、参照、一覧、更新、ローテーション、暗号化と復号、状態変更、削除予約とその取り消し、削除までを検証します。BYOK モードのキーも作成し、`KeyOrigin` が `imported` になることを確認します。作成するのは KMS キー 2 件のみで、テスト関数内の `defer` で削除と不在確認まで行います。
+`test/e2e/kms-api/` はビルド済み CLI を呼び出す testing.T ベースのシナリオテストです（[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)）。シナリオは生成モードのキー作成から、参照、一覧、更新、ローテーション、暗号化と復号、状態変更、削除予約とその取り消しまでを検証します。BYOK モードのキーも作成し、`KeyOrigin` が `imported` になることを確認します。作成するのは KMS キー 2 件のみで、テスト関数内の `defer` で ID・名前・状態を再確認してから削除を予約し、`pending_destruction` と削除予定日時を確認します。2026-11-09 のライブ記録は即時削除コマンドを含む変更前の実装に対する結果です。この設計変更後のライブ E2E は未実施です。
 
 ```console
 $ SKR_E2E=1 go test ./test/e2e/kms-api/ -run TestScenarioKmsKey
 ```
 
-実行には `SKR_E2E` の設定と `skr-e2e` プロファイルが必要です。シナリオは作成前に同名キーが存在しないことを確認し、削除時は保持した ID で削除してから一覧で不在を確認します。
+実行には `SKR_E2E` の設定と `skr-e2e` プロファイルが必要です。シナリオは作成前に同名キーが存在しないことを確認し、後片付けでは保持した ID でキーを再取得し、ID・名前・状態が今回作成した対象と一致する場合だけ削除を予約します。
 
 sakumock を使った CLI と SDK の統合テストは `internal/cli/kms_test.go` で、手書き処理の単体テストは `internal/kmsapi/commands_test.go` で確認します。
 
