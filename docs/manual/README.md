@@ -27,6 +27,7 @@
 - [Object Storage API: サイトとバケットを管理する](tutorials/object-storage-api.md)
 - [EventBus: スイッチ作成イベントを SimpleMQ で受信する](tutorials/eventbus.md)
 - [AppRun API: コンテナイメージからアプリケーションをデプロイする](tutorials/apprun-api.md)
+- [AppRun 専有型: 定義ファイルからアプリケーションをデプロイする](tutorials/apprun-dedicated.md)
 - [IAM API: 組織と IAM リソースを管理する](tutorials/iam-api.md)
 - [Networking Suite API: 別サブネット間の通信を確認する](tutorials/networking-suite-api.md)
 - [SecurityControl API: セキュリティコントロールを有効化し、評価ルールと自動アクションを操作する](tutorials/security-control-api.md)
