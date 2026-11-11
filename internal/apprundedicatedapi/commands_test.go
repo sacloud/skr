@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -572,5 +573,141 @@ func setStdin(t *testing.T, content string, closed bool) {
 		if err := file.Close(); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// listResponseJSON は一覧操作のパスに対応する空の一覧応答を返します。
+// 一覧応答の配列フィールドは必須のため、応答キーを切り替えます。
+// パスはリソース ID を含むため、末尾のセグメントで判定します。
+func listResponseJSON(path string) string {
+	switch {
+	case strings.HasSuffix(path, "/load_balancer_nodes"):
+		return `{"loadBalancerNodes":[]}`
+	case strings.HasSuffix(path, "/worker_nodes"):
+		return `{"workerNodes":[]}`
+	case strings.HasSuffix(path, "/load_balancers"):
+		return `{"loadBalancers":[]}`
+	case strings.HasSuffix(path, "/asg"):
+		return `{"autoScalingGroups":[]}`
+	case strings.HasSuffix(path, "/certificates"):
+		return `{"certificates":[]}`
+	case strings.HasSuffix(path, "/versions"):
+		return `{"versions":[]}`
+	case strings.HasSuffix(path, "/applications"):
+		return `{"applications":[]}`
+	default:
+		return `{"clusters":[]}`
+	}
+}
+
+// TestListCommandsSendDefaultMaxItems は、一覧操作を引数なしで実行したときに
+// kong の既定値 (20) が API リクエストの maxItems として送られることを確認します。
+// 明示した値がそのまま送られることも合わせて確認します。
+func TestListCommandsSendDefaultMaxItems(t *testing.T) {
+	const (
+		clusterID = "13b9ea83-ddb0-4385-9533-3d693a6a310f"
+		appID     = "3f3f6f61-6df3-4f0e-8b9f-63d4d24b31a1"
+		asgID     = "9f4b8b62-9a45-4b7e-9b1e-2f5cf0a5a1b2"
+		lbID      = "57f7a1a0-6e5a-4b1f-9c0e-3c5e6e0f0e01"
+	)
+
+	grammar := struct {
+		Cluster          ClusterListCommand          `cmd:"" name:"list-clusters"`
+		Application      ApplicationListCommand      `cmd:"" name:"list-applications"`
+		Version          VersionListCommand          `cmd:"" name:"list-application-versions"`
+		AutoScalingGroup AutoScalingGroupListCommand `cmd:"" name:"list-auto-scaling-groups"`
+		WorkerNode       WorkerNodeListCommand       `cmd:"" name:"list-worker-nodes"`
+		LoadBalancer     LoadBalancerListCommand     `cmd:"" name:"list-load-balancers"`
+		LoadBalancerNode LoadBalancerNodeListCommand `cmd:"" name:"list-load-balancer-nodes"`
+		Certificate      CertificateListCommand      `cmd:"" name:"list-certificates"`
+	}{}
+
+	// run は grammar の各コマンドフィールドへのメソッド値です。パース後に
+	// runtime を差し込んで呼び出すため、レシーバのフィールド値を参照します。
+	tests := map[string]struct {
+		args []string
+		run  func(*kong.Context) error
+		// wantQuery は送信される maxItems の期待値です。既定では kong の
+		// 既定値 (20) を確認します。
+		wantQuery string
+	}{
+		"list-clusters": {
+			args: []string{"list-clusters"},
+			run:  grammar.Cluster.Run,
+		},
+		"list-applications": {
+			args: []string{"list-applications"},
+			run:  grammar.Application.Run,
+		},
+		"list-application-versions": {
+			args: []string{"list-application-versions", "--application-id", appID},
+			run:  grammar.Version.Run,
+		},
+		"list-auto-scaling-groups": {
+			args: []string{"list-auto-scaling-groups", "--cluster-id", clusterID},
+			run:  grammar.AutoScalingGroup.Run,
+		},
+		"list-worker-nodes": {
+			args: []string{"list-worker-nodes", "--cluster-id", clusterID, "--auto-scaling-group-id", asgID},
+			run:  grammar.WorkerNode.Run,
+		},
+		"list-load-balancers": {
+			args: []string{"list-load-balancers", "--cluster-id", clusterID, "--auto-scaling-group-id", asgID},
+			run:  grammar.LoadBalancer.Run,
+		},
+		"list-load-balancer-nodes": {
+			args: []string{"list-load-balancer-nodes", "--cluster-id", clusterID, "--auto-scaling-group-id", asgID, "--load-balancer-id", lbID},
+			run:  grammar.LoadBalancerNode.Run,
+		},
+		"list-certificates": {
+			args: []string{"list-certificates", "--cluster-id", clusterID},
+			run:  grammar.Certificate.Run,
+		},
+		"明示した --max-items で既定を上書きする": {
+			args:      []string{"list-clusters", "--max-items", "5"},
+			run:       grammar.Cluster.Run,
+			wantQuery: "5",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var maxItems []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				maxItems = append(maxItems, r.URL.Query().Get("maxItems"))
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(listResponseJSON(r.URL.Path)))
+			}))
+			defer server.Close()
+			setAppRunTestEndpoint(t, server.URL)
+
+			want := test.wantQuery
+			if want == "" {
+				want = "20"
+			}
+
+			parser := kong.Must(&grammar, kong.Name("skr"), kong.Writers(io.Discard, io.Discard),
+				kong.Exit(func(int) { t.Fatal("kong.Exit が呼ばれました") }))
+			kctx, err := parser.Parse(test.args)
+			require.NoError(t, err)
+
+			rt := Runtime{
+				ValidateOutput: func(*kong.Context) error { return nil },
+				NewClient:      func() (*v1.Client, error) { return NewClient(false) },
+				WriteOutput:    func(*kong.Context, any) error { return nil },
+			}
+			grammar.Cluster.runtime = rt
+			grammar.Application.runtime = rt
+			grammar.Version.runtime = rt
+			grammar.AutoScalingGroup.runtime = rt
+			grammar.WorkerNode.runtime = rt
+			grammar.LoadBalancer.runtime = rt
+			grammar.LoadBalancerNode.runtime = rt
+			grammar.Certificate.runtime = rt
+
+			require.NoError(t, test.run(kctx))
+			require.Equal(t, []string{want}, maxItems,
+				"maxItems を期待値どおり 1 回だけ送ること")
+		})
 	}
 }
