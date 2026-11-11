@@ -14,7 +14,7 @@
 
 2026-11-09 に [ADR 0074](../adr/0074-api-command-name-structure.md) の移行計画フェーズ 3 として、グループ階層を Kong の embed で展開した 1 階層の operationId 派生名に移行しました。たとえば `list-clusters`、`create-application-version`、`update-worker-node-draining` です。
 
-各操作は SDK の公開オペレーションに対応し、階層リソースの ID は名前付きフラグまたは位置引数で指定します。ページング結果は `items` と `nextCursor` を含む JSON 形状で出力します。
+各操作は SDK の公開オペレーションに対応し、階層リソースの ID は名前付きフラグまたは位置引数で指定します。ページング結果は `items` と `nextCursor` を含む JSON 形状で出力します。一覧操作の `--max-items` の既定値は 20 です。実 API は受け付ける上限を超えるページサイズを HTTP 400 で拒否するため、既定値はその範囲内に収めています。
 
 SDK v0.5.0 で追加されたクラスタロードバランサの参照・更新と limits の参照は CLI 未対応です。operationId 派生名の `read-cluster-load-balancer`、`patch-cluster-load-balancer`、`read-limits` として [#202](https://github.com/sacloud/skr/issues/202) で対応します。
 
