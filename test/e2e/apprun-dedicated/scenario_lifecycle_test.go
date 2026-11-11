@@ -156,7 +156,7 @@ func TestScenarioAppRunDedicatedLifecycle(t *testing.T) {
 		t.Skipf("%s not set, skipping E2E test", envServicePrincipalID)
 	}
 
-	// 事前確認と後片て付けの確認は SDK で静かに実行します。
+	// 事前確認と後片付けの確認は SDK で静かに実行します。
 	// skr CLI と同じ認証設定 (プロファイル) を使います。
 	sdkClient := newAppRunDedicatedClient(t)
 	clusters := apprun_dedicated.NewClusterOp(sdkClient)
@@ -184,7 +184,10 @@ func TestScenarioAppRunDedicatedLifecycle(t *testing.T) {
 	clusterID := parseCreateClusterOutput(t, data)
 	require.NotEqual(t, uuid.Nil, uuid.UUID(clusterID), "created cluster should have an ID")
 
-	// 後片て付け: クラスタを削除する。defer は LIFO のため、最後に実行されます。
+	// 作成直後に SDK で読み戻し、ID と名前が一致することを確認する。
+	verifyCreatedCluster(t, clusters, clusterID, clusterName)
+
+	// 後片付け: クラスタを削除する。defer は LIFO のため、最後に実行されます。
 	defer func() {
 		cleanupCluster(t, h, clusters, clusterID, clusterName)
 	}()
@@ -208,9 +211,13 @@ func TestScenarioAppRunDedicatedLifecycle(t *testing.T) {
 	asgID := parseCreateAutoScalingGroupOutput(t, data)
 	require.NotEqual(t, uuid.Nil, uuid.UUID(asgID), "created auto-scaling group should have an ID")
 
-	// 後片て付け: オートスケーリンググループを削除する。
+	// 作成直後に SDK で読み戻し、ID と指定内容が一致することを確認する。
+	asgs := apprun_dedicated.NewAutoScalingGroupOp(sdkClient, clusterID)
+	verifyCreatedAutoScalingGroup(t, asgs, asgID, asgName)
+
+	// 後片付け: オートスケーリンググループを削除する。
 	defer func() {
-		cleanupAutoScalingGroup(t, h, apprun_dedicated.NewAutoScalingGroupOp(sdkClient, clusterID), clusterID, asgID, asgName)
+		cleanupAutoScalingGroup(t, h, asgs, clusterID, asgID, asgName)
 	}()
 
 	// ワーカノードが healthy になるのを待つ。コンテナの実行にはノードが必要です。
@@ -241,7 +248,7 @@ func TestScenarioAppRunDedicatedLifecycle(t *testing.T) {
 	require.EqualValues(t, 1, deployedV1.Version, "first deploy should activate version 1")
 	require.True(t, deployedV1.ApplicationCreated, "first deploy should create the application")
 
-	// 後片て付け: アプリケーションを削除する。テスト本体で削除済みのときは何もしません。
+	// 後片付け: アプリケーションを削除する。テスト本体で削除済みのときは何もしません。
 	defer func() {
 		cleanupApplication(t, h, applications, deployedV1.ApplicationID, clusterName, appName)
 	}()
@@ -437,6 +444,42 @@ func requireNoApplicationNamed(t *testing.T, applications *application.Applicati
 	}
 }
 
+// verifyCreatedCluster は作成直後にクラスタを読み戻し、保持した ID と名前が
+// 一致することを確認します。確認の実行は証跡に残らず、既存リソースを変更しません。
+func verifyCreatedCluster(t *testing.T, clusters *cluster.ClusterOp, clusterID v1.ClusterID, clusterName string) {
+	t.Helper()
+
+	detail, err := clusters.Read(t.Context(), clusterID)
+	require.NoError(t, err, "read the created cluster")
+	require.Equal(t, clusterID, detail.ClusterID, "created cluster should keep the returned ID")
+	require.Equal(t, clusterName, detail.Name, "created cluster should have the requested name")
+	require.False(t, detail.HasLetsEncryptEmail,
+		"created cluster should not have Let's Encrypt email (not requested)")
+}
+
+// verifyCreatedAutoScalingGroup は作成直後にオートスケーリンググループを読み戻し、
+// 保持した ID と指定内容が一致することを確認します。確認の実行は証跡に残らず、
+// 既存リソースを変更しません。
+func verifyCreatedAutoScalingGroup(t *testing.T, asgs *autoscalinggroup.AutoScalingGroupOp, asgID v1.AutoScalingGroupID, asgName string) {
+	t.Helper()
+
+	detail, err := asgs.Read(t.Context(), asgID)
+	require.NoError(t, err, "read the created auto-scaling group")
+	require.Equal(t, asgID, detail.AutoScalingGroupID, "created group should keep the returned ID")
+	require.Equal(t, asgName, detail.Name, "created group should have the requested name")
+	require.Equal(t, apprunDedicatedZone, detail.Zone, "created group should be in the requested zone")
+	require.Equal(t, workerServiceClassPath, detail.WorkerServiceClassPath,
+		"created group should use the requested worker service class")
+	require.EqualValues(t, 1, detail.MinNodes, "created group should have the requested min nodes")
+	require.EqualValues(t, 1, detail.MaxNodes, "created group should have the requested max nodes")
+	require.False(t, detail.Deleting, "created group should not be deleting")
+	require.Len(t, detail.Interfaces, 1, "created group should have the requested interfaces")
+	iface := detail.Interfaces[0]
+	require.EqualValues(t, 0, iface.InterfaceIndex, "interface should be eth0")
+	require.Equal(t, "shared", iface.Upstream, "interface should connect to the shared segment")
+	require.False(t, iface.ConnectsToLB, "interface should not connect to the load balancer")
+}
+
 // waitForHealthyWorkerNode はオートスケーリンググループのワーカノードが
 // healthy になるまで待ちます。ノードの作成に失敗したメッセージが返ってきたら
 // そこで失敗します。
@@ -602,7 +645,7 @@ func cleanupApplication(t *testing.T, h *helper.Helper, applications *applicatio
 		"cluster": clusterName,
 		"name":    appName,
 	})
-	h.Call(t, "後片て付け: アプリケーションを削除する",
+	h.Call(t, "後片付け: アプリケーションを削除する",
 		"apprun-dedicated", "delete", "--app", definition, "--force")
 	requireApplicationAbsent(t, applications, id)
 }
@@ -636,13 +679,14 @@ func cleanupAutoScalingGroup(t *testing.T, h *helper.Helper, asgs *autoscalinggr
 			asgID, detail.AutoScalingGroupID, detail.Name)
 		return
 	}
-	h.Call(t, "後片て付け: オートスケーリンググループを削除する",
+	h.Call(t, "後片付け: オートスケーリンググループを削除する",
 		"apprun-dedicated-api", "delete-auto-scaling-group", "--cluster-id", uuid.UUID(clusterID).String(), "--auto-scaling-group-id", uuid.UUID(asgID).String())
 	requireAutoScalingGroupAbsent(t, asgs, asgID)
 }
 
 // requireAutoScalingGroupAbsent はオートスケーリンググループが削除後に存在しない
-// ことを確認します。削除中 (Deleting) の間は完了を待って再確認します。
+// ことを確認します。削除は非同期に完了するため、`Deleting` の値にかかわらず
+// 不在になるまで期限付きで再確認します。
 func requireAutoScalingGroupAbsent(t *testing.T, asgs *autoscalinggroup.AutoScalingGroupOp, asgID v1.AutoScalingGroupID) {
 	t.Helper()
 
@@ -659,10 +703,7 @@ func requireAutoScalingGroupAbsent(t *testing.T, asgs *autoscalinggroup.AutoScal
 				"auto-scaling group %s should be reported as not found after deletion, got: %v", asgID, err)
 			return
 		}
-		if !detail.Deleting {
-			t.Errorf("auto-scaling group %s still exists after deletion (deleting=false)", asgID)
-			return
-		}
+		t.Logf("auto-scaling group %s is still present (deleting=%t); waiting for deletion", asgID, detail.Deleting)
 
 		select {
 		case <-ctx.Done():
@@ -692,7 +733,7 @@ func cleanupCluster(t *testing.T, h *helper.Helper, clusters *cluster.ClusterOp,
 			clusterID, detail.ClusterID, detail.Name)
 		return
 	}
-	h.Call(t, "後片て付け: クラスタを削除する",
+	h.Call(t, "後片付け: クラスタを削除する",
 		"apprun-dedicated-api", "delete-cluster", uuid.UUID(clusterID).String())
 	requireClusterAbsent(t, clusters, clusterID)
 }
