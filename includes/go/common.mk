@@ -23,7 +23,7 @@ TEXTLINT_ACTION_VERSION ?= v0.1.0
 GO_LICENSES_PACKAGE     ?= .
 
 # service/ 配下の独立モジュール。ルートの go.mod から replace で参照します (ADR 0077)。
-SUBMODULES              ?= service/eventbus-service-go
+SUBMODULES              ?= service/apprun-dedicated-service-go service/eventbus-service-go
 
 .DEFAULT_GOAL = default
 
