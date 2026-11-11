@@ -275,7 +275,15 @@ func TestRunAppRunDedicatedInputErrors(t *testing.T) {
 
 	t.Run("定義ファイルが存在しない", func(t *testing.T) {
 		message := runError("apprun-dedicated", "status", "--app", definitionDir+"/missing.json")
-		require.Contains(t, message, "読み込めません")
+		require.Contains(t, message, "存在しません")
+	})
+
+	// --app にパスでなく秘密情報を含む値を誤って指定した場合も、その値は
+	// エラーメッセージへ出力しません。
+	t.Run("--app の読み込みエラーに入力値を含めない", func(t *testing.T) {
+		message := runError("apprun-dedicated", "status", "--app", `{"registryPassword":"SECRET-VALUE"}`)
+		require.Contains(t, message, "--app")
+		require.NotContains(t, message, "SECRET-VALUE")
 	})
 
 	t.Run("未知のフィールドは拒否します", func(t *testing.T) {

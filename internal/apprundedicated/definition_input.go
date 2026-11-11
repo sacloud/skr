@@ -15,8 +15,10 @@
 package apprundedicated
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 
 	apprundedicatedservice "github.com/sacloud/skr/service/apprun-dedicated-service-go"
@@ -44,7 +46,18 @@ func loadDefinition(stdin io.Reader, input string) (*apprundedicatedservice.Appl
 		var err error
 		data, err = os.ReadFile(input) // #nosec G304 -- パスは --app で利用者が明示的に指定したものです。
 		if err != nil {
-			return nil, fmt.Errorf("--app のファイル %q を読み込めません: %w", input, err)
+			// --app の値と os.PathError (指定された値を含む) をエラーに含めません。
+			// 利用者が誤って秘密情報を含む値をインラインで指定した場合に、
+			// それがエラーメッセージへ漏れないようにするためです。
+			// 原因の区別は errors.Is で行います。
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				return nil, fmt.Errorf("--app で指定された定義ファイルが存在しません")
+			case errors.Is(err, fs.ErrPermission):
+				return nil, fmt.Errorf("--app で指定された定義ファイルを読み取る権限がありません")
+			default:
+				return nil, fmt.Errorf("--app で指定された定義ファイルを読み込めません")
+			}
 		}
 	}
 	def, err := apprundedicatedservice.ParseDefinition(data)

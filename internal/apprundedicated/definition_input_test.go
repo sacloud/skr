@@ -52,7 +52,18 @@ func TestLoadDefinitionErrors(t *testing.T) {
 	t.Run("ファイル不在", func(t *testing.T) {
 		_, err := loadDefinition(strings.NewReader(""), t.TempDir()+"/missing.json")
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "読み込めません")
+		require.Contains(t, err.Error(), "存在しません")
+	})
+
+	// --app は値のインライン指定を受け付けないため、利用者が誤って秘密情報を含む
+	// 値を指定した場合も、その値がエラーメッセージへ漏れてはいけません。
+	t.Run("読み込みエラーに入力値を含めない", func(t *testing.T) {
+		inline := `{"registryPassword":"SECRET-VALUE"}`
+		_, err := loadDefinition(strings.NewReader(""), inline)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "--app")
+		require.NotContains(t, err.Error(), "SECRET-VALUE")
+		require.NotContains(t, err.Error(), inline)
 	})
 
 	t.Run("未知のフィールド", func(t *testing.T) {
