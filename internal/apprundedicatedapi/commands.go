@@ -192,7 +192,7 @@ func (c *ClusterCommands) setRuntime(runtime Runtime) {
 }
 
 type ClusterListCommand struct {
-	MaxItems int64   `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	MaxItems int64   `name:"max-items" default:"20" help:"1ページあたりの最大件数。実 API が受け付ける上限を超える値はエラーになります。"`
 	Cursor   *string `help:"前ページの nextCursor。"`
 	runtime  Runtime
 }
@@ -288,7 +288,7 @@ func (c *ApplicationCommands) setRuntime(runtime Runtime) {
 }
 
 type ApplicationListCommand struct {
-	MaxItems int64   `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	MaxItems int64   `name:"max-items" default:"20" help:"1ページあたりの最大件数。実 API が受け付ける上限を超える値はエラーになります。"`
 	Cursor   *string `help:"前ページの nextCursor。"`
 	runtime  Runtime
 }
@@ -398,7 +398,7 @@ func (c *VersionCommands) setRuntime(runtime Runtime) {
 
 type VersionListCommand struct {
 	ApplicationID string `name:"application-id" required:"" help:"対象アプリケーション ID。"`
-	MaxItems      int64  `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	MaxItems      int64  `name:"max-items" default:"20" help:"1ページあたりの最大件数。実 API が受け付ける上限を超える値はエラーになります。"`
 	Cursor        *int32 `help:"前ページの nextCursor。"`
 	runtime       Runtime
 }
@@ -492,7 +492,7 @@ func (c *AutoScalingGroupCommands) setRuntime(runtime Runtime) {
 
 type AutoScalingGroupListCommand struct {
 	ClusterID string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
-	MaxItems  int64   `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	MaxItems  int64   `name:"max-items" default:"20" help:"1ページあたりの最大件数。実 API が受け付ける上限を超える値はエラーになります。"`
 	Cursor    *string `help:"前ページの nextCursor。"`
 	runtime   Runtime
 }
@@ -585,7 +585,7 @@ func (c *WorkerNodeCommands) setRuntime(runtime Runtime) {
 type WorkerNodeListCommand struct {
 	ClusterID          string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
 	AutoScalingGroupID string  `name:"auto-scaling-group-id" required:"" help:"対象グループ ID。"`
-	MaxItems           int64   `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	MaxItems           int64   `name:"max-items" default:"20" help:"1ページあたりの最大件数。実 API が受け付ける上限を超える値はエラーになります。"`
 	Cursor             *string `help:"前ページの nextCursor。"`
 	runtime            Runtime
 }
@@ -680,7 +680,7 @@ func (c *LoadBalancerCommands) setRuntime(runtime Runtime) {
 type LoadBalancerListCommand struct {
 	ClusterID          string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
 	AutoScalingGroupID string  `name:"auto-scaling-group-id" required:"" help:"対象グループ ID。"`
-	MaxItems           int64   `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	MaxItems           int64   `name:"max-items" default:"20" help:"1ページあたりの最大件数。実 API が受け付ける上限を超える値はエラーになります。"`
 	Cursor             *string `help:"前ページの nextCursor。"`
 	runtime            Runtime
 }
@@ -792,7 +792,7 @@ type LoadBalancerNodeListCommand struct {
 	ClusterID          string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
 	AutoScalingGroupID string  `name:"auto-scaling-group-id" required:"" help:"対象グループ ID。"`
 	LoadBalancerID     string  `name:"load-balancer-id" required:"" help:"対象ロードバランサ ID。"`
-	MaxItems           int64   `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	MaxItems           int64   `name:"max-items" default:"20" help:"1ページあたりの最大件数。実 API が受け付ける上限を超える値はエラーになります。"`
 	Cursor             *string `help:"前ページの nextCursor。"`
 	runtime            Runtime
 }
@@ -865,7 +865,7 @@ func (c *CertificateCommands) setRuntime(runtime Runtime) {
 
 type CertificateListCommand struct {
 	ClusterID string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
-	MaxItems  int64   `name:"max-items" default:"100" help:"1ページあたりの最大件数。"`
+	MaxItems  int64   `name:"max-items" default:"20" help:"1ページあたりの最大件数。実 API が受け付ける上限を超える値はエラーになります。"`
 	Cursor    *string `help:"前ページの nextCursor。"`
 	runtime   Runtime
 }
