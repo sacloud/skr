@@ -341,6 +341,9 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 - 事前の同名確認と、作成直後の SDK による読み戻し (クラスタは ID・名前、ASG は ID・名前・ゾーン・サービスクラス・ノード数・インターフェース) を行います。
 - `deploy` (バージョン 1)、`status`、`versions`、`containers`、`init` での参照、環境変数を追加した 2 回目の `deploy` (バージョン 2)、`rollback`、`deactivate`、`delete` の順に実行し、応答と状態を照合します。
 - アプリケーション、ASG、クラスタは保持した ID と識別情報を再照合したうえで `defer` で CLI 経路から削除し、非同期の削除は不在になるまで期限付きで再確認します。サービスプリンシパル ID は環境変数 `SKR_E2E_APPRUN_DEDICATED_SERVICE_PRINCIPAL_ID` で渡し、未設定のときはスキップします。
+- アプリケーションの後片付けは deploy の成否にかかわらず、名前と所属クラスタで再検索して確定できた ID に対してのみ実行します (`cleanupApplicationAfterDeploy`)。deploy はアプリ作成後の反映待ちで失敗することがあるため、deploy より前に `defer` で登録します。
+
+deploy の反映待ち失敗時の後片付けを `test/e2e/apprun-dedicated/scenario_deploy_failure_test.go` に実装済みです。オートスケーリンググループを作らないためワーカノードの料金は発生しません。再検索の判定 (作成済み、未作成、別クラスタの同名、同名の複数、照会失敗) はスタブによる単体テスト (`TestFindCreatedApplication`) で確認します。
 
 低レベル `apprun-dedicated-api` コマンドのライブ E2E はクラスタ作成を前提とするため [#59](https://github.com/sacloud/skr/issues/59) で管理します (ライフサイクルシナリオのセットアップと後片付けは低レベルの create/delete を利用しますが、各操作の専用検証は別途整備します)。
 

@@ -22,6 +22,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -238,6 +240,13 @@ func TestScenarioAppRunDedicatedLifecycle(t *testing.T) {
 	}
 	pathV1 := h.WriteRequestJSONFile(t, "deploy-v1-definition", definitionV1)
 
+	// 後片付け: deploy はアプリ作成後の反映待ちで失敗することがあるため、
+	// deploy の成否にかかわらず、再検索で作成済みを確認できたアプリケーションを
+	// 削除します。deploy より前に登録するのは、失敗時も後片付けを実行するためです。
+	defer func() {
+		cleanupApplicationAfterDeploy(t, h, applications, clusterName, appName)
+	}()
+
 	// deploy でアプリケーションを作成し、バージョン 1 を有効化して反映を待つ。
 	data = h.CallWithTimeout(t, deployCommandLimit, "deploy でアプリケーションを作成し、バージョン 1 を有効化する",
 		"apprun-dedicated", "deploy", "--app", pathV1, "--wait-timeout", deployWaitTimeout.String())
@@ -247,11 +256,6 @@ func TestScenarioAppRunDedicatedLifecycle(t *testing.T) {
 	require.NotEqual(t, uuid.Nil, uuid.UUID(deployedV1.ApplicationID), "deploy result should contain the application ID")
 	require.EqualValues(t, 1, deployedV1.Version, "first deploy should activate version 1")
 	require.True(t, deployedV1.ApplicationCreated, "first deploy should create the application")
-
-	// 後片付け: アプリケーションを削除する。テスト本体で削除済みのときは何もしません。
-	defer func() {
-		cleanupApplication(t, h, applications, deployedV1.ApplicationID, clusterName, appName)
-	}()
 
 	// status でアクティブバージョンとコンテナの状態を確認する。
 	data = h.Call(t, "status でアクティブバージョンとコンテナの状態を確認する",
@@ -650,6 +654,68 @@ func cleanupApplication(t *testing.T, h *helper.Helper, applications *applicatio
 	requireApplicationAbsent(t, applications, id)
 }
 
+// applicationLister はアプリケーション一覧の取得に必要な操作です。
+// テストで応答を差し替えられるように、ApplicationOp の List と同じ
+// シグネチャで定義します。
+type applicationLister interface {
+	List(ctx context.Context, maxItems int64, cursor *v1.ApplicationID) ([]v1.ReadApplication, *v1.ApplicationID, error)
+}
+
+// findCreatedApplication は deploy 失敗後に、このテストが作成した可能性のある
+// アプリケーションを再検索します。作成前の同名不在確認 (requireNoApplicationNamed)
+// を前提に、名前と所属クラスタが一致する 1 件だけ見つかった場合はその ID を返します。
+// 見つからなければ作成されなかった (または削除済み) として nil を返します。
+// 照会に失敗した場合や同じクラスタに同名が複数ある場合は ID を確定できないため
+// エラーを返します。呼び出し側は ID を確定できないときに削除してはなりません。
+func findCreatedApplication(t *testing.T, applications applicationLister, clusterName, appName string) (*v1.ApplicationID, error) {
+	t.Helper()
+
+	var found *v1.ApplicationID
+	var cursor *v1.ApplicationID
+	for {
+		list, next, err := applications.List(t.Context(), listPageSize, cursor)
+		if err != nil {
+			return nil, fmt.Errorf("list applications for cleanup: %w", err)
+		}
+		for _, a := range list {
+			// 名前が一致しても所属クラスタが異なるアプリケーションは対象外です。
+			// 名前はクラスタ内でのみ一意なため、別クラスタの同名は削除できません。
+			if a.Name != appName || a.ClusterName != clusterName {
+				continue
+			}
+			if found != nil {
+				return nil, fmt.Errorf("multiple applications named %q found in cluster %q; refusing to delete", appName, clusterName)
+			}
+			id := a.ApplicationID
+			found = &id
+		}
+		if next == nil {
+			break
+		}
+		cursor = next
+	}
+	return found, nil
+}
+
+// cleanupApplicationAfterDeploy は deploy の成否にかかわらず、このテストが
+// 作成した可能性のあるアプリケーションを後片付けします。deploy はアプリ作成後の
+// 反映待ちで失敗することがあるため、失敗時も作成済みのアプリケーションを残しません。
+// 再検索で ID・名前・所属クラスタを確定できた場合にだけ cleanupApplication で
+// 削除し、不在を確認します。確定できないときは削除せず、その旨を報告します。
+func cleanupApplicationAfterDeploy(t *testing.T, h *helper.Helper, applications *application.ApplicationOp, clusterName, appName string) {
+	t.Helper()
+
+	id, err := findCreatedApplication(t, applications, clusterName, appName)
+	if err != nil {
+		t.Errorf("cleanup application after deploy: %v", err)
+		return
+	}
+	if id == nil {
+		return
+	}
+	cleanupApplication(t, h, applications, *id, clusterName, appName)
+}
+
 // requireApplicationAbsent はアプリケーションが削除後に存在しないことを確認します。
 func requireApplicationAbsent(t *testing.T, applications *application.ApplicationOp, id v1.ApplicationID) {
 	t.Helper()
@@ -763,4 +829,109 @@ func requireClusterAbsent(t *testing.T, clusters *cluster.ClusterOp, clusterID v
 		case <-ticker.C:
 		}
 	}
+}
+
+// fakeApplicationLister は findCreatedApplication のテストで一覧の応答を
+// 差し替えるためのスタブです。
+type fakeApplicationLister struct {
+	// list は最初のページの応答です。
+	list []v1.ReadApplication
+	// next は最初のページの続きがあるときに返すカーソルです。
+	next *v1.ApplicationID
+	// page2 は next を指定した 2 ページ目の応答です。
+	page2 []v1.ReadApplication
+	// err が設定されているときは List がエラーを返します。
+	err error
+	// calls は List の呼び出し回数です。
+	calls int
+	// maxItems は最後の List 呼び出しで渡されたページサイズです。
+	maxItems int64
+}
+
+func (f *fakeApplicationLister) List(_ context.Context, maxItems int64, cursor *v1.ApplicationID) ([]v1.ReadApplication, *v1.ApplicationID, error) {
+	f.calls++
+	f.maxItems = maxItems
+	if f.err != nil {
+		return nil, nil, f.err
+	}
+	if cursor == nil {
+		return f.list, f.next, nil
+	}
+	return f.page2, nil, nil
+}
+
+// testApplication は検索結果のアプリケーションを組み立てます。
+func testApplication(name, clusterName string) v1.ReadApplication {
+	return v1.ReadApplication{
+		ApplicationID: v1.ApplicationID(uuid.New()),
+		Name:          name,
+		ClusterName:   clusterName,
+	}
+}
+
+// deploy 失敗後の再検索が、作成済みのアプリケーションを安全に特定できることを
+// 確認します。ID を確定できない場合に削除しないための分岐も検証します。
+func TestFindCreatedApplication(t *testing.T) {
+	const (
+		clusterName = "skr-e2e-cluster"
+		appName     = "skr-e2e-app"
+	)
+
+	t.Run("作成済みのアプリケーションを ID と名前、所属クラスタで特定する", func(t *testing.T) {
+		created := testApplication(appName, clusterName)
+		lister := &fakeApplicationLister{list: []v1.ReadApplication{created}}
+		id, err := findCreatedApplication(t, lister, clusterName, appName)
+		require.NoError(t, err)
+		require.NotNil(t, id)
+		require.Equal(t, created.ApplicationID, *id, "should find the created application")
+		require.Equal(t, 1, lister.calls, "single page should need a single call")
+		require.EqualValues(t, listPageSize, lister.maxItems, "should request the scenario page size")
+	})
+
+	t.Run("アプリケーションが作成されなかった場合は nil を返す", func(t *testing.T) {
+		lister := &fakeApplicationLister{list: []v1.ReadApplication{}}
+		id, err := findCreatedApplication(t, lister, clusterName, appName)
+		require.NoError(t, err)
+		require.Nil(t, id)
+	})
+
+	t.Run("所属クラスタが異なる同名のアプリケーションは対象にしない", func(t *testing.T) {
+		lister := &fakeApplicationLister{list: []v1.ReadApplication{
+			testApplication(appName, "other-cluster"),
+		}}
+		id, err := findCreatedApplication(t, lister, clusterName, appName)
+		require.NoError(t, err)
+		require.Nil(t, id, "should not delete an application in another cluster")
+	})
+
+	t.Run("同じクラスタに同名が複数ある場合は ID を確定できない", func(t *testing.T) {
+		lister := &fakeApplicationLister{list: []v1.ReadApplication{
+			testApplication(appName, clusterName),
+			testApplication(appName, clusterName),
+		}}
+		id, err := findCreatedApplication(t, lister, clusterName, appName)
+		require.Error(t, err, "refusing to delete when the ID cannot be determined")
+		require.Nil(t, id)
+	})
+
+	t.Run("照会に失敗した場合はエラーを返し ID を返さない", func(t *testing.T) {
+		lister := &fakeApplicationLister{err: errors.New("list failed")}
+		id, err := findCreatedApplication(t, lister, clusterName, appName)
+		require.Error(t, err)
+		require.Nil(t, id, "should not return an ID when the lookup fails")
+	})
+
+	t.Run("ページングをまたいで検索する", func(t *testing.T) {
+		created := testApplication(appName, clusterName)
+		lister := &fakeApplicationLister{
+			list:  []v1.ReadApplication{testApplication("skr-e2e-other", clusterName)},
+			next:  &[]v1.ApplicationID{v1.ApplicationID(uuid.New())}[0],
+			page2: []v1.ReadApplication{created},
+		}
+		id, err := findCreatedApplication(t, lister, clusterName, appName)
+		require.NoError(t, err)
+		require.NotNil(t, id)
+		require.Equal(t, created.ApplicationID, *id, "should find the application on the second page")
+		require.Equal(t, 2, lister.calls, "should follow the cursor to the next page")
+	})
 }
