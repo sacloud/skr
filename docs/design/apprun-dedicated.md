@@ -128,7 +128,7 @@ CLI 層の `definition_input.go` が読み込みを担います。
 
 - `--app` で指定したファイルまたは標準入力からバイト列を読み込みます。
 - 未知のフィールドを検出したらエラーにします。Jsonnet がなく単純な JSON であるため、typo を確実に検出できます。末尾の余分なデータもエラーにします。
-- 検証は service 層の `ApplicationDefinition.Validate()` で行います。`cluster`、`name`、`cpu`、`memory`、`scalingMode`、`image` を必須とします。`scalingMode` が `manual` の場合は `fixedScale` を、`cpu` の場合は `minScale` と `maxScale` を必須とします (`scaleInThreshold`、`scaleOutThreshold` は任意)。`exposedPorts` の要素で `loadBalancerPort` を指定した場合は `host` が必須、未指定の場合は `host` が指定不可であることを検証します。この検証は API の制約の再実装ではなく、CLI 経路で `host` の取り違えや欠落を確実に防ぐためのものです ([ADR 0075](../adr/0075-high-level-command-tier.md) の追加検証の判断基準に従います)。
+- 検証は service 層の `ApplicationDefinition` に対して行い、操作の種類で必須項目を分けます。参照・停止・削除系の操作 (`status`、`versions`、`containers`、`rollback`、`deactivate`、`delete`) は `cluster` と `name` を必須とし、デプロイ内容を含まない定義でも読み込めるようにします。`init` がバージョンを持たないアプリケーションに生成する識別子だけの定義も、これらの操作でそのまま使えます。デプロイ系の操作 (`deploy`、`render`、`diff`) はそれに加えて `cpu`、`memory`、`scalingMode`、`image` を必須とします。`scalingMode` が `manual` の場合は `fixedScale` を、`cpu` の場合は `minScale` と `maxScale` を必須とします (`scaleInThreshold`、`scaleOutThreshold` は任意)。`exposedPorts` の要素で `loadBalancerPort` を指定した場合は `host` が必須、未指定の場合は `host` が指定不可であることを検証します。この検証は API の制約の再実装ではなく、CLI 経路で `host` の取り違えや欠落を確実に防ぐためのものです ([ADR 0075](../adr/0075-high-level-command-tier.md) の追加検証の判断基準に従います)。
 - 定義の未指定 (省略) は API の nullable フィールドで null に変換します。`registryPasswordAction` は定義には現れず、service 層が deploy の文脈から決定します (後述)。
 
 定義の例:
@@ -187,7 +187,7 @@ CLI 層の `definition_input.go` が読み込みを担います。
 rollback、deactivate、delete も同じポーリング機構を使います。
 
 - rollback: 有効化後のデプロイ完了待ち (deploy と同じ条件)。
-- deactivate: `Application.Update` でバージョンを解除した後、`Read` の `DesiredCount` が 0 になったら完了。
+- deactivate: `Application.Update` でバージョンを解除した後、`Read` の `DesiredCount` が 0 になったら完了。`DesiredCount` はアクティブバージョンの解除後に null を返すことがあるため、null も停止完了として扱います。
 - delete: 非活性化が必要なら行い、停止を待ち、その後 `Application.Delete` を呼び出します。API が削除条件 (アクティブバージョンなし、実行中コンテナなし) を満たすまで即座に失敗する場合は、期限付きで再試行します。
 
 ## rollback のバージョン選択
@@ -261,13 +261,15 @@ skr apprun-dedicated delete [--app FILE|-] [--force] [--no-wait] [--wait-timeout
 | `--app FILE\|-` | init 以外 | 定義ファイル (既定 `application.json`)。`-` で標準入力 |
 | `--output-file FILE` | init | 出力先ファイル (既定 `application.json`)。既存ファイルは上書きしない |
 | `--target VERSION` | rollback | 有効化するバージョン番号 |
-| `--force` | rollback、deactivate、delete | 確認プロンプトを省略 |
+| `--force` | rollback、deactivate、delete | 確認プロンプトを省略。標準入力が端末でない場合や `--app -` と併用する場合は必須 |
 | `--no-wait` | deploy、rollback、deactivate、delete | 待機を省略 |
 | `--wait-timeout DURATION` | deploy、rollback、deactivate、delete | 待機の期限 (既定 5 分) |
 
 ### 確認プロンプト
 
-`rollback`、`deactivate`、`delete` は、変更する対象のクラスタ名、アプリケーション名、ID、現在の状態を表示して確認を求めます。標準入力から `y` を読めた場合だけ実行します。`--force` で省略します。標準入力が読めない場合 (EOF) は中止し、`--force` の指定を促します。確認プロンプトの入力読み込みは CLI 層の責務で、service 層は確認済みの入力を受け取ります。
+`rollback`、`deactivate`、`delete` は、変更する対象のクラスタ名、アプリケーション名、ID、現在の状態を表示して確認を求めます。`--force` で省略します。確認プロンプトの入力読み込みは CLI 層の責務で、service 層は確認済みの入力を受け取ります。
+
+確認の入力は標準入力から読みますが、標準入力が端末でない場合 (パイプ、リダイレクト) はプロンプトを出せないため `--force` が必須です。指定がなければ操作を開始せず、`--force` の指定を促すエラーにします。`--app -` で標準入力から定義を読む場合も、定義の読み込みで標準入力を EOF まで消費するため、変更系操作では必ず `--force` を指定します。
 
 ## 出力設計
 
@@ -288,7 +290,7 @@ skr apprun-dedicated delete [--app FILE|-] [--force] [--no-wait] [--wait-timeout
 
 - `registryPassword` と `secret=true` の環境変数の値は、定義ファイル (または標準入力) からのみ入力します。フラグは設けません。
 - service 層は秘密情報をログ・エラー・出力に含めません。デプロイのリクエスト構築で秘密情報を扱う処理は、値を構造体として受け渡します。
-- SDK のトレース実装はリクエスト本文を出力します。デプロイ (`registryPassword` や `secret=true` の環境変数を含み得る) では、EventBus の set-secret と同じく、SDK の有効なトレース設定を調べます。トレースが有効なら、秘密情報の読み込み・送信の前にエラーを返します ([EventBus 高レベルコマンドの設計](eventbus.md) の secret の扱いと同じ判断です)。
+- SDK のトレース実装はリクエスト本文を出力します。デプロイ (`registryPassword` や `secret=true` の環境変数を含み得る) では、EventBus と同じ方式で、CLI 層の ServiceFactory が SDK の実効トレース設定 (`TraceMode` など) を検査します。トレースが有効なら、定義の読み込み・送信の前にエラーを返します。検査は必須の設計要素であり、省略しません ([EventBus 高レベルコマンドの設計](eventbus.md) の secret の扱いと同じ判断です)。
 - `status` と `versions` の射影から `registryPassword` を除外します (`secret=true` の環境変数の `value` は API が null を返すため、そのまま出力します)。
 - 定義ファイルに秘密情報を書く場合のファイル権限への注意をヘルプとチュートリアルに記載します。標準入力 (`--app -`) は CI などでファイルを作らずに済む経路として案内します。
 - Jsonnet のネイティブ関数 (`env`、`secret`) がなく、定義内に秘密情報を平文で書かざるを得ない点は、Jsonnet 非対応の制約として ADR に記録済みです ([ADR 0079](../adr/0079-apprun-dedicated-high-level-commands.md))。
@@ -311,14 +313,14 @@ skr apprun-dedicated delete [--app FILE|-] [--force] [--no-wait] [--wait-timeout
 - 待機: ポーリング間隔、完了条件 (対象バージョンの全コンテナ `running`)、期限での打ち切り、ポーリング中の参照エラーの継続、`--no-wait` でポーリングしないこと。fake の時計・ticker を差し替え可能にして検証します。
 - エラー系: 必須フィールドの欠落、`scalingMode` とスケール設定の整合、`loadBalancerPort` と `host` の整合、クラスタ不在、同名アプリの他クラスタ混在、削除前の再照合失敗で削除 API を呼ばないこと、タイムアウト。
 - 変換: `VersionDetail` → 定義の正規化 (diff・init 用)、`registryPassword` と secret 環境変数の除外、`created` の RFC3339 変換。
-- 安全性: deploy で `registryPassword` が fake に渡ったリクエスト以外の場所に現れないこと、trace 有効時の拒否 (service 層が SDK のトレース設定を検査する実装にする場合)。
+- 安全性: deploy で `registryPassword` が fake に渡ったリクエスト以外の場所に現れないこと、trace 有効時 (CLI 層の ServiceFactory での検査) の拒否。
 
 ### CLI 層の単体テスト
 
 `internal/apprundedicated` の単体テストで検証します。
 
 - 定義の読み込み: `--app` の既定値、ファイル不在、`--app -` の標準入力、未知フィールドの拒否、末尾データの拒否、必須欠落のエラー文言。
-- 確認プロンプト: `--force` なしの確認 (y で続行、n で中止)、EOF で中止、`--force` で読み込みを行わないこと。
+- 確認プロンプト: 端末での確認 (y で続行、n で中止)、非端末と `--app -` で `--force` なしの場合に操作を開始しないこと、`--force` で読み込みを行わないこと。
 - init: 既存ファイルがある場合に上書きしないこと、出力パス。
 
 ### CLI 全体と SDK 通信のテスト
