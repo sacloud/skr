@@ -86,4 +86,6 @@ require (
 	modernc.org/sqlite v1.61.0 // indirect
 )
 
+replace github.com/sacloud/skr/service/apprun-dedicated-service-go => ./service/apprun-dedicated-service-go
+
 replace github.com/sacloud/skr/service/eventbus-service-go => ./service/eventbus-service-go
