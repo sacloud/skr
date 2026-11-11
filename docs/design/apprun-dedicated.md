@@ -211,9 +211,9 @@ rollback、deactivate、delete も同じポーリング機構を使います。
 
 `init` は既存アプリケーションから定義ファイルを生成します。デプロイ済みのアプリケーションをこの CLI で管理し始める入口です。
 
-- 位置引数でクラスタ名とアプリケーション名を指定します。`--output-dir` で出力先ディレクトリを指定します (既定はカレントディレクトリ)。
+- 位置引数でクラスタ名とアプリケーション名を指定します。`--output-file` で出力先ファイルを指定します (既定はカレントディレクトリの `application.json`)。
 - アプリケーションを検索し、アクティブバージョンがあればその `Version.Read` の結果から定義を復元します。アクティブバージョンがなければ最新のバージョンから復元します。バージョンが1つもなければ、識別子だけの定義を生成します。
-- 出力は `output-dir` 配下の `application.json` です。インデント付きの JSON を書き出します。Jsonnet のフォーマッタは使わず、JSON として整形します。
+- 出力は1ファイルの JSON です。インデント付きの JSON を書き出します。Jsonnet のフォーマッタは使わず、JSON として整形します。生成されたファイルのパスは `deploy` などの `--app` にそのまま指定できます。1つのディレクトリに複数のアプリケーションの定義を置けます (`--app` で切り替えます)。
 - 同名のファイルが既に存在する場合は上書きせず、エラーにします。既存の定義を壊さないための挙動です。
 - `registryPassword` と `secret=true` の環境変数の値は API から取得できないため、生成される定義には含めません。含まれないことを出力またはコメントで明示します。
 
@@ -238,7 +238,7 @@ rollback、deactivate、delete も同じポーリング機構を使います。
 ### コマンドツリー
 
 ```text
-skr apprun-dedicated init CLUSTER APPLICATION [--output-dir DIR]
+skr apprun-dedicated init CLUSTER APPLICATION [--output-file FILE]
 
 skr apprun-dedicated deploy [--app FILE|-] [--no-wait] [--wait-timeout DURATION]
 skr apprun-dedicated diff [--app FILE|-]
@@ -259,7 +259,7 @@ skr apprun-dedicated delete [--app FILE|-] [--force] [--no-wait] [--wait-timeout
 | フラグ | コマンド | 説明 |
 | ------ | -------- | ---- |
 | `--app FILE\|-` | init 以外 | 定義ファイル (既定 `application.json`)。`-` で標準入力 |
-| `--output-dir DIR` | init | 出力先ディレクトリ (既定 `.`) |
+| `--output-file FILE` | init | 出力先ファイル (既定 `application.json`)。既存ファイルは上書きしない |
 | `--target VERSION` | rollback | 有効化するバージョン番号 |
 | `--force` | rollback、deactivate、delete | 確認プロンプトを省略 |
 | `--no-wait` | deploy、rollback、deactivate、delete | 待機を省略 |
