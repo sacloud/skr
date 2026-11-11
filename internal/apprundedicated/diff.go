@@ -127,23 +127,31 @@ func splitLines(text string) []string {
 func lcsDiff(a, b []string) []diffLine {
 	n, m := len(a), len(b)
 	// lcs[i][j] は a[i:] と b[j:] の最長共通部分列の長さです。
-	lcs := make([][]int, n+1)
+	// 添字は入力の行数そのものなので、確保サイズの計算があふれることはありません。
+	lcs := make([][]int, n)
 	for i := range lcs {
-		lcs[i] = make([]int, m+1)
+		lcs[i] = make([]int, m)
+	}
+	// at は表の外 (入力の末尾より先) を空の接尾辞として扱います。
+	at := func(i, j int) int {
+		if i >= n || j >= m {
+			return 0
+		}
+		return lcs[i][j]
 	}
 	for i := n - 1; i >= 0; i-- {
 		for j := m - 1; j >= 0; j-- {
 			switch {
 			case a[i] == b[j]:
-				lcs[i][j] = lcs[i+1][j+1] + 1
-			case lcs[i+1][j] >= lcs[i][j+1]:
-				lcs[i][j] = lcs[i+1][j]
+				lcs[i][j] = at(i+1, j+1) + 1
+			case at(i+1, j) >= at(i, j+1):
+				lcs[i][j] = at(i+1, j)
 			default:
-				lcs[i][j] = lcs[i][j+1]
+				lcs[i][j] = at(i, j+1)
 			}
 		}
 	}
-	ops := make([]diffLine, 0, n+m)
+	var ops []diffLine
 	i, j := 0, 0
 	for i < n && j < m {
 		switch {
@@ -151,7 +159,7 @@ func lcsDiff(a, b []string) []diffLine {
 			ops = append(ops, diffLine{diffEqual, a[i]})
 			i++
 			j++
-		case lcs[i+1][j] >= lcs[i][j+1]:
+		case at(i+1, j) >= at(i, j+1):
 			ops = append(ops, diffLine{diffDelete, a[i]})
 			i++
 		default:

@@ -16,6 +16,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/alecthomas/kong"
 )
@@ -41,4 +42,15 @@ func writeOutput(ctx *kong.Context, value any) error {
 	encoder := json.NewEncoder(ctx.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(value)
+}
+
+// rejectQuery は JSON 以外の出力を持つコマンド向けに、--query の指定をエラーにします。
+// 指定を暗黙に無視すると利用者の意図と異なる出力になるため、対応しないことを明示します。
+func rejectQuery(ctx *kong.Context) error {
+	if _, set, err := queryExpression(ctx); err != nil {
+		return err
+	} else if set {
+		return fmt.Errorf("このコマンドの出力は JSON ではないため --query には対応しません")
+	}
+	return nil
 }

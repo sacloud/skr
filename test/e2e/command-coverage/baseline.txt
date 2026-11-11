@@ -57,9 +57,9 @@ apprun-dedicated containers deferred #59 クラスタ作成を前提とし実行
 apprun-dedicated deactivate deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated deploy deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated diff deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated diff live
 apprun-dedicated init deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated render deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated render live
 apprun-dedicated rollback deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated status deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated versions deferred #59 クラスタ作成を前提とし実行コストが大きいため

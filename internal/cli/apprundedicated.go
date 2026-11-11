@@ -40,6 +40,7 @@ func (c *cli) initAppRunDedicated() {
 		apprundedicated.Runtime{
 			ValidateOutput: validateOutput,
 			WriteOutput:    writeOutput,
+			RejectQuery:    rejectQuery,
 		},
 		func() (*apprundedicatedservice.Service, error) {
 			return newAppRunDedicatedService(c.Trace)

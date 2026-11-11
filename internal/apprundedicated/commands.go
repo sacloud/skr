@@ -46,6 +46,9 @@ import (
 type Runtime struct {
 	ValidateOutput func(*kong.Context) error
 	WriteOutput    func(*kong.Context, any) error
+	// RejectQuery は --query に対応しないコマンドで、--query の指定をエラーにします。
+	// nil の場合は検査しません (テスト向け)。
+	RejectQuery func(*kong.Context) error
 	// Stdin は確認プロンプトと --app - の読み込み元です。nil の場合は os.Stdin を使います。
 	Stdin io.Reader
 	// IsTerminal は標準入力が端末かどうかを返します。nil の場合は既定の判定を使います。
@@ -73,6 +76,15 @@ func (r Runtime) writeOutput(kongCtx *kong.Context, value any) error {
 		return fmt.Errorf("API 出力処理が設定されていません")
 	}
 	return r.WriteOutput(kongCtx, value)
+}
+
+// rejectQuery は --query に対応しないコマンドで、--query の指定を拒否します。
+// 指定を暗黙に無視すると利用者の意図と異なる出力になるため、エラーにします。
+func (r Runtime) rejectQuery(kongCtx *kong.Context) error {
+	if r.RejectQuery == nil {
+		return nil
+	}
+	return r.RejectQuery(kongCtx)
 }
 
 func (r Runtime) stdin() io.Reader {
@@ -123,7 +135,7 @@ var errAborted = errors.New("操作を中止しました")
 type Commands struct {
 	Init       InitCommand       `cmd:"" help:"デプロイ済みのアプリケーションから定義ファイルを生成します。アクティブバージョンがあればその内容から、なければ最新のバージョンから定義を復元します。バージョンが 1 つもない場合は識別子だけの定義を生成します。registryPassword と secret=true の環境変数の値は API から取得できないため、生成される定義には含まれません。同名のファイルが既に存在する場合は上書きせずにエラーになります。"`
 	Deploy     DeployCommand     `cmd:"" help:"定義ファイルの内容をデプロイします。クラスタとアプリケーションを検索し、見つからなければアプリケーションを作成して、定義から新しいバージョンを作成して有効化します。registryPassword は定義に値があれば新しく登録し (registryPasswordAction: new)、値がなくアクティブバージョンがあれば維持し (keep)、初回デプロイで値がなければ削除します (remove)。有効化後、作成したバージョンのコンテナがすべて running になるまで待ちます (--no-wait で省略)。トレースが有効な場合は実行しません。"`
-	Diff       DiffCommand       `cmd:"" help:"ローカルの定義とデプロイ済みの現状を比較し、unified diff 形式で標準出力へ出力します。現状はアクティブバージョンの内容です。アプリケーションが存在しないか非活性の場合は、識別子だけの定義を現状とします。registryPassword と secret=true の環境変数の値、registryPasswordAction は応答で取得できないため比較から除外し、その旨を標準エラー出力に示します。差分がなければ標準出力には何も出力しません。このコマンドは --query に対応しません。"`
+	Diff       DiffCommand       `cmd:"" help:"ローカルの定義とデプロイ済みの現状を比較し、unified diff 形式で標準出力へ出力します。現状はアクティブバージョンの内容です。アプリケーションが存在しないか非活性の場合は、識別子だけの定義を現状とします。registryPassword と secret=true の環境変数の値、registryPasswordAction は応答で取得できないため比較から除外し、その旨を標準エラー出力に示します。差分がなければ標準出力には何も出力しません。このコマンドは --query には対応せず、指定した場合はエラーになります。"`
 	Render     RenderCommand     `cmd:"" help:"定義を読み込み、検証と正規化を行った結果を JSON で出力します。registryPassword と secret=true の環境変数の値は出力に含めません。API には接続しません。"`
 	Status     StatusCommand     `cmd:"" help:"アプリケーションの状態を表示します。アプリケーションの ID、名前、アクティブバージョン、DesiredCount と、アクティブバージョンの内容 (イメージ、CPU、メモリ、スケーリング方式、アクティブノード数) を表示します。registryPassword は表示しません。"`
 	Versions   VersionsCommand   `cmd:"" help:"アプリケーションのバージョンの一覧を表示します。バージョン番号、イメージ、アクティブノード数、アクティブかどうか、作成日時 (UTC) を表示します。"`
@@ -160,6 +172,10 @@ type InitCommand struct {
 }
 
 func (c *InitCommand) Run(kongCtx *kong.Context) error {
+	// 出力は JSON ではないため --query は受け付けません。
+	if err := c.runtime.rejectQuery(kongCtx); err != nil {
+		return err
+	}
 	svc, err := newService(c.factory)
 	if err != nil {
 		return err
@@ -174,14 +190,22 @@ func (c *InitCommand) Run(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(c.OutputFile); err == nil {
-		return fmt.Errorf("出力先のファイル %q が既に存在します。上書きはしないため、--output-file で別のパスを指定してください", c.OutputFile)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("出力先のファイル %q を確認できません: %w", c.OutputFile, err)
-	}
 	// 定義には秘密情報を書けるため、所有者だけが読める権限で書き出します。
-	if err := os.WriteFile(c.OutputFile, data, 0600); err != nil { // #nosec G304 -- パスは --output-file で利用者が明示的に指定したものです。
+	// O_EXCL で作成するため、既存ファイルの存在確認と作成の間に上書きが
+	// 挿入されることはありません。
+	f, err := os.OpenFile(c.OutputFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600) // #nosec G304 -- パスは --output-file で利用者が明示的に指定したものです。
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return fmt.Errorf("出力先のファイル %q が既に存在します。上書きはしないため、--output-file で別のパスを指定してください", c.OutputFile)
+		}
+		return fmt.Errorf("出力先のファイル %q を作成できません: %w", c.OutputFile, err)
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
 		return fmt.Errorf("出力先のファイル %q を書き込めません: %w", c.OutputFile, err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("出力先のファイル %q を閉じられません: %w", c.OutputFile, err)
 	}
 	// 進行状況のログは補足情報のため、書き込みエラーを無視します (ベストエフォート)。
 	_, _ = fmt.Fprintf(kongCtx.Stderr, "定義を %s に書き出しました\n", c.OutputFile)
@@ -232,6 +256,10 @@ type DiffCommand struct {
 }
 
 func (c *DiffCommand) Run(kongCtx *kong.Context) error {
+	// 出力は unified diff のテキストで JSON ではないため --query は受け付けません。
+	if err := c.runtime.rejectQuery(kongCtx); err != nil {
+		return err
+	}
 	svc, err := newService(c.factory)
 	if err != nil {
 		return err
@@ -457,6 +485,10 @@ type DeleteCommand struct {
 }
 
 func (c *DeleteCommand) Run(kongCtx *kong.Context) error {
+	// 出力は JSON ではないため --query は受け付けません。
+	if err := c.runtime.rejectQuery(kongCtx); err != nil {
+		return err
+	}
 	svc, err := newService(c.factory)
 	if err != nil {
 		return err

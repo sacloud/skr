@@ -50,7 +50,7 @@ func TestRunAppRunDedicatedHighLevelHelp(t *testing.T) {
 		},
 		{
 			args: []string{"apprun-dedicated", "diff", "--help"},
-			want: []string{"unified diff", "registryPassword"},
+			want: []string{"unified diff", "registryPassword", "--query には対応せず"},
 		},
 		{
 			args: []string{"apprun-dedicated", "delete", "--help"},
@@ -312,5 +312,16 @@ func TestRunAppRunDedicatedInputErrors(t *testing.T) {
 	t.Run("トレースが有効な deploy は実行しません", func(t *testing.T) {
 		message := runError("--trace", "apprun-dedicated", "deploy", "--app", definitionPath)
 		require.Contains(t, message, "トレースを無効にしてください")
+	})
+
+	t.Run("JSON 以外の出力のコマンドは --query を拒否します", func(t *testing.T) {
+		for _, args := range [][]string{
+			{"apprun-dedicated", "diff", "--app", definitionPath, "--query", ".name"},
+			{"apprun-dedicated", "init", "c1", "app1", "--query", ".name"},
+			{"apprun-dedicated", "delete", "--app", definitionPath, "--query", ".name"},
+		} {
+			message := runError(args...)
+			require.Contains(t, message, "--query には対応しません")
+		}
 	})
 }
