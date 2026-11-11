@@ -90,7 +90,7 @@ $ skr apprun-dedicated-api read-cluster "$CLUSTER_ID" --query '{clusterID, name,
 $ skr apprun-dedicated-api list-worker-service-classes --query 'map({path, name})'
 ```
 
-以下は出力形式の例で、実際に選べる構成はコマンドの出力で確認してください。
+以下は出力形式の例です。実際に選べる構成はコマンドの出力で確認してください。
 
 ```json
 [
@@ -101,13 +101,13 @@ $ skr apprun-dedicated-api list-worker-service-classes --query 'map({path, name}
 ]
 ```
 
-`ASG-NAME` と `ZONE` を置き換えて `asg.json` を保存します。
+`ASG-NAME`、`ZONE`、`WORKER-SERVICE-CLASS-PATH` を置き換えて `asg.json` を保存します。`WORKER-SERVICE-CLASS-PATH` には上の出力から選んだ `path` を指定します (例: `cloud/apprun/dedicated/worker/1vcpu_2gb`)。
 
 ```json
 {
   "name": "ASG-NAME",
   "zone": "ZONE",
-  "workerServiceClassPath": "cloud/apprun/dedicated/worker/1vcpu_2gb",
+  "workerServiceClassPath": "WORKER-SERVICE-CLASS-PATH",
   "minNodes": 1,
   "maxNodes": 1,
   "interfaces": [
@@ -253,7 +253,7 @@ $ skr apprun-dedicated containers --app apprun-dedicated.json --query 'map({node
 ワーカノードの IP アドレスを取得し、サンプルアプリケーションにアクセスします。この構成ではワーカノードが共有セグメントに接続され、パケットフィルタを設定していないため、アプリケーションのポートへ外部から直接アクセスできます。[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)の動作確認も同じ方法です。実際のアプリケーションでは、パケットフィルタを設定して意図しないアクセスを防いでください。
 
 ```console
-$ NODE_IP=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '.items[0].networkInterfaces[0].addresses[0].address' | jq -er '.')
+$ NODE_IP=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '.items[0].networkInterfaces[0].addresses[0]' | jq -er '.')
 $ curl -i "http://$NODE_IP:8080/"
 ```
 
@@ -261,9 +261,17 @@ $ curl -i "http://$NODE_IP:8080/"
 
 ## Step 6: 定義を更新してロールバックする
 
-定義ファイルに環境変数を追加して保存します。`secret` を `true` にした環境変数の値は API から取得できず、値を指定しない場合は前のバージョンの値が引き継がれます。
+定義ファイルに環境変数を追加します。`secret` を `true` にした環境変数の値は API から取得できず、値を指定しない場合は前のバージョンの値が引き継がれます。次の内容を `apprun-dedicated.json` として保存してください (`cluster` と `name` は手順 4 と同じ値にします)。
 
 ```json
+{
+  "cluster": "CLUSTER-NAME",
+  "name": "APP-NAME",
+  "cpu": 100,
+  "memory": 128,
+  "scalingMode": "manual",
+  "fixedScale": 1,
+  "image": "ghcr.io/sacloud/apprun-samples/tutorial:latest",
   "env": [
     {
       "key": "GREETING",
@@ -271,6 +279,12 @@ $ curl -i "http://$NODE_IP:8080/"
       "secret": false
     }
   ],
+  "exposedPorts": [
+    {
+      "targetPort": 8080
+    }
+  ]
+}
 ```
 
 `diff` でローカルの定義とデプロイ済みの現状の差分を確認します。
@@ -367,19 +381,18 @@ $ skr apprun-dedicated status --app apprun-dedicated.json --query '{activeVersio
 
 ```console
 $ skr apprun-dedicated delete --app apprun-dedicated.json
-$ skr apprun-dedicated-api list-applications --query '[.items[] | select(.name == "APP-NAME") | .applicationID]'
+$ skr apprun-dedicated-api list-applications --query "[.items[] | select(.applicationID == \"$APP_ID\") | .applicationID]"
 []
 ```
 
 ## Step 8: クラスタとオートスケーリンググループを削除する
 
-オートスケーリンググループを削除します。削除の前に `read` で ID と名前、ゾーンがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。削除は非同期で、ワーカノードの削除も伴います。一覧から消えるまで繰り返し確認してください (`deleting` が `true` の間は削除中です)。
+オートスケーリンググループを削除します。削除の前に `read` で ID と名前、ゾーンがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。削除は非同期で、ワーカノードの削除も伴います。`deleting` が `true` の間は削除中です。次のコマンドを期限を決めて (例: 10 分) 繰り返し実行し、一覧が空になるまで待ってください。
 
 ```console
-$ skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '{autoScalingGroupID, name, zone}'
+$ skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '{autoScalingGroupID, name, zone, deleting}'
 $ skr apprun-dedicated-api delete-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID"
-$ skr apprun-dedicated-api list-auto-scaling-groups --cluster-id "$CLUSTER_ID" --query '[.items[] | {autoScalingGroupID, name}]'
-[]
+$ until [ "$(skr apprun-dedicated-api list-auto-scaling-groups --cluster-id "$CLUSTER_ID" --query '[.items] | length')" = "0" ]; do sleep 15; done
 ```
 
 続けてクラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループ) がないことを確認してから実行してください。
@@ -449,4 +462,4 @@ $ skr apprun-dedicated-api update-application "$APP_ID" --deactivate
 - [AppRun 専有型 API ドキュメント](https://manual.sakura.ad.jp/api/cloud/apprun-dedicated/)
 - [AppRun クイックスタート (サンプルアプリケーション)](https://manual.sakura.ad.jp/cloud/apprun/getting_started.html)
 - [sacloud-sdk-go v0.5.0: AppRun Dedicated API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.5.0/api/apprun-dedicated)
-- [sacloud-sdk-go v0.5.0: apprun-dedicated service](https://pkg.go.dev/github.com/sacloud/apprun-dedicated-service-go)
+- [apprun-dedicated service (skr の service 層)](https://github.com/sacloud/skr/tree/main/service/apprun-dedicated-service-go)
