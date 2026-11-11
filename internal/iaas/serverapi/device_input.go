@@ -17,52 +17,20 @@ package serverapi
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+	"github.com/sacloud/skr/internal/textjson"
 )
 
-func parseDeviceFields(input string, allowed ...string) (map[string]string, error) {
-	fields := make(map[string]string)
-	for _, part := range strings.Split(input, ",") {
-		key, value, ok := strings.Cut(part, "=")
-		if !ok || key == "" || value == "" || strings.Contains(value, "=") {
-			return nil, fmt.Errorf("各要素は空でない key=value 形式で指定してください")
-		}
-		found := false
-		for _, candidate := range allowed {
-			found = found || key == candidate
-		}
-		if !found {
-			return nil, fmt.Errorf("未対応のキーです。指定可能なキー: %s", strings.Join(allowed, ", "))
-		}
-		if _, exists := fields[key]; exists {
-			return nil, fmt.Errorf("%s は重複して指定できません", key)
-		}
-		fields[key] = value
-	}
-	return fields, nil
-}
-
-func positiveDeviceInteger(fields map[string]string, key string, bits int) (int64, error) {
-	value, exists := fields[key]
-	if !exists {
-		return 0, fmt.Errorf("%s が必要です", key)
-	}
-	for _, char := range value {
-		if char < '0' || char > '9' {
-			return 0, fmt.Errorf("%s は正の整数で指定してください", key)
-		}
-	}
-	number, err := strconv.ParseInt(value, 10, bits)
-	if err != nil || number <= 0 {
-		return 0, fmt.Errorf("%s は正の整数で指定してください", key)
-	}
-	return number, nil
-}
-
+// parseDisk は反復可能な --disk の 1 回の指定をディスクのリクエストへ変換します。
+// 構文は skr 全体で統一された text → JSON 簡易表記 (ADR 0078) の共通パーサーで解析し、
+// 値の検証 (正の整数) と API リクエストへの変換はこの関数が行います。
 func parseDisk(input, name string) (*DiskRequest, error) {
-	fields, err := parseDeviceFields(input, "archive-id", "plan-id", "size-gb")
+	fields, err := textjson.Parse(input, []textjson.Field{
+		{Name: "archive-id"},
+		{Name: "plan-id", Required: true},
+		{Name: "size-gb", Required: true},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +43,7 @@ func parseDisk(input, name string) (*DiskRequest, error) {
 		return nil, err
 	}
 	var archive int64
-	if _, exists := fields["archive-id"]; exists {
+	if fields.Has("archive-id") {
 		archive, err = positiveDeviceInteger(fields, "archive-id", 64)
 		if err != nil {
 			return nil, err
@@ -87,19 +55,40 @@ func parseDisk(input, name string) (*DiskRequest, error) {
 	}, nil
 }
 
+// parseNIC は反復可能な --nic の 1 回の指定を NIC のリクエストへ変換します。
+// 構文は skr 全体で統一された text → JSON 簡易表記 (ADR 0078) の共通パーサーで解析し、
+// 値の検証 (列挙値または正の整数) と API リクエストへの変換はこの関数が行います。
 func parseNIC(input string) (*NetworkInterface, error) {
-	fields, err := parseDeviceFields(input, "upstream")
+	fields, err := textjson.Parse(input, []textjson.Field{
+		{Name: "upstream", Required: true},
+	})
 	if err != nil {
 		return nil, err
 	}
-	upstream, exists := fields["upstream"]
-	if !exists {
-		return nil, fmt.Errorf("upstream が必要です")
-	}
+	upstream := fields.Get("upstream")
 	if upstream != "shared" && upstream != "disconnected" {
 		if _, err := positiveDeviceInteger(fields, "upstream", 64); err != nil {
 			return nil, fmt.Errorf("upstream は shared、disconnected、または正の整数のスイッチ ID で指定してください")
 		}
 	}
 	return &NetworkInterface{Upstream: upstream}, nil
+}
+
+// positiveDeviceInteger は指定されたキーの値を正の整数として検証して返します。
+// 値が未指定、10進数の数字以外を含む、範囲外、0以下の場合はエラーになります。
+func positiveDeviceInteger(fields textjson.Fields, key string, bits int) (int64, error) {
+	value := fields.Get(key)
+	if value == "" {
+		return 0, fmt.Errorf("%s が必要です", key)
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return 0, fmt.Errorf("%s は正の整数で指定してください", key)
+		}
+	}
+	number, err := strconv.ParseInt(value, 10, bits)
+	if err != nil || number <= 0 {
+		return 0, fmt.Errorf("%s は正の整数で指定してください", key)
+	}
+	return number, nil
 }

@@ -1,7 +1,7 @@
 # EventBus 高レベルコマンドの設計
 
 - Status: 実装完了 (ライブ E2E 成功)
-- ADR: [ADR 0075](../adr/0075-high-level-command-tier.md)、[ADR 0076](../adr/0076-eventbus-trigger-condition-option.md)
+- ADR: [ADR 0075](../adr/0075-high-level-command-tier.md)、[ADR 0076](../adr/0076-eventbus-trigger-condition-option.md)、[ADR 0078](../adr/0078-shared-text-to-json-notation.md)
 - Issue: [#214](https://github.com/sacloud/skr/issues/214)
 - SDK: `github.com/sacloud/sacloud-sdk-go` v0.5.0
 
@@ -38,7 +38,7 @@ service/eventbus-service-go/
   *_test.go
 internal/eventbus/
   commands.go               # kong コマンド (ライブラリのリクエストを組み立てる)
-  condition.go              # --condition の構文解析 (CLI 固有)
+  condition.go              # --condition の構文解析 (ADR 0078 の共通パーサーを利用)
   secret_input.go           # secret の入力読み込み (CLI 固有)
   *_test.go
 ```
@@ -384,11 +384,11 @@ create では周期指定 (`--recurring-step` と `--recurring-unit` の組) と
 | `--condition` | 任意 (反復) | 任意 (反復) | 条件 ([ADR 0076](../adr/0076-eventbus-trigger-condition-option.md))。指定時は全体置換 |
 | `--process-configuration-id` | 必須 | 任意 | 実行設定の ID |
 
-`--type` と `--condition` は反復可能オプションで、指定順序を保持します。Kong の既定のカンマ分割は無効にし、1回の指定を1要素として扱います。`--condition` 内部のカンマだけを専用パーサーで解釈します。`value` の反復以外の重複キーは拒否し、値にカンマを含めることはできません。
+`--type` と `--condition` は反復可能オプションで、指定順序を保持します。Kong の既定のカンマ分割は無効にし、1回の指定を1要素として扱います。`--condition` 内部のカンマだけを、skr 全体で統一された text → JSON 簡易表記の共通パーサー ([ADR 0078](../adr/0078-shared-text-to-json-notation.md)) で解釈します。`value` の反復以外の重複キーは拒否し、値にカンマを含めることはできません。
 
 ### 検証の分担
 
-- 構文の解析 (`--condition` の `key=value` 形式、`--starts-at` の RFC3339 解析) は CLI が行います。
+- 構文の解析 (`--condition` は [ADR 0078](../adr/0078-shared-text-to-json-notation.md) の共通パーサー、`--starts-at` の RFC3339 解析) は CLI が行います。
 - 解析後の意味検証 (`key` の pattern、`eq`/`in` の値数、宛先とフィールドの整合、モードの完全性) は service 層が行います。
 - ローカルで判定できる入力形式のエラーは API を呼び出す前に返します。既存値が必要な更新では Read 後にマージの整合性を判定し、検証失敗時に変更 API を呼び出しません。
 - [ADR 0047](../adr/0047-minimize-cli-request-body-validation.md) に従い、サービス上の値の範囲、宛先の実在性、crontab 式の全仕様、イベントタイプの一覧は再実装しません。本書で追加する検証は、フラグ経路の必須指定、独自構文の変換、宛先別入力の取り違え防止、更新モードの決定、種別確認、秘密情報の安全性に限定します。service 層のエラーは API のフィールドで表し、フラグ名への対応付けは CLI が担います。

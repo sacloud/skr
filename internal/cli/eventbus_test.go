@@ -321,7 +321,7 @@ func TestEventbusCommandInputErrors(t *testing.T) {
 				"--source", "//eventbus.sakura.ad.jp/eventlog",
 				"--condition", "key=zone,op=eq",
 				"--process-configuration-id", "123"},
-			want: "--condition は key・op・value が必要です",
+			want: "--condition: 必須キーがありません: value",
 		},
 		{
 			name: "invalid condition op",

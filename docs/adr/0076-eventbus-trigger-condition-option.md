@@ -23,7 +23,7 @@ EventBus トリガーの条件 (Conditions) は、API では配列で指定し�
 
 [SDK v0.5.0 同梱の EventBus OpenAPI 定義](https://github.com/sacloud/sacloud-sdk-go/blob/v0.5.0/api/eventbus/openapi/openapi.json)では、`Key` は 1〜20 文字の小文字英数字で `data` を禁止する pattern (`^(?!data$)[a-z0-9]{1,20}$`)、`eq` は `Values` がちょうど 1 件 (minItems=1、maxItems=1)、`in` は 1 件以上 (minItems=1) とされています。条件に使うキーは、モニタリングスイートの Alert ソースでは `severity` と `subject`、イベントログソースでは `zone` と `subject` です ([EventBus のイベント](https://manual.sakura.ad.jp/cloud/appliance/eventbus/events.html))。
 
-高レベルの `skr eventbus trigger` ([ADR 0075](0075-high-level-command-tier.md)) で条件を JSON なしに指定する構文が必要です。[ADR 0041](0041-server-repeatable-disk-and-nic-options.md) は Server の `--disk` / `--nic` に反復可能な `key=value` 構文を導入しましたが、他の配列への自動適用は禁止されています。トリガー条件の構文は個別に決定します。
+高レベルの `skr eventbus trigger` ([ADR 0075](0075-high-level-command-tier.md)) で条件を JSON なしに指定する構文が必要です。[ADR 0041](0041-server-repeatable-disk-and-nic-options.md) は Server の `--disk` / `--nic` に反復可能な `key=value` 構文を導入しましたが、他の配列への自動適用は禁止されています。トリガー条件の構文は個別に決定します。構文の共通規則は、のちに [ADR 0078](0078-shared-text-to-json-notation.md) で skr 全体の text → JSON 簡易表記として抽出しました。
 
 ## 決定
 
@@ -43,14 +43,12 @@ $ skr eventbus trigger create --name alert-example --process-configuration-id 12
 
 実行設定 ID は構文を示すための仮の値です。例はソースごとに分け、イベントログに Alert 用の `severity` 条件を組み合わせません。
 
-- 対応キーは `key`、`op`、`value` とします。`key` と `op` は各1回、`value` は1回以上指定します。未知のキー、`key` または `op` の欠落・重複、空の値、空の要素、不正な構文はエラーにします。
-- 各要素は最初の `=` でキーと値に分け、後続の `=` は値の一部として保持します。前後の空白を除去するなどの暗黙の補正は行いません。
+- 対応キーは `key`、`op`、`value` とします。`key` と `op` は必須で反復できず、`value` は反復を許可します。未知のキー、必須キーの欠落・重複、構文エラーはエラーにします。
+- 構文の共通規則 (要素の分解、値の字義どおりの扱い、カンマの制限、エラーメッセージへの入力値の非表示など) は、skr 全体で統一された text → JSON 簡易表記 ([ADR 0078](0078-shared-text-to-json-notation.md)) に従います。解析は共有パーサー `internal/textjson` が行います。
 - `key` は API と同じ条件で検証します。Go の標準正規表現は否定先読みを扱えないため、`^[a-z0-9]{1,20}$` の照合と `data` の除外を組み合わせます。`op` は `eq` または `in` を受け付けます。
-- `value` は条件の値で、**同一指定内での反復を許可します**。これは [ADR 0041](0041-server-repeatable-disk-and-nic-options.md) の重複キー拒否に対する、本オプション固有の例外です。API の `Values` 配列に対応するための例外で、`eq` はちょうど 1 件、`in` は 1 件以上を要求します。
-- カンマは要素の区切り専用です。`value=a,b` は不正な要素 `b` を含むためエラーにします。値自体にカンマを含めることはできず、その場合は低レベル `eventbus-api` の JSON 経路を使います。シェルで全体を引用しても、この制限は変わりません。
-- 値は字義どおり扱い、引用符やエスケープを解釈する独自機構は設けません ([ADR 0041](0041-server-repeatable-disk-and-nic-options.md) と同じ)。
+- `value` は条件の値で、**同一指定内での反復を許可します**。これは [ADR 0041](0041-server-repeatable-disk-and-nic-options.md) の重複キー拒否に対する、本オプション固有の例外です。API の `Values` 配列に対応するための例外で、`eq` はちょうど 1 件、`in` は 1 件以上を要求します。値自体にカンマを含めることはできず、その場合は低レベル `eventbus-api` の JSON 経路を使います。シェルで全体を引用しても、この制限は変わりません。
 - update で `--condition` を指定した場合は `Conditions` 全体を置き換え、未指定の場合は現状を維持します。条件の消去 (`null`) は低レベル `eventbus-api` で指定します。
-- 構文の解析は CLI が行い、解析後の意味検証 (`key` の pattern、`eq`/`in` の値数) は service 層が行います。
+- 構文の解析は CLI が共通パーサーで行い、解析後の意味検証 (`key` の pattern、`eq`/`in` の値数) は service 層が行います。
 - この検証は、独自構文から条件の union 型へ曖昧さなく変換するためのものです。[ADR 0047](0047-minimize-cli-request-body-validation.md) の原則に従い、イベントタイプの網羅的な許可リストやソース別の値の一覧は再実装しません。ヘルプにはソースごとのキーと参照先を示し、サービス上の有効性は API に委ねます。
 - 本構文の対象は `skr eventbus trigger` の create と update だけです。他の配列や操作へ自動的に適用しません。
 
