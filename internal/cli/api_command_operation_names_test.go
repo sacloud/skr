@@ -194,7 +194,6 @@ var apiPublishedOperations = map[string][]string{
 		kmsv1.ChangeKeyStatusOperation,
 		kmsv1.CreateKeyOperation,
 		kmsv1.DecryptDataWithKeyOperation,
-		kmsv1.DeleteKeyOperation,
 		kmsv1.EncryptDataWithKeyOperation,
 		kmsv1.ListKeysOperation,
 		kmsv1.ReadKeyOperation,

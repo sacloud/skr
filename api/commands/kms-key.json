@@ -89,20 +89,6 @@
       "command_name": "update-key"
     },
     {
-      "name": "Delete",
-      "help": "ID を指定して KMS キーを削除します。削除前に対象 ID を確認してください。",
-      "method": "Delete",
-      "arguments": [
-        {
-          "name": "id",
-          "field": "ID",
-          "type": "string",
-          "help": "削除する KMS キー ID。"
-        }
-      ],
-      "command_name": "delete-key"
-    },
-    {
       "name": "Rotate",
       "help": "KMS キーをローテーションします。有効 (active) なキーだけが対象で、BYOK モードでインポートしたキーはローテーションできません。",
       "method": "Rotate",

@@ -244,7 +244,6 @@ operationId 機械派生に移行する際、この 2 ドメインでは spec �
 | `skr kms-api key change-status` | `changeKeyStatus` | `skr kms-api change-key-status` |
 | `skr kms-api key create` | `createKey` | `skr kms-api create-key` |
 | `skr kms-api key decrypt` | `decryptDataWithKey` | `skr kms-api decrypt-data-with-key` |
-| `skr kms-api key delete` | `deleteKey` | `skr kms-api delete-key` |
 | `skr kms-api key encrypt` | `encryptDataWithKey` | `skr kms-api encrypt-data-with-key` |
 | `skr kms-api key list` | `listKeys` | `skr kms-api list-keys` |
 | `skr kms-api key read` | `readKey` | `skr kms-api read-key` |
