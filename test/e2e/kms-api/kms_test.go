@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/sacloud/skr/test/e2e/internal/helper"
@@ -29,12 +30,13 @@ import (
 // kmsKeyItem は kms-api key コマンドの参照結果です。
 // KMS API の応答フィールドは PascalCase です。
 type kmsKeyItem struct {
-	ID            string `json:"ID"`
-	Name          string `json:"Name"`
-	Status        string `json:"Status"`
-	KeyOrigin     string `json:"KeyOrigin"`
-	ServiceClass  string `json:"ServiceClass"`
-	LatestVersion int    `json:"LatestVersion"`
+	ID                     string `json:"ID"`
+	Name                   string `json:"Name"`
+	Status                 string `json:"Status"`
+	KeyOrigin              string `json:"KeyOrigin"`
+	ServiceClass           string `json:"ServiceClass"`
+	LatestVersion          int    `json:"LatestVersion"`
+	DeletionScheduledAfter string `json:"DeletionScheduledAfter"`
 }
 
 // createKmsKey は skr CLI で KMS キーを作成し、必要な項目に絞って返します。
@@ -71,7 +73,7 @@ func readKmsKey(t *testing.T, h *helper.Helper, id string) kmsKeyItem {
 
 	data := h.Call(t, "KMS キーを参照する",
 		"kms-api", "read-key", id,
-		"--query", "{ID,Name,Status,KeyOrigin,ServiceClass,LatestVersion}",
+		"--query", "{ID,Name,Status,KeyOrigin,ServiceClass,LatestVersion,DeletionScheduledAfter}",
 	)
 	var item kmsKeyItem
 	require.NoError(t, json.Unmarshal(data, &item), "decode kms-api key read response")
@@ -136,7 +138,7 @@ func scheduleKmsKeyDestruction(t *testing.T, h *helper.Helper, id string, pendin
 
 	data := h.Call(t, "KMS キーの削除を予約する",
 		"kms-api", "schedule-key-destruction", id,
-		"--pending-days", "7",
+		"--pending-days", strconv.Itoa(pendingDays),
 	)
 	var scheduled struct {
 		Status                 string `json:"Status"`
@@ -168,11 +170,29 @@ func decryptKmsKey(t *testing.T, h *helper.Helper, id, cipherFile string) string
 	return string(data)
 }
 
-// deleteKmsKey は skr CLI で指定した KMS キーを削除します。
-func deleteKmsKey(t *testing.T, h *helper.Helper, id string) {
+// scheduleKmsKeyDestructionForCleanup は所有を再確認してから作成した KMS キーの削除を予約します。
+func scheduleKmsKeyDestructionForCleanup(t *testing.T, h *helper.Helper, id, expectedName string) {
 	t.Helper()
 
-	h.Call(t, "KMS キーを削除する", "kms-api", "delete-key", id)
+	current := readKmsKey(t, h, id)
+	require.Equal(t, id, current.ID, "refusing to change a KMS key with an unexpected ID")
+	require.Equal(t, expectedName, current.Name, "refusing to change a KMS key with an unexpected name")
+	switch current.Status {
+	case "active":
+		status, deletionAfter := scheduleKmsKeyDestruction(t, h, id, 7)
+		require.Equal(t, "pending_destruction", status, "KMS key should be scheduled for destruction")
+		require.NotEmpty(t, deletionAfter, "scheduled KMS key should include its destruction time")
+	case "pending_destruction":
+		require.NotEmpty(t, current.DeletionScheduledAfter, "scheduled KMS key should include its destruction time")
+	default:
+		require.Contains(t, []string{"active", "pending_destruction"}, current.Status,
+			"refusing to change a KMS key in an unexpected state")
+	}
+	scheduled := readKmsKey(t, h, id)
+	require.Equal(t, id, scheduled.ID)
+	require.Equal(t, expectedName, scheduled.Name)
+	require.Equal(t, "pending_destruction", scheduled.Status)
+	require.NotEmpty(t, scheduled.DeletionScheduledAfter)
 }
 
 // writePlainFile は暗号化する平文を一時ファイルに書き込みます。

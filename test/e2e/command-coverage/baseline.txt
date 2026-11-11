@@ -264,7 +264,6 @@ iam-api read-security-key live
 kms-api change-key-status live
 kms-api create-key live
 kms-api decrypt-data-with-key live
-kms-api delete-key live
 kms-api encrypt-data-with-key live
 kms-api list-keys live
 kms-api read-key live
