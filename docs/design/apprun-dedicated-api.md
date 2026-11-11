@@ -4,6 +4,8 @@
 - SDK: `github.com/sacloud/sacloud-sdk-go v0.5.0`
 - Related ADR: [ADR 0027](../adr/0027-apprun-dedicated-api-commands.md)
 
+同じデプロイフローを JSON 定義ファイルから行う高レベルコマンド `skr apprun-dedicated` の設計は [AppRun Dedicated 高レベルコマンドの設計](apprun-dedicated.md) にあります。インフラの構築管理 (クラスタ作成を含む) と、バージョン作成・有効化を含む個別の操作は本書の低レベルコマンドが担います。
+
 ## コマンド構成
 
 `skr apprun-dedicated-api` は AppRun 専有型の SDK 公開 API を直接呼び出す低レベルコマンドです。コマンド本体と SDK client の生成は `internal/apprundedicatedapi/`、CLI の登録と Runtime 接続は `internal/cli/` に置きます。認証は SDK プロファイル、または `SAKURA_ACCESS_TOKEN` と `SAKURA_ACCESS_TOKEN_SECRET` を使います。
