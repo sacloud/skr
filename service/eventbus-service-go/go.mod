@@ -1,6 +1,6 @@
 module github.com/sacloud/skr/service/eventbus-service-go
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/sacloud/sacloud-sdk-go v0.5.0
