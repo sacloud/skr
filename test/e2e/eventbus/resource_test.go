@@ -275,16 +275,6 @@ func createSimpleMQQueue(t *testing.T, h *helper.Helper, callDescription string,
 	return item
 }
 
-// readSimpleMQQueue は ID で SimpleMQ キューを参照します。
-func readSimpleMQQueue(t *testing.T, h *helper.Helper, callDescription, id string) queueItem {
-	t.Helper()
-
-	var item queueItem
-	require.NoError(t, decodeJSON(h.Call(t, callDescription,
-		"simplemq-api", "read-queue", id), &item, false), "%s", callDescription)
-	return item
-}
-
 // listSimpleMQQueues は SimpleMQ キューの一覧を取得します。
 func listSimpleMQQueues(t *testing.T, h *helper.Helper, callDescription string) []queueItem {
 	t.Helper()
@@ -483,6 +473,115 @@ func requireNoNameCollision(t *testing.T, h *helper.Helper, resources ...*eventb
 // いない対象は同名・同説明でも今回の作成物と断定できないため、自動削除せずに
 // 候補を報告して手動確認を求めます。
 // 削除直前に今回の作成物と識別情報を再照合し、一致しない場合は削除しません。
+// cleanupResourceReader は後片付けの再照合でリソースを参照する関数です。
+// 参照またはデコードに失敗した場合はエラーを返します。
+type cleanupResourceReader func(id string) (any, error)
+
+// confirmedCleanupID は後片付けの削除に使える、作成結果で確定した ID を返します。
+// ID が確定していない場合はエラーを返します。作成 API がエラーを返しても
+// サーバー側で作成済みの可能性があるため、呼び出し元は削除せず、
+// 同名・同説明の候補を報告して手動確認を求めます。
+func confirmedCleanupID(r *eventbusResource) (string, error) {
+	if r.id != "" {
+		return r.id, nil
+	}
+	return "", fmt.Errorf("%s %s の ID が作成結果で確定していないため自動削除できません", kindName(r.kind), r.name)
+}
+
+// verifyCleanupIdentity は削除前の再照合結果が、今回の実行で作成したリソースと一致することを確認します。
+// 一致しない場合はエラーを返します。呼び出し元は clear-queue を含む削除系 API を呼び出してはいけません。
+func verifyCleanupIdentity(current any, r *eventbusResource, id string) error {
+	switch item := current.(type) {
+	case queueItem:
+		return checkQueueIdentity(item, r, id)
+	case processConfigurationItem:
+		return checkProcessConfigurationIdentity(item, r, id)
+	case scheduleItem:
+		return checkScheduleIdentity(item, r, id)
+	case triggerItem:
+		return checkTriggerIdentity(item, r, id)
+	case switchItem:
+		return checkSwitchIdentity(item, r, id)
+	default:
+		return fmt.Errorf("%sの再照合結果を検証できません", kindName(r.kind))
+	}
+}
+
+// decideEventbusCleanup は後片付けの削除前に、対象を再照合して削除してよいか判定します。
+// 判定は参照系の呼び出しだけで行い、この関数自身はリソースを変更しません。
+// エラーを返したとき、呼び出し元は clear-queue を含む削除系 API を呼び出してはいけません。
+func decideEventbusCleanup(read cleanupResourceReader, r *eventbusResource) (string, error) {
+	id, err := confirmedCleanupID(r)
+	if err != nil {
+		return "", err
+	}
+	current, err := read(id)
+	if err != nil {
+		return "", fmt.Errorf("%sの再照合に失敗したため削除しません: %w", kindName(r.kind), err)
+	}
+	if err := verifyCleanupIdentity(current, r, id); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+// cleanupResourceReaderFor はリソース種別に応じた再照合用の参照関数を返します。
+// 参照の失敗はエラーとして返し、テストを停止しないため、呼び出し元は削除系 API を
+// 呼び出さずに後続の後片付けを続けられます。
+func cleanupResourceReaderFor(t *testing.T, h *helper.Helper, r *eventbusResource) cleanupResourceReader {
+	t.Helper()
+
+	return func(id string) (any, error) {
+		description := fmt.Sprintf("削除前に%sを再照合する", kindName(r.kind))
+		switch r.kind {
+		case "queue":
+			var item queueItem
+			if err := readForCleanup(t, h, description, []string{"simplemq-api", "read-queue", id}, &item); err != nil {
+				return nil, err
+			}
+			return item, nil
+		case "process-configuration":
+			var item processConfigurationItem
+			if err := readForCleanup(t, h, description, []string{"eventbus", "process-configuration", "read", id}, &item); err != nil {
+				return nil, err
+			}
+			return item, nil
+		case "schedule":
+			var item scheduleItem
+			if err := readForCleanup(t, h, description, []string{"eventbus", "schedule", "read", id}, &item); err != nil {
+				return nil, err
+			}
+			return item, nil
+		case "trigger":
+			var item triggerItem
+			if err := readForCleanup(t, h, description, []string{"eventbus", "trigger", "read", id}, &item); err != nil {
+				return nil, err
+			}
+			return item, nil
+		case "switch":
+			var item switchItem
+			if err := readForCleanup(t, h, description, []string{"iaas-api", "switch", "read", "--zone", r.zone, "--id", id}, &item); err != nil {
+				return nil, err
+			}
+			return item, nil
+		default:
+			return nil, fmt.Errorf("cleanup: %sの再照合方法が定義されていません", kindName(r.kind))
+		}
+	}
+}
+
+// readForCleanup は後片付けの再照合で参照系コマンドを実行し、JSON をデコードします。
+// 実行やデコードの失敗はエラーとして返します。
+func readForCleanup(t *testing.T, h *helper.Helper, callDescription string, args []string, dst any) error {
+	t.Helper()
+
+	stdout, stderr, err := h.CallAllowingFailure(t, callDescription, args...)
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, stderr)
+	}
+	return decodeJSON(stdout, dst, false)
+}
+
 func cleanupEventbusResource(t *testing.T, h *helper.Helper, r *eventbusResource) {
 	t.Helper()
 
@@ -490,51 +589,18 @@ func cleanupEventbusResource(t *testing.T, h *helper.Helper, r *eventbusResource
 	if !r.attempted || r.deleted {
 		return
 	}
-	id := r.id
-	if id == "" {
-		// 作成 API がエラーを返しても、サーバー側で作成済みの可能性があります。
-		// 削除は行わず、同名・同説明の候補を報告して手動確認を求めます。
-		if candidate := findResourceIDByName(t, h, r); candidate != "" {
-			t.Errorf("cleanup refused: %s %s の ID が作成結果で確定していないため自動削除しません。同名・同説明の %s を手動で確認してください", label, r.name, candidate)
+	// 削除系 API は判定が通ったあとにだけ呼び出す。
+	id, err := decideEventbusCleanup(cleanupResourceReaderFor(t, h, r), r)
+	if err != nil {
+		// ID 未確定のときは同名・同説明の候補を併せて報告して手動確認を求めます。
+		if r.id == "" {
+			if candidate := findResourceIDByName(t, h, r); candidate != "" {
+				t.Errorf("cleanup refused: %v。同名・同説明の %s を手動で確認してください", err, candidate)
+				return
+			}
 		}
+		t.Errorf("cleanup refused: %v", err)
 		return
-	}
-
-	// 削除前に今回の作成物と識別情報を再照合する
-	switch r.kind {
-	case "queue":
-		current := readSimpleMQQueue(t, h, fmt.Sprintf("削除前に%sを再照合する", label), id)
-		if err := checkQueueIdentity(current, r, id); err != nil {
-			t.Errorf("cleanup refused: %v", err)
-			return
-		}
-	case "process-configuration":
-		current := readProcessConfiguration(t, h, fmt.Sprintf("削除前に%sを再照合する", label), id)
-		if err := checkProcessConfigurationIdentity(current, r, id); err != nil {
-			t.Errorf("cleanup refused: %v", err)
-			return
-		}
-	case "schedule":
-		current := readSchedule(t, h, fmt.Sprintf("削除前に%sを再照合する", label), id)
-		if err := checkScheduleIdentity(current, r, id); err != nil {
-			t.Errorf("cleanup refused: %v", err)
-			return
-		}
-	case "trigger":
-		current := readTrigger(t, h, fmt.Sprintf("削除前に%sを再照合する", label), id)
-		if err := checkTriggerIdentity(current, r, id); err != nil {
-			t.Errorf("cleanup refused: %v", err)
-			return
-		}
-	case "switch":
-		var current switchItem
-		require.NoError(t, decodeJSON(h.Call(t, fmt.Sprintf("削除前に%sを再照合する", label),
-			"iaas-api", "switch", "read", "--zone", r.zone, "--id", id), &current, false),
-			"read %s before cleanup", label)
-		if err := checkSwitchIdentity(current, r, id); err != nil {
-			t.Errorf("cleanup refused: %v", err)
-			return
-		}
 	}
 
 	if r.kind == "queue" {
@@ -816,4 +882,232 @@ func TestWriteSecretFiles(t *testing.T) {
 	secretData, err := os.ReadFile(secretFile) //nolint:gosec // テスト専用ディレクトリ内のファイルを読み込む。
 	require.NoError(t, err)
 	require.JSONEq(t, `{"APIKey":"test-only-api-key"}`, string(secretData))
+}
+
+// cleanupTestResource は回帰テスト用に、追跡対象の設定を持つリソースを返します。
+func cleanupTestResource(kind string) *eventbusResource {
+	r := &eventbusResource{kind: kind, name: "mock-" + kind, description: "test " + kind, id: "111"}
+	switch kind {
+	case "process-configuration":
+		r.destination = "simplemq"
+		r.parameters = map[string]string{"queue_name": "mock-queue", "content": "hello"}
+	case "schedule":
+		r.processConfigurationID = "222"
+		r.startsAt = "2030-01-10T00:00:00Z"
+		r.recurringStep = 5
+		r.recurringUnit = "hour"
+	case "trigger":
+		r.source = "//eventbus.sakura.ad.jp/eventlog"
+		r.types = []string{"zone.updated"}
+		r.conditions = []triggerConditionItem{{Key: "zone", Op: "eq", Values: []string{"is1b"}}}
+		r.processConfigurationID = "222"
+	case "switch":
+		r.zone = "is1b"
+	}
+	return r
+}
+
+// cleanupTestItem は回帰テスト用に、指定した ID の再照合結果を返します。
+// confirmed が true のときは cleanupTestResource が想定する設定を返します。
+func cleanupTestItem(kind, id string, confirmed bool) any {
+	description := "test " + kind
+	if !confirmed {
+		description = "repurposed " + kind
+	}
+	switch kind {
+	case "queue":
+		item := queueItem{ID: json.RawMessage(`"` + id + `"`), Name: "mock-queue", Description: description}
+		item.Status.QueueName = "mock-queue"
+		if !confirmed {
+			item.Status.QueueName = "repurposed-queue"
+		}
+		return item
+	case "process-configuration":
+		item := processConfigurationItem{ID: json.RawMessage(`"` + id + `"`), Name: "mock-process-configuration", Description: &description, Destination: "simplemq"}
+		if confirmed {
+			item.Parameters = map[string]string{"queue_name": "mock-queue", "content": "hello"}
+		} else {
+			item.Parameters = map[string]string{"queue_name": "other-queue", "content": "repurposed"}
+		}
+		return item
+	case "schedule":
+		step, unit := 5, "hour"
+		startsAt := "2030-01-10T00:00:00Z"
+		if !confirmed {
+			step, unit = 10, "minute"
+			startsAt = "2031-02-11T00:00:00Z"
+		}
+		return scheduleItem{ID: json.RawMessage(`"` + id + `"`), Name: "mock-schedule", Description: &description,
+			ProcessConfigurationID: json.RawMessage(`"222"`), StartsAt: startsAt, RecurringStep: &step, RecurringUnit: &unit}
+	case "trigger":
+		types := []string{"zone.updated"}
+		conditions := []triggerConditionItem{{Key: "zone", Op: "eq", Values: []string{"is1b"}}}
+		if !confirmed {
+			types = []string{"disk.inserted"}
+			conditions = []triggerConditionItem{{Key: "zone", Op: "eq", Values: []string{"tk1a"}}}
+		}
+		return triggerItem{ID: json.RawMessage(`"` + id + `"`), Name: "mock-trigger", Description: &description,
+			Source: "//eventbus.sakura.ad.jp/eventlog", Types: types, Conditions: conditions,
+			ProcessConfigurationID: json.RawMessage(`"222"`)}
+	case "switch":
+		return switchItem{ID: json.RawMessage(`"` + id + `"`), Name: "mock-switch", Description: description}
+	default:
+		return nil
+	}
+}
+
+// TestConfirmedCleanupID は ID 未確定のリソースで削除を拒否することを確認します。
+func TestConfirmedCleanupID(t *testing.T) {
+	r := cleanupTestResource("schedule")
+	id, err := confirmedCleanupID(r)
+	require.NoError(t, err)
+	require.Equal(t, "111", id)
+
+	// 作成結果で ID を確定していない対象は自動削除しない。
+	r.id = ""
+	_, err = confirmedCleanupID(r)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "確定していない")
+}
+
+// TestVerifyCleanupIdentity は削除前の再照合で、同名の別 ID や設定の不一致を拒否することを確認します。
+func TestVerifyCleanupIdentity(t *testing.T) {
+	for _, kind := range []string{"queue", "process-configuration", "schedule", "trigger", "switch"} {
+		r := cleanupTestResource(kind)
+		r.id = "111"
+
+		// 今回の作成物と完全一致するときだけ削除を許可します。
+		require.NoError(t, verifyCleanupIdentity(cleanupTestItem(kind, "111", true), r, "111"),
+			"%s: identical resource should be deletable", kind)
+
+		// 同名・同説明でも ID が違うリソースは削除しません。
+		err := verifyCleanupIdentity(cleanupTestItem(kind, "999", true), r, "111")
+		require.Error(t, err, "%s: same-name different-ID resource should be refused", kind)
+		require.Contains(t, err.Error(), "一致しません")
+	}
+
+	tests := []struct {
+		name    string
+		kind    string
+		mutate  func(current any) any
+		wantErr string
+	}{
+		{"queue with different queue name", "queue", func(current any) any {
+			item := current.(queueItem)
+			item.Status.QueueName = "other-queue"
+			return item
+		}, "キュー名が一致しません"},
+		{"queue with different description", "queue", func(current any) any {
+			item := current.(queueItem)
+			item.Description = "repurposed"
+			return item
+		}, "一致しません"},
+		{"process with different destination", "process-configuration", func(current any) any {
+			item := current.(processConfigurationItem)
+			item.Destination = "simplenotification"
+			return item
+		}, "宛先が一致しません"},
+		{"process with different parameters", "process-configuration", func(current any) any {
+			item := current.(processConfigurationItem)
+			item.Parameters = map[string]string{"queue_name": "other-queue", "content": "repurposed"}
+			return item
+		}, "パラメーターが一致しません"},
+		{"schedule with different process reference", "schedule", func(current any) any {
+			item := current.(scheduleItem)
+			item.ProcessConfigurationID = json.RawMessage(`"999"`)
+			return item
+		}, "参照先が一致しません"},
+		{"schedule with different starts-at", "schedule", func(current any) any {
+			item := current.(scheduleItem)
+			item.StartsAt = "2031-02-11T00:00:00Z"
+			return item
+		}, "開始日時が一致しません"},
+		{"schedule with different recurring step", "schedule", func(current any) any {
+			item := current.(scheduleItem)
+			step := 10
+			item.RecurringStep = &step
+			return item
+		}, "繰り返し間隔が一致しません"},
+		{"trigger with different source", "trigger", func(current any) any {
+			item := current.(triggerItem)
+			item.Source = "//eventbus.sakura.ad.jp/monitoringsuite/alert"
+			return item
+		}, "送信元が一致しません"},
+		{"trigger with different types", "trigger", func(current any) any {
+			item := current.(triggerItem)
+			item.Types = []string{"disk.inserted"}
+			return item
+		}, "イベントタイプが一致しません"},
+		{"trigger with different conditions", "trigger", func(current any) any {
+			item := current.(triggerItem)
+			item.Conditions = []triggerConditionItem{{Key: "zone", Op: "eq", Values: []string{"tk1a"}}}
+			return item
+		}, "条件が一致しません"},
+		{"trigger with different process reference", "trigger", func(current any) any {
+			item := current.(triggerItem)
+			item.ProcessConfigurationID = json.RawMessage(`"999"`)
+			return item
+		}, "参照先が一致しません"},
+		{"switch with different description", "switch", func(current any) any {
+			item := current.(switchItem)
+			item.Description = "repurposed"
+			return item
+		}, "一致しません"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := cleanupTestResource(test.kind)
+			r.id = "111"
+			current := cleanupTestItem(test.kind, "111", true)
+			current = test.mutate(current)
+			err := verifyCleanupIdentity(current, r, "111")
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.wantErr)
+		})
+	}
+}
+
+// TestDecideEventbusCleanup は後片付けの判定が、削除系 API を呼び出す前に拒否することを確認します。
+// decideEventbusCleanup はリソースを変更しないため、エラーを返したケースでは
+// clear-queue や delete が呼ばれません (参照関数の呼び出し記録で確認します)。
+func TestDecideEventbusCleanup(t *testing.T) {
+	// ID 未確定の対象は参照もせずに拒否します。
+	r := cleanupTestResource("schedule")
+	r.id = ""
+	var reads int
+	read := func(id string) (any, error) {
+		reads++
+		return cleanupTestItem("schedule", id, true), nil
+	}
+	_, err := decideEventbusCleanup(read, r)
+	require.Error(t, err)
+	require.Equal(t, 0, reads, "unconfirmed ID should be refused without reading")
+
+	// 再照合の参照に失敗したときも削除を拒否します。
+	r.id = "111"
+	_, err = decideEventbusCleanup(func(id string) (any, error) {
+		return nil, fmt.Errorf("connection refused")
+	}, r)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "再照合に失敗")
+
+	// 同名の別 ID や設定の不一致も拒否します。
+	_, err = decideEventbusCleanup(func(id string) (any, error) {
+		return cleanupTestItem("schedule", "999", true), nil
+	}, r)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "一致しません")
+
+	_, err = decideEventbusCleanup(func(id string) (any, error) {
+		return cleanupTestItem("schedule", "111", false), nil
+	}, r)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "一致しません")
+
+	// 完全一致するときだけ削除を許可します。
+	confirmedID, err := decideEventbusCleanup(func(id string) (any, error) {
+		return cleanupTestItem("schedule", id, true), nil
+	}, r)
+	require.NoError(t, err)
+	require.Equal(t, "111", confirmedID)
 }
