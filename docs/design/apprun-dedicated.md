@@ -22,7 +22,7 @@ AppRun 専有型のアプリケーションを、JSON の定義ファイル1つ�
 - クラスタ、オートスケーリンググループ、ワーカノード、ロードバランサ、証明書、サービスクラスの参照・管理。低レベル `apprun-dedicated-api` が同じ入出力で提供しており、高レベル層では繰り返しません。インフラの構築と管理 (クラスタ作成を含む) は Terraform などの別手段とし、高レベル層はアプリケーションだけを変更します。
 - 低レベル `apprun-dedicated-api` の変更。現行のコマンドと JSON 経路を維持します。
 - Jsonnet、環境変数参照 (`env`、`must_env`)、tfstate-lookup、Secret Manager 参照の評価機構。定義は JSON のみです。
-- ライブ E2E の実行。クラスタ作成を伴うため、シナリオ設計と費用の承認を [#59](https://github.com/sacloud/skr/issues/59) で管理します。
+- 低レベル `apprun-dedicated-api` コマンドのライブ E2E。クラスタ作成を伴うため [#59](https://github.com/sacloud/skr/issues/59) で管理します。高レベルコマンドのライフサイクルシナリオは「ライブ E2E」のとおり実装済みです。
 
 ## 全体構成
 
@@ -336,22 +336,13 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 
 ### ライブ E2E
 
-低レベル層と同様、全コマンドがクラスタ作成を前提とするため、この設計では実装しません。ライブ E2E のシナリオ設計、費用の範囲 (クラスタ、ASG、ワーカノード)、安全な後片付けは [#59](https://github.com/sacloud/skr/issues/59) で、低レベル層の検証と一体として承認を求めます。実行する場合は [ADR 0058](../adr/0058-live-e2e-command-coverage.md)、[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)、[ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従い、`test/e2e/apprun-dedicated/` 配下の testing.T ベースのシナリオとして実装します。
+クラスタ作成を含むライフサイクルシナリオを `test/e2e/apprun-dedicated/scenario_lifecycle_test.go` に実装済みです ([ADR 0058](../adr/0058-live-e2e-command-coverage.md)、[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)、[ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従う testing.T ベースのシナリオ)。2026-11-12 にクラスタと ASG (ワーカノード 1 台) の作成を含むライブ実行で全操作の正常動作と後片付けを確認済みで、`baseline.txt` の高レベル 10 コマンドは `live` です。シナリオの概要:
 
-想定するシナリオの骨子 (承認時点で調整します):
+- 事前の同名確認と、作成直後の SDK による読み戻し (クラスタは ID・名前、ASG は ID・名前・ゾーン・サービスクラス・ノード数・インターフェース) を行います。
+- `deploy` (バージョン 1)、`status`、`versions`、`containers`、`init` での参照、環境変数を追加した 2 回目の `deploy` (バージョン 2)、`rollback`、`deactivate`、`delete` の順に実行し、応答と状態を照合します。
+- アプリケーション、ASG、クラスタは保持した ID と識別情報を再照合したうえで `defer` で CLI 経路から削除し、非同期の削除は不在になるまで期限付きで再確認します。サービスプリンシパル ID は環境変数 `SKR_E2E_APPRUN_DEDICATED_SERVICE_PRINCIPAL_ID` で渡し、未設定のときはスキップします。
 
-- 専用クラスタを1つ作成し、作成直後に ID・構成を照合して、削除と不在確認を含む `defer` をその場で登録します。
-- 初回 `deploy` でアプリ作成とバージョン1の有効化を行い、待機完了を確認します。
-- `init` で既存アプリから定義を生成し、書き出された定義をそのまま用いて再 `deploy` し、冪等に新バージョンが作成されることを確認します。
-- `status`、`versions`、`containers` で状態を照合します。`containers` の配置数と状態、`versions` の `active` の一致を確認します。
-- イメージを変更した定義で再 `deploy` し、新バージョンの作成と有効化、待機完了を確認します。
-- `diff` で差分がないことを確認したうえで、ローカル定義の一部を変更して差分が現れることを確認します。
-- `rollback` で前バージョンへ戻し、有効バージョンと待機完了を確認します。
-- `deactivate` で停止し、`DesiredCount` が 0 になったことを確認します。`rollback` で再開します。
-- `delete` で削除し、不在を確認します。
-- 後片付けはクラスタ (と ASG、ワーカノード) の削除で、削除直前に ID と構成を再照合します。途中の失敗でも後片付けを試み、失敗をテスト結果へ反映します。
-
-sakumock テストのみの段階では、ライブ検証済みとは扱いません (`PLAN.md` に区別して記録します)。
+低レベル `apprun-dedicated-api` コマンドのライブ E2E はクラスタ作成を前提とするため [#59](https://github.com/sacloud/skr/issues/59) で管理します (ライフサイクルシナリオのセットアップと後片付けは低レベルの create/delete を利用しますが、各操作の専用検証は別途整備します)。
 
 ## ドキュメントと PLAN
 

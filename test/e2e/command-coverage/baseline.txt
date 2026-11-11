@@ -53,16 +53,16 @@ apprun-dedicated-api read-application-version deferred #59 クラスタ作成を
 apprun-dedicated-api list-worker-nodes deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated-api read-worker-node deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated-api update-worker-node-draining deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated containers deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated deactivate deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated delete deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated deploy deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated containers live
+apprun-dedicated deactivate live
+apprun-dedicated delete live
+apprun-dedicated deploy live
 apprun-dedicated diff live
-apprun-dedicated init deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated init live
 apprun-dedicated render live
-apprun-dedicated rollback deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated status deferred #59 クラスタ作成を前提とし実行コストが大きいため
-apprun-dedicated versions deferred #59 クラスタ作成を前提とし実行コストが大きいため
+apprun-dedicated rollback live
+apprun-dedicated status live
+apprun-dedicated versions live
 config create live
 config current live
 config edit live
