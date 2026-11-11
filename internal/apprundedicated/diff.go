@@ -224,7 +224,11 @@ func formatHunks(ops []diffLine, context int) string {
 			for next < len(ops) && ops[next].kind == diffEqual {
 				next++
 			}
-			if next < len(ops) && next-end <= context {
+			// GNU diff -u と同じく、次の変更までの間隔が 2*context 行以下のときは
+			// 1 つの hunk に統合します。間隔がそれより長い場合は hunk を分けますが、
+			// このとき文脈の tail (context 行) と次の hunk の head (context 行) が
+			// 重ならないため、同じ行を 2 回出力することはありません。
+			if next < len(ops) && next-end <= 2*context {
 				endA += next - end
 				endB += next - end
 				end = next
