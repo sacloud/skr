@@ -79,7 +79,7 @@ func (s *Service) Init(ctx context.Context, clusterName, applicationName string)
 
 ## アプリケーション定義ファイル
 
-定義は JSON ファイルのみです。Jsonnet などの評価機構は持ちません ([ADR 0079](../adr/0079-apprun-dedicated-high-level-commands.md))。既定のファイル名は `application.json` で、`--app` グローバルフラグで変更します。`--app -` で標準入力から読み込みます。インラインの JSON 文字列は受け付けません。秘密情報 (`registryPassword`、`secret=true` の環境変数の値) を含む定義は、コマンドライン引数へ露出させないための経路として、ファイルまたは標準入力から読み込みます ([ADR 0007](../adr/0007-api-request-input.md) の入力経路の規律に合わせます)。
+定義は JSON ファイルのみです。Jsonnet などの評価機構は持ちません ([ADR 0079](../adr/0079-apprun-dedicated-high-level-commands.md))。定義ファイルは `--app` グローバルフラグで指定し、既定値はありません。skr は複数のドメインを扱う CLI であるため、カレントディレクトリの暗黙のファイルに依存せず、操作対象を常に明示します (PR #231 のレビューでの合意)。`--app -` で標準入力から読み込みます。インラインの JSON 文字列は受け付けません。秘密情報 (`registryPassword`、`secret=true` の環境変数の値) を含む定義は、コマンドライン引数へ露出させないための経路として、ファイルまたは標準入力から読み込みます ([ADR 0007](../adr/0007-api-request-input.md) の入力経路の規律に合わせます)。
 
 フィールド名は API リクエスト (`CreateApplicationVersionRequest`) と同じ camelCase にします。`cluster` と `name` はデプロイ対象の識別子で、API リクエストには含まれません。
 
@@ -240,16 +240,16 @@ rollback、deactivate、delete も同じポーリング機構を使います。
 ```text
 skr apprun-dedicated init CLUSTER APPLICATION [--output-file FILE]
 
-skr apprun-dedicated deploy [--app FILE|-] [--no-wait] [--wait-timeout DURATION]
-skr apprun-dedicated diff [--app FILE|-]
-skr apprun-dedicated render [--app FILE|-]
-skr apprun-dedicated status [--app FILE|-]
-skr apprun-dedicated versions [--app FILE|-]
-skr apprun-dedicated containers [--app FILE|-]
+skr apprun-dedicated deploy --app FILE|- [--no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated diff --app FILE|-
+skr apprun-dedicated render --app FILE|-
+skr apprun-dedicated status --app FILE|-
+skr apprun-dedicated versions --app FILE|-
+skr apprun-dedicated containers --app FILE|-
 
-skr apprun-dedicated rollback [--app FILE|-] [--target VERSION] [--force] [--no-wait] [--wait-timeout DURATION]
-skr apprun-dedicated deactivate [--app FILE|-] [--force] [--no-wait] [--wait-timeout DURATION]
-skr apprun-dedicated delete [--app FILE|-] [--force] [--no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated rollback --app FILE|- [--target VERSION] [--force] [--no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated deactivate --app FILE|- [--force] [--no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated delete --app FILE|- [--force] [--no-wait] [--wait-timeout DURATION]
 ```
 
 末端コマンドは 10 個です。位置引数は `init` のクラスタ名とアプリケーション名のみです ([ADR 0075](../adr/0075-high-level-command-tier.md) に従い、対象を表す値は位置引数にします)。認証は低レベル層と同じ SDK のプロファイル機構を使い、グローバルフラグと共通の出力処理を接続します。
@@ -258,7 +258,7 @@ skr apprun-dedicated delete [--app FILE|-] [--force] [--no-wait] [--wait-timeout
 
 | フラグ | コマンド | 説明 |
 | ------ | -------- | ---- |
-| `--app FILE\|-` | init 以外 | 定義ファイル (既定 `application.json`)。`-` で標準入力 |
+| `--app FILE\|-` | init 以外 | 定義ファイル (常に必須、既定値なし)。`-` で標準入力 |
 | `--output-file FILE` | init | 出力先ファイル (既定 `application.json`)。既存ファイルは上書きしない |
 | `--target VERSION` | rollback | 有効化するバージョン番号 |
 | `--force` | rollback、deactivate、delete | 確認プロンプトを省略。標準入力が端末でない場合や `--app -` と併用する場合は必須 |
