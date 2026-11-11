@@ -56,7 +56,8 @@ func (t realTicker) Stop() { t.ticker.Stop() }
 
 // poll は check が完了 (true) を返すまで DefaultPollInterval 間隔で再試行します。
 //
-// 参照エラーなど check がエラーを返しても打ち切らず、期限まで再試行します。最初の
+// check がエラーを返した場合は打ち切ってエラーを返します。参照エラーなど打ち切りたく
+// ない一時的な失敗は、check が (false, nil) を返すことで期限まで再試行できます。最初の
 // check は待機せずに即座に行います。期限を超えた場合と context がキャンセルされた
 // 場合はエラーを返します。timeout の零値は DefaultWaitTimeout として扱います。
 func (s *Service) poll(ctx context.Context, timeout time.Duration, check func() (bool, error)) error {

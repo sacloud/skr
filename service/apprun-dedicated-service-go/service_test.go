@@ -275,6 +275,79 @@ func TestDeployFindsAcrossPages(t *testing.T) {
 	require.Equal(t, app.applicationID, result.ApplicationID)
 }
 
+// readMutatingAppAPI は Read の応答を加工する application.ApplicationAPI です。
+// 応答の不整合を再現するために使います。
+type readMutatingAppAPI struct {
+	application.ApplicationAPI
+	mutate func(*application.ApplicationDetail)
+}
+
+func (m *readMutatingAppAPI) Read(ctx context.Context, id v1.ApplicationID) (*application.ApplicationDetail, error) {
+	detail, err := m.ApplicationAPI.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	m.mutate(detail)
+	return detail, nil
+}
+
+func TestFindApplicationResponseMismatch(t *testing.T) {
+	def := manualDef("c1", "app1")
+
+	// 応答の不整合は後続の変更 API が別のリソースを変更する恐れがあるため、変更に進みません。
+	t.Run("応答の ID が一致しなければエラー", func(t *testing.T) {
+		f := newFakeSDK(t)
+		f.addCluster(t, "c1")
+		f.addApp(t, "c1", "app1")
+		s := &Service{
+			applicationAPI: &readMutatingAppAPI{ApplicationAPI: f.app, mutate: func(d *application.ApplicationDetail) {
+				d.ApplicationID = v1.ApplicationID{0xFF}
+			}},
+			clusterAPI:    f.cluster,
+			newVersionAPI: f.newVersionAPI,
+			clock:         newFakeClock(),
+		}
+		_, err := s.Status(t.Context(), def)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ID が一致しません")
+	})
+
+	t.Run("応答の名前が一致しなければエラー", func(t *testing.T) {
+		f := newFakeSDK(t)
+		f.addCluster(t, "c1")
+		f.addApp(t, "c1", "app1")
+		s := &Service{
+			applicationAPI: &readMutatingAppAPI{ApplicationAPI: f.app, mutate: func(d *application.ApplicationDetail) {
+				d.Name = "other"
+			}},
+			clusterAPI:    f.cluster,
+			newVersionAPI: f.newVersionAPI,
+			clock:         newFakeClock(),
+		}
+		_, err := s.Status(t.Context(), def)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "名前が一致しません")
+	})
+
+	t.Run("作成後の応答の所属クラスタが一致しなければエラー", func(t *testing.T) {
+		f := newFakeSDK(t)
+		f.addCluster(t, "c1")
+		s := &Service{
+			applicationAPI: &readMutatingAppAPI{ApplicationAPI: f.app, mutate: func(d *application.ApplicationDetail) {
+				d.ClusterName = "other-cluster"
+			}},
+			clusterAPI:    f.cluster,
+			newVersionAPI: f.newVersionAPI,
+			clock:         newFakeClock(),
+		}
+		_, err := s.Deploy(t.Context(), def, &DeployOptions{NoWait: true})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "所属クラスタが一致しません")
+		// バージョンの作成に進みません。
+		require.Len(t, f.createVersionCalls, 0)
+	})
+}
+
 func TestRollbackFromActiveVersion(t *testing.T) {
 	f := newFakeSDK(t)
 	f.addCluster(t, "c1")
@@ -540,6 +613,22 @@ func TestDelete(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "アプリケーションの削除に失敗しました")
+	})
+
+	t.Run("削除済みを示すエラーが返っても不在確認で完了する", func(t *testing.T) {
+		// 削除 API が成功した後も参照が遅延で存在を返すと、次の削除は既に削除済みを
+		// 示すエラーで失敗します。不在確認が NotFound を返せば成功として扱います。
+		f := newFakeSDK(t)
+		f.addCluster(t, "c1")
+		app := f.addApp(t, "c1", "app1")
+		app.lingeringReads = 1
+		s := newTestService(t, f)
+
+		_, err := runWithTicks(t, s, func() (any, error) {
+			return s.Delete(t.Context(), def, &WaitOptions{Timeout: time.Minute})
+		})
+		require.NoError(t, err)
+		require.Len(t, f.deleteApplicationCalls, 1)
 	})
 }
 

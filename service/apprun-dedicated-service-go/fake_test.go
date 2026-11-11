@@ -42,6 +42,8 @@ type fakeApp struct {
 	// deleteFailures は Delete がこの回数だけ失敗することを表します (再試行の検証用)。
 	deleteFailures int
 	deleted        bool
+	// lingeringReads は削除後も参照がこの回数だけ存在を返すことを表します (遅延の再現用)。
+	lingeringReads int
 }
 
 func (a *fakeApp) readApplication() v1.ReadApplication {
@@ -199,6 +201,13 @@ func (f *fakeApplicationAPI) Read(ctx context.Context, id v1.ApplicationID) (*ap
 		return nil, f.sdk.readErr
 	}
 	app, ok := f.sdk.findApp(id)
+	if !ok {
+		// 削除済みのアプリケーションが参照の遅延で存在を返すケースを再現します。
+		if a, found := f.sdk.findAppIncludingDeleted(id); found && a.lingeringReads > 0 {
+			a.lingeringReads--
+			app, ok = a, true
+		}
+	}
 	if !ok {
 		return nil, notFoundError("application not found")
 	}
@@ -400,6 +409,16 @@ func (v *fakeVersionAPI) Delete(ctx context.Context, id v1.ApplicationVersionNum
 func (f *fakeSDK) findApp(id v1.ApplicationID) (*fakeApp, bool) {
 	for _, a := range f.apps {
 		if a.applicationID == id && !a.deleted {
+			return a, true
+		}
+	}
+	return nil, false
+}
+
+// findAppIncludingDeleted は削除済みを含めて識別子でアプリケーションを検索します。
+func (f *fakeSDK) findAppIncludingDeleted(id v1.ApplicationID) (*fakeApp, bool) {
+	for _, a := range f.apps {
+		if a.applicationID == id {
 			return a, true
 		}
 	}

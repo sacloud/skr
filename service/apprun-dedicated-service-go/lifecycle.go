@@ -173,17 +173,28 @@ func (s *Service) deleteWithRetry(ctx context.Context, id v1.ApplicationID, time
 			return false, err
 		}
 		if err := s.applicationAPI.Delete(ctx, id); err != nil {
-			// 削除条件を満たすまで即座に失敗することがあるため、期限まで再試行します。
-			return false, nil
+			// 削除 API は削除条件を満たすまで即座に失敗することがあるため、期限まで
+			// 再試行します。ただし、削除が完了した後も参照が遅延で存在を返すと、次の
+			// 削除は既に削除済みを示すエラーで失敗するため、削除の成否は不在確認の
+			// 結果で判定します。
+			return s.confirmDeleted(ctx, id)
 		}
-		if _, err := s.applicationAPI.Read(ctx, id); err != nil {
-			if saclient.IsNotFoundError(err) {
-				return true, nil
-			}
-			// 不在確認の参照エラーも期限まで再試行します。
-			return false, nil
-		}
-		// 削除 API は成功したがまだ存在するため、期限まで再試行します。
-		return false, nil
+		// 削除 API が成功した場合も、参照が遅延で存在を返すことがあるため、不在を
+		// 確認してから完了とします。
+		return s.confirmDeleted(ctx, id)
 	})
+}
+
+// confirmDeleted は対象の不在を確認します。NotFound なら削除済みとして true を返し、
+// 存在する場合と参照エラーの場合は、期限まで再試行するため false を返します。
+func (s *Service) confirmDeleted(ctx context.Context, id v1.ApplicationID) (bool, error) {
+	if _, err := s.applicationAPI.Read(ctx, id); err != nil {
+		if saclient.IsNotFoundError(err) {
+			return true, nil
+		}
+		// 不在確認の参照エラーも期限まで再試行します。
+		return false, nil
+	}
+	// まだ存在するため、期限まで再試行します。
+	return false, nil
 }

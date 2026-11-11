@@ -122,7 +122,8 @@ func (s *Service) findCluster(ctx context.Context, name string) (*cluster.Cluste
 // findApplication は定義の cluster と name でアプリケーションを検索します。
 //
 // アプリケーション名はクラスタ内で一意であるため、一覧の名前一致に対して Read で
-// ClusterName を照合し、クラスタが一致するものだけを対象にします。見つからない場合は
+// ID・名前の一致を確認し、クラスタが一致するものだけを対象にします。応答が検索対象と
+// 一致しない場合は応答の不整合としてエラーにします。見つからない場合は
 // *ApplicationNotFoundError を返します。
 func (s *Service) findApplication(ctx context.Context, def *ApplicationDefinition) (*application.ApplicationDetail, error) {
 	var cursor *v1.ApplicationID
@@ -139,6 +140,11 @@ func (s *Service) findApplication(ctx context.Context, def *ApplicationDefinitio
 			if err != nil {
 				return nil, fmt.Errorf("アプリケーション %q の情報取得に失敗しました: %w", def.Name, err)
 			}
+			if err := verifyApplicationIdentity(detail, list[i].ApplicationID, def.Name); err != nil {
+				return nil, err
+			}
+			// 同名のアプリケーションは別クラスタにも作れるため、所属クラスタが一致する
+			// ものだけを対象にします。
 			if detail.ClusterName == def.Cluster {
 				return detail, nil
 			}
@@ -172,7 +178,39 @@ func (s *Service) findOrCreateApplication(ctx context.Context, def *ApplicationD
 	if err != nil {
 		return nil, false, fmt.Errorf("作成したアプリケーション %q の情報取得に失敗しました: %w", def.Name, err)
 	}
+	if err := verifyApplicationIdentity(detail, ident.ApplicationID, def.Name); err != nil {
+		return nil, false, err
+	}
+	if err := verifyApplicationCluster(detail, def.Cluster); err != nil {
+		return nil, false, err
+	}
 	return detail, true, nil
+}
+
+// verifyApplicationIdentity は Read の応答が検索対象のアプリケーションと一致することを
+// 確認します。nil 応答や ID・名前の不一致は応答の不整合としてエラーにします。応答が
+// 不整合のまま変更系の操作に進むと、別のアプリケーションを変更する恐れがあります。
+// 所属クラスタは検索と再照合の条件として使うため、ここでは確認しません。
+func verifyApplicationIdentity(detail *application.ApplicationDetail, id v1.ApplicationID, name string) error {
+	if detail == nil {
+		return fmt.Errorf("アプリケーション %q の情報取得の応答が空です", name)
+	}
+	if detail.ApplicationID != id {
+		return fmt.Errorf("アプリケーションの ID が一致しません: 検索対象は %s ですが、応答は %s です", id, detail.ApplicationID)
+	}
+	if detail.Name != name {
+		return fmt.Errorf("アプリケーションの名前が一致しません: 検索対象は %q ですが、応答は %q です", name, detail.Name)
+	}
+	return nil
+}
+
+// verifyApplicationCluster は Read の応答の所属クラスタが意図したクラスタと一致することを
+// 確認します。作成直後の所属確認と変更前の再照合に使います。
+func verifyApplicationCluster(detail *application.ApplicationDetail, clusterName string) error {
+	if detail.ClusterName != clusterName {
+		return fmt.Errorf("アプリケーションの所属クラスタが一致しません: 期待 %q、応答 %q", clusterName, detail.ClusterName)
+	}
+	return nil
 }
 
 // listAllVersions はアプリケーションの全バージョンを取得します。
