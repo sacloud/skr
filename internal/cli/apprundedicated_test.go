@@ -42,11 +42,19 @@ func TestRunAppRunDedicatedAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"apprun-dedicated-api", "create-application-version", "--help"},
-			want: []string{"--application-id", "--request", "version.CreateParams", "@path.json", "標準入力"},
+			want: []string{"--application-id", "--request", "registryPasswordAction", "@path.json", "標準入力"},
 		},
 		{
 			args: []string{"apprun-dedicated-api", "create-certificate", "--help"},
 			want: []string{"--cluster-id", "--request", "certificatePem", "privatekeyPem", "@path.json"},
+		},
+		{
+			args: []string{"apprun-dedicated-api", "create-cluster", "--help"},
+			want: []string{"--request", "servicePrincipalID", "@path.json", "- (標準入力)"},
+		},
+		{
+			args: []string{"apprun-dedicated-api", "create-auto-scaling-group", "--help"},
+			want: []string{"--request", "workerServiceClassPath", "- (標準入力)"},
 		},
 		{
 			args: []string{"apprun-dedicated-api", "update-application", "--help"},
@@ -64,6 +72,29 @@ func TestRunAppRunDedicatedAPIHelp(t *testing.T) {
 			for _, text := range test.want {
 				require.Contains(t, help, text, "help does not contain %q", text)
 			}
+		})
+	}
+}
+
+// --request を持つコマンドのヘルプに SDK の内部型名が現れないことを検証します。
+// 入力経路の記載 (@path.json と標準入力) も実装と一致していることを確認します。
+func TestAppRunDedicatedAPIRequestHelpExcludesSDKTypeNames(t *testing.T) {
+	for _, command := range []string{
+		"create-cluster",
+		"update-cluster",
+		"create-auto-scaling-group",
+		"create-load-balancer",
+		"create-application-version",
+		"create-certificate",
+		"update-certificate",
+	} {
+		t.Run(command, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			require.Equal(t, 0, run([]string{"apprun-dedicated-api", command, "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
+			help := strings.Join(strings.Fields(stdout.String()), " ")
+			require.NotContains(t, help, "Params", "help should not expose SDK type names: %s", help)
+			require.Contains(t, help, "@path.json")
+			require.Contains(t, help, "- (標準入力)")
 		})
 	}
 }

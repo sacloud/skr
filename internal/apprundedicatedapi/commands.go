@@ -224,7 +224,7 @@ func (c *ClusterReadCommand) Run(ctx *kong.Context) error {
 }
 
 type ClusterCreateCommand struct {
-	Request *string `required:"" help:"cluster.CreateParams JSON。直接 JSON または @path.json で指定します。必須項目は name と servicePrincipalID です。ports はロードバランサの待受ポート設定です。"`
+	Request *string `required:"" help:"クラスタ作成のリクエスト JSON。必須項目は name、ports、servicePrincipalID です。ロードバランサの待受ポートを使わない場合も ports は必須のため [] を指定します。letsEncryptEmail は Let's Encrypt の証明書発行に使うメールアドレスです。直接 JSON、@path.json、- (標準入力) のいずれかで指定します。"`
 	runtime Runtime
 }
 
@@ -240,7 +240,7 @@ func (c *ClusterCreateCommand) Run(ctx *kong.Context) error {
 
 type ClusterUpdateCommand struct {
 	ID      string  `arg:"" help:"更新するクラスタ ID。"`
-	Request *string `required:"" help:"cluster.UpdateParams JSON。直接 JSON または @path.json で指定します。"`
+	Request *string `required:"" help:"クラスタ更新のリクエスト JSON。servicePrincipalID は必須です。Let's Encrypt のメールアドレスは letsEncryptEmail に指定します。直接 JSON、@path.json、- (標準入力) のいずれかで指定します。"`
 	runtime Runtime
 }
 
@@ -421,7 +421,7 @@ func (c *VersionListCommand) Run(ctx *kong.Context) error {
 
 type VersionCreateCommand struct {
 	ApplicationID string  `name:"application-id" required:"" help:"対象アプリケーション ID。"`
-	Request       *string `required:"" help:"version.CreateParams JSON。イメージ、CPU、メモリ、スケーリング設定を指定します。秘密情報が含まれる場合は @path.json または - (標準入力) を使います。"`
+	Request       *string `required:"" help:"バージョン作成のリクエスト JSON。必須項目は image、cpu、memory、scalingMode、registryUsername、registryPassword、registryPasswordAction、exposedPorts、env です。認証を使わない場合も registryUsername と registryPassword に null を指定します。scalingMode が manual のときは fixedScale を、cpu のときは minScale と maxScale も指定します。registryPassword など秘密情報を含むため、@path.json または - (標準入力) で指定します。"`
 	runtime       Runtime
 }
 
@@ -514,7 +514,7 @@ func (c *AutoScalingGroupListCommand) Run(ctx *kong.Context) error {
 
 type AutoScalingGroupCreateCommand struct {
 	ClusterID string  `name:"cluster-id" required:"" help:"作成先クラスタ ID。"`
-	Request   *string `required:"" help:"autoscalinggroup.CreateParams JSON。zone、workerServiceClassPath、ノード数、ネットワーク interfaces を指定します。複雑な配列を含むため JSON で指定してください。"`
+	Request   *string `required:"" help:"オートスケーリンググループ作成のリクエスト JSON。必須項目は name、zone、workerServiceClassPath、minNodes、maxNodes、interfaces です。nameServers は省略できます。直接 JSON、@path.json、- (標準入力) のいずれかで指定します。"`
 	runtime   Runtime
 }
 
@@ -707,7 +707,7 @@ func (c *LoadBalancerListCommand) Run(ctx *kong.Context) error {
 type LoadBalancerCreateCommand struct {
 	ClusterID          string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
 	AutoScalingGroupID string  `name:"auto-scaling-group-id" required:"" help:"作成先グループ ID。"`
-	Request            *string `required:"" help:"loadbalancer.CreateParams JSON。name、serviceClassPath、interfaces 等を指定します。"`
+	Request            *string `required:"" help:"ロードバランサ作成のリクエスト JSON。必須項目は name、serviceClassPath、interfaces です。nameServers は省略できます。serviceClassPath は list-load-balancer-service-classes で確認できます。直接 JSON、@path.json、- (標準入力) のいずれかで指定します。"`
 	runtime            Runtime
 }
 
@@ -887,7 +887,7 @@ func (c *CertificateListCommand) Run(ctx *kong.Context) error {
 
 type CertificateCreateCommand struct {
 	ClusterID string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
-	Request   *string `required:"" help:"certificate.CreateParams JSON。name、certificatePem、privatekeyPem を指定します。リクエストは @path.json または - (標準入力) で渡してください。"`
+	Request   *string `required:"" help:"証明書作成のリクエスト JSON。必須項目は name、certificatePem、privatekeyPem です。中間証明書は intermediateCertificatePem に指定します。秘密情報を含むため、@path.json または - (標準入力) で指定します。"`
 	runtime   Runtime
 }
 
@@ -928,7 +928,7 @@ func (c *CertificateReadCommand) Run(ctx *kong.Context) error {
 type CertificateUpdateCommand struct {
 	ClusterID     string  `name:"cluster-id" required:"" help:"対象クラスタ ID。"`
 	CertificateID string  `name:"certificate-id" required:"" help:"更新する証明書 ID。"`
-	Request       *string `required:"" help:"certificate.UpdateParams JSON。リクエストは @path.json または - (標準入力) で渡してください。"`
+	Request       *string `required:"" help:"証明書更新のリクエスト JSON。必須項目は name、certificatePem、privatekeyPem です。中間証明書は intermediateCertificatePem に指定します。秘密情報を含むため、@path.json または - (標準入力) で指定します。"`
 	runtime       Runtime
 }
 
