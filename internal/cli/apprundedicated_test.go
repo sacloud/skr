@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -77,8 +78,12 @@ func TestRunAppRunDedicatedAPIHelp(t *testing.T) {
 }
 
 // --request を持つコマンドのヘルプに SDK の内部型名が現れないことを検証します。
-// 入力経路の記載 (@path.json と標準入力) も実装と一致していることを確認します。
+// 以前のヘルプに表示していた cluster.CreateParams のような SDK のパッケージ名と
+// 型名の組み合わせ (7 種類) を含め、SDK のパッケージ名に続く大文字始まりの型名表記を
+// 禁止します。入力経路の記載 (@path.json と標準入力) も実装と一致していることを
+// 確認します。
 func TestAppRunDedicatedAPIRequestHelpExcludesSDKTypeNames(t *testing.T) {
+	var sdkTypeName = regexp.MustCompile(`(cluster|version|autoscalinggroup|loadbalancer|certificate)\.[A-Z]`)
 	for _, command := range []string{
 		"create-cluster",
 		"update-cluster",
@@ -93,6 +98,7 @@ func TestAppRunDedicatedAPIRequestHelpExcludesSDKTypeNames(t *testing.T) {
 			require.Equal(t, 0, run([]string{"apprun-dedicated-api", command, "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
 			help := strings.Join(strings.Fields(stdout.String()), " ")
 			require.NotContains(t, help, "Params", "help should not expose SDK type names: %s", help)
+			require.NotRegexp(t, sdkTypeName, help, "help should not expose SDK type names: %s", help)
 			require.Contains(t, help, "@path.json")
 			require.Contains(t, help, "- (標準入力)")
 		})
