@@ -154,7 +154,7 @@ func (s *Service) Delete(ctx context.Context, def *ApplicationDefinition, opts *
 
 // waitStopped はアプリケーションの DesiredCount が 0 または null になるまで待機します。
 func (s *Service) waitStopped(ctx context.Context, id v1.ApplicationID, timeout time.Duration) error {
-	return s.poll(ctx, timeout, func() (bool, error) {
+	return s.poll(ctx, timeout, func(ctx context.Context) (bool, error) {
 		detail, err := s.applicationAPI.Read(ctx, id)
 		if err != nil {
 			// 参照エラーは打ち切らず、期限まで再試行します。
@@ -168,7 +168,7 @@ func (s *Service) waitStopped(ctx context.Context, id v1.ApplicationID, timeout 
 
 // deleteWithRetry は削除を期限付きで再試行し、削除後の不在を確認します。
 func (s *Service) deleteWithRetry(ctx context.Context, id v1.ApplicationID, timeout time.Duration) error {
-	return s.poll(ctx, timeout, func() (bool, error) {
+	return s.poll(ctx, timeout, func(ctx context.Context) (bool, error) {
 		if err := ensureActive(ctx); err != nil {
 			return false, err
 		}

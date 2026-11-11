@@ -28,11 +28,13 @@ import (
 )
 
 // fakeClock はテスト用の時計です。Advance で時刻を進め、ticker に tick を供給します。
+// WithTimeout は期限を過ぎたときに Done を閉じる fake context を返します。
 type fakeClock struct {
 	mu           sync.Mutex
 	now          time.Time
 	ticks        chan time.Time
 	lastInterval time.Duration
+	ctxs         []*fakeDeadlineCtx
 }
 
 type fakeTicker struct {
@@ -65,17 +67,100 @@ func (t *fakeTicker) C() <-chan time.Time {
 
 func (t *fakeTicker) Stop() {}
 
-// Advance は時刻を進めて tick を1つ供給します。
+// WithTimeout は期限を過ぎると Done が閉じる context を返します。
+// 実 context と同じく、親のキャンセルも伝えます。
+func (c *fakeClock) WithTimeout(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ctx := newFakeDeadlineCtx(parent, c.now.Add(d))
+	c.ctxs = append(c.ctxs, ctx)
+	return ctx, ctx.cancel
+}
+
+// Advance は時刻を進めて tick を1つ供給し、期限を過ぎた context を完了させます。
 func (c *fakeClock) Advance(d time.Duration) {
 	c.mu.Lock()
 	c.now = c.now.Add(d)
 	now := c.now
+	ctxs := append([]*fakeDeadlineCtx(nil), c.ctxs...)
 	c.mu.Unlock()
 	select {
 	case c.ticks <- now:
 	default:
 	}
+	for _, ctx := range ctxs {
+		ctx.expireIfPast(now)
+	}
 }
+
+// fakeDeadlineCtx は fakeClock の WithTimeout が返す context です。
+// 期限を過ぎるか cancel されると Done が閉じます。親が先に完了した場合は
+// 親の完了も伝えます。
+type fakeDeadlineCtx struct {
+	parent   context.Context
+	deadline time.Time
+
+	mu   sync.Mutex
+	done chan struct{}
+	err  error
+}
+
+func newFakeDeadlineCtx(parent context.Context, deadline time.Time) *fakeDeadlineCtx {
+	f := &fakeDeadlineCtx{parent: parent, deadline: deadline, done: make(chan struct{})}
+	if parent != nil && parent.Done() != nil {
+		go func() {
+			select {
+			case <-parent.Done():
+				f.cancelWith(parent.Err())
+			case <-f.done:
+			}
+		}()
+	}
+	return f
+}
+
+// expireIfPast は現在時刻が期限を過ぎていれば期限切れとして完了させます。
+func (f *fakeDeadlineCtx) expireIfPast(now time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil || now.Before(f.deadline) {
+		return
+	}
+	f.err = context.DeadlineExceeded
+	close(f.done)
+}
+
+func (f *fakeDeadlineCtx) cancel() {
+	f.cancelWith(context.Canceled)
+}
+
+func (f *fakeDeadlineCtx) cancelWith(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return
+	}
+	f.err = err
+	close(f.done)
+}
+
+func (f *fakeDeadlineCtx) Deadline() (time.Time, bool) { return f.deadline, true }
+
+func (f *fakeDeadlineCtx) Done() <-chan struct{} { return f.done }
+
+func (f *fakeDeadlineCtx) Err() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return f.err
+	}
+	if f.parent != nil {
+		return f.parent.Err()
+	}
+	return nil
+}
+
+func (f *fakeDeadlineCtx) Value(key any) any { return f.parent.Value(key) }
 
 // runningPlacement は指定バージョンの running コンテナを持つ Placement を返します。
 func runningPlacement(version v1.ApplicationVersionNumber) application.Placement {
@@ -225,7 +310,7 @@ func TestPollImmediateCheck(t *testing.T) {
 
 	// 最初の確認で完了条件を満たせば、tick を待たずに終了します。
 	var calls int
-	err := s.poll(t.Context(), time.Minute, func() (bool, error) {
+	err := s.poll(t.Context(), time.Minute, func(_ context.Context) (bool, error) {
 		calls++
 		return true, nil
 	})
@@ -240,7 +325,7 @@ func TestPollTimeout(t *testing.T) {
 	// 完了しないまま期限を超えるとタイムアウトします。
 	var calls int
 	_, err := runWithTicks(t, s, func() (any, error) {
-		return nil, s.poll(t.Context(), DefaultPollInterval*2, func() (bool, error) {
+		return nil, s.poll(t.Context(), DefaultPollInterval*2, func(_ context.Context) (bool, error) {
 			calls++
 			return false, nil
 		})
@@ -257,7 +342,7 @@ func TestPollCheckError(t *testing.T) {
 	// check が返したエラーはそのまま伝わります。
 	wantErr := errors.New("確認に失敗しました")
 	_, err := runWithTicks(t, s, func() (any, error) {
-		return nil, s.poll(t.Context(), time.Minute, func() (bool, error) {
+		return nil, s.poll(t.Context(), time.Minute, func(_ context.Context) (bool, error) {
 			return false, wantErr
 		})
 	})
@@ -272,12 +357,86 @@ func TestPollContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	var calls int
-	err := s.poll(ctx, time.Minute, func() (bool, error) {
+	err := s.poll(ctx, time.Minute, func(_ context.Context) (bool, error) {
 		calls++
 		return false, nil
 	})
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, 1, calls)
+}
+
+// check に渡す context に待機期限が設定されていることを確認します。
+func TestPollCheckContextHasDeadline(t *testing.T) {
+	clock := newFakeClock()
+	s := &Service{clock: clock}
+
+	var deadline time.Time
+	var ok bool
+	err := s.poll(t.Context(), 90*time.Second, func(ctx context.Context) (bool, error) {
+		deadline, ok = ctx.Deadline()
+		return true, nil
+	})
+	require.NoError(t, err)
+	require.True(t, ok, "check context should have a deadline")
+	require.Equal(t, clock.Now().Add(90*time.Second), deadline)
+}
+
+// API 呼び出しの最中に待機期限が過ぎると、check に渡した context が完了し、
+// タイムアウトのエラーが返ります。
+func TestPollTimeoutDuringCheck(t *testing.T) {
+	clock := newFakeClock()
+	s := &Service{clock: clock}
+
+	started := make(chan struct{})
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- s.poll(t.Context(), time.Minute, func(ctx context.Context) (bool, error) {
+			// 長い API 呼び出しを模偉し、待機 context の完了を待ちます。
+			close(started)
+			<-ctx.Done()
+			return false, ctx.Err()
+		})
+	}()
+	// check が待機 context を受領したあとに、期限を超えるまで時刻を進めます。
+	<-started
+	clock.Advance(time.Minute + time.Second)
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "タイムアウト")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(5 * time.Second):
+		t.Fatal("poll did not return after the deadline passed during a check")
+	}
+}
+
+// API 呼び出しの最中に利用者がキャンセルすると、check に渡した context が完了し、
+// キャンセルのエラーが返ります。
+func TestPollCancelDuringCheck(t *testing.T) {
+	clock := newFakeClock()
+	s := &Service{clock: clock}
+
+	parent, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	started := make(chan struct{})
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- s.poll(parent, time.Minute, func(ctx context.Context) (bool, error) {
+			close(started)
+			<-ctx.Done()
+			return false, ctx.Err()
+		})
+	}()
+	<-started
+	cancel()
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "キャンセル")
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("poll did not return after the user canceled")
+	}
 }
 
 func TestPollInterval(t *testing.T) {
@@ -286,7 +445,7 @@ func TestPollInterval(t *testing.T) {
 
 	// デフォルトのポーリング間隔で ticker を作ります。
 	_, err := runWithTicks(t, s, func() (any, error) {
-		return nil, s.poll(t.Context(), time.Minute, func() (bool, error) {
+		return nil, s.poll(t.Context(), time.Minute, func(_ context.Context) (bool, error) {
 			return true, nil
 		})
 	})
@@ -304,7 +463,7 @@ func TestPollWaitBoundedByDeadline(t *testing.T) {
 		// 期限までの残り時間だけ待ってからタイムアウトします。
 		var calls int
 		_, err := runWithTicks(t, s, func() (any, error) {
-			return nil, s.poll(t.Context(), time.Second, func() (bool, error) {
+			return nil, s.poll(t.Context(), time.Second, func(_ context.Context) (bool, error) {
 				calls++
 				return false, nil
 			})
@@ -324,7 +483,7 @@ func TestPollWaitBoundedByDeadline(t *testing.T) {
 		// 期限 12 秒に対し、最後の待ちはポーリング間隔 (5 秒) ではなく残り 2 秒です。
 		var calls int
 		_, err := runWithTicks(t, s, func() (any, error) {
-			return nil, s.poll(t.Context(), 12*time.Second, func() (bool, error) {
+			return nil, s.poll(t.Context(), 12*time.Second, func(_ context.Context) (bool, error) {
 				calls++
 				return false, nil
 			})

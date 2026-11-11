@@ -217,7 +217,7 @@ func (c *InitCommand) Run(kongCtx *kong.Context) error {
 type DeployCommand struct {
 	App         string        `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
 	NoWait      bool          `name:"no-wait" help:"有効化後の反映待ちを省略します。"`
-	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
+	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     DeployServiceFactory
 	runtime     Runtime
 }
@@ -400,7 +400,7 @@ type RollbackCommand struct {
 	Target      *int          `name:"target" placeholder:"VERSION" help:"有効化するバージョン番号。省略した場合、活性ならアクティブバージョンより前のバージョンのうち最大のものを、非活性なら最新のバージョンを切り替え先にします。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合や --app - の場合は必須です。"`
 	NoWait      bool          `name:"no-wait" help:"有効化後の反映待ちを省略します。"`
-	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
+	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
 }
@@ -442,7 +442,7 @@ type DeactivateCommand struct {
 	App         string        `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合や --app - の場合は必須です。"`
 	NoWait      bool          `name:"no-wait" help:"停止待ちを省略します。"`
-	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
+	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
 }
@@ -479,7 +479,7 @@ type DeleteCommand struct {
 	App         string        `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合や --app - の場合は必須です。"`
 	NoWait      bool          `name:"no-wait" help:"停止待ちを省略します。削除自体と削除後の不在確認は行います。"`
-	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
+	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
 }
