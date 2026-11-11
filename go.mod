@@ -10,6 +10,7 @@ require (
 	github.com/itchyny/gojq v0.12.20
 	github.com/sacloud/sacloud-sdk-go v0.5.0
 	github.com/sacloud/sakumock v0.14.0
+	github.com/sacloud/skr/service/eventbus-service-go v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.12.1
 	github.com/yuin/goldmark v1.8.7
 	golang.org/x/term v0.47.0
@@ -84,3 +85,5 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 	modernc.org/sqlite v1.61.0 // indirect
 )
+
+replace github.com/sacloud/skr/service/eventbus-service-go => ./service/eventbus-service-go

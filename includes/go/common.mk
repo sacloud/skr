@@ -22,12 +22,19 @@ GOLANG_CI_LINT_VERSION  ?= v2.14.0
 TEXTLINT_ACTION_VERSION ?= v0.1.0
 GO_LICENSES_PACKAGE     ?= .
 
+# service/ 配下の独立モジュール。ルートの go.mod から replace で参照します (ADR 0077)。
+SUBMODULES              ?= service/eventbus-service-go
+
 .DEFAULT_GOAL = default
 
 .PHONY: test
 test:
 	@echo "running 'go test'..."
 	TESTACC= $(GO) test ./... $(TESTARGS) -v -timeout=120m -parallel=8 -race;
+	@for submodule in $(SUBMODULES); do \
+		echo "running 'go test' for $$submodule..."; \
+		(cd $$submodule && TESTACC= $(GO) test ./... $(TESTARGS) -v -timeout=120m -parallel=8 -race) || exit 1; \
+	done
 
 .PHONY: testacc
 testacc:
@@ -66,6 +73,10 @@ lint: lint-go lint-text lint-action
 lint-go:
 	@echo "running golanci-lint..."
 	@golangci-lint run --fix ./...
+	@for submodule in $(SUBMODULES); do \
+		echo "running golangci-lint for $$submodule..."; \
+		(cd $$submodule && golangci-lint run --fix ./...) || exit 1; \
+	done
 
 .PHONY: textlint lint-text
 textlint: lint-text
@@ -90,4 +101,8 @@ go-licenses-check:
 .PHONY: vulncheck
 vulncheck:
 	@echo "running govulncheck..."
-	@govulncheck -version ./...
+	@govulncheck ./...
+	@for submodule in $(SUBMODULES); do \
+		echo "running govulncheck for $$submodule..."; \
+		(cd $$submodule && govulncheck ./...) || exit 1; \
+	done

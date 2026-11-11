@@ -41,6 +41,7 @@ $ docker run --rm ghcr.io/sacloud/skr:latest --help
 | `skr simplemq-api` | キューの管理、メッセージ数の確認、キュー内メッセージの削除、メッセージの送信、受信、タイムアウト延長、削除 |
 | `skr simple-notification-api` | 通知先、通知先グループ、ルーティング設定の管理、送信可否ステータスの確認、通知送信、順序変更、通知履歴の参照 |
 | `skr eventbus-api` | 実行設定、スケジュール、トリガーの管理、実行先サービス用シークレットの登録 |
+| `skr eventbus` | 実行設定、スケジュール、トリガーの管理 (宛先別の個別フラグで入力)、実行設定へのシークレット登録 |
 | `skr apprun-dedicated-api` | AppRun 専有型のクラスタ、アプリケーション、ワーカノードなどの管理 |
 | `skr apprun-api` | AppRun 共用型のアプリケーション、バージョン、トラフィック分散、パケットフィルター、ユーザー情報の管理 |
 | `skr container-registry-api registry` | コンテナレジストリと認証ユーザーの管理 |
@@ -69,6 +70,7 @@ $ skr gslb-api --help
 $ skr simplemq-api --help
 $ skr simple-notification-api --help
 $ skr eventbus-api --help
+$ skr eventbus --help
 $ skr apprun-dedicated-api --help
 $ skr apprun-api --help
 $ skr container-registry-api --help
