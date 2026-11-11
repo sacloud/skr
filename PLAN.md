@@ -162,6 +162,16 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。末端コマンドごとの状況は [ADR 0065](docs/adr/0065-e2e-command-coverage-baseline.md) に従い [`test/e2e/command-coverage/baseline.txt`](test/e2e/command-coverage/baseline.txt) に記録し、`make e2e-coverage` で検証します。2026-10-28 の baseline 作成時に、iam-api の旧 runner が `iam-api group update` を実行していない網羅漏れを検出し、未整備として記録しました。2026-10-29 の移行時に `group update` のカバレッジを追加し、baseline を live に更新しました。
 
+## CLI 機能の改善候補: `--query-raw` (jq -r 相当の生出力)
+
+`--query` は式の評価に内蔵の gojq を使うが、結果は常に JSON として出力するため、文字列スカラーが引用符付きで出力され、シェル変数への取り込みには `jq -er '.'` が必要です。2026-11-11 時点のチュートリアルでは、ID の抽出を `--query '...' | jq -er '.'` で記述しています。引用符なしの生出力モードとして `--query-raw` フラグを追加すると、この手順から jq を不要にできます (実装は未着手)。
+
+- 位置づけ: `internal/cli/cli.go` のルート共通フラグ (--query と同様に全サブコマンドで使える)。kong の `xor` タグで --query と相互排他にする
+- 式の評価は --query と同じ gojq。結果ごとの出力のみ変える
+- 出力: 文字列は引用符なしの生文字列、null は `null`、数値・真偽値は JSON 表記、配列・オブジェクトは整形 JSON。複数結果は各行に 1 件、0 件は空出力で終了コード 0 (jq -r の挙動に準拠)
+- 影響範囲: `internal/cli/query.go` と `internal/cli/cli.go` のみ (--query はルート共通フラグのため生成コードへの影響なし)。writeQueryOutput の単体テスト (文字列・数値・null・オブジェクト・複数結果・0 件) と CLI 経由の相互排他テストを追加する
+- 導入時: ADR を作成し、チュートリアルの ID 取得手順と AGENTS.md の ID 取得ガイドラインを --query-raw ベースへ更新する
+
 ## 進め方
 
 1. SDK のサービス／API ごとに公開操作とリクエスト・レスポンス型を確認します。
