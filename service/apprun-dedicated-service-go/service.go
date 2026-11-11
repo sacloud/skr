@@ -43,7 +43,8 @@ import (
 )
 
 // listPageSize は一覧取得のページサイズです。テストでページングを検証するために var にしています。
-var listPageSize = int64(100)
+// 実 API では大きなページサイズがリクエストエラーになるため、控えめな値にしています。
+var listPageSize = int64(20)
 
 // Service は AppRun 専有型のアプリケーションに対するデプロイフローを提供します。
 //

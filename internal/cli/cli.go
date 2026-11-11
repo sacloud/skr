@@ -23,6 +23,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"github.com/sacloud/skr/internal/apprunapi"
+	"github.com/sacloud/skr/internal/apprundedicated"
 	"github.com/sacloud/skr/internal/apprundedicatedapi"
 	"github.com/sacloud/skr/internal/containerregistryapi"
 	"github.com/sacloud/skr/internal/eventbus"
@@ -56,6 +57,7 @@ type cli struct {
 	SimpleNotificationAPI     simplenotificationapi.Commands     `cmd:"" name:"simple-notification-api" help:"さくらのクラウド シンプル通知の通知先、通知先グループ、ルーティング設定、通知履歴を操作します。グループへの通知送信は実際の通知を発生させます。通知の到達は保証されず、結果は通知履歴でも確認してください。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/simplenotification/about.html"`
 	NetworkingSuiteAPI        networkingsuiteapi.Commands        `cmd:"" name:"networking-suite-api" help:"ネットワークスイートのサブネットグループ、サブネット、サーバ NIC 接続、IP アドレスを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。API エンドポイントは SDK の既定値を使います。対象ゾーンに合わせる場合は SAKURA_ENDPOINTS_NETWORKING_SUITE を設定してください。Create/Update はフラグまたは --request JSON で入力します。SRN はリソース一覧や参照結果から取得します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/network/networking-suite/index.html"`
 	AppRunDedicatedAPI        apprundedicatedapi.Commands        `cmd:"" name:"apprun-dedicated-api" help:"専用ワーカノード上でコンテナを実行する AppRun 専有型のクラスタ、アプリケーションなどを操作します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html"`
+	AppRunDedicated           apprundedicated.Commands           `cmd:"" name:"apprun-dedicated" help:"AppRun 専有型のアプリケーションを定義ファイルでデプロイ・運用します。定義ファイル (--app) は init で生成するか、手元の JSON で用意します。デプロイやロールバックの反映待ちを行い、状態の確認 (status、versions、containers)、差分の確認 (diff)、正規化した定義の確認 (render) を提供します。registryPassword と secret=true の環境変数の値は定義ファイルまたは標準入力からのみ入力し、トレースが有効な場合は deploy を実行しません。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。deploy、render、status、versions、containers、rollback、deactivate は結果を JSON で出力し、--query で必要な項目を抽出できます。init は定義ファイルを書き出し、diff は unified diff を出力するため、この 2 つと delete は --query には対応しません。詳細: https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html"`
 	AppRunAPI                 apprunapi.Commands                 `cmd:"" name:"apprun-api" help:"AppRun 共用型のアプリケーション、バージョン、トラフィック分散などを操作します。アプリケーションはコンテナイメージからデプロイされ、負荷に応じてスケーリングします。料金は実行リソース、スケール数、時間に応じて発生します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。認証情報を含む作成・更新リクエストは保護したファイルまたは標準入力から読み込みます。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/apprun/about.html"`
 	ContainerRegistryAPI      containerregistryapi.Commands      `cmd:"" name:"container-registry-api" help:"さくらのクラウドのコンテナレジストリと認証ユーザーを管理します。2026年6月25日以降の新規レジストリは非公開です。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。ユーザーのパスワードは保護されたファイルまたは標準入力から読み込みます。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/container-registry/index.html"`
 	ObjectStorageAPI          objectstorageapi.Commands          `cmd:"" name:"object-storage-api" help:"さくらのオブジェクトストレージ管理 API でサイト、バケット、サイトアカウント、パーミッションを操作します。S3 互換 API のオブジェクト本体の転送ではなく、管理操作を行います。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。バケット作成は課金対象です。アクセスキーのシークレットは発行時の応答にのみ含まれます。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/objectstorage/api.html"`
@@ -119,6 +121,7 @@ func newCLI() *cli {
 	result.initSimpleNotificationAPI()
 	result.initNetworkingSuiteAPI()
 	result.initAppRunDedicatedAPI()
+	result.initAppRunDedicated()
 	result.initAppRunAPI()
 	result.initContainerRegistryAPI()
 	result.initObjectStorageAPI()

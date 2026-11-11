@@ -44,7 +44,8 @@ service/apprun-dedicated-service-go/
 internal/apprundedicated/
   commands.go               # kong コマンド (定義読み込みと service 呼び出し)
   definition_input.go       # 定義ファイルの読み込み (--app、標準入力、未知フィールド拒否)
-  confirm.go                # 確認プロンプト
+  confirm.go                # 確認プロンプトとトレース設定の検査
+  diff.go                   # unified diff の生成 (LCS、文脈行、色付き出力)
   *_test.go
 ```
 
@@ -228,7 +229,7 @@ rollback、deactivate、delete も同じポーリング機構を使います。
   - `registryPasswordAction`: 定義に現れない service 層の判断フィールドです。
 - 除外するフィールドを差分に出力へ含めず、除外したことを標準エラー出力のログで示します。
 - アプリケーションが存在しない場合、識別子のみの定義を現状として差分を表示します (初回デプロイで作成される内容の確認)。
-- 出力は unified diff 形式のテキストです。JSON 出力方針 ([ADR 0030](../adr/0030-remove-table-output.md)) の例外として、人間が変更前後を目で確認する用途のテキストに限定します。`--query` には対応しません。差分がない場合はその旨を標準エラー出力に示し、標準出力には何も書きません。
+- 出力は unified diff 形式のテキストです。JSON 出力方針 ([ADR 0030](../adr/0030-remove-table-output.md)) の例外として、人間が変更前後を目で確認する用途のテキストに限定します。`--query` には対応せず、指定した場合はエラーにします。差分がない場合はその旨を標準エラー出力に示し、標準出力には何も書きません。
 - diff 文字列の生成は Go 標準ライブラリベースの実装で行うか、ライブラリの採用は実装時に選定します。色付き出力は標準出力が端末のときだけ行います。
 
 `render` は定義を読み込み、検証と正規化 (`cluster`、`name` を含む定義の正規形) を行った結果を JSON で出力します。差分のローカル側と同じ形式です。API に送る内容の確認 (`registryPasswordAction` を含むバージョン作成リクエストの形状) は実装後に必要性を判断し、別オプションにする場合は本書へ追記します。
@@ -273,7 +274,9 @@ skr apprun-dedicated delete --app FILE|- [--force] [--no-wait] [--wait-timeout D
 
 ## 出力設計
 
-出力は JSON で、`--query` による絞り込みを低レベル層と同じ方式で受け付けます ([ADR 0030](../adr/0030-remove-table-output.md))。進行状況のログは標準エラー出力に書き、標準出力は結果の JSON だけを含めます。
+出力は JSON で、`--query` による絞り込みを低レベル層と同じ方式で受け付けます ([ADR 0030](../adr/0030-remove-table-output.md))。進行状況のログは標準エラー出力に書き、標準出力は結果の JSON だけを含めます。JSON 以外の出力を持つ `init`、`diff`、`delete` は `--query` を受け付けず、指定した場合はエラーにします (指定を暗黙に無視しない)。
+
+init は既存ファイルの保護を `O_EXCL` 付きの作成で行います。存在確認と書き込みの間に別のプロセスが同じパスへ書き込む競合を避け、上書きを防止します。
 
 - `deploy`、`rollback`、`deactivate`: 操作後の状態をオブジェクトで出力します。クラスタ名、アプリケーション名、アプリケーション ID、有効化したバージョン番号 (deactivate では解除したことを表す値)、作成の有無 (deploy の新規作成時) を含みます。SDK の操作応答の本文は多くの操作で空のため、service 層は操作後の `Read` 結果から結果オブジェクトを組み立てます。
 - `delete`: 出力しません (低レベルの delete と同じ)。
