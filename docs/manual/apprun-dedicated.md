@@ -71,7 +71,7 @@ AppRun 専有型のリソースは次の階層で構成されます。用語の�
 | `exposedPorts` | array | 任意 | 公開ポートの設定 (API の `exposedPorts`) |
 | `env` | array | 任意 | 環境変数 (API の `env`) |
 
-値の範囲 (ポート番号、閾値、CPU とメモリの組み合わせなど) は API が検証します。範囲の詳細は [AppRun 専有型のマニュアル](https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html) を参照してください。
+値の範囲 (ポート番号、閾値、CPU とメモリの組み合わせなど) は API が検証します。範囲の詳細は [AppRun 専有型 API ドキュメント](https://manual.sakura.ad.jp/api/cloud/apprun-dedicated/) を参照してください。
 
 `exposedPorts` の要素は次のフィールドを持ちます。
 
