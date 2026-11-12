@@ -8,7 +8,7 @@
 
 対象は実行設定 (process-configuration)、スケジュール (schedule)、トリガー (trigger) の一覧・参照・作成・更新・削除と、実行設定への secret の登録です。
 
-対象外はジョブの実行履歴の参照と、EventBus 以外のサービス (SimpleMQ キューの管理など) の操作です。SimpleMQ キューの操作は低レベルの `skr simplemq-api` を使います。
+対象外はジョブの実行履歴の参照と、EventBus 以外のサービスの操作です。
 
 ## 概念
 
@@ -68,6 +68,8 @@ EventBus API では、この 3 種類を共通のリソース (CommonServiceItem
 | `autoscale` | `--action`、`--resource-id` | アクション (`scale_up`、`scale_down`) と対象リソース ID |
 
 宛先に属さないフラグを指定すると、空文字列でもエラーになります。これは、他の宛先のパラメーターの取り違えを防止するための検証です。未指定のパラメーターは空文字列として送信します。
+
+宛先が参照するリソース (SimpleMQ キュー、オートスケーラーのアクション対象) は EventBus のリソースではありません。キューの作成は `skr simplemq-api` で行うなど、各サービスの操作で用意します。
 
 宛先ごとのパラメーターの値の範囲は API が検証します。範囲の詳細は [EventBus API ドキュメント](https://manual.sakura.ad.jp/api/cloud/portal/eventbus-api/index.html) を参照してください。
 
