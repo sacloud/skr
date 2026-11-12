@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -240,7 +241,10 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	require.Equal(t, "mock-app", app.Name, "application name = %q, want mock-app", app.Name)
 
 	requestPath := t.TempDir() + "/version.json"
-	err8 := os.WriteFile(requestPath, []byte(`{"cpu":1000,"memory":2048,"scalingMode":"manual","fixedScale":1,"image":"nginx:latest","registryPasswordAction":"keep","exposedPorts":[{"targetPort":80}]}`), 0o600)
+	// registryUsername と registryPassword は省略する。省略時は API のリクエストに
+	// null として送信されるため、認証なしのイメージでは入力に必要ありません。
+	// envVars は環境変数の入力フィールドで、API のリクエストでは env に変換されます。
+	err8 := os.WriteFile(requestPath, []byte(`{"cpu":1000,"memory":2048,"scalingMode":"manual","fixedScale":1,"image":"nginx:latest","registryPasswordAction":"keep","exposedPorts":[{"targetPort":80}],"envVars":[{"key":"EXAMPLE","value":"value1","secret":false}]}`), 0o600)
 	require.NoError(t, err8)
 	var createdVersion v1.ApplicationVersionIdentifier
 	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "create-application-version",
@@ -256,6 +260,20 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 		"--application-id", appID, "--max-items", "30"), &versions))
 	require.Len(t, versions.Items, 1, "version list = %#v, want version %d", versions.Items, createdVersion.Version)
 	require.Equal(t, createdVersion.Version, versions.Items[0].Version, "unexpected value")
+
+	// envVars で指定した環境変数が、API の env に変換されて送信されたことを
+	// バージョンの詳細で確認します。出力ではバージョンの環境変数は envVars です。
+	var versionDetail struct {
+		EnvVars []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"envVars"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "read-application-version",
+		"--application-id", appID, strconv.Itoa(int(createdVersion.Version))), &versionDetail))
+	require.Len(t, versionDetail.EnvVars, 1, "version envVars = %#v, want 1 entry", versionDetail.EnvVars)
+	require.Equal(t, "EXAMPLE", versionDetail.EnvVars[0].Key)
+	require.Equal(t, "value1", versionDetail.EnvVars[0].Value)
 
 	runCommand("apprun-dedicated-api", "update-application", appID, "--active-version", "1")
 	var containers []map[string]any

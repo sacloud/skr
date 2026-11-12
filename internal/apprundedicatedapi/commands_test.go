@@ -90,12 +90,9 @@ func TestDecodeRequest(t *testing.T) {
 				setStdin(t, content, false)
 			}
 			var request cluster.CreateParams
-			if err := decodeRequest(input, false, &request); err != nil {
-				t.Fatal(err)
-			}
-			if request.Name != "cluster" || request.ServicePrincipalID != "123456789012" {
-				t.Fatalf("request = %#v", request)
-			}
+			require.NoError(t, decodeRequest(input, false, &request))
+			require.Equal(t, "cluster", request.Name)
+			require.Equal(t, "123456789012", request.ServicePrincipalID)
 		})
 	}
 	for _, input := range []string{"@" + writeRequestFile(t, `{"image":"private-image","registryPassword":"test-only-secret"}`), "-"} {
@@ -104,14 +101,20 @@ func TestDecodeRequest(t *testing.T) {
 				setStdin(t, `{"image":"private-image","registryPassword":"test-only-secret"}`, false)
 			}
 			var request version.CreateParams
-			if err := decodeRequest(input, true, &request); err != nil {
-				t.Fatal(err)
-			}
-			if request.Image != "private-image" || request.RegistryPassword == nil || *request.RegistryPassword != "test-only-secret" {
-				t.Fatalf("sensitive request fields were not decoded")
-			}
+			require.NoError(t, decodeRequest(input, true, &request))
+			require.Equal(t, "private-image", request.Image)
+			require.NotNil(t, request.RegistryPassword)
+			require.Equal(t, "test-only-secret", *request.RegistryPassword)
 		})
 	}
+	t.Run("envVars を環境変数として読み込む", func(t *testing.T) {
+		var request version.CreateParams
+		require.NoError(t, decodeRequest(`{"image":"nginx:latest","envVars":[{"key":"EXAMPLE","value":"value1","secret":false}]}`, false, &request))
+		require.Len(t, request.EnvVars, 1)
+		require.Equal(t, "EXAMPLE", request.EnvVars[0].Key)
+		require.NotNil(t, request.EnvVars[0].Value)
+		require.Equal(t, "value1", *request.EnvVars[0].Value)
+	})
 }
 
 func TestDecodeRequestErrorsDoNotExposeSecrets(t *testing.T) {
@@ -153,13 +156,25 @@ func TestDecodeRequestErrorsDoNotExposeSecrets(t *testing.T) {
 	})
 }
 
-func TestDecodeRequestPreservesUnknownFieldBehavior(t *testing.T) {
-	var request cluster.CreateParams
-	if err := decodeRequest(`{"name":"cluster","unknown":"ignored"}`, false, &request); err != nil {
-		t.Fatal(err)
-	}
-	if request.Name != "cluster" {
-		t.Fatalf("Name = %q", request.Name)
+func TestDecodeRequestRejectsUnknownField(t *testing.T) {
+	// 未知のフィールドは黙って無視せずエラーにします。リクエストの入力 JSON は
+	// 環境変数を envVars で受け付けるため、API のフィールド名 env と書いても
+	// 環境変数が黙って失われないことを、特にこの名前で確認します。
+	for _, tc := range []struct {
+		name   string
+		input  string
+		target any
+		field  string
+	}{
+		{name: "未知のフィールド", input: `{"name":"cluster","unknown":"ignored"}`, target: new(cluster.CreateParams), field: "unknown"},
+		{name: "API のフィールド名 env", input: `{"image":"nginx:latest","env":[{"key":"A","value":"B"}]}`, target: new(version.CreateParams), field: "env"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := decodeRequest(tc.input, false, tc.target)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "リクエスト JSON")
+			require.Contains(t, err.Error(), tc.field)
+		})
 	}
 }
 

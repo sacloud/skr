@@ -15,6 +15,7 @@
 package apprundedicatedapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -142,8 +143,16 @@ func decodeRequest(input string, sensitive bool, destination any) error {
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, destination); err != nil {
+	// 未知のフィールドはエラーにします。リクエストの入力 JSON は API のフィールド名と
+	// 異なる名前 (環境変数は envVars) を使うため、typo や別名の入力が黙って失われるのを
+	// 防ぎます。高レベルの定義ファイルと同じ扱いです。
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(destination); err != nil {
 		return fmt.Errorf("リクエスト JSON を読み込めません: %w", err)
+	}
+	if dec.More() {
+		return fmt.Errorf("リクエスト JSON を読み込めません: 末尾に余分なデータがあります")
 	}
 	return nil
 }
@@ -421,7 +430,7 @@ func (c *VersionListCommand) Run(ctx *kong.Context) error {
 
 type VersionCreateCommand struct {
 	ApplicationID string  `name:"application-id" required:"" help:"対象アプリケーション ID。"`
-	Request       *string `required:"" help:"バージョン作成のリクエスト JSON。必須項目は image、cpu、memory、scalingMode、registryUsername、registryPassword、registryPasswordAction、exposedPorts、env です。認証を使わない場合も registryUsername と registryPassword に null を指定します。scalingMode が manual のときは fixedScale を、cpu のときは minScale と maxScale も指定します。registryPassword など秘密情報を含むため、@path.json または - (標準入力) で指定します。"`
+	Request       *string `required:"" help:"バージョン作成のリクエスト JSON。必須項目は image、cpu、memory、scalingMode、registryPasswordAction、exposedPorts、envVars です。envVars は環境変数で、API のリクエストでは env という名前のフィールドに対応します。registryUsername と registryPassword は省略でき、省略時は API のリクエストに null として送信されます。scalingMode が manual のときは fixedScale を、cpu のときは minScale と maxScale も指定します。registryPassword など秘密情報を含むため、@path.json または - (標準入力) で指定します。"`
 	runtime       Runtime
 }
 
