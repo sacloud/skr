@@ -25,22 +25,22 @@ AppRun 専有型のリソースは次の階層で構成されます。用語の�
 
 ## コマンド一覧
 
-定義ファイルの指定方法はすべてのコマンドで共通です (「[定義ファイル](#定義ファイル)」参照)。
+`init` 以外のコマンドは、定義ファイルを `--app` で指定します (「[定義ファイル](#定義ファイル)」参照)。各コマンドが組み合わせる低レベル `apprun-dedicated-api` の操作は次のとおりです。
 
-| コマンド | 役割 |
-| --- | --- |
-| `init` | デプロイ済みのアプリケーションから定義ファイルを生成する |
-| `deploy` | 定義ファイルの内容をデプロイする (検索または作成、バージョン作成、有効化、反映待ち) |
-| `diff` | ローカルの定義とデプロイ済みの現状の差分を unified diff で表示する |
-| `render` | 定義を検証・正規化した結果を JSON で表示する |
-| `status` | アプリケーションの状態を表示する |
-| `versions` | アプリケーションのバージョンの一覧を表示する |
-| `containers` | コンテナの配置を表示する |
-| `rollback` | 既存のバージョンを有効化して切り替える |
-| `deactivate` | アクティブバージョンを解除してアプリケーションを停止する |
-| `delete` | アプリケーションとすべてのバージョンを削除する |
+| コマンド | 役割 | 低レベル `apprun-dedicated-api` の操作 |
+| --- | --- | --- |
+| `init` | デプロイ済みのアプリケーションから定義ファイルを生成する | `list-applications` での検索、`list-application-versions` と `read-application-version` での定義の復元 |
+| `deploy` | 定義ファイルの内容をデプロイする (検索または作成、バージョン作成、有効化、反映待ち) | `list-applications`、`create-application`、`create-application-version`、`update-application`、反映待ちの `read-application` と `list-application-containers` |
+| `diff` | ローカルの定義とデプロイ済みの現状の差分を unified diff で表示する | 対応する単独の操作はありません (`read-application` と `read-application-version` で現状を取得して比較します) |
+| `render` | 定義を検証・正規化した結果を JSON で表示する | 対応する操作はありません (API に接続しません) |
+| `status` | アプリケーションの状態を表示する | `read-application` と `read-application-version` |
+| `versions` | アプリケーションのバージョンの一覧を表示する | `list-application-versions` |
+| `containers` | コンテナの配置を表示する | `list-application-containers` |
+| `rollback` | 既存のバージョンを有効化して切り替える | `update-application`、反映待ちの `read-application` と `list-application-containers` |
+| `deactivate` | アクティブバージョンを解除してアプリケーションを停止する | `update-application --deactivate`、停止待ちの `read-application` |
+| `delete` | アプリケーションとすべてのバージョンを削除する | `update-application --deactivate`、`delete-application`、削除後の不在確認 (`read-application`) |
 
-デプロイ作業で毎回判断が必要な操作の組み合わせ (アプリケーションの検索または作成、`registryPasswordAction` の選択、反映待ち) は、高レベルコマンドが内部で行います。低レベルコマンドの対応はチュートリアルの冒頭の表を参照してください。
+デプロイ作業で毎回判断が必要な操作の組み合わせ (アプリケーションの検索または作成、`registryPasswordAction` の選択、反映待ち) は、高レベルコマンドが内部で行います。
 
 ## 定義ファイル
 
@@ -56,14 +56,14 @@ AppRun 専有型のリソースは次の階層で構成されます。用語の�
 | --- | --- | --- | --- |
 | `cluster` | string | 必須 | デプロイ先クラスタの名前 |
 | `name` | string | 必須 | アプリケーション名 |
-| `cpu` | integer | deploy / render / diff で必須 | コンテナ 1 つあたりの CPU (API の `cpu`) |
-| `memory` | integer | deploy / render / diff で必須 | コンテナ 1 つあたりのメモリ (API の `memory`) |
+| `cpu` | integer | deploy / render / diff で必須 | コンテナ 1 つあたりの CPU (単位 mCPU、API の `cpu`) |
+| `memory` | integer | deploy / render / diff で必須 | コンテナ 1 つあたりのメモリ (単位 MB、API の `memory`) |
 | `scalingMode` | string | deploy / render / diff で必須 | スケーリング方式 (API の `scalingMode`)。`manual` または `cpu` |
 | `fixedScale` | integer | `manual` で必須 | 手動スケーリングのコンテナ数 (API の `fixedScale`) |
 | `minScale` | integer | `cpu` で必須 | CPU ベーススケーリングの下限 (API の `minScale`) |
 | `maxScale` | integer | `cpu` で必須 | CPU ベーススケーリングの上限 (API の `maxScale`) |
-| `scaleInThreshold` | integer | 任意 | スケールインの CPU 閾値 (API の `scaleInThreshold`) |
-| `scaleOutThreshold` | integer | 任意 | スケールアウトの CPU 閾値 (API の `scaleOutThreshold`) |
+| `scaleInThreshold` | integer | 任意 | `cpu` 方式のスケールイン閾値 (単位は %、API の `scaleInThreshold`) |
+| `scaleOutThreshold` | integer | 任意 | `cpu` 方式のスケールアウト閾値 (単位は %、API の `scaleOutThreshold`) |
 | `image` | string | deploy / render / diff で必須 | コンテナイメージ (API の `image`) |
 | `cmd` | array of string | 任意 | 起動コマンド (API の `cmd`) |
 | `registryUsername` | string | 任意 | プライベートレジストリのユーザー名 (API の `registryUsername`) |
@@ -242,7 +242,7 @@ skr apprun-dedicated init <cluster> <application>
 - `--no-wait` で待機を省略します。既定は待機します。
 - `--wait-timeout DURATION` で待機の期限を指定します。未指定のときは 5 分です。期限には待機中の API 呼び出しも含まれます。
 
-待機がタイムアウトした場合、有効化などの変更自体は完了していることがあります。タイムアウトのメッセージには `status` や `containers` で状態を確認できることを示します。
+待機がタイムアウトした場合、有効化などの変更自体は完了していることがあります。タイムアウトの後は `status` や `containers` で状態を確認してください。
 
 タイムアウトの典型的な原因は、要求されたコンテナ数に対してワーカノードが足りないことです。1 つのワーカノードには同一アプリケーションのコンテナが 1 つだけ配置されるため、ノード数が足りないとコンテナは要求した数まで現れず、待機は期限まで進んでタイムアウトします。オートスケーリンググループのワーカノード数と定義のコンテナ数 (`fixedScale`、`maxScale`) を確認し、必要であれば `skr apprun-dedicated-api` でオートスケーリンググループの希望ノード数を増やしてください。
 
