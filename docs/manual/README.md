@@ -1,6 +1,6 @@
 # 利用者向けドキュメント
 
-このディレクトリには、`skr` の利用者向けドキュメントをまとめます。API を使った具体的な操作手順は `tutorials/` に、`--zone` やプロファイルなど複数のコマンドに関係する機能の解説はこのディレクトリ直下に配置します。
+このディレクトリには、`skr` の利用者向けドキュメントをまとめます。API を使った具体的な操作手順は `tutorials/` に、`--zone` やプロファイルなど複数のコマンドに関係する機能の解説はこのディレクトリ直下に配置します。高レベルコマンドのコマンドリファレンス (対象、構造、各サブコマンドの挙動と制約の解説) もこのディレクトリ直下に配置します ([ADR 0081](../adr/0081-high-level-command-users-manual.md))。
 
 ## チュートリアル
 
@@ -32,6 +32,10 @@
 - [Networking Suite API: 別サブネット間の通信を確認する](tutorials/networking-suite-api.md)
 - [SecurityControl API: セキュリティコントロールを有効化し、評価ルールと自動アクションを操作する](tutorials/security-control-api.md)
 - [HTTP API: `get_zone` でゾーン一覧を取得する](tutorials/http-request.md)
+
+## コマンドリファレンス
+
+- [AppRun 専有型の高レベルコマンド](apprun-dedicated.md)
 
 ## 共通機能
 
