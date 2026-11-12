@@ -43,7 +43,7 @@ skr は 2 つの階層のコマンドを提供します。
 3. **ワーカノード** — グループの作成後に自動で起動します。`healthy` になるのを待ちます。
 4. **アプリケーションとバージョン** — 定義ファイルから高レベルの `deploy` で作成し、コンテナの起動まで待ちます。
 5. **更新とロールバック** — 定義を変更して新しいバージョンをデプロイし、前のバージョンへ戻します。
-6. **(省略可) 低レベルコマンドだけでの操作** — 補足の手順で、クラスタを削除する前に低レベルコマンドだけでアプリケーションを作成・削除します。
+6. **クラスタとオートスケーリンググループの削除** — 作成したリソースを順に削除して後片付けします。
 
 ## Step 1: 対象環境とコマンドを確認する
 
@@ -415,83 +415,6 @@ apprun-dedicated: Application.Read: API Error 404: code 404: {Status:404 Title:.
 
 `delete` が戻った時点で CLI 自身がアプリケーションの不在を確認済みですが、保持した `APP_ID` で参照して存在しないこと (404 エラー) を再確認しています。404 以外のエラーが出た場合は削除が完了していない可能性があるため、ID を控えたまま状態を調査してください。
 
-## 補足: 低レベルコマンドだけでの操作
-
-この手順は Step 7 の後、Step 8 のクラスタ削除の前に実行してください。Step 8 でクラスタを削除した後は、アプリケーションの作成先のクラスタが存在しないため、この手順は実行できません。この手順を省略して Step 8 へ進んでも構いません。実行した場合は末尾まで進めて作成したアプリケーションを削除してから、Step 8 へ進んでください。
-
-高レベルコマンドが行うデプロイは、低レベルコマンドでは次の手順に相当します。個別の操作ごとに実行結果を制御したい場合に使ってください。アプリケーション名は Step 4 と同じ `APP-NAME` を使います (Step 7 で削除済みのため、同名で作成できます)。`APP_ID` 変数は Step 7 で不在確認に使った値を上書きします。
-
-```console
-$ APP_ID=$(skr apprun-dedicated-api create-application --name APP-NAME --cluster-id "$CLUSTER_ID" --query '.applicationID' | jq -er '.')
-```
-
-バージョンの作成リクエストには `registryPasswordAction` が必要です。新しいレジストリパスワードを設定する場合は `new` (リクエストに `registryPassword` を含める)、アクティブなバージョンがある状態で既存のパスワードを維持する場合は `keep`、それ以外は `remove` を指定します。公開イメージでレジストリ認証を使わない場合は `remove` です。`registryUsername`、`registryPassword`、`loadBalancerPort`、`healthCheck` は省略できます。省略時は API のリクエストに null として送信されます。環境変数は `envVars` で指定します (API のリクエストでは `env` という名前のフィールドに対応します)。入力 JSON でリクエストにないフィールドを書くとエラーになるため、`env` と書いた環境変数は黙って送信されずに気付けます。`registryPassword` や `secret=true` の環境変数の値など秘密情報を含むリクエストは、`@path.json` または標準入力 (`-`) からのみ指定でき、インラインの JSON は拒否されます。
-
-次の内容を `version.json` という名前で保存します。
-
-```json
-{
-  "image": "ghcr.io/sacloud/apprun-samples/tutorial:latest",
-  "cpu": 100,
-  "memory": 128,
-  "scalingMode": "manual",
-  "fixedScale": 1,
-  "registryPasswordAction": "remove",
-  "exposedPorts": [
-    {
-      "targetPort": 8080,
-      "useLetsEncrypt": false,
-      "host": []
-    }
-  ],
-  "envVars": []
-}
-```
-
-バージョンを作成して有効化します。
-
-```console
-$ skr apprun-dedicated-api create-application-version --application-id "$APP_ID" --request @version.json --query '.version'
-$ skr apprun-dedicated-api update-application "$APP_ID" --active-version 1
-```
-
-有効化の反映は自動では待機されません。`list-application-containers` のコンテナの状態を繰り返し確認し、作成したバージョンのコンテナがすべて `running` になるまで待ってください。高レベルコマンドはこの待機を自動で行います。
-
-```console
-$ skr apprun-dedicated-api list-application-containers "$APP_ID" --query 'map({nodeID, states: [.containersStats.containers[].state]})'
-```
-
-動作を確認したら、有効化を解除してからアプリケーションを削除します。有効化の解除は `update-application --deactivate` です (`--active-version` とは併用できません)。
-
-```console
-$ skr apprun-dedicated-api update-application "$APP_ID" --deactivate
-```
-
-解除後はコンテナの停止を待ってから削除してください。削除の条件はアクティブバージョンがないことと実行中のコンテナがないことなので、条件を満たす前に `delete-application` を実行すると即座に失敗します。停止の完了は、`read-application` の `desiredCount` が `0` または null になるかどうかで判定します (高レベルコマンドの `deactivate` はこの待機を自動で行います)。15 秒間隔で最大 5 分待ちます。待ちの間は表示されません。
-
-```console
-$ STOPPED=""
-$ for i in $(seq 20); do
-      STATE=$(skr apprun-dedicated-api read-application "$APP_ID" 2>&1) || { echo "状態の確認に失敗しました: $STATE"; exit 1; }
-      case "$(echo "$STATE" | jq -r 'if .desiredCount == null or .desiredCount == 0 then "stopped" else "stopping" end')" in
-          stopped) STOPPED=1; break ;;
-          *) sleep 15 ;;
-      esac
-  done
-$ [ -n "$STOPPED" ] && echo "コンテナの停止が完了しました" || { echo "5 分以内にコンテナの停止が完了しませんでした"; exit 1; }
-コンテナの停止が完了しました
-```
-
-削除します。削除後は、保持した `APP_ID` で参照して存在しないこと (404 エラー) を確認します。
-
-```console
-$ skr apprun-dedicated-api delete-application "$APP_ID"
-$ skr apprun-dedicated-api read-application "$APP_ID"
-apprun-dedicated: Application.Read: API Error 404: code 404: {Status:404 Title:...}
-```
-
-ここまで完了したら Step 8 へ進みます。
-
 ## Step 8: クラスタとオートスケーリンググループを削除する
 
 オートスケーリンググループを削除します。削除の前に `read` で ID と名前、ゾーンがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。削除は非同期で、ワーカノードの削除も伴います。`deleting` が `true` の間は削除中です。削除後は、保持した `ASG_ID` が存在しなくなるまで (404 エラーになるまで)、15 秒間隔で最大 10 分確認を繰り返します。照会の失敗は削除の完了と扱わないため、404 以外のエラーで手順を中断します。
@@ -534,7 +457,7 @@ $ [ -n "$DELETED" ] && echo "削除が完了しました" || { echo "10 分以�
 
 低レベルコマンドでクラスタとオートスケーリンググループを構築し、高レベルコマンドで定義ファイル 1 つからアプリケーションをデプロイ、更新、ロールバック、削除しました。定義の変更は `diff` で確認し、`render` で正規化した内容を確認できます。`registryPassword` などの秘密情報はコマンド引数に含めず、定義ファイルまたは標準入力から渡します。
 
-ロードバランサの待受ポート、Let's Encrypt、証明書、ワーカノードの draining、CPU 使用率によるオートスケーリング (`scalingMode: "cpu"`) はこのチュートリアルでは扱っていません。低レベルコマンドの `--help` と[技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)を参照してください。
+ロードバランサの待受ポート、Let's Encrypt、証明書、ワーカノードの draining、CPU 使用率によるオートスケーリング (`scalingMode: "cpu"`) はこのチュートリアルでは扱っていません。低レベルコマンドの `--help` と[技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)を参照してください。アプリケーションの作成・更新・削除を低レベルコマンドだけで行うこともできます。その場合は、高レベルコマンドが自動で行うバージョンの有効化とコンテナの起動・停止の待機を自分で行う必要があるため、各操作の `--help` と待機条件を確認してください。
 
 ## 参考資料
 
