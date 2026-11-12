@@ -23,7 +23,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/alecthomas/kong"
 	skrSaclient "github.com/sacloud/skr/internal/saclient"
@@ -58,6 +60,14 @@ func newAuthenticatedHTTPDoer(trace bool) (authenticatedHTTPDoer, error) {
 	return client, nil
 }
 
+// newHTTPRequestContext は HTTP リクエストに使う context とその解除関数を返します。
+// 実行中に SIGINT と SIGTERM を受けて context をキャンセルし、リクエストの送信、応答の
+// 受信、本文の読み込み、リトライの待ち時間を含む実行全体を中断します。テストでは
+// シグナルに依存しない実装へ差し替えます。
+var newHTTPRequestContext = func() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+}
+
 func (c *httpCommand) Run(ctx *kong.Context) error {
 	if err := validateHTTPSURL(c.URL); err != nil {
 		return err
@@ -76,7 +86,12 @@ func (c *httpCommand) Run(ctx *kong.Context) error {
 	if method == "" {
 		method = http.MethodGet
 	}
-	request, err := http.NewRequestWithContext(context.Background(), method, c.URL, body)
+	// シグナル待ちはこのコマンドの実行中に限るため、Run の戻りまでに解除します。
+	// 解除しないと他のコマンド実行中の SIGINT が Go ランタイムの既定動作 (プロセスの即時終了) で
+	// なくなり、終了しないコマンドが生じます。
+	requestCtx, stop := newHTTPRequestContext()
+	defer stop()
+	request, err := http.NewRequestWithContext(requestCtx, method, c.URL, body)
 	if err != nil {
 		return fmt.Errorf("create HTTP request: %w", err)
 	}
@@ -99,6 +114,9 @@ func (c *httpCommand) Run(ctx *kong.Context) error {
 	}
 	response, err := doer.Do(request)
 	if err != nil {
+		if requestCtx.Err() != nil {
+			return fmt.Errorf("send HTTP request: %w (interrupted by signal)", err)
+		}
 		return fmt.Errorf("send HTTP request: %w", err)
 	}
 	if response == nil {
@@ -111,6 +129,9 @@ func (c *httpCommand) Run(ctx *kong.Context) error {
 	_, copyErr := io.Copy(ctx.Stdout, response.Body)
 	closeErr := response.Body.Close()
 	if copyErr != nil {
+		if requestCtx.Err() != nil {
+			return fmt.Errorf("write HTTP response body: %w (interrupted by signal)", errors.Join(copyErr, closeErr))
+		}
 		return fmt.Errorf("write HTTP response body: %w", errors.Join(copyErr, closeErr))
 	}
 	if closeErr != nil {
