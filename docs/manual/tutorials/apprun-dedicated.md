@@ -301,15 +301,17 @@ $ skr apprun-dedicated diff --app apprun-dedicated.json
 @@
    "cluster": "CLUSTER-NAME",
    "cpu": 100,
-+  "env": [
-+    {
-+      "key": "GREETING",
-+      "value": "hello",
-+      "secret": false
-+    }
-+  ],
+-  "env": [
+-    {
+-      "key": "GREETING",
+-      "secret": false,
+-      "value": "hello"
+-    }
+-  ],
    "exposedPorts": [
 ```
+
+`---` がローカルの定義、`+++` がデプロイ済みの現状です。この時点では環境変数の追加をまだデプロイしていないため、定義だけに存在する `env` は `-` 行として表示されます。
 
 再び `deploy` を実行します。今度はアプリケーションが既に存在するため、新しいバージョン (バージョン 2) の作成と有効化だけが行われます。
 
@@ -381,28 +383,41 @@ $ skr apprun-dedicated status --app apprun-dedicated.json --query '{activeVersio
 
 ```console
 $ skr apprun-dedicated delete --app apprun-dedicated.json
-$ skr apprun-dedicated-api list-applications --query "[.items[] | select(.applicationID == \"$APP_ID\") | .applicationID]"
-[]
+$ skr apprun-dedicated-api read-application "$APP_ID"
+apprun-dedicated: Application.Read: API Error 404: code 404: {Status:404 Title:...}
 ```
+
+`delete` が戻った時点で CLI 自身がアプリケーションの不在を確認済みですが、保持した `APP_ID` で参照して存在しないこと (404 エラー) を再確認しています。404 以外のエラーが出た場合は削除が完了していない可能性があるため、ID を控えたまま状態を調査してください。
 
 ## Step 8: クラスタとオートスケーリンググループを削除する
 
-オートスケーリンググループを削除します。削除の前に `read` で ID と名前、ゾーンがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。削除は非同期で、ワーカノードの削除も伴います。`deleting` が `true` の間は削除中です。次のコマンドを期限を決めて (例: 10 分) 繰り返し実行し、一覧が空になるまで待ってください。
+オートスケーリンググループを削除します。削除の前に `read` で ID と名前、ゾーンがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。削除は非同期で、ワーカノードの削除も伴います。`deleting` が `true` の間は削除中です。削除後は、保持した `ASG_ID` が存在しなくなるまで (404 エラーになるまで)、15 秒間隔で最大 10 分確認を繰り返します。照会の失敗は削除の完了と扱わないため、404 以外のエラーで手順を中断します。
 
 ```console
 $ skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '{autoScalingGroupID, name, zone, deleting}'
 $ skr apprun-dedicated-api delete-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID"
-$ until [ "$(skr apprun-dedicated-api list-auto-scaling-groups --cluster-id "$CLUSTER_ID" --query '[.items] | length')" = "0" ]; do sleep 15; done
+$ for i in $(seq 40); do
+      OUT=$(skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" 2>&1) && { sleep 15; continue; }
+      case "$OUT" in
+          *"API Error 404"*) echo "削除が完了しました"; break ;;
+          *) echo "削除の確認に失敗しました: $OUT"; exit 1 ;;
+      esac
+  done
+削除が完了しました
 ```
+
+完了メッセージが表示されないまま 10 分経過した場合は削除がまだ完了していません。コンソールパネルでオートスケーリンググループの状態を確認してください。
 
 続けてクラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループ) がないことを確認してから実行してください。
 
 ```console
 $ skr apprun-dedicated-api read-cluster "$CLUSTER_ID" --query '{clusterID, name}'
 $ skr apprun-dedicated-api delete-cluster "$CLUSTER_ID"
-$ skr apprun-dedicated-api list-clusters --query '[.items[] | {clusterID, name}]'
-[]
+$ skr apprun-dedicated-api read-cluster "$CLUSTER_ID"
+apprun-dedicated: Cluster.Read: API Error 404: code 404: {Status:404 Title:...}
 ```
+
+削除後も保持した `CLUSTER_ID` で参照して存在しないこと (404 エラー) を確認します。
 
 ## 補足: 低レベルコマンドだけでの操作
 
