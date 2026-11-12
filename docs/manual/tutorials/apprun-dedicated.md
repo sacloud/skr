@@ -150,18 +150,20 @@ $ skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-s
 起動には時間がかかるため、15 秒間隔で最大 20 分、次のループで待ちます。いずれかのノードの `status` が `healthy` になったら待ちを終えて次へ進みます。`createErrorMessage` にメッセージが設定されているノードがあった場合はノードの作成に失敗しているため、待ちを続けても解消しないので、その場でループを中断します。確認コマンド自体が失敗した場合もそこで中断します。待ちの間は表示されません。
 
 ```console
+$ READY=""
 $ for i in $(seq 80); do
       STATE=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" 2>&1) || { echo "状態の確認に失敗しました: $STATE"; exit 1; }
       case "$(echo "$STATE" | jq -r 'if any(.items[]; .createErrorMessage != null and .createErrorMessage != "") then "failed" elif any(.items[]; .status == "healthy") then "ready" else "waiting" end')" in
-          ready) echo "ワーカノードが healthy になりました"; break ;;
+          ready) READY=1; break ;;
           failed) echo "ノードの作成に失敗しました: $STATE"; exit 1 ;;
           *) sleep 15 ;;
       esac
   done
+$ [ -n "$READY" ] && echo "ワーカノードが healthy になりました" || { echo "20 分以内にワーカノードが healthy になりませんでした"; exit 1; }
 ワーカノードが healthy になりました
 ```
 
-20 分を過ぎても `healthy` にならない場合は、次のステップに進まず、コンソールパネルでクラスタとオートスケーリンググループの状態を確認してください。
+20 分を過ぎても `healthy` にならない場合は、ループの直後の確認が失敗して手順が止まります。次へ進まず、コンソールパネルでクラスタとオートスケーリンググループの状態を確認してください。
 
 ## Step 4: 定義ファイルを用意してデプロイする
 
@@ -281,7 +283,7 @@ Hello from AppRun!
 HTTP status: 200
 ```
 
-`--fail` 付きのため、ステータスが 200 以外のときは失敗して本文を表示しません。その場合は `containers` でコンテナの状態を確認してください。確認が終わったら次の手順へ進み、作成したリソースを速やかに削除します。
+`--fail` 付きのため、HTTP エラー (4xx、5xx) のときは失敗して本文を表示しません。その場合は `containers` でコンテナの状態を確認してください。成功したかどうかは、表示された本文と `HTTP status` の値で判断してください (`--fail` は 4xx、5xx 以外のステータスを失敗扱いにしないため、`200` の確認は出力に対して行います)。確認が終わったら次の手順へ進み、作成したリソースを速やかに削除します。
 
 ## Step 6: 定義を更新してロールバックする
 
@@ -459,10 +461,30 @@ $ skr apprun-dedicated-api update-application "$APP_ID" --active-version 1
 $ skr apprun-dedicated-api list-application-containers "$APP_ID" --query 'map({nodeID, states: [.containersStats.containers[].state]})'
 ```
 
-動作を確認したら、有効化を解除してからアプリケーションを削除します。有効化の解除は `update-application --deactivate` です (`--active-version` とは併用できません)。解除後は `list-application-containers` の繰り返し確認でコンテナの停止を待ってから削除してください (高レベルコマンドは `deactivate` と `delete` のどちらでも待機を自動で行います)。削除後は、保持した `APP_ID` で参照して存在しないこと (404 エラー) を確認します。
+動作を確認したら、有効化を解除してからアプリケーションを削除します。有効化の解除は `update-application --deactivate` です (`--active-version` とは併用できません)。
 
 ```console
 $ skr apprun-dedicated-api update-application "$APP_ID" --deactivate
+```
+
+解除後はコンテナの停止を待ってから削除してください。削除の条件はアクティブバージョンがないことと実行中のコンテナがないことなので、条件を満たす前に `delete-application` を実行すると即座に失敗します。停止の完了は、`read-application` の `desiredCount` が `0` または null になるかどうかで判定します (高レベルコマンドの `deactivate` はこの待機を自動で行います)。15 秒間隔で最大 5 分待ちます。待ちの間は表示されません。
+
+```console
+$ STOPPED=""
+$ for i in $(seq 20); do
+      STATE=$(skr apprun-dedicated-api read-application "$APP_ID" 2>&1) || { echo "状態の確認に失敗しました: $STATE"; exit 1; }
+      case "$(echo "$STATE" | jq -r 'if .desiredCount == null or .desiredCount == 0 then "stopped" else "stopping" end')" in
+          stopped) STOPPED=1; break ;;
+          *) sleep 15 ;;
+      esac
+  done
+$ [ -n "$STOPPED" ] && echo "コンテナの停止が完了しました" || { echo "5 分以内にコンテナの停止が完了しませんでした"; exit 1; }
+コンテナの停止が完了しました
+```
+
+削除します。削除後は、保持した `APP_ID` で参照して存在しないこと (404 エラー) を確認します。
+
+```console
 $ skr apprun-dedicated-api delete-application "$APP_ID"
 $ skr apprun-dedicated-api read-application "$APP_ID"
 apprun-dedicated: Application.Read: API Error 404: code 404: {Status:404 Title:...}
@@ -475,30 +497,38 @@ apprun-dedicated: Application.Read: API Error 404: code 404: {Status:404 Title:.
 オートスケーリンググループを削除します。削除の前に `read` で ID と名前、ゾーンがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。削除は非同期で、ワーカノードの削除も伴います。`deleting` が `true` の間は削除中です。削除後は、保持した `ASG_ID` が存在しなくなるまで (404 エラーになるまで)、15 秒間隔で最大 10 分確認を繰り返します。照会の失敗は削除の完了と扱わないため、404 以外のエラーで手順を中断します。
 
 ```console
+$ DELETED=""
 $ skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '{autoScalingGroupID, name, zone, deleting}'
 $ skr apprun-dedicated-api delete-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID"
 $ for i in $(seq 40); do
       OUT=$(skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" 2>&1) && { sleep 15; continue; }
       case "$OUT" in
-          *"API Error 404"*) echo "削除が完了しました"; break ;;
+          *"API Error 404"*) DELETED=1; break ;;
           *) echo "削除の確認に失敗しました: $OUT"; exit 1 ;;
       esac
   done
+$ [ -n "$DELETED" ] && echo "削除が完了しました" || { echo "10 分以内に削除が完了しませんでした"; exit 1; }
 削除が完了しました
 ```
 
-完了メッセージが表示されないまま 10 分経過した場合は削除がまだ完了していません。コンソールパネルでオートスケーリンググループの状態を確認してください。
+10 分を過ぎても削除が完了しない場合は、ループの直後の確認が失敗して手順が止まります。コンソールパネルでオートスケーリンググループの状態を確認してください。
 
-続けてクラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループ) がないことを確認してから実行してください。
+続けてクラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループ) がないことを確認してから実行してください。クラスタの削除も非同期で完了するため、保持した `CLUSTER_ID` が 404 になるまで (15 秒間隔で最大 10 分) 確認を繰り返します。404 以外のエラーで手順を中断します。
 
 ```console
 $ skr apprun-dedicated-api read-cluster "$CLUSTER_ID" --query '{clusterID, name}'
 $ skr apprun-dedicated-api delete-cluster "$CLUSTER_ID"
-$ skr apprun-dedicated-api read-cluster "$CLUSTER_ID"
-apprun-dedicated: Cluster.Read: API Error 404: code 404: {Status:404 Title:...}
+$ DELETED=""
+$ for i in $(seq 40); do
+      OUT=$(skr apprun-dedicated-api read-cluster "$CLUSTER_ID" 2>&1) && { sleep 15; continue; }
+      case "$OUT" in
+          *"API Error 404"*) DELETED=1; break ;;
+          *) echo "削除の確認に失敗しました: $OUT"; exit 1 ;;
+      esac
+  done
+$ [ -n "$DELETED" ] && echo "削除が完了しました" || { echo "10 分以内に削除が完了しませんでした"; exit 1; }
+削除が完了しました
 ```
-
-削除後も保持した `CLUSTER_ID` で参照して存在しないこと (404 エラー) を確認します。
 
 ## まとめ
 
