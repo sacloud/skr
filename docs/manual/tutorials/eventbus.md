@@ -221,6 +221,7 @@ $ rm eventbus-secret.json simplemq.key
 
 ## 参考資料
 
+- [EventBus の高レベルコマンド (リファレンス)](../eventbus.md)
 - [EventBus の基本情報](https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html)
 - [EventBus API 利用の基本手順](https://manual.sakura.ad.jp/cloud/appliance/eventbus/api.html)
 - [EventBus の実行設定](https://manual.sakura.ad.jp/cloud/appliance/eventbus/control_panel.html)
