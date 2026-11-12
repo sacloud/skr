@@ -36,6 +36,7 @@
 ## コマンドリファレンス
 
 - [AppRun 専有型の高レベルコマンド](apprun-dedicated.md)
+- [EventBus の高レベルコマンド](eventbus.md)
 
 ## 共通機能
 

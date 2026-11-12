@@ -511,6 +511,7 @@ create では周期指定 (`--recurring-step` と `--recurring-unit` の組) と
 ## ドキュメントと PLAN
 
 - チュートリアルを `docs/manual/tutorials/eventbus.md` に作成しました。`skr eventbus` のコマンドと `eventbus-api` の対応、条件の指定方法、メッセージの受信までの流れを説明しています。
+- ユーザーズマニュアルを `docs/manual/eventbus.md` に作成しました ([ADR 0081](../adr/0081-high-level-command-users-manual.md)、[Issue #251](https://github.com/sacloud/skr/issues/251))。対象と対象外、概念、コマンド一覧と低レベル `eventbus-api` との対応、宛先別パラメーター、update のマージ規則、secret の扱い、出力とエラーを説明します。
 - `PLAN.md` の高レベル `eventbus` の節に、実装した操作の範囲、ライブ E2E、チュートリアルの対応状況を記録しています。
 - 低レベル `eventbus-api` の設計文書 ([eventbus-api](eventbus-api.md)) に高レベル層への誘導を追記しています。
 
