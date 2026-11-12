@@ -314,7 +314,7 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 テストは service/apprun-dedicated-service-go モジュールに置き、CLI 入出力に依存しません。SDK の操作 interface に fake を注入します。
 
 - 正常系: クラスタ・アプリケーションの名前検索 (ページングを含む) と、定義から `CreateParams` への変換を確認します。`registryPasswordAction` の 3 パターン (`new`、`keep`、`remove`) も、バージョン作成と有効化の順序も、rollback のバージョン選択 (活性・非活性・`--target`) も、deactivate・delete の再照合と順序も確認します。
-- 待機: ポーリング間隔、完了条件 (対象バージョンの全コンテナ `running`)、期限での打ち切り、ポーリング中の参照エラーの継続、`--no-wait` でポーリングしないこと。fake の時計・ticker を差し替え可能にして検証します。
+- 待機: ポーリング間隔、完了条件 (要求されたコンテナ数 (`DesiredCount`) と同じ数のコンテナがすべて `running`)、期限での打ち切り、ポーリング中の参照エラーの継続、`--no-wait` でポーリングしないこと。fake の時計・ticker を差し替え可能にして検証します。
 - エラー系: 必須フィールドの欠落、`scalingMode` とスケール設定の整合、`loadBalancerPort` と `host` の整合、クラスタ不在、同名アプリの他クラスタ混在、削除前の再照合失敗で削除 API を呼ばないこと、タイムアウト。
 - 変換: `VersionDetail` → 定義の正規化 (diff・init 用)、`registryPassword` と secret 環境変数の除外、`created` の RFC3339 変換。
 - 安全性: deploy で `registryPassword` が fake に渡ったリクエスト以外の場所に現れないこと、trace 有効時 (CLI 層の ServiceFactory での検査) の拒否。
@@ -355,5 +355,5 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 - `verify` (依存リソースの妥当性確認) や単独の `wait` コマンドなど、ecspresso 由来の追加操作。要望が明確になった時点で設計します。
 - クラスタロードバランサの参照・更新 (`read-cluster-load-balancer`、`patch-cluster-load-balancer`) と limits の参照 (`read-limits`) は低レベル層の課題として [#202](https://github.com/sacloud/skr/issues/202) で対応します。高レベル層では扱いません。
 - Jsonnet など定義の生成支援は対象外です ([ADR 0079](../adr/0079-apprun-dedicated-high-level-commands.md))。利用手順が固まった後、外部テンプレートの案内だけを行うかどうかを再検討します。
-- 待機条件の `Placement.Desired` との照合、ポーリング間隔と既定のタイムアウト値は、ライブ観察が可能になった時点で見直します。
+- ポーリング間隔と既定のタイムアウト値は、ライブ観察が可能になった時点で見直します。
 - `render` で `registryPasswordAction` を含むバージョン作成リクエストの確認表示が必要かどうかは、実装後の利用確認で判断します。

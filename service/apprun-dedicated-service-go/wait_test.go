@@ -17,6 +17,7 @@ package apprundedicated
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -198,6 +199,24 @@ func TestWaitRunningRequiresRequestedContainers(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "タイムアウト")
 	})
+
+	for _, desired := range []int32{0, -1} {
+		t.Run(fmt.Sprintf("DesiredCount が %d の場合は完了しない", desired), func(t *testing.T) {
+			s, _, app := newWaitRunningService(t)
+
+			// 0 や負数は要求されたコンテナ数として確定していないため、
+			// running なコンテナがあっても完了しません。
+			d := desired
+			app.desiredCount = &d
+			app.containers = []application.Placement{runningPlacement(1)}
+
+			_, err := runWithTicks(t, s, func() (any, error) {
+				return nil, s.waitRunning(t.Context(), app.applicationID, 1, DefaultPollInterval*2)
+			})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "タイムアウト")
+		})
+	}
 }
 
 func TestPollImmediateCheck(t *testing.T) {

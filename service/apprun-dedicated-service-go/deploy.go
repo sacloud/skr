@@ -56,8 +56,9 @@ type DeployResult struct {
 //
 // opts が nil の場合は待機あり (タイムアウト DefaultWaitTimeout) で動作します。
 // NoWait が true の場合は有効化まで行い、反映を待ちません。反映待ちの完了条件は、
-// 作成したバージョンのコンテナが 1 つ以上あり、そのすべてが running 状態であること
-// です。ポーリング中の参照エラーは打ち切らず、期限まで再試行します。
+// 要求されたコンテナ数 (DesiredCount) と同じ数のコンテナが作成したバージョンで
+// すべて running 状態であることです。ポーリング中の参照エラーは打ち切らず、
+// 期限まで再試行します。
 func (s *Service) Deploy(ctx context.Context, def *ApplicationDefinition, opts *DeployOptions) (*DeployResult, error) {
 	if def == nil {
 		return nil, errors.New("定義が nil です")
