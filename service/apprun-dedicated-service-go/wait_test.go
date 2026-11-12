@@ -391,7 +391,7 @@ func TestPollTimeoutDuringCheck(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- s.poll(t.Context(), time.Minute, func(ctx context.Context) (bool, error) {
-			// 長い API 呼び出しを模偉し、待機 context の完了を待ちます。
+			// 長い API 呼び出しを模倣し、待機 context の完了を待ちます。
 			close(started)
 			<-ctx.Done()
 			return false, ctx.Err()
@@ -470,6 +470,7 @@ func TestPollWaitBoundedByDeadline(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "タイムアウト")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.Equal(t, 2, calls)
 		clock.mu.Lock()
 		defer clock.mu.Unlock()
@@ -490,6 +491,7 @@ func TestPollWaitBoundedByDeadline(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "タイムアウト")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
 		clock.mu.Lock()
 		defer clock.mu.Unlock()
 		require.Equal(t, 2*time.Second, clock.lastInterval)

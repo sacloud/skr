@@ -95,6 +95,11 @@ func (s *Service) poll(ctx context.Context, timeout time.Duration, check func(ct
 			return err
 		}
 		if done {
+			// 完了でも待機期限やキャンセルを優先します。API が context を無視して
+			// 完了を返しても、期限を超えた待機を成功と扱いません。
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return waitContextError(ctxErr, timeout)
+			}
 			return nil
 		}
 		// 待ちに入る前にも完了を確認します。
@@ -103,7 +108,9 @@ func (s *Service) poll(ctx context.Context, timeout time.Duration, check func(ct
 		}
 		now := s.clock.Now()
 		if !now.Before(deadline) {
-			return fmt.Errorf("待機がタイムアウトしました (期限: %s)", timeout)
+			// 通常の期限切れも、API 呼び出し中の期限切れと同じく
+			// context.DeadlineExceeded をラップして返します。
+			return waitContextError(context.DeadlineExceeded, timeout)
 		}
 		// Ticker の間隔は作成後に変えられないため、期限までの残り時間がポーリング間隔
 		// より短くなったら、残り時間で Ticker を作り直します。
