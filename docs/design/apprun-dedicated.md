@@ -351,7 +351,7 @@ deploy の反映待ち失敗時の後片付けを `test/e2e/apprun-dedicated/sce
 
 ## ドキュメントと PLAN
 
-- チュートリアル `docs/manual/tutorials/apprun-dedicated.md` は、実装と sakumock 検証の完了後に作成します。`skr apprun-dedicated` のコマンド、定義ファイルの書き方、デプロイからロールバック・削除までの流れ、低レベル `apprun-dedicated-api` との対応を含めます。
+- チュートリアル `docs/manual/tutorials/apprun-dedicated.md` は、実装と sakumock 検証の完了後に作成します。`skr apprun-dedicated` のコマンド、定義ファイルの書き方、デプロイからロールバック・削除までの流れ、低レベル `apprun-dedicated-api` との対応を含めます。**作成済み** (クラスタ・グループ作成などの低レベルの手順と、高レベルのアプリケーションライフサイクルを統合した内容)。
 - `PLAN.md` の `apprun-dedicated` の節に、高レベル層の実装範囲、ライブ E2E、チュートリアルの対応状況を区別して記録します。
 - 低レベル `apprun-dedicated-api` の設計文書に高レベル層への誘導を追記します。
 
