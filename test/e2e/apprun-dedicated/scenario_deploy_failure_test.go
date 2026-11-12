@@ -29,8 +29,6 @@ import (
 const (
 	// deployFailureWaitTimeout は反映待ちを失敗させるために deploy に渡す短いタイムアウトです。
 	deployFailureWaitTimeout = 1 * time.Minute
-	// deployFailureCommandLimit はタイムアウトで失敗する deploy の実行期限です。
-	deployFailureCommandLimit = 5 * time.Minute
 )
 
 // ライブ E2E です。deploy が反映待ちで失敗した場合でも、作成済みのアプリケーションが
