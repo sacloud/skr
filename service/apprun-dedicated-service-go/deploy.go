@@ -134,7 +134,7 @@ func registryPasswordAction(def *ApplicationDefinition, detail *application.Appl
 // ない場合、コンテナは要求した数まで現れません。その場合も反映完了とは判定せず、
 // 期限まで待機してタイムアウトします。
 func (s *Service) waitRunning(ctx context.Context, id v1.ApplicationID, version v1.ApplicationVersionNumber, timeout time.Duration) error {
-	return s.poll(ctx, timeout, func() (bool, error) {
+	return s.poll(ctx, timeout, func(ctx context.Context) (bool, error) {
 		detail, err := s.applicationAPI.Read(ctx, id)
 		if err != nil {
 			// 参照エラーは打ち切らず、期限まで再試行します。

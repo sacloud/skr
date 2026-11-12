@@ -16,6 +16,7 @@ package apprundedicated
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -27,11 +28,14 @@ const (
 	DefaultPollInterval = 5 * time.Second
 )
 
-// clock は待機処理で使う時刻と ticker の供給源です。
+// clock は待機処理で使う時刻、ticker、待機期限付き context の供給源です。
 // 単体テストでは fake に差し替えて、実時間を使わずに待機を検証します。
 type clock interface {
 	Now() time.Time
 	NewTicker(time.Duration) ticker
+	// WithTimeout は親 context に指定した期間の期限を持つ context を作ります。
+	// 待機中の API 呼び出しに待機期限を適用するために使います。
+	WithTimeout(parent context.Context, d time.Duration) (context.Context, context.CancelFunc)
 }
 
 // ticker は一定間隔で時刻を通知します。
@@ -43,6 +47,10 @@ type ticker interface {
 type realClock struct{}
 
 func (realClock) Now() time.Time { return time.Now() }
+
+func (realClock) WithTimeout(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(parent, d)
+}
 
 func (realClock) NewTicker(d time.Duration) ticker {
 	return realTicker{ticker: time.NewTicker(d)}
@@ -56,29 +64,53 @@ func (t realTicker) Stop() { t.ticker.Stop() }
 
 // poll は check が完了 (true) を返すまで DefaultPollInterval 間隔で再試行します。
 //
-// check がエラーを返した場合は打ち切ってエラーを返します。参照エラーなど打ち切りたく
-// ない一時的な失敗は、check が (false, nil) を返すことで期限まで再試行できます。最初の
-// check は待機せずに即座に行います。待機はポーリング間隔と期限までの残り時間の短い方
-// までとし、期限を超えて待機しません。期限を超えた場合と context がキャンセルされた
-// 場合はエラーを返します。timeout の零値は DefaultWaitTimeout として扱います。
-func (s *Service) poll(ctx context.Context, timeout time.Duration, check func() (bool, error)) error {
+// check には待機期限を持つ context を渡します。check 内の API 呼び出しとリトライも
+// 待機期限で打ち切られるため、API 呼び出しが長引いても待機期限を超えて待機しません。
+//
+// check がエラーを返した場合は打ち切ってエラーを返します。ただし待機 context が
+// 完了している場合は、期限切れまたはキャンセルのエラーを優先して返します。参照エラー
+// など打ち切りたくない一時的な失敗は、check が (false, nil) を返すことで期限まで
+// 再試行できます。最初の check は待機せずに即座に行います。待機はポーリング間隔と
+// 期限までの残り時間の短い方までとし、期限を超えて待機しません。期限を超えた場合と
+// context がキャンセルされた場合はエラーを返します。timeout の零値は
+// DefaultWaitTimeout として扱います。
+func (s *Service) poll(ctx context.Context, timeout time.Duration, check func(ctx context.Context) (bool, error)) error {
 	if timeout <= 0 {
 		timeout = DefaultWaitTimeout
 	}
 	deadline := s.clock.Now().Add(timeout)
+	// 待機中の API 呼び出しとリトライにも待機期限を適用します。
+	ctx, cancel := s.clock.WithTimeout(ctx, timeout)
+	defer cancel()
 	tk := s.clock.NewTicker(DefaultPollInterval)
 	defer tk.Stop()
 	for {
-		done, err := check()
+		done, err := check(ctx)
 		if err != nil {
+			// API 呼び出しが待機期限や利用者によるキャンセルで打ち切られた場合は、
+			// その理由を示すエラーを優先して返します。
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return waitContextError(ctxErr, timeout)
+			}
 			return err
 		}
 		if done {
+			// 完了でも待機期限やキャンセルを優先します。API が context を無視して
+			// 完了を返しても、期限を超えた待機を成功と扱いません。
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return waitContextError(ctxErr, timeout)
+			}
 			return nil
+		}
+		// 待ちに入る前にも完了を確認します。
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return waitContextError(ctxErr, timeout)
 		}
 		now := s.clock.Now()
 		if !now.Before(deadline) {
-			return fmt.Errorf("待機がタイムアウトしました (期限: %s)", timeout)
+			// 通常の期限切れも、API 呼び出し中の期限切れと同じく
+			// context.DeadlineExceeded をラップして返します。
+			return waitContextError(context.DeadlineExceeded, timeout)
 		}
 		// Ticker の間隔は作成後に変えられないため、期限までの残り時間がポーリング間隔
 		// より短くなったら、残り時間で Ticker を作り直します。
@@ -90,8 +122,16 @@ func (s *Service) poll(ctx context.Context, timeout time.Duration, check func() 
 		tk = s.clock.NewTicker(wait)
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("待機がキャンセルされました: %w", ctx.Err())
+			return waitContextError(ctx.Err(), timeout)
 		case <-tk.C():
 		}
 	}
+}
+
+// waitContextError は待機 context の状態を利用者向けのエラーに変換します。
+func waitContextError(ctxErr error, timeout time.Duration) error {
+	if errors.Is(ctxErr, context.DeadlineExceeded) {
+		return fmt.Errorf("待機がタイムアウトしました (期限: %s): %w", timeout, ctxErr)
+	}
+	return fmt.Errorf("待機がキャンセルされました: %w", ctxErr)
 }
