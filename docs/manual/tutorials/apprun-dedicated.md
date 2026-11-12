@@ -427,7 +427,7 @@ apprun-dedicated: Cluster.Read: API Error 404: code 404: {Status:404 Title:...}
 $ APP_ID=$(skr apprun-dedicated-api create-application --name APP-NAME --cluster-id "$CLUSTER_ID" --query '.applicationID' | jq -er '.')
 ```
 
-バージョンの作成リクエストには `registryPasswordAction` が必要です。新しいレジストリパスワードを設定する場合は `new` (リクエストに `registryPassword` を含める)、アクティブなバージョンがある状態で既存のパスワードを維持する場合は `keep`、それ以外は `remove` を指定します。公開イメージでレジストリ認証を使わない場合は `remove` です。`registryUsername`、`registryPassword`、`loadBalancerPort`、`healthCheck` は、使わない場合もリクエストの必須項目のため `null` を指定します。`registryPassword` や `secret=true` の環境変数の値など秘密情報を含むリクエストは、`@path.json` または標準入力 (`-`) からのみ指定でき、インラインの JSON は拒否されます。
+バージョンの作成リクエストには `registryPasswordAction` が必要です。新しいレジストリパスワードを設定する場合は `new` (リクエストに `registryPassword` を含める)、アクティブなバージョンがある状態で既存のパスワードを維持する場合は `keep`、それ以外は `remove` を指定します。公開イメージでレジストリ認証を使わない場合は `remove` です。`registryUsername`、`registryPassword`、`loadBalancerPort`、`healthCheck` は省略できます。省略時は API のリクエストに null として送信されます。環境変数は `envVars` で指定します (API のリクエストでは `env` という名前のフィールドに対応します)。入力 JSON でリクエストにないフィールドを書くとエラーになるため、`env` と書いた環境変数は黙って送信されずに気付けます。`registryPassword` や `secret=true` の環境変数の値など秘密情報を含むリクエストは、`@path.json` または標準入力 (`-`) からのみ指定でき、インラインの JSON は拒否されます。
 
 ```json
 {
@@ -436,19 +436,15 @@ $ APP_ID=$(skr apprun-dedicated-api create-application --name APP-NAME --cluster
   "memory": 128,
   "scalingMode": "manual",
   "fixedScale": 1,
-  "registryUsername": null,
-  "registryPassword": null,
   "registryPasswordAction": "remove",
   "exposedPorts": [
     {
       "targetPort": 8080,
-      "loadBalancerPort": null,
       "useLetsEncrypt": false,
-      "host": [],
-      "healthCheck": null
+      "host": []
     }
   ],
-  "env": []
+  "envVars": []
 }
 ```
 
