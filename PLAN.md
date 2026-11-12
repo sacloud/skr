@@ -173,6 +173,12 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 - 影響範囲: `internal/cli/query.go` と `internal/cli/cli.go` のみ (--query はルート共通フラグのため生成コードへの影響なし)。writeQueryOutput の単体テスト (文字列・数値・null・オブジェクト・複数結果・0 件) と CLI 経由の相互排他テストを追加する
 - 導入時: ADR を作成し、チュートリアルの ID 取得手順と AGENTS.md の ID 取得ガイドラインを --query-raw ベースへ更新する
 
+## CLI のキャンセル伝播の対応状況
+
+`skr http` は [ADR 0080](docs/adr/0080-http-command-signal-cancellation.md) に従い、実行中に SIGINT / SIGTERM を受けて HTTP リクエスト (送信、応答の受信、本文の読み込み、リトライの待ち時間) を中断し、`(interrupted by signal)` を含むエラーで終了します。単体テストと、Unix での SIGINT 伝播テスト (本文の読み込み中とリトライ待ち時間中) で確認しています。設計の詳細は [HTTP コマンドの設計](docs/design/http-command.md) を参照してください。
+
+他の API コマンドは引き続き `context.Background()` で SDK を呼び出し、SIGINT は Go ランタイムの既定動作 (プロセスの即時終了) で処理されます。全コマンドへの伝播は kong の context バインドと、生成コード・手書きハンドラーを含む SDK 呼び出し箇所の変更を伴うため、別の作業として扱います (実装は未着手)。
+
 ## 進め方
 
 1. SDK のサービス／API ごとに公開操作とリクエスト・レスポンス型を確認します。

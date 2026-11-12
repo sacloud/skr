@@ -35,6 +35,12 @@ $ cat request.json | skr http 'https://API-HOST/PATH' --method POST --data -
 
 レスポンス本文を加工せず標準出力へ書き込みます。グローバル `--query` は本文を加工しません。HTTP ステータスが 2xx 以外の場合もレスポンス本文を出力したうえで、ステータスを標準エラーに表示してコマンドを失敗として終了します。成功時に本文が空であれば、何も出力しません。
 
+## 中断と期限
+
+実行中に `SIGINT` (Ctrl+C) または `SIGTERM` を受けると、実行中のリクエストを中断してエラーで終了します。応答の受信、本文の読み込み、リトライの待ち時間も含めて中断されます。
+
+1 回のリクエスト試行の期限は SDK が管理します。`SAKURA_API_REQUEST_TIMEOUT` 環境変数、またはプロファイル設定の `api_request_timeout` (秒) で変更できます。環境変数は `SAKURA_` プレフィックスを優先し、未設定の項目は旧プレフィックスの `SAKURACLOUD_API_REQUEST_TIMEOUT` も使われます。リトライ回数と待ち時間は `SAKURA_RETRY_MAX`、`SAKURA_RETRY_WAIT_MIN`、`SAKURA_RETRY_WAIT_MAX` で変更でき、未設定の項目は `SAKURACLOUD_RETRY_MAX` などの旧プレフィックスも使われます。期限はリトライの 1 回ごとの試行に適用されます。未設定時の値は SDK の実装に従います。
+
 ## 参照先
 
 - [さくらのクラウド API ドキュメント](https://developer.sakura.ad.jp/cloud/api/1.1/)

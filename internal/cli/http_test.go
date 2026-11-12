@@ -16,6 +16,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -227,9 +228,39 @@ func TestHTTPCommandUsesSDKAuthenticationAndUserAgent(t *testing.T) {
 	}
 }
 
+func TestRunHTTPCommandPropagatesCancelToRequest(t *testing.T) {
+	// シグナルに依存せず、newHTTPRequestContext が返す context のキャンセルが
+	// リクエストへ伝播し、エラーとして報告されることを確認する。
+	original := newHTTPRequestContext
+	requestCtx, cancel := context.WithCancel(context.Background())
+	newHTTPRequestContext = func() (context.Context, context.CancelFunc) {
+		return requestCtx, cancel
+	}
+	t.Cleanup(func() {
+		newHTTPRequestContext = original
+		cancel()
+	})
+
+	commandLine := newCLI()
+	commandLine.HTTP.doerFactory = func() (authenticatedHTTPDoer, error) {
+		return authenticatedHTTPDoerFunc(func(request *http.Request) (*http.Response, error) {
+			require.Same(t, requestCtx, request.Context(), "request context is not the one from newHTTPRequestContext")
+			cancel()
+			// 実際の HTTP クライアントと同じく、キャンセル済み context をエラーとして返す。
+			return nil, request.Context().Err()
+		}), nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	require.NotEqual(t, 0, runCLI([]string{"http", "https://api.example.test/resource"}, &stdout, &stderr, commandLine), "run should fail")
+	require.Contains(t, stderr.String(), "interrupted by signal", "stderr = %q, want interrupted", stderr.String())
+}
+
 func TestRunHTTPCommandHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	require.Equal(t, 0, run([]string{"http", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	// kong はヘルプ文言を端末幅でラップするため、空白を正規化してから検証する。
+	normalized := strings.Join(strings.Fields(stdout.String()), " ")
 	for _, text := range []string{
 		"--method",
 		"--data",
@@ -239,7 +270,11 @@ func TestRunHTTPCommandHelp(t *testing.T) {
 		"標準入力",
 		"SDK の認証情報",
 		"--query による加工は行いません",
+		"SIGINT (Ctrl+C) または SIGTERM を受けるとリクエストを中断します",
+		"SAKURA_API_REQUEST_TIMEOUT",
+		"SAKURACLOUD_API_REQUEST_TIMEOUT",
+		"プロファイルの api_request_timeout",
 	} {
-		require.Contains(t, stdout.String(), text, "http help does not contain %q", text)
+		require.Contains(t, normalized, text, "http help does not contain %q", text)
 	}
 }
