@@ -18,6 +18,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -42,11 +44,19 @@ func TestRunAppRunDedicatedAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"apprun-dedicated-api", "create-application-version", "--help"},
-			want: []string{"--application-id", "--request", "version.CreateParams", "@path.json", "標準入力"},
+			want: []string{"--application-id", "--request", "registryPasswordAction", "@path.json", "標準入力"},
 		},
 		{
 			args: []string{"apprun-dedicated-api", "create-certificate", "--help"},
 			want: []string{"--cluster-id", "--request", "certificatePem", "privatekeyPem", "@path.json"},
+		},
+		{
+			args: []string{"apprun-dedicated-api", "create-cluster", "--help"},
+			want: []string{"--request", "servicePrincipalID", "@path.json", "- (標準入力)"},
+		},
+		{
+			args: []string{"apprun-dedicated-api", "create-auto-scaling-group", "--help"},
+			want: []string{"--request", "workerServiceClassPath", "- (標準入力)"},
 		},
 		{
 			args: []string{"apprun-dedicated-api", "update-application", "--help"},
@@ -64,6 +74,34 @@ func TestRunAppRunDedicatedAPIHelp(t *testing.T) {
 			for _, text := range test.want {
 				require.Contains(t, help, text, "help does not contain %q", text)
 			}
+		})
+	}
+}
+
+// --request を持つコマンドのヘルプに SDK の内部型名が現れないことを検証します。
+// 以前のヘルプに表示していた cluster.CreateParams のような SDK のパッケージ名と
+// 型名の組み合わせ (7 種類) を含め、SDK のパッケージ名に続く大文字始まりの型名表記を
+// 禁止します。入力経路の記載 (@path.json と標準入力) も実装と一致していることを
+// 確認します。
+func TestAppRunDedicatedAPIRequestHelpExcludesSDKTypeNames(t *testing.T) {
+	var sdkTypeName = regexp.MustCompile(`(cluster|version|autoscalinggroup|loadbalancer|certificate)\.[A-Z]`)
+	for _, command := range []string{
+		"create-cluster",
+		"update-cluster",
+		"create-auto-scaling-group",
+		"create-load-balancer",
+		"create-application-version",
+		"create-certificate",
+		"update-certificate",
+	} {
+		t.Run(command, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			require.Equal(t, 0, run([]string{"apprun-dedicated-api", command, "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
+			help := strings.Join(strings.Fields(stdout.String()), " ")
+			require.NotContains(t, help, "Params", "help should not expose SDK type names: %s", help)
+			require.NotRegexp(t, sdkTypeName, help, "help should not expose SDK type names: %s", help)
+			require.Contains(t, help, "@path.json")
+			require.Contains(t, help, "- (標準入力)")
 		})
 	}
 }
@@ -203,7 +241,10 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 	require.Equal(t, "mock-app", app.Name, "application name = %q, want mock-app", app.Name)
 
 	requestPath := t.TempDir() + "/version.json"
-	err8 := os.WriteFile(requestPath, []byte(`{"cpu":1000,"memory":2048,"scalingMode":"manual","fixedScale":1,"image":"nginx:latest","registryPasswordAction":"keep","exposedPorts":[{"targetPort":80}]}`), 0o600)
+	// registryUsername と registryPassword は省略する。省略時は API のリクエストに
+	// null として送信されるため、認証なしのイメージでは入力に必要ありません。
+	// envVars は環境変数の入力フィールドで、API のリクエストでは env に変換されます。
+	err8 := os.WriteFile(requestPath, []byte(`{"cpu":1000,"memory":2048,"scalingMode":"manual","fixedScale":1,"image":"nginx:latest","registryPasswordAction":"keep","exposedPorts":[{"targetPort":80}],"envVars":[{"key":"EXAMPLE","value":"value1","secret":false}]}`), 0o600)
 	require.NoError(t, err8)
 	var createdVersion v1.ApplicationVersionIdentifier
 	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "create-application-version",
@@ -219,6 +260,20 @@ func TestAppRunDedicatedAPIWithSakumock(t *testing.T) {
 		"--application-id", appID, "--max-items", "30"), &versions))
 	require.Len(t, versions.Items, 1, "version list = %#v, want version %d", versions.Items, createdVersion.Version)
 	require.Equal(t, createdVersion.Version, versions.Items[0].Version, "unexpected value")
+
+	// envVars で指定した環境変数が、API の env に変換されて送信されたことを
+	// バージョンの詳細で確認します。出力ではバージョンの環境変数は envVars です。
+	var versionDetail struct {
+		EnvVars []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"envVars"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "read-application-version",
+		"--application-id", appID, strconv.Itoa(int(createdVersion.Version))), &versionDetail))
+	require.Len(t, versionDetail.EnvVars, 1, "version envVars = %#v, want 1 entry", versionDetail.EnvVars)
+	require.Equal(t, "EXAMPLE", versionDetail.EnvVars[0].Key)
+	require.Equal(t, "value1", versionDetail.EnvVars[0].Value)
 
 	runCommand("apprun-dedicated-api", "update-application", appID, "--active-version", "1")
 	var containers []map[string]any
