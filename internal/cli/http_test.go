@@ -259,6 +259,8 @@ func TestRunHTTPCommandPropagatesCancelToRequest(t *testing.T) {
 func TestRunHTTPCommandHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	require.Equal(t, 0, run([]string{"http", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
+	// kong はヘルプ文言を端末幅でラップするため、空白を正規化してから検証する。
+	normalized := strings.Join(strings.Fields(stdout.String()), " ")
 	for _, text := range []string{
 		"--method",
 		"--data",
@@ -270,7 +272,9 @@ func TestRunHTTPCommandHelp(t *testing.T) {
 		"--query による加工は行いません",
 		"SIGINT (Ctrl+C) または SIGTERM を受けるとリクエストを中断します",
 		"SAKURA_API_REQUEST_TIMEOUT",
+		"SAKURACLOUD_API_REQUEST_TIMEOUT",
+		"プロファイルの api_request_timeout",
 	} {
-		require.Contains(t, stdout.String(), text, "http help does not contain %q", text)
+		require.Contains(t, normalized, text, "http help does not contain %q", text)
 	}
 }

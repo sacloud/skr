@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -56,6 +56,46 @@ func newTestServerDoerFactory(t *testing.T, server *httptest.Server) authenticat
 	}
 }
 
+// runCLIGoroutineSafe は runCLI を別 goroutine で実行し、終了コードを done チャネルへ返します。
+// runCLI の出力先は呼び出し元と goroutine の両方から触れるため、同期付きの writer を渡す
+// 必要があります。
+type synchronizedWriter struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (w *synchronizedWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Write(p)
+}
+
+func (w *synchronizedWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.String()
+}
+
+// firstWriteDoneWriter は最初の書き込みで done を閉じる同期付き io.Writer。別 goroutine で
+// 動く runCLI が応答本文を書き出したことを、競合なく待つために使います。
+type firstWriteDoneWriter struct {
+	synchronizedWriter
+	once sync.Once
+	done chan struct{}
+}
+
+func newFirstWriteDoneWriter() *firstWriteDoneWriter {
+	return &firstWriteDoneWriter{done: make(chan struct{})}
+}
+
+func (w *firstWriteDoneWriter) Write(p []byte) (int, error) {
+	n, err := w.synchronizedWriter.Write(p)
+	if err == nil {
+		w.once.Do(func() { close(w.done) })
+	}
+	return n, err
+}
+
 func TestRunHTTPCommandInterruptsSlowResponseBodyOnSignal(t *testing.T) {
 	// プロファイルや環境変数による設定差異の影響を受けないよう、一時プロファイル
 	// ディレクトリに切り離す。
@@ -82,18 +122,19 @@ func TestRunHTTPCommandInterruptsSlowResponseBodyOnSignal(t *testing.T) {
 	commandLine.HTTP.doerFactory = newTestServerDoerFactory(t, server)
 
 	done := make(chan int, 1)
-	var stdout, stderr bytes.Buffer
+	// stdout は別 goroutine の runCLI が書き込み、この goroutine が本文到着を待つため、
+	// 同期付きの writer を使う。
+	stdout := newFirstWriteDoneWriter()
+	var stderr bytes.Buffer
 	go func() {
-		done <- runCLI([]string{"http", server.URL}, &stdout, &stderr, commandLine)
+		done <- runCLI([]string{"http", server.URL}, stdout, &stderr, commandLine)
 	}()
 
 	// 応答本文の先頭が届くのを待ってから SIGINT を送る。
-	deadline := time.Now().Add(30 * time.Second)
-	for !strings.Contains(stdout.String(), "partial") {
-		if time.Now().After(deadline) {
-			t.Fatal("timed out waiting for the response body")
-		}
-		time.Sleep(10 * time.Millisecond)
+	select {
+	case <-stdout.done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for the response body")
 	}
 	sendSelfSignal(t, syscall.SIGINT)
 
@@ -107,13 +148,19 @@ func TestRunHTTPCommandInterruptsSlowResponseBodyOnSignal(t *testing.T) {
 }
 
 func TestRunHTTPCommandInterruptsRetryWaitOnSignal(t *testing.T) {
-	// プロファイルの RetryMax=0 などの設定に影響されないよう、一時プロファイル
-	// ディレクトリに切り離す。既定のリトライ回数 (SDK 既定) でリトライが発生する。
+	// プロファイルや環境変数による設定差異の影響を受けないよう、一時プロファイル
+	// ディレクトリに切り離す。
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	// リトライ回数と待ち時間を明示する。実行環境に SAKURA_RETRY_MAX=0 などがあっても
+	// テストの前提 (500 応答後の待ち時間への SIGINT 中断) が崩れないようにする。
+	// 両プレフィックスとも SDK が読むため、両方を設定する。
+	for _, prefix := range []string{"SAKURA_", "SAKURACLOUD_"} {
+		t.Setenv(prefix+"RETRY_MAX", "3")
+		t.Setenv(prefix+"RETRY_WAIT_MIN", "60")
+		t.Setenv(prefix+"RETRY_WAIT_MAX", "60")
+	}
 	// 500 を返すサーバーに対して SDK がリトライする。リトライの待ち時間を長くし、
 	// 待ち時間中に SIGINT を送ると、待ち時間を待たずに中断されることを確認する。
-	t.Setenv("SAKURA_RETRY_WAIT_MIN", "60")
-	t.Setenv("SAKURA_RETRY_WAIT_MAX", "60")
 
 	var attempts int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -39,7 +39,7 @@ $ cat request.json | skr http 'https://API-HOST/PATH' --method POST --data -
 
 実行中に `SIGINT` (Ctrl+C) または `SIGTERM` を受けると、実行中のリクエストを中断してエラーで終了します。応答の受信、本文の読み込み、リトライの待ち時間も含めて中断されます。
 
-1 回のリクエスト試行の期限は SDK が管理します。`SAKURA_API_REQUEST_TIMEOUT` 環境変数、またはプロファイル設定の `api_request_timeout` (秒) で変更できます。リトライ回数と待ち時間は `SAKURA_RETRY_MAX`、`SAKURA_RETRY_WAIT_MIN`、`SAKURA_RETRY_WAIT_MAX` で変更できます。期限はリトライの 1 回ごとの試行に適用されます。未設定時の値は SDK の実装に従います。
+1 回のリクエスト試行の期限は SDK が管理します。`SAKURA_API_REQUEST_TIMEOUT` 環境変数、またはプロファイル設定の `api_request_timeout` (秒) で変更できます。環境変数は `SAKURA_` プレフィックスを優先し、未設定の項目は旧プレフィックスの `SAKURACLOUD_API_REQUEST_TIMEOUT` も使われます。リトライ回数と待ち時間は `SAKURA_RETRY_MAX`、`SAKURA_RETRY_WAIT_MIN`、`SAKURA_RETRY_WAIT_MAX` で変更でき、未設定の項目は `SAKURACLOUD_RETRY_MAX` などの旧プレフィックスも使われます。期限はリトライの 1 回ごとの試行に適用されます。未設定時の値は SDK の実装に従います。
 
 ## 参照先
 
