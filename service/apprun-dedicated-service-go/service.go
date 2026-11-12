@@ -17,7 +17,8 @@
 //
 // 低レベルの application・version・cluster 操作を組み合わせた deploy、rollback、
 // deactivate、delete のフローと、status・versions・containers の参照、既存リソース
-// からの定義復元 (Init)、定義の正規化 (Render、Diff) を提供します。
+// からの定義復元 (Init)、定義の正規化 (Render、Diff)、クラスタ・オートスケーリング
+// グループのライフサイクル操作を提供します。
 //
 // 使い方の概要は次のとおりです。
 //
@@ -37,9 +38,11 @@ import (
 	"fmt"
 
 	application "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/application"
+	autoscalinggroup "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/autoscalinggroup"
 	cluster "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	version "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
+	workernode "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/workernode"
 )
 
 // listPageSize は一覧取得のページサイズです。テストでページングを検証するために var にしています。
@@ -61,7 +64,12 @@ type Service struct {
 	// newVersionAPI はアプリケーション ID に紐づくバージョン操作を構築します。
 	// バージョン操作はアプリケーションが確定した後に必要になるため、構築を遅らせます。
 	newVersionAPI func(v1.ApplicationID) version.VersionAPI
-	clock         clock
+	// newAutoScalingGroupAPI はクラスタ ID に紐づくオートスケーリンググループ操作を構築します。
+	newAutoScalingGroupAPI func(v1.ClusterID) autoscalinggroup.AutoScalingGroupAPI
+	// newWorkerNodeAPI はクラスタ ID とオートスケーリンググループ ID に紐づく
+	// ワーカノード操作を構築します。
+	newWorkerNodeAPI func(v1.ClusterID, v1.AutoScalingGroupID) workernode.WorkerNodeAPI
+	clock            clock
 }
 
 // New は AppRun Dedicated API クライアント (sacloud-sdk-go の api/apprun-dedicated
@@ -82,6 +90,12 @@ func New(client *v1.Client) *Service {
 		clusterAPI:     cluster.NewClusterOp(client),
 		newVersionAPI: func(id v1.ApplicationID) version.VersionAPI {
 			return version.NewVersionOp(client, id)
+		},
+		newAutoScalingGroupAPI: func(clusterID v1.ClusterID) autoscalinggroup.AutoScalingGroupAPI {
+			return autoscalinggroup.NewAutoScalingGroupOp(client, clusterID)
+		},
+		newWorkerNodeAPI: func(clusterID v1.ClusterID, autoScalingGroupID v1.AutoScalingGroupID) workernode.WorkerNodeAPI {
+			return workernode.NewWorkerNodeOp(client, clusterID, autoScalingGroupID)
 		},
 		clock: realClock{},
 	}

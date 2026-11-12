@@ -19,12 +19,15 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"sync"
 	"testing"
 
 	application "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/application"
+	autoscalinggroup "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/autoscalinggroup"
 	cluster "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	version "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/version"
+	workernode "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/workernode"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
@@ -59,6 +62,39 @@ func (a *fakeApp) readApplication() v1.ReadApplication {
 type fakeCluster struct {
 	clusterID v1.ClusterID
 	name      string
+	deleted   bool
+}
+
+// fakeAutoScalingGroup はメモリ上のオートスケーリンググループです。
+type fakeAutoScalingGroup struct {
+	clusterID              v1.ClusterID
+	autoScalingGroupID     v1.AutoScalingGroupID
+	name                   string
+	zone                   string
+	workerServiceClassPath string
+	minNodes               int32
+	maxNodes               int32
+	deleted                bool
+}
+
+func (a *fakeAutoScalingGroup) readAutoScalingGroup() v1.ReadAutoScalingGroup {
+	return v1.ReadAutoScalingGroup{
+		AutoScalingGroupID:     a.autoScalingGroupID,
+		Name:                   a.name,
+		Zone:                   a.zone,
+		WorkerServiceClassPath: a.workerServiceClassPath,
+		MinNodes:               a.minNodes,
+		MaxNodes:               a.maxNodes,
+	}
+}
+
+// fakeWorkerNode はメモリ上のワーカノードです。
+type fakeWorkerNode struct {
+	clusterID          v1.ClusterID
+	autoScalingGroupID v1.AutoScalingGroupID
+	workerNodeID       v1.WorkerNodeID
+	healthy            bool
+	deleted            bool
 }
 
 // fakeSDK は application・cluster・version の操作をメモリ上で再現する fake です。
@@ -67,8 +103,11 @@ type fakeCluster struct {
 // メソッドを持つため、それぞれ fakeApplicationAPI と fakeClusterAPI で公開します。
 // ページングと変更操作の呼び出し記録を提供します。
 type fakeSDK struct {
-	clusters []*fakeCluster
-	apps     []*fakeApp
+	mu          sync.Mutex
+	clusters    []*fakeCluster
+	apps        []*fakeApp
+	asgs        []*fakeAutoScalingGroup
+	workerNodes []*fakeWorkerNode
 
 	// deactivatedDesiredCount はアクティブバージョン解除後の DesiredCount です。
 	deactivatedDesiredCount *int32
@@ -107,6 +146,8 @@ func newFakeSDK(_ *testing.T) *fakeSDK {
 
 func (f *fakeSDK) addCluster(t *testing.T, name string) *fakeCluster {
 	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	c := &fakeCluster{clusterID: v1.ClusterID(f.newID()), name: name}
 	f.clusters = append(f.clusters, c)
 	return c
@@ -114,6 +155,8 @@ func (f *fakeSDK) addCluster(t *testing.T, name string) *fakeCluster {
 
 func (f *fakeSDK) addApp(t *testing.T, clusterName, name string) *fakeApp {
 	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var c *fakeCluster
 	for _, e := range f.clusters {
 		if e.name == clusterName {
@@ -134,6 +177,67 @@ func (f *fakeSDK) addApp(t *testing.T, clusterName, name string) *fakeApp {
 	}
 	f.apps = append(f.apps, app)
 	return app
+}
+
+func (f *fakeSDK) addAutoScalingGroup(t *testing.T, clusterName, name, zone, workerServiceClassPath string, minNodes, maxNodes int32) *fakeAutoScalingGroup {
+	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var c *fakeCluster
+	for _, e := range f.clusters {
+		if e.name == clusterName {
+			c = e
+			break
+		}
+	}
+	if c == nil {
+		panic("テストの準備に失敗しました: クラスタ " + clusterName + " がありません")
+	}
+	asg := &fakeAutoScalingGroup{
+		clusterID:              c.clusterID,
+		autoScalingGroupID:     v1.AutoScalingGroupID(f.newID()),
+		name:                   name,
+		zone:                   zone,
+		workerServiceClassPath: workerServiceClassPath,
+		minNodes:               minNodes,
+		maxNodes:               maxNodes,
+	}
+	f.asgs = append(f.asgs, asg)
+	return asg
+}
+
+func (f *fakeSDK) addWorkerNode(t *testing.T, clusterName, asgName string, healthy bool) *fakeWorkerNode {
+	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var c *fakeCluster
+	for _, e := range f.clusters {
+		if e.name == clusterName {
+			c = e
+			break
+		}
+	}
+	if c == nil {
+		panic("テストの準備に失敗しました: クラスタ " + clusterName + " がありません")
+	}
+	var asg *fakeAutoScalingGroup
+	for _, a := range f.asgs {
+		if a.clusterID == c.clusterID && a.name == asgName {
+			asg = a
+			break
+		}
+	}
+	if asg == nil {
+		panic("テストの準備に失敗しました: オートスケーリンググループ " + asgName + " がありません")
+	}
+	node := &fakeWorkerNode{
+		clusterID:          c.clusterID,
+		autoScalingGroupID: asg.autoScalingGroupID,
+		workerNodeID:       v1.WorkerNodeID(f.newID()),
+		healthy:            healthy,
+	}
+	f.workerNodes = append(f.workerNodes, node)
+	return node
 }
 
 // newID は重複しない識別子を返します。255 を超えると下位 8 ビットが折り返しますが、
@@ -160,12 +264,14 @@ func (f *fakeApplicationAPI) List(ctx context.Context, maxItems int64, cursor *v
 	if f.sdk.listErr != nil {
 		return nil, nil, f.sdk.listErr
 	}
+	f.sdk.mu.Lock()
 	var items []v1.ReadApplication
 	for _, a := range f.sdk.apps {
 		if !a.deleted {
 			items = append(items, a.readApplication())
 		}
 	}
+	f.sdk.mu.Unlock()
 	return pageItems(items, maxItems, cursor, func(r v1.ReadApplication) v1.ApplicationID { return r.ApplicationID })
 }
 
@@ -173,6 +279,8 @@ func (f *fakeApplicationAPI) Create(ctx context.Context, name string, clusterID 
 	if f.sdk.createApplicationErr != nil {
 		return nil, f.sdk.createApplicationErr
 	}
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	f.sdk.createApplicationCalls = append(f.sdk.createApplicationCalls, struct {
 		name      string
 		clusterID v1.ClusterID
@@ -200,6 +308,7 @@ func (f *fakeApplicationAPI) Read(ctx context.Context, id v1.ApplicationID) (*ap
 	if f.sdk.readErr != nil {
 		return nil, f.sdk.readErr
 	}
+	f.sdk.mu.Lock()
 	app, ok := f.sdk.findApp(id)
 	if !ok {
 		// 削除済みのアプリケーションが参照の遅延で存在を返すケースを再現します。
@@ -209,8 +318,10 @@ func (f *fakeApplicationAPI) Read(ctx context.Context, id v1.ApplicationID) (*ap
 		}
 	}
 	if !ok {
+		f.sdk.mu.Unlock()
 		return nil, notFoundError("application not found")
 	}
+	defer f.sdk.mu.Unlock()
 	return &application.ApplicationDetail{
 		ApplicationID: app.applicationID,
 		Name:          app.name,
@@ -225,6 +336,8 @@ func (f *fakeApplicationAPI) Update(ctx context.Context, id v1.ApplicationID, to
 	if f.sdk.updateErr != nil {
 		return f.sdk.updateErr
 	}
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	app, ok := f.sdk.findApp(id)
 	if !ok {
 		return notFoundError("application not found")
@@ -254,6 +367,8 @@ func (f *fakeApplicationAPI) Update(ctx context.Context, id v1.ApplicationID, to
 }
 
 func (f *fakeApplicationAPI) Delete(ctx context.Context, id v1.ApplicationID) error {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	app, ok := f.sdk.findApp(id)
 	if !ok {
 		return notFoundError("application not found")
@@ -268,16 +383,21 @@ func (f *fakeApplicationAPI) Delete(ctx context.Context, id v1.ApplicationID) er
 }
 
 func (f *fakeApplicationAPI) Containers(ctx context.Context, id v1.ApplicationID) ([]application.Placement, error) {
+	f.sdk.mu.Lock()
 	f.sdk.containersCalls++
 	if f.sdk.containersErrCount > 0 {
 		f.sdk.containersErrCount--
+		f.sdk.mu.Unlock()
 		return nil, errors.New("一時的なエラー")
 	}
 	app, ok := f.sdk.findApp(id)
 	if !ok {
+		f.sdk.mu.Unlock()
 		return nil, notFoundError("application not found")
 	}
-	return app.containers, nil
+	containers := app.containers
+	f.sdk.mu.Unlock()
+	return containers, nil
 }
 
 // --- cluster.ClusterAPI ---
@@ -291,10 +411,15 @@ func (f *fakeClusterAPI) List(ctx context.Context, maxItems int64, cursor *v1.Cl
 	if f.sdk.listErr != nil {
 		return nil, nil, f.sdk.listErr
 	}
+	f.sdk.mu.Lock()
 	var items []cluster.ClusterDetail
 	for _, c := range f.sdk.clusters {
+		if c.deleted {
+			continue
+		}
 		items = append(items, cluster.ClusterDetail{ClusterID: c.clusterID, Name: c.name})
 	}
+	f.sdk.mu.Unlock()
 	return pageItems(items, maxItems, cursor, func(c cluster.ClusterDetail) v1.ClusterID { return c.ClusterID })
 }
 
@@ -303,8 +428,10 @@ func (f *fakeClusterAPI) Create(ctx context.Context, params cluster.CreateParams
 }
 
 func (f *fakeClusterAPI) Read(ctx context.Context, id v1.ClusterID) (*cluster.ClusterDetail, error) {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	for _, c := range f.sdk.clusters {
-		if c.clusterID == id {
+		if c.clusterID == id && !c.deleted {
 			return &cluster.ClusterDetail{ClusterID: c.clusterID, Name: c.name}, nil
 		}
 	}
@@ -316,7 +443,18 @@ func (f *fakeClusterAPI) Update(ctx context.Context, id v1.ClusterID, params clu
 }
 
 func (f *fakeClusterAPI) Delete(ctx context.Context, id v1.ClusterID) error {
-	return errors.New("fakeSDK はクラスタの削除に対応しません")
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
+	for _, c := range f.sdk.clusters {
+		if c.clusterID == id {
+			if c.deleted {
+				return notFoundError("cluster not found")
+			}
+			c.deleted = true
+			return nil
+		}
+	}
+	return notFoundError("cluster not found")
 }
 
 func (f *fakeClusterAPI) ReadLoadBalancer(ctx context.Context, id v1.ClusterID) (*v1.ReadClusterLoadBalancer, error) {
@@ -325,6 +463,125 @@ func (f *fakeClusterAPI) ReadLoadBalancer(ctx context.Context, id v1.ClusterID) 
 
 func (f *fakeClusterAPI) UpdateLoadBalancer(ctx context.Context, id v1.ClusterID, params cluster.UpdateLoadBalancerParams) error {
 	return errors.New("fakeSDK はロードバランサの更新に対応しません")
+}
+
+// --- autoscalinggroup.AutoScalingGroupAPI ---
+
+// fakeAutoScalingGroupAPI は autoscalinggroup.AutoScalingGroupAPI の fake です。
+type fakeAutoScalingGroupAPI struct {
+	sdk       *fakeSDK
+	clusterID v1.ClusterID
+}
+
+func (f *fakeAutoScalingGroupAPI) List(ctx context.Context, maxItems int64, cursor *v1.AutoScalingGroupID) ([]v1.ReadAutoScalingGroup, *v1.AutoScalingGroupID, error) {
+	f.sdk.mu.Lock()
+	var items []v1.ReadAutoScalingGroup
+	for _, a := range f.sdk.asgs {
+		if a.clusterID != f.clusterID || a.deleted {
+			continue
+		}
+		items = append(items, a.readAutoScalingGroup())
+	}
+	f.sdk.mu.Unlock()
+	return pageItems(items, maxItems, cursor, func(r v1.ReadAutoScalingGroup) v1.AutoScalingGroupID { return r.AutoScalingGroupID })
+}
+
+func (f *fakeAutoScalingGroupAPI) Create(ctx context.Context, params autoscalinggroup.CreateParams) (*v1.AutoScalingGroupIdentifier, error) {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
+	asg := &fakeAutoScalingGroup{
+		clusterID:              f.clusterID,
+		autoScalingGroupID:     v1.AutoScalingGroupID(f.sdk.newID()),
+		name:                   params.Name,
+		zone:                   params.Zone,
+		workerServiceClassPath: params.WorkerServiceClassPath,
+		minNodes:               params.MinNodes,
+		maxNodes:               params.MaxNodes,
+	}
+	f.sdk.asgs = append(f.sdk.asgs, asg)
+	return &v1.AutoScalingGroupIdentifier{AutoScalingGroupID: asg.autoScalingGroupID}, nil
+}
+
+func (f *fakeAutoScalingGroupAPI) Read(ctx context.Context, id v1.AutoScalingGroupID) (*autoscalinggroup.AutoScalingGroupDetail, error) {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
+	for _, a := range f.sdk.asgs {
+		if a.autoScalingGroupID != id {
+			continue
+		}
+		if a.deleted {
+			return nil, notFoundError("auto scaling group not found")
+		}
+		return &autoscalinggroup.AutoScalingGroupDetail{
+			AutoScalingGroupID:     a.autoScalingGroupID,
+			Name:                   a.name,
+			Zone:                   a.zone,
+			WorkerServiceClassPath: a.workerServiceClassPath,
+			MinNodes:               a.minNodes,
+			MaxNodes:               a.maxNodes,
+		}, nil
+	}
+	return nil, notFoundError("auto scaling group not found")
+}
+
+func (f *fakeAutoScalingGroupAPI) Delete(ctx context.Context, id v1.AutoScalingGroupID) error {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
+	for _, a := range f.sdk.asgs {
+		if a.autoScalingGroupID != id {
+			continue
+		}
+		if a.deleted {
+			return notFoundError("auto scaling group not found")
+		}
+		a.deleted = true
+		return nil
+	}
+	return notFoundError("auto scaling group not found")
+}
+
+// --- workernode.WorkerNodeAPI ---
+
+// fakeWorkerNodeAPI は workernode.WorkerNodeAPI の fake です。
+type fakeWorkerNodeAPI struct {
+	sdk                *fakeSDK
+	clusterID          v1.ClusterID
+	autoScalingGroupID v1.AutoScalingGroupID
+}
+
+func (f *fakeWorkerNodeAPI) List(ctx context.Context, maxItems int64, cursor *v1.WorkerNodeID) ([]workernode.WorkerNodeDetail, *v1.WorkerNodeID, error) {
+	f.sdk.mu.Lock()
+	var items []workernode.WorkerNodeDetail
+	for _, n := range f.sdk.workerNodes {
+		if n.clusterID != f.clusterID || n.autoScalingGroupID != f.autoScalingGroupID || n.deleted {
+			continue
+		}
+		items = append(items, workernode.WorkerNodeDetail{WorkerNodeID: n.workerNodeID, Healthy: n.healthy})
+	}
+	f.sdk.mu.Unlock()
+	return pageItems(items, maxItems, cursor, func(r workernode.WorkerNodeDetail) v1.WorkerNodeID { return r.WorkerNodeID })
+}
+
+func (f *fakeWorkerNodeAPI) Read(ctx context.Context, id v1.WorkerNodeID) (*workernode.WorkerNodeDetail, error) {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
+	for _, n := range f.sdk.workerNodes {
+		if n.workerNodeID != id {
+			continue
+		}
+		if n.deleted {
+			return nil, notFoundError("worker node not found")
+		}
+		return &workernode.WorkerNodeDetail{
+			WorkerNodeID: n.workerNodeID,
+			Healthy:      n.healthy,
+		}, nil
+	}
+	return nil, notFoundError("worker node not found")
+}
+
+func (f *fakeWorkerNodeAPI) Update(ctx context.Context, id v1.WorkerNodeID, draining bool) error {
+	return errors.New("fakeSDK はワーカノードの更新に対応しません")
 }
 
 // --- version.VersionAPI ---
@@ -338,6 +595,14 @@ type fakeVersionAPI struct {
 func (f *fakeSDK) newVersionAPI(id v1.ApplicationID) version.VersionAPI {
 	app, _ := f.findApp(id)
 	return &fakeVersionAPI{sdk: f, app: app}
+}
+
+func (f *fakeSDK) newAutoScalingGroupAPI(clusterID v1.ClusterID) autoscalinggroup.AutoScalingGroupAPI {
+	return &fakeAutoScalingGroupAPI{sdk: f, clusterID: clusterID}
+}
+
+func (f *fakeSDK) newWorkerNodeAPI(clusterID v1.ClusterID, autoScalingGroupID v1.AutoScalingGroupID) workernode.WorkerNodeAPI {
+	return &fakeWorkerNodeAPI{sdk: f, clusterID: clusterID, autoScalingGroupID: autoScalingGroupID}
 }
 
 func (v *fakeVersionAPI) List(ctx context.Context, maxItems int64, cursor *v1.ApplicationVersionNumber) ([]v1.ApplicationVersionSummary, *v1.ApplicationVersionNumber, error) {

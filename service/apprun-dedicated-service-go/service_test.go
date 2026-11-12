@@ -28,10 +28,12 @@ import (
 func newTestService(t *testing.T, f *fakeSDK) *Service {
 	t.Helper()
 	return &Service{
-		applicationAPI: f.app,
-		clusterAPI:     f.cluster,
-		newVersionAPI:  f.newVersionAPI,
-		clock:          newFakeClock(),
+		applicationAPI:         f.app,
+		clusterAPI:             f.cluster,
+		newVersionAPI:          f.newVersionAPI,
+		newAutoScalingGroupAPI: f.newAutoScalingGroupAPI,
+		newWorkerNodeAPI:       f.newWorkerNodeAPI,
+		clock:                  newFakeClock(),
 	}
 }
 
