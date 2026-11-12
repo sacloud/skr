@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.2.0](https://github.com/sacloud/skr/compare/v0.1.0...v0.2.0) - 2026-11-12
+
+### 🚀 Changes
+- Go 1.27.4 に更新 by @tokuhirom in https://github.com/sacloud/skr/pull/230
+- EventBus の高レベルコマンド skr eventbus と service 層の独立モジュール化 by @tokuhirom in https://github.com/sacloud/skr/pull/227
+- docs: AppRun Dedicated 高レベルデプロイフローコマンドの設計 by @tokuhirom in https://github.com/sacloud/skr/pull/231
+- AppRun 専有型の service 層 (service/apprun-dedicated-service-go) を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/232
+- AppRun 専有型の高レベルコマンド skr apprun-dedicated を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/233
+- diff の hunk 統合条件を GNU diff の unified 形式に合わせる by @tokuhirom in https://github.com/sacloud/skr/pull/234
+- AppRun 専有型高レベルコマンドのライブ E2E を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/235
+- apprun-dedicated-api の一覧操作の max-items 既定値を 20 に変更 by @tokuhirom in https://github.com/sacloud/skr/pull/236
+- deploy と rollback の反映待ちで要求されたコンテナ数を確認する by @tokuhirom in https://github.com/sacloud/skr/pull/248
+- deploy が反映待ちで失敗してもアプリケーションを後片付けする by @tokuhirom in https://github.com/sacloud/skr/pull/244
+- apprun-dedicated の --wait-timeout を待機中の API 呼び出しにも適用する by @tokuhirom in https://github.com/sacloud/skr/pull/245
+- apprun-dedicated-api のヘルプから SDK 内部型名を除く by @tokuhirom in https://github.com/sacloud/skr/pull/243
+- AppRun 専有型のチュートリアルを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/242
+- AppRun 専有型チュートリアルの実行順と成功条件を明確にする by @tokuhirom in https://github.com/sacloud/skr/pull/249
+- http コマンドにシグナルによるキャンセル伝播を追加 by @tokuhirom in https://github.com/sacloud/skr/pull/250
+- AppRun 専有型の高レベルコマンドにユーザーズマニュアルを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/252
+- EventBus のユーザーズマニュアルを追加する by @tokuhirom in https://github.com/sacloud/skr/pull/253
+### 📦 Dependency Updates
+- go: bump github.com/sacloud/sakumock from 0.13.1-0.20261106064007-b549aa2fc6d3 to 0.14.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/228
+- ci: bump docker/login-action from 4.7.0 to 4.8.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/246
+
 ## [v0.1.0](https://github.com/sacloud/skr/compare/v0.0.7...v0.1.0) - 2026-11-10
 
 ### 🚀 Changes
