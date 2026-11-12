@@ -19,6 +19,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"sync"
 	"testing"
 
 	application "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/application"
@@ -102,6 +103,7 @@ type fakeWorkerNode struct {
 // メソッドを持つため、それぞれ fakeApplicationAPI と fakeClusterAPI で公開します。
 // ページングと変更操作の呼び出し記録を提供します。
 type fakeSDK struct {
+	mu          sync.Mutex
 	clusters    []*fakeCluster
 	apps        []*fakeApp
 	asgs        []*fakeAutoScalingGroup
@@ -144,6 +146,8 @@ func newFakeSDK(_ *testing.T) *fakeSDK {
 
 func (f *fakeSDK) addCluster(t *testing.T, name string) *fakeCluster {
 	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	c := &fakeCluster{clusterID: v1.ClusterID(f.newID()), name: name}
 	f.clusters = append(f.clusters, c)
 	return c
@@ -151,6 +155,8 @@ func (f *fakeSDK) addCluster(t *testing.T, name string) *fakeCluster {
 
 func (f *fakeSDK) addApp(t *testing.T, clusterName, name string) *fakeApp {
 	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var c *fakeCluster
 	for _, e := range f.clusters {
 		if e.name == clusterName {
@@ -175,6 +181,8 @@ func (f *fakeSDK) addApp(t *testing.T, clusterName, name string) *fakeApp {
 
 func (f *fakeSDK) addAutoScalingGroup(t *testing.T, clusterName, name, zone, workerServiceClassPath string, minNodes, maxNodes int32) *fakeAutoScalingGroup {
 	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var c *fakeCluster
 	for _, e := range f.clusters {
 		if e.name == clusterName {
@@ -200,6 +208,8 @@ func (f *fakeSDK) addAutoScalingGroup(t *testing.T, clusterName, name, zone, wor
 
 func (f *fakeSDK) addWorkerNode(t *testing.T, clusterName, asgName string, healthy bool) *fakeWorkerNode {
 	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var c *fakeCluster
 	for _, e := range f.clusters {
 		if e.name == clusterName {
@@ -254,12 +264,14 @@ func (f *fakeApplicationAPI) List(ctx context.Context, maxItems int64, cursor *v
 	if f.sdk.listErr != nil {
 		return nil, nil, f.sdk.listErr
 	}
+	f.sdk.mu.Lock()
 	var items []v1.ReadApplication
 	for _, a := range f.sdk.apps {
 		if !a.deleted {
 			items = append(items, a.readApplication())
 		}
 	}
+	f.sdk.mu.Unlock()
 	return pageItems(items, maxItems, cursor, func(r v1.ReadApplication) v1.ApplicationID { return r.ApplicationID })
 }
 
@@ -267,6 +279,8 @@ func (f *fakeApplicationAPI) Create(ctx context.Context, name string, clusterID 
 	if f.sdk.createApplicationErr != nil {
 		return nil, f.sdk.createApplicationErr
 	}
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	f.sdk.createApplicationCalls = append(f.sdk.createApplicationCalls, struct {
 		name      string
 		clusterID v1.ClusterID
@@ -294,6 +308,7 @@ func (f *fakeApplicationAPI) Read(ctx context.Context, id v1.ApplicationID) (*ap
 	if f.sdk.readErr != nil {
 		return nil, f.sdk.readErr
 	}
+	f.sdk.mu.Lock()
 	app, ok := f.sdk.findApp(id)
 	if !ok {
 		// 削除済みのアプリケーションが参照の遅延で存在を返すケースを再現します。
@@ -303,8 +318,10 @@ func (f *fakeApplicationAPI) Read(ctx context.Context, id v1.ApplicationID) (*ap
 		}
 	}
 	if !ok {
+		f.sdk.mu.Unlock()
 		return nil, notFoundError("application not found")
 	}
+	defer f.sdk.mu.Unlock()
 	return &application.ApplicationDetail{
 		ApplicationID: app.applicationID,
 		Name:          app.name,
@@ -319,6 +336,8 @@ func (f *fakeApplicationAPI) Update(ctx context.Context, id v1.ApplicationID, to
 	if f.sdk.updateErr != nil {
 		return f.sdk.updateErr
 	}
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	app, ok := f.sdk.findApp(id)
 	if !ok {
 		return notFoundError("application not found")
@@ -348,6 +367,8 @@ func (f *fakeApplicationAPI) Update(ctx context.Context, id v1.ApplicationID, to
 }
 
 func (f *fakeApplicationAPI) Delete(ctx context.Context, id v1.ApplicationID) error {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	app, ok := f.sdk.findApp(id)
 	if !ok {
 		return notFoundError("application not found")
@@ -362,16 +383,21 @@ func (f *fakeApplicationAPI) Delete(ctx context.Context, id v1.ApplicationID) er
 }
 
 func (f *fakeApplicationAPI) Containers(ctx context.Context, id v1.ApplicationID) ([]application.Placement, error) {
+	f.sdk.mu.Lock()
 	f.sdk.containersCalls++
 	if f.sdk.containersErrCount > 0 {
 		f.sdk.containersErrCount--
+		f.sdk.mu.Unlock()
 		return nil, errors.New("一時的なエラー")
 	}
 	app, ok := f.sdk.findApp(id)
 	if !ok {
+		f.sdk.mu.Unlock()
 		return nil, notFoundError("application not found")
 	}
-	return app.containers, nil
+	containers := app.containers
+	f.sdk.mu.Unlock()
+	return containers, nil
 }
 
 // --- cluster.ClusterAPI ---
@@ -385,6 +411,7 @@ func (f *fakeClusterAPI) List(ctx context.Context, maxItems int64, cursor *v1.Cl
 	if f.sdk.listErr != nil {
 		return nil, nil, f.sdk.listErr
 	}
+	f.sdk.mu.Lock()
 	var items []cluster.ClusterDetail
 	for _, c := range f.sdk.clusters {
 		if c.deleted {
@@ -392,6 +419,7 @@ func (f *fakeClusterAPI) List(ctx context.Context, maxItems int64, cursor *v1.Cl
 		}
 		items = append(items, cluster.ClusterDetail{ClusterID: c.clusterID, Name: c.name})
 	}
+	f.sdk.mu.Unlock()
 	return pageItems(items, maxItems, cursor, func(c cluster.ClusterDetail) v1.ClusterID { return c.ClusterID })
 }
 
@@ -400,6 +428,8 @@ func (f *fakeClusterAPI) Create(ctx context.Context, params cluster.CreateParams
 }
 
 func (f *fakeClusterAPI) Read(ctx context.Context, id v1.ClusterID) (*cluster.ClusterDetail, error) {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	for _, c := range f.sdk.clusters {
 		if c.clusterID == id && !c.deleted {
 			return &cluster.ClusterDetail{ClusterID: c.clusterID, Name: c.name}, nil
@@ -413,6 +443,8 @@ func (f *fakeClusterAPI) Update(ctx context.Context, id v1.ClusterID, params clu
 }
 
 func (f *fakeClusterAPI) Delete(ctx context.Context, id v1.ClusterID) error {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	for _, c := range f.sdk.clusters {
 		if c.clusterID == id {
 			if c.deleted {
@@ -442,6 +474,7 @@ type fakeAutoScalingGroupAPI struct {
 }
 
 func (f *fakeAutoScalingGroupAPI) List(ctx context.Context, maxItems int64, cursor *v1.AutoScalingGroupID) ([]v1.ReadAutoScalingGroup, *v1.AutoScalingGroupID, error) {
+	f.sdk.mu.Lock()
 	var items []v1.ReadAutoScalingGroup
 	for _, a := range f.sdk.asgs {
 		if a.clusterID != f.clusterID || a.deleted {
@@ -449,10 +482,13 @@ func (f *fakeAutoScalingGroupAPI) List(ctx context.Context, maxItems int64, curs
 		}
 		items = append(items, a.readAutoScalingGroup())
 	}
+	f.sdk.mu.Unlock()
 	return pageItems(items, maxItems, cursor, func(r v1.ReadAutoScalingGroup) v1.AutoScalingGroupID { return r.AutoScalingGroupID })
 }
 
 func (f *fakeAutoScalingGroupAPI) Create(ctx context.Context, params autoscalinggroup.CreateParams) (*v1.AutoScalingGroupIdentifier, error) {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	asg := &fakeAutoScalingGroup{
 		clusterID:              f.clusterID,
 		autoScalingGroupID:     v1.AutoScalingGroupID(f.sdk.newID()),
@@ -467,6 +503,8 @@ func (f *fakeAutoScalingGroupAPI) Create(ctx context.Context, params autoscaling
 }
 
 func (f *fakeAutoScalingGroupAPI) Read(ctx context.Context, id v1.AutoScalingGroupID) (*autoscalinggroup.AutoScalingGroupDetail, error) {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	for _, a := range f.sdk.asgs {
 		if a.autoScalingGroupID != id {
 			continue
@@ -487,6 +525,8 @@ func (f *fakeAutoScalingGroupAPI) Read(ctx context.Context, id v1.AutoScalingGro
 }
 
 func (f *fakeAutoScalingGroupAPI) Delete(ctx context.Context, id v1.AutoScalingGroupID) error {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	for _, a := range f.sdk.asgs {
 		if a.autoScalingGroupID != id {
 			continue
@@ -510,6 +550,7 @@ type fakeWorkerNodeAPI struct {
 }
 
 func (f *fakeWorkerNodeAPI) List(ctx context.Context, maxItems int64, cursor *v1.WorkerNodeID) ([]workernode.WorkerNodeDetail, *v1.WorkerNodeID, error) {
+	f.sdk.mu.Lock()
 	var items []workernode.WorkerNodeDetail
 	for _, n := range f.sdk.workerNodes {
 		if n.clusterID != f.clusterID || n.autoScalingGroupID != f.autoScalingGroupID || n.deleted {
@@ -517,10 +558,13 @@ func (f *fakeWorkerNodeAPI) List(ctx context.Context, maxItems int64, cursor *v1
 		}
 		items = append(items, workernode.WorkerNodeDetail{WorkerNodeID: n.workerNodeID, Healthy: n.healthy})
 	}
+	f.sdk.mu.Unlock()
 	return pageItems(items, maxItems, cursor, func(r workernode.WorkerNodeDetail) v1.WorkerNodeID { return r.WorkerNodeID })
 }
 
 func (f *fakeWorkerNodeAPI) Read(ctx context.Context, id v1.WorkerNodeID) (*workernode.WorkerNodeDetail, error) {
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
 	for _, n := range f.sdk.workerNodes {
 		if n.workerNodeID != id {
 			continue
