@@ -16,6 +16,7 @@ package apprundedicated
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -66,8 +67,13 @@ func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, group
 		return nil, err
 	}
 	asgAPI := s.newAutoScalingGroupAPI(clusterDetail.ClusterID)
-	if _, err := s.findAutoScalingGroup(ctx, asgAPI, groupName); err == nil {
+	if _, err := s.findAutoScalingGroup(ctx, asgAPI, clusterName, groupName); err == nil {
 		return nil, fmt.Errorf("クラスタ %q にオートスケーリンググループ %q は既に存在します", clusterName, groupName)
+	} else {
+		var notFound *AutoScalingGroupNotFoundError
+		if !errors.As(err, &notFound) {
+			return nil, err
+		}
 	}
 	if err := ensureActive(ctx); err != nil {
 		return nil, err
@@ -107,7 +113,7 @@ func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, group
 // DeleteAutoScalingGroupOptions は DeleteAutoScalingGroup の待機に関するオプションです。
 type DeleteAutoScalingGroupOptions struct {
 	// NoWait が true の場合、削除 API 呼び出し後の削除完了待ちを省略します。
-	// 削除 API の呼び出しと削除後の不在確認は行います。
+	// 削除 API の呼び出しと削除後の不在確認は常に行います。
 	NoWait bool
 	// Timeout は削除完了待ちのタイムアウトです。零値の場合は DefaultWaitTimeout を使います。
 	Timeout time.Duration
@@ -126,8 +132,7 @@ type DeleteAutoScalingGroupResult struct {
 // DeleteAutoScalingGroup はクラスタのオートスケーリンググループを削除します。
 //
 // クラスタ名とグループ名で対象を特定し、削除 API を呼び出した後、削除後の不在を
-// 確認します。NoWait が true の場合、削除 API 呼び出しから実際に削除されるまでの
-// 待機を省略しますが、削除 API の呼び出しと削除後の不在確認は行います。
+// 確認します。削除後の不在確認は常に行います。
 func (s *Service) DeleteAutoScalingGroup(ctx context.Context, clusterName, groupName string, opts *DeleteAutoScalingGroupOptions) (*DeleteAutoScalingGroupResult, error) {
 	if opts == nil {
 		opts = &DeleteAutoScalingGroupOptions{}
@@ -137,7 +142,7 @@ func (s *Service) DeleteAutoScalingGroup(ctx context.Context, clusterName, group
 		return nil, err
 	}
 	asgAPI := s.newAutoScalingGroupAPI(clusterDetail.ClusterID)
-	asgDetail, err := s.findAutoScalingGroup(ctx, asgAPI, groupName)
+	asgDetail, err := s.findAutoScalingGroup(ctx, asgAPI, clusterName, groupName)
 	if err != nil {
 		return nil, err
 	}
@@ -155,10 +160,8 @@ func (s *Service) DeleteAutoScalingGroup(ctx context.Context, clusterName, group
 		}
 		return result, nil
 	}
-	if !opts.NoWait {
-		if err := s.confirmAutoScalingGroupDeleted(ctx, asgAPI, asgDetail.AutoScalingGroupID, opts.Timeout); err != nil {
-			return nil, fmt.Errorf("オートスケーリンググループ %q の削除後の不在確認に失敗しました: %w", groupName, err)
-		}
+	if err := s.confirmAutoScalingGroupDeleted(ctx, asgAPI, asgDetail.AutoScalingGroupID, opts.Timeout); err != nil {
+		return nil, fmt.Errorf("オートスケーリンググループ %q の削除後の不在確認に失敗しました: %w", groupName, err)
 	}
 	return result, nil
 }
@@ -166,7 +169,7 @@ func (s *Service) DeleteAutoScalingGroup(ctx context.Context, clusterName, group
 // DeleteClusterOptions は DeleteCluster の待機に関するオプションです。
 type DeleteClusterOptions struct {
 	// NoWait が true の場合、削除 API 呼び出し後の削除完了待ちを省略します。
-	// 依存確認、削除 API の呼び出し、削除後の不在確認は行います。
+	// 依存確認、削除 API の呼び出し、削除後の不在確認は常に行います。
 	NoWait bool
 	// Timeout は削除完了待ちのタイムアウトです。零値の場合は DefaultWaitTimeout を使います。
 	Timeout time.Duration
@@ -184,9 +187,7 @@ type DeleteClusterResult struct {
 //
 // クラスタ名で対象を特定し、アプリケーションやオートスケーリンググループなどの
 // 関連リソースが残っていれば列挙して中断します。関連リソースがなければ削除 API を
-// 呼び出し、削除後の不在を確認します。NoWait が true の場合、削除 API 呼び出しから
-// 実際に削除されるまでの待機を省略しますが、依存確認、削除 API の呼び出し、削除後の
-// 不在確認は行います。
+// 呼び出し、削除後の不在を確認します。削除後の不在確認は常に行います。
 func (s *Service) DeleteCluster(ctx context.Context, clusterName string, opts *DeleteClusterOptions) (*DeleteClusterResult, error) {
 	if opts == nil {
 		opts = &DeleteClusterOptions{}
@@ -215,10 +216,8 @@ func (s *Service) DeleteCluster(ctx context.Context, clusterName string, opts *D
 		}
 		return result, nil
 	}
-	if !opts.NoWait {
-		if err := s.confirmClusterDeleted(ctx, clusterDetail.ClusterID, opts.Timeout); err != nil {
-			return nil, fmt.Errorf("クラスタ %q の削除後の不在確認に失敗しました: %w", clusterName, err)
-		}
+	if err := s.confirmClusterDeleted(ctx, clusterDetail.ClusterID, opts.Timeout); err != nil {
+		return nil, fmt.Errorf("クラスタ %q の削除後の不在確認に失敗しました: %w", clusterName, err)
 	}
 	return result, nil
 }
@@ -237,7 +236,7 @@ func (e *AutoScalingGroupNotFoundError) Error() string {
 }
 
 // findAutoScalingGroup はクラスタ内のオートスケーリンググループを名前で検索します。
-func (s *Service) findAutoScalingGroup(ctx context.Context, api autoscalinggroup.AutoScalingGroupAPI, name string) (*autoscalinggroup.AutoScalingGroupDetail, error) {
+func (s *Service) findAutoScalingGroup(ctx context.Context, api autoscalinggroup.AutoScalingGroupAPI, clusterName, name string) (*autoscalinggroup.AutoScalingGroupDetail, error) {
 	var cursor *v1.AutoScalingGroupID
 	for {
 		list, next, err := api.List(ctx, listPageSize, cursor)
@@ -255,30 +254,38 @@ func (s *Service) findAutoScalingGroup(ctx context.Context, api autoscalinggroup
 			return detail, nil
 		}
 		if next == nil {
-			return nil, &AutoScalingGroupNotFoundError{Cluster: "", Name: name}
+			return nil, &AutoScalingGroupNotFoundError{Cluster: clusterName, Name: name}
 		}
 		cursor = next
 	}
 }
 
 // waitWorkerNodesHealthy は指定されたオートスケーリンググループの全ワーカノードが
-// healthy になるまで待機します。
+// healthy になるまで待機します。全ページを走査します。
 func (s *Service) waitWorkerNodesHealthy(ctx context.Context, clusterID v1.ClusterID, asgID v1.AutoScalingGroupID, timeout time.Duration) error {
 	wnAPI := s.newWorkerNodeAPI(clusterID, asgID)
 	return s.poll(ctx, timeout, func(ctx context.Context) (bool, error) {
-		nodes, _, err := wnAPI.List(ctx, listPageSize, nil)
-		if err != nil {
-			return false, nil
-		}
-		if len(nodes) == 0 {
-			return false, nil
-		}
-		for _, node := range nodes {
-			if !node.Healthy {
+		var cursor *v1.WorkerNodeID
+		found := false
+		for {
+			nodes, next, err := wnAPI.List(ctx, listPageSize, cursor)
+			if err != nil {
 				return false, nil
 			}
+			if len(nodes) > 0 {
+				found = true
+			}
+			for _, node := range nodes {
+				if !node.Healthy {
+					return false, nil
+				}
+			}
+			if next == nil {
+				break
+			}
+			cursor = next
 		}
-		return true, nil
+		return found, nil
 	})
 }
 
