@@ -461,6 +461,7 @@ $ [ -n "$DELETED" ] && echo "削除が完了しました" || { echo "10 分以�
 
 ## 参考資料
 
+- [AppRun 専有型の高レベルコマンド (リファレンス)](../apprun-dedicated.md)
 - [AppRun 専有型の基本情報](https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html)
 - [AppRun 専有型 クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)
 - [AppRun 専有型 技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)

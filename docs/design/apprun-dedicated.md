@@ -351,6 +351,7 @@ deploy の反映待ち失敗時の後片付けを `test/e2e/apprun-dedicated/sce
 
 ## ドキュメントと PLAN
 
+- ユーザーズマニュアル `docs/manual/apprun-dedicated.md` を作成済みです ([ADR 0081](../adr/0081-high-level-command-users-manual.md))。対象と対象外、概念モデル、コマンド一覧、定義ファイルのフィールドと検証、各コマンドの挙動、待機と反映の確認、確認プロンプトと `--force`、出力、秘密情報の扱い、エラーと対処を含めます。各コマンドの挙動には、deploy の `registryPasswordAction` の決定、rollback のバージョン選択、init の復元も含まれます。フラグの網羅はヘルプ、手順はチュートリアルに任せています。
 - チュートリアル `docs/manual/tutorials/apprun-dedicated.md` は、実装と sakumock 検証の完了後に作成します。`skr apprun-dedicated` のコマンド、定義ファイルの書き方、デプロイからロールバック・削除までの流れ、低レベル `apprun-dedicated-api` との対応を含めます。**作成済み** (クラスタ・グループ作成などの低レベルの手順と、高レベルのアプリケーションライフサイクルを統合した内容)。
 - `PLAN.md` の `apprun-dedicated` の節に、高レベル層の実装範囲、ライブ E2E、チュートリアルの対応状況を区別して記録します。
 - 低レベル `apprun-dedicated-api` の設計文書に高レベル層への誘導を追記します。
