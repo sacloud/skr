@@ -43,6 +43,7 @@ skr は 2 つの階層のコマンドを提供します。
 3. **ワーカノード** — グループの作成後に自動で起動します。`healthy` になるのを待ちます。
 4. **アプリケーションとバージョン** — 定義ファイルから高レベルの `deploy` で作成し、コンテナの起動まで待ちます。
 5. **更新とロールバック** — 定義を変更して新しいバージョンをデプロイし、前のバージョンへ戻します。
+6. **クラスタとオートスケーリンググループの削除** — 作成したリソースを順に削除して後片付けします。
 
 ## Step 1: 対象環境とコマンドを確認する
 
@@ -65,7 +66,7 @@ $ skr apprun-dedicated-api list-clusters --query '[.items[] | {clusterID, name}]
 
 ## Step 2: クラスタを作成する
 
-クラスタの作成リクエストを JSON ファイルとして用意します。`SERVICE-PRINCIPAL-ID` は前提条件で確認した ID に置き換えます。`ports` はクラスタロードバランサの待受ポート、`letsEncryptEmail` は Let's Encrypt の利用設定です。このチュートリアルではどちらも使わないため、`ports` を空配列にします（[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)）。待受ポートや Let's Encrypt を利用する場合の設定は、該当ページを参照してください。
+クラスタの作成リクエストを次の内容で `cluster.json` という名前で保存します。`SERVICE-PRINCIPAL-ID` は前提条件で確認した ID に置き換えます。`ports` はクラスタロードバランサの待受ポート、`letsEncryptEmail` は Let's Encrypt の利用設定です。このチュートリアルではどちらも使わないため、`ports` を空配列にします（[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)）。待受ポートや Let's Encrypt を利用する場合の設定は、該当ページを参照してください。
 
 ```json
 {
@@ -101,7 +102,7 @@ $ skr apprun-dedicated-api list-worker-service-classes --query 'map({path, name}
 ]
 ```
 
-`ASG-NAME`、`ZONE`、`WORKER-SERVICE-CLASS-PATH` を置き換えて `asg.json` を保存します。`WORKER-SERVICE-CLASS-PATH` には上の出力から選んだ `path` を指定します (例: `cloud/apprun/dedicated/worker/1vcpu_2gb`)。
+`ASG-NAME`、`ZONE`、`WORKER-SERVICE-CLASS-PATH` を置き換えて、次の内容を `asg.json` という名前で保存します。`WORKER-SERVICE-CLASS-PATH` には上の出力から選んだ `path` を指定します (例: `cloud/apprun/dedicated/worker/1vcpu_2gb`)。
 
 ```json
 {
@@ -129,13 +130,13 @@ $ skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --
 
 参照結果に指定した名前、ゾーン、サービスクラス、ノード数が表示されることを確認します。
 
-グループの作成後にワーカノードが自動で起動します。ノードの状態は次のコマンドで確認します。`status` が `healthy` になるまで繰り返し実行して待ってください。起動には時間がかかります。
+グループの作成後にワーカノードが自動で起動します。ノードの状態は次のコマンドで確認します。
 
 ```console
 $ skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '[.items[] | {status, createErrorMessage}]'
 ```
 
-以下は出力形式の例です。`createErrorMessage` が設定されている場合はノードの作成に失敗しています。
+以下は出力形式の例です。
 
 ```json
 [
@@ -145,6 +146,24 @@ $ skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-s
   }
 ]
 ```
+
+起動には時間がかかるため、15 秒間隔で最大 20 分、次のループで待ちます。いずれかのノードの `status` が `healthy` になったら待ちを終えて次へ進みます。`createErrorMessage` にメッセージが設定されているノードがあった場合はノードの作成に失敗しているため、待ちを続けても解消しないので、その場でループを中断します。確認コマンド自体が失敗した場合もそこで中断します。待ちの間は表示されません。
+
+```console
+$ READY=""
+$ for i in $(seq 80); do
+      STATE=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" 2>&1) || { echo "状態の確認に失敗しました: $STATE"; exit 1; }
+      case "$(echo "$STATE" | jq -r 'if any(.items[]; .createErrorMessage != null and .createErrorMessage != "") then "failed" elif any(.items[]; .status == "healthy") then "ready" else "waiting" end')" in
+          ready) READY=1; break ;;
+          failed) echo "ノードの作成に失敗しました: $STATE"; exit 1 ;;
+          *) sleep 15 ;;
+      esac
+  done
+$ [ -n "$READY" ] && echo "ワーカノードが healthy になりました" || { echo "20 分以内にワーカノードが healthy になりませんでした"; exit 1; }
+ワーカノードが healthy になりました
+```
+
+20 分を過ぎても `healthy` にならない場合は、ループの直後の確認が失敗して手順が止まります。次へ進まず、コンソールパネルでクラスタとオートスケーリンググループの状態を確認してください。
 
 ## Step 4: 定義ファイルを用意してデプロイする
 
@@ -254,10 +273,17 @@ $ skr apprun-dedicated containers --app apprun-dedicated.json --query 'map({node
 
 ```console
 $ NODE_IP=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '.items[0].networkInterfaces[0].addresses[0]' | jq -er '.')
-$ curl -i "http://$NODE_IP:8080/"
+$ curl --fail --silent --show-error --connect-timeout 10 --max-time 60 --write-out '\nHTTP status: %{http_code}\n' "http://$NODE_IP:8080/"
 ```
 
-アプリケーションが HTTP で応答することを確認してください。確認が終わったら次の手順へ進み、作成したリソースを速やかに削除します。
+成功条件は HTTP ステータス `200` と、本文が `Hello from AppRun!` であることです。サンプルイメージは `GET /` に対して HTTP 200 で本文 `Hello from AppRun!` (`Content-Type: text/plain`) を返します ([app.js](https://github.com/sacloud/apprun-samples/blob/main/tutorial/app.js))。次はこの実装に基づく表示例です。
+
+```text
+Hello from AppRun!
+HTTP status: 200
+```
+
+`--fail` 付きのため、HTTP エラー (4xx、5xx) のときは失敗して本文を表示しません。その場合は `containers` でコンテナの状態を確認してください。成功したかどうかは、表示された本文と `HTTP status` の値で判断してください (`--fail` は 4xx、5xx 以外のステータスを失敗扱いにしないため、`200` の確認は出力に対して行います)。確認が終わったら次の手順へ進み、作成したリソースを速やかに削除します。
 
 ## Step 6: 定義を更新してロールバックする
 
@@ -394,76 +420,44 @@ apprun-dedicated: Application.Read: API Error 404: code 404: {Status:404 Title:.
 オートスケーリンググループを削除します。削除の前に `read` で ID と名前、ゾーンがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。削除は非同期で、ワーカノードの削除も伴います。`deleting` が `true` の間は削除中です。削除後は、保持した `ASG_ID` が存在しなくなるまで (404 エラーになるまで)、15 秒間隔で最大 10 分確認を繰り返します。照会の失敗は削除の完了と扱わないため、404 以外のエラーで手順を中断します。
 
 ```console
+$ DELETED=""
 $ skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '{autoScalingGroupID, name, zone, deleting}'
 $ skr apprun-dedicated-api delete-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID"
 $ for i in $(seq 40); do
       OUT=$(skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" 2>&1) && { sleep 15; continue; }
       case "$OUT" in
-          *"API Error 404"*) echo "削除が完了しました"; break ;;
+          *"API Error 404"*) DELETED=1; break ;;
           *) echo "削除の確認に失敗しました: $OUT"; exit 1 ;;
       esac
   done
+$ [ -n "$DELETED" ] && echo "削除が完了しました" || { echo "10 分以内に削除が完了しませんでした"; exit 1; }
 削除が完了しました
 ```
 
-完了メッセージが表示されないまま 10 分経過した場合は削除がまだ完了していません。コンソールパネルでオートスケーリンググループの状態を確認してください。
+10 分を過ぎても削除が完了しない場合は、ループの直後の確認が失敗して手順が止まります。コンソールパネルでオートスケーリンググループの状態を確認してください。
 
-続けてクラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループ) がないことを確認してから実行してください。
+続けてクラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループ) がないことを確認してから実行してください。クラスタの削除も非同期で完了するため、保持した `CLUSTER_ID` が 404 になるまで (15 秒間隔で最大 10 分) 確認を繰り返します。404 以外のエラーで手順を中断します。
 
 ```console
 $ skr apprun-dedicated-api read-cluster "$CLUSTER_ID" --query '{clusterID, name}'
 $ skr apprun-dedicated-api delete-cluster "$CLUSTER_ID"
-$ skr apprun-dedicated-api read-cluster "$CLUSTER_ID"
-apprun-dedicated: Cluster.Read: API Error 404: code 404: {Status:404 Title:...}
-```
-
-削除後も保持した `CLUSTER_ID` で参照して存在しないこと (404 エラー) を確認します。
-
-## 補足: 低レベルコマンドだけでの操作
-
-高レベルコマンドが行うデプロイは、低レベルコマンドでは次の手順に相当します。個別の操作ごとに実行結果を制御したい場合に使ってください。
-
-```console
-$ APP_ID=$(skr apprun-dedicated-api create-application --name APP-NAME --cluster-id "$CLUSTER_ID" --query '.applicationID' | jq -er '.')
-```
-
-バージョンの作成リクエストには `registryPasswordAction` が必要です。新しいレジストリパスワードを設定する場合は `new` (リクエストに `registryPassword` を含める)、アクティブなバージョンがある状態で既存のパスワードを維持する場合は `keep`、それ以外は `remove` を指定します。公開イメージでレジストリ認証を使わない場合は `remove` です。`registryUsername`、`registryPassword`、`loadBalancerPort`、`healthCheck` は省略できます。省略時は API のリクエストに null として送信されます。環境変数は `envVars` で指定します (API のリクエストでは `env` という名前のフィールドに対応します)。入力 JSON でリクエストにないフィールドを書くとエラーになるため、`env` と書いた環境変数は黙って送信されずに気付けます。`registryPassword` や `secret=true` の環境変数の値など秘密情報を含むリクエストは、`@path.json` または標準入力 (`-`) からのみ指定でき、インラインの JSON は拒否されます。
-
-```json
-{
-  "image": "ghcr.io/sacloud/apprun-samples/tutorial:latest",
-  "cpu": 100,
-  "memory": 128,
-  "scalingMode": "manual",
-  "fixedScale": 1,
-  "registryPasswordAction": "remove",
-  "exposedPorts": [
-    {
-      "targetPort": 8080,
-      "useLetsEncrypt": false,
-      "host": []
-    }
-  ],
-  "envVars": []
-}
-```
-
-```console
-$ skr apprun-dedicated-api create-application-version --application-id "$APP_ID" --request @version.json --query '.version'
-$ skr apprun-dedicated-api update-application "$APP_ID" --active-version 1
-```
-
-有効化の解除は `update-application --deactivate` です。`--active-version` とは併用できません。反映待ちの判定は `list-application-containers` のコンテナの状態を繰り返し確認して行います。高レベルコマンドはこの待機を自動で行います。
-
-```console
-$ skr apprun-dedicated-api update-application "$APP_ID" --deactivate
+$ DELETED=""
+$ for i in $(seq 40); do
+      OUT=$(skr apprun-dedicated-api read-cluster "$CLUSTER_ID" 2>&1) && { sleep 15; continue; }
+      case "$OUT" in
+          *"API Error 404"*) DELETED=1; break ;;
+          *) echo "削除の確認に失敗しました: $OUT"; exit 1 ;;
+      esac
+  done
+$ [ -n "$DELETED" ] && echo "削除が完了しました" || { echo "10 分以内に削除が完了しませんでした"; exit 1; }
+削除が完了しました
 ```
 
 ## まとめ
 
 低レベルコマンドでクラスタとオートスケーリンググループを構築し、高レベルコマンドで定義ファイル 1 つからアプリケーションをデプロイ、更新、ロールバック、削除しました。定義の変更は `diff` で確認し、`render` で正規化した内容を確認できます。`registryPassword` などの秘密情報はコマンド引数に含めず、定義ファイルまたは標準入力から渡します。
 
-ロードバランサの待受ポート、Let's Encrypt、証明書、ワーカノードの draining、CPU 使用率によるオートスケーリング (`scalingMode: "cpu"`) はこのチュートリアルでは扱っていません。低レベルコマンドの `--help` と[技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)を参照してください。
+ロードバランサの待受ポート、Let's Encrypt、証明書、ワーカノードの draining、CPU 使用率によるオートスケーリング (`scalingMode: "cpu"`) はこのチュートリアルでは扱っていません。低レベルコマンドの `--help` と[技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)を参照してください。アプリケーションの作成・更新・削除を低レベルコマンドだけで行うこともできます。その場合は、高レベルコマンドが自動で行うバージョンの有効化とコンテナの起動・停止の待機を自分で行う必要があるため、各操作の `--help` と待機条件を確認してください。
 
 ## 参考資料
 
@@ -472,5 +466,6 @@ $ skr apprun-dedicated-api update-application "$APP_ID" --deactivate
 - [AppRun 専有型 技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)
 - [AppRun 専有型 API ドキュメント](https://manual.sakura.ad.jp/api/cloud/apprun-dedicated/)
 - [AppRun クイックスタート (サンプルアプリケーション)](https://manual.sakura.ad.jp/cloud/apprun/getting_started.html)
+- [サンプルイメージの実装 (apprun-samples tutorial)](https://github.com/sacloud/apprun-samples/blob/main/tutorial/app.js)
 - [sacloud-sdk-go v0.5.0: AppRun Dedicated API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.5.0/api/apprun-dedicated)
 - [apprun-dedicated service (skr の service 層)](https://github.com/sacloud/skr/tree/main/service/apprun-dedicated-service-go)
