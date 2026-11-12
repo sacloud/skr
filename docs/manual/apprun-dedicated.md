@@ -125,7 +125,13 @@ AppRun 専有型のリソースは次の階層で構成されます。用語の�
 
 ## 各コマンドの挙動
 
+各節の先頭に構文を示します。構文の `--app=FILE|-` は定義ファイルの指定です (「[定義ファイル](#定義ファイル)」参照)。フラグの詳細は各コマンドの `--help` で確認できます。
+
 ### deploy
+
+```
+skr apprun-dedicated deploy --app=FILE|-
+```
 
 定義ファイルの内容をデプロイします。
 
@@ -148,27 +154,51 @@ AppRun 専有型のリソースは次の階層で構成されます。用語の�
 
 ### diff
 
+```
+skr apprun-dedicated diff --app=FILE|-
+```
+
 ローカルの定義とデプロイ済みの現状を比較し、unified diff を標準出力へ出力します。現状はアクティブバージョンの内容を定義と同じ形式に正規化したものです。アプリケーションが存在しない、または非活性の場合は、`cluster` と `name` だけの定義を現状として差分を表示します (初回デプロイで作成される内容の確認に使えます)。
 
 `registryPassword`、`secret=true` の環境変数の値、`registryPasswordAction` は応答で取得できないため比較から除外し、その旨を標準エラー出力に示します。差分がなければ標準出力には何も書きません。
 
 ### render
 
+```
+skr apprun-dedicated render --app=FILE|-
+```
+
 定義を読み込み、検証と正規化を行った結果を JSON で出力します。API には接続しません。`registryPassword` と `secret=true` の環境変数の値は出力に含めません。デプロイ前に定義の構造を確認する用途に使います。
 
 ### status
+
+```
+skr apprun-dedicated status --app=FILE|-
+```
 
 アプリケーションの状態を出力します。アプリケーションの ID、名前、アクティブバージョン、要求されたコンテナ数 (API の `DesiredCount`) と、アクティブバージョンの内容 (イメージ、CPU、メモリ、スケーリング方式、アクティブノード数) を含みます。アクティブバージョンがなければその内容は null になります。`registryPassword` は表示しません。
 
 ### versions
 
+```
+skr apprun-dedicated versions --app=FILE|-
+```
+
 バージョンの一覧を出力します。各要素はバージョン番号、イメージ、アクティブノード数、アクティブかどうか、作成日時 (UTC) を含みます。
 
 ### containers
 
+```
+skr apprun-dedicated containers --app=FILE|-
+```
+
 コンテナの配置を出力します。ノードごとのコンテナの状態を確認できます。deploy の反映待ちがタイムアウトしたときの原因確認にも使います。
 
 ### rollback
+
+```
+skr apprun-dedicated rollback --app=FILE|-
+```
 
 新しいバージョンを作成せず、既存のバージョンを有効化して切り替えます。切り替え後は deploy と同じ反映待ちを行います。
 
@@ -181,13 +211,25 @@ AppRun 専有型のリソースは次の階層で構成されます。用語の�
 
 ### deactivate
 
+```
+skr apprun-dedicated deactivate --app=FILE|-
+```
+
 アクティブバージョンを解除し、コンテナの停止を待ちます。アプリケーションとバージョンは残るため、後から rollback で再開できます。すでに非活性のときは変更せずに成功します。
 
 ### delete
 
+```
+skr apprun-dedicated delete --app=FILE|-
+```
+
 アプリケーションとすべてのバージョンを削除します。アクティブバージョンがあれば先に解除し、停止を待ってから削除します。削除後は API の応答でアプリケーションが不在になったことを確認します。`--no-wait` を指定しても、削除自体と削除後の不在確認は行われます。
 
 ### init
+
+```
+skr apprun-dedicated init <cluster> <application>
+```
 
 デプロイ済みのアプリケーションから定義ファイルを生成します。位置引数でクラスタ名とアプリケーション名を指定し、`--output-file` で出力先を指定します (既定は `application.json`)。
 
