@@ -21,7 +21,6 @@ import (
 
 	"github.com/google/uuid"
 	apprun_dedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
-	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
@@ -111,15 +110,9 @@ func TestScenarioAppRunDedicatedDeployFailureCleanup(t *testing.T) {
 		"deploy failure should come from the wait timeout, stderr: %s", stderr)
 
 	// deploy はアプリケーションを作成してから反映待ちで失敗したはずです。
-	// 後片付けが対象を削除できる前提を、SDK で確認します。
-	list, _, err := applications.List(t.Context(), listPageSize, nil)
+	// 後片付けが対象を削除できる前提を、SDK で確認します。一覧は後片付けと同じく
+	// 全ページを走査して、名前と所属クラスタが一致する 1 件を探します。
+	id, err := findCreatedApplication(t, applications, clusterName, appName)
 	require.NoError(t, err, "list applications after the failed deploy")
-	var created *v1.ReadApplication
-	for i := range list {
-		if list[i].Name == appName && list[i].ClusterName == clusterName {
-			require.Nil(t, created, "application %q should be unique in cluster %q", appName, clusterName)
-			created = &list[i]
-		}
-	}
-	require.NotNil(t, created, "deploy should have created the application before the wait timed out")
+	require.NotNil(t, id, "deploy should have created the application before the wait timed out")
 }
