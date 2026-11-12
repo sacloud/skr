@@ -159,7 +159,7 @@ func TestDeployWithWait(t *testing.T) {
 	f := newFakeSDK(t)
 	f.addCluster(t, "c1")
 	app := f.addApp(t, "c1", "app1")
-	app.containers = []application.Placement{runningPlacement(1)}
+	app.containers = twoRunningPlacements(1)
 	s := newTestService(t, f)
 
 	// 最初の確認でコンテナが running なら、追加の待ち時間なしで完了します。
@@ -189,7 +189,7 @@ func TestDeployWaitRetriesReadErrors(t *testing.T) {
 	f := newFakeSDK(t)
 	f.addCluster(t, "c1")
 	app := f.addApp(t, "c1", "app1")
-	app.containers = []application.Placement{runningPlacement(1)}
+	app.containers = twoRunningPlacements(1)
 	f.containersErrCount = 2
 	s := newTestService(t, f)
 

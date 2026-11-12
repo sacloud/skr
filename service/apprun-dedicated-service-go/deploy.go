@@ -56,8 +56,9 @@ type DeployResult struct {
 //
 // opts が nil の場合は待機あり (タイムアウト DefaultWaitTimeout) で動作します。
 // NoWait が true の場合は有効化まで行い、反映を待ちません。反映待ちの完了条件は、
-// 作成したバージョンのコンテナが 1 つ以上あり、そのすべてが running 状態であること
-// です。ポーリング中の参照エラーは打ち切らず、期限まで再試行します。
+// 要求されたコンテナ数 (DesiredCount) と同じ数のコンテナが作成したバージョンで
+// すべて running 状態であることです。ポーリング中の参照エラーは打ち切らず、
+// 期限まで再試行します。
 func (s *Service) Deploy(ctx context.Context, def *ApplicationDefinition, opts *DeployOptions) (*DeployResult, error) {
 	if def == nil {
 		return nil, errors.New("定義が nil です")
@@ -124,16 +125,32 @@ func registryPasswordAction(def *ApplicationDefinition, detail *application.Appl
 	return v1.RegistryPasswordActionRemove
 }
 
-// waitRunning は作成したバージョンのコンテナがすべて running になるまで待機します。
+// waitRunning は、要求されたコンテナ数 (DesiredCount) と同じ数のコンテナが
+// 対象バージョンで running になるまで待機します。
+//
+// 1つのワーカノードには同一アプリケーションのコンテナが最大1つ配置されるため
+// (https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html「技術概要」の
+// 「コンテナのスケジューリング」)、要求されたコンテナ数を配置できるワーカノードが
+// ない場合、コンテナは要求した数まで現れません。その場合も反映完了とは判定せず、
+// 期限まで待機してタイムアウトします。
 func (s *Service) waitRunning(ctx context.Context, id v1.ApplicationID, version v1.ApplicationVersionNumber, timeout time.Duration) error {
 	return s.poll(ctx, timeout, func() (bool, error) {
+		detail, err := s.applicationAPI.Read(ctx, id)
+		if err != nil {
+			// 参照エラーは打ち切らず、期限まで再試行します。
+			return false, nil
+		}
+		if detail.DesiredCount == nil || *detail.DesiredCount <= 0 {
+			// 要求されたコンテナ数が確定していない間は完了と判定しません。
+			return false, nil
+		}
 		placements, err := s.applicationAPI.Containers(ctx, id)
 		if err != nil {
 			// 参照エラーは打ち切らず、期限まで再試行します。
 			return false, nil
 		}
 		running, total := containersRunning(placements, version)
-		return total > 0 && running == total, nil
+		return total == int(*detail.DesiredCount) && running == total, nil
 	})
 }
 
