@@ -124,16 +124,32 @@ func registryPasswordAction(def *ApplicationDefinition, detail *application.Appl
 	return v1.RegistryPasswordActionRemove
 }
 
-// waitRunning は作成したバージョンのコンテナがすべて running になるまで待機します。
+// waitRunning は、要求されたコンテナ数 (DesiredCount) と同じ数のコンテナが
+// 対象バージョンで running になるまで待機します。
+//
+// 1つのワーカノードには同一アプリケーションのコンテナが最大1つ配置されるため
+// (https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html「技術概要」の
+// 「コンテナのスケジューリング」)、要求されたコンテナ数を配置できるワーカノードが
+// ない場合、コンテナは要求した数まで現れません。その場合も反映完了とは判定せず、
+// 期限まで待機してタイムアウトします。
 func (s *Service) waitRunning(ctx context.Context, id v1.ApplicationID, version v1.ApplicationVersionNumber, timeout time.Duration) error {
 	return s.poll(ctx, timeout, func() (bool, error) {
+		detail, err := s.applicationAPI.Read(ctx, id)
+		if err != nil {
+			// 参照エラーは打ち切らず、期限まで再試行します。
+			return false, nil
+		}
+		if detail.DesiredCount == nil || *detail.DesiredCount <= 0 {
+			// 要求されたコンテナ数が確定していない間は完了と判定しません。
+			return false, nil
+		}
 		placements, err := s.applicationAPI.Containers(ctx, id)
 		if err != nil {
 			// 参照エラーは打ち切らず、期限まで再試行します。
 			return false, nil
 		}
 		running, total := containersRunning(placements, version)
-		return total > 0 && running == total, nil
+		return total == int(*detail.DesiredCount) && running == total, nil
 	})
 }
 

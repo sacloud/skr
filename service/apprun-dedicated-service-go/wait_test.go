@@ -87,6 +87,13 @@ func runningPlacement(version v1.ApplicationVersionNumber) application.Placement
 	}
 }
 
+// twoRunningPlacements は指定バージョンの running コンテナを 2 ノードに配置した Placement を返します。
+func twoRunningPlacements(version v1.ApplicationVersionNumber) []application.Placement {
+	second := runningPlacement(version)
+	second.ContainersStats.Containers[0].ID = "container-2"
+	return []application.Placement{runningPlacement(version), second}
+}
+
 func TestContainersRunning(t *testing.T) {
 	running := func(id string, version v1.ApplicationVersionNumber, state string) v1.ApplicationCurrentContainer {
 		return v1.ApplicationCurrentContainer{ID: id, ApplicationVersion: version, State: state}
@@ -103,15 +110,13 @@ func TestContainersRunning(t *testing.T) {
 		name        string
 		placements  []application.Placement
 		version     v1.ApplicationVersionNumber
-		wantOK      bool
 		wantTotal   int
 		wantRunning int
 	}{
 		{
-			name:        "対象バージョンのすべてのコンテナが running なら完了",
+			name:        "対象バージョンのコンテナを数える",
 			placements:  placements([]v1.ApplicationCurrentContainer{running("c1", 2, "running"), running("c2", 2, "running")}),
 			version:     2,
-			wantOK:      true,
 			wantTotal:   2,
 			wantRunning: 2,
 		},
@@ -119,33 +124,80 @@ func TestContainersRunning(t *testing.T) {
 			name:       "別バージョンのコンテナは対象外",
 			placements: placements([]v1.ApplicationCurrentContainer{running("c1", 1, "running")}),
 			version:    2,
-			wantOK:     false,
 			wantTotal:  0,
 		},
 		{
-			name:        "running 以外が混ざると未完了",
+			name:        "running 以外も total に数える",
 			placements:  placements([]v1.ApplicationCurrentContainer{running("c1", 2, "running"), running("c2", 2, "exited")}),
 			version:     2,
-			wantOK:      false,
 			wantTotal:   2,
 			wantRunning: 1,
 		},
 		{
-			name:       "コンテナがない場合は未完了",
+			name:       "コンテナがない場合は 0",
 			placements: nil,
 			version:    2,
-			wantOK:     false,
 			wantTotal:  0,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			running, total := containersRunning(tc.placements, tc.version)
-			require.Equal(t, tc.wantOK, total > 0 && running == total)
+			runningCount, total := containersRunning(tc.placements, tc.version)
 			require.Equal(t, tc.wantTotal, total)
-			require.Equal(t, tc.wantRunning, running)
+			require.Equal(t, tc.wantRunning, runningCount)
 		})
 	}
+}
+
+// newWaitRunningService は waitRunning の完了条件を検証するための Service と fake を
+// 組み立てます。
+func newWaitRunningService(t *testing.T) (*Service, *fakeSDK, *fakeApp) {
+	t.Helper()
+	f := newFakeSDK(t)
+	f.addCluster(t, "c1")
+	app := f.addApp(t, "c1", "app1")
+	return newTestService(t, f), f, app
+}
+
+func TestWaitRunningRequiresRequestedContainers(t *testing.T) {
+	t.Run("要求されたコンテナ数が一部しか現れていない間は完了しない", func(t *testing.T) {
+		s, _, app := newWaitRunningService(t)
+
+		// DesiredCount が 2 に対し、running なコンテナは 1 つのままでは完了しません。
+		two := int32(2)
+		app.desiredCount = &two
+		app.containers = []application.Placement{runningPlacement(1)}
+
+		_, err := runWithTicks(t, s, func() (any, error) {
+			return nil, s.waitRunning(t.Context(), app.applicationID, 1, DefaultPollInterval*2)
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "タイムアウト")
+	})
+
+	t.Run("要求されたコンテナ数すべてが running なら完了", func(t *testing.T) {
+		s, _, app := newWaitRunningService(t)
+
+		two := int32(2)
+		app.desiredCount = &two
+		app.containers = twoRunningPlacements(1)
+
+		err := s.waitRunning(t.Context(), app.applicationID, 1, time.Minute)
+		require.NoError(t, err)
+	})
+
+	t.Run("DesiredCount が確定していない間は完了しない", func(t *testing.T) {
+		s, _, app := newWaitRunningService(t)
+
+		// DesiredCount が null の間は、running なコンテナがあっても完了しません。
+		app.containers = []application.Placement{runningPlacement(1)}
+
+		_, err := runWithTicks(t, s, func() (any, error) {
+			return nil, s.waitRunning(t.Context(), app.applicationID, 1, DefaultPollInterval*2)
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "タイムアウト")
+	})
 }
 
 func TestPollImmediateCheck(t *testing.T) {
