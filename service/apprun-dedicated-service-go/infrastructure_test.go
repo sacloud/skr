@@ -29,17 +29,19 @@ func TestCreateAutoScalingGroup(t *testing.T) {
 		s := newTestService(t, f)
 
 		var result *CreateAutoScalingGroupResult
-		var nodeAdded bool
+		var node *fakeWorkerNode
 		err := runWithTicksAndHook(t, s, func() error {
 			var err error
 			result, err = s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", []v1.Ipv4{"210.188.224.10"}, 1, 3, nil)
 			return err
 		}, func() {
-			if nodeAdded {
+			if node == nil {
+				// 最初の tick で creating 状態のノードが現れる。
+				node = f.addWorkerNode(t, "c1", "asg1", v1.WorkerNodeStatusCreating)
 				return
 			}
-			f.addWorkerNode(t, "c1", "asg1", true)
-			nodeAdded = true
+			// 2 回目以降の tick で healthy に遷移する。
+			f.setWorkerNodeStatus(t, node, v1.WorkerNodeStatusHealthy)
 		})
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -61,6 +63,24 @@ func TestCreateAutoScalingGroup(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.Equal(t, "asg1", result.Name)
+	})
+
+	t.Run("ノードが unhealthy のままではタイムアウトする", func(t *testing.T) {
+		f := newFakeSDK(t)
+		f.addCluster(t, "c1")
+		s := newTestService(t, f)
+
+		var node *fakeWorkerNode
+		err := runWithTicksAndHook(t, s, func() error {
+			_, err := s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", []v1.Ipv4{"210.188.224.10"}, 1, 3, nil)
+			return err
+		}, func() {
+			if node == nil {
+				node = f.addWorkerNode(t, "c1", "asg1", v1.WorkerNodeStatusUnhealthy)
+			}
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "待機がタイムアウトしました")
 	})
 
 	t.Run("クラスタが存在しない", func(t *testing.T) {

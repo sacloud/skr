@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	apprun_dedicated "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated"
+	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/skr/test/e2e/internal/helper"
 	"github.com/stretchr/testify/require"
 )
@@ -69,33 +70,43 @@ func TestScenarioAppRunDedicatedInfrastructureLifecycle(t *testing.T) {
 	}()
 
 	// 高レベルコマンドでオートスケーリンググループを作成する。
-	data = h.CallWithTimeout(t, createCommandLimit, "オートスケーリンググループを作成する (高レベルコマンド)",
+	asgs := apprun_dedicated.NewAutoScalingGroupOp(sdkClient, clusterID)
+
+	// 作成前に同名のグループが存在しないことを SDK で確認する。この検証に成功した
+	// 場合だけ、作成がタイムアウトで打ち切られて ID が確定しなかった場合の後片付けを
+	// 一意な名前で行える。ID が確定した後の後片付けは ID と名前を再照合して削除する。
+	requireNoAutoScalingGroupNamed(t, asgs, asgName)
+	var asgID v1.AutoScalingGroupID
+	defer func() {
+		if asgID != (v1.AutoScalingGroupID{}) {
+			cleanupAutoScalingGroup(t, h, asgs, clusterID, asgID, asgName)
+			return
+		}
+		cleanupAutoScalingGroupByName(t, h, asgs, clusterID, asgName)
+	}()
+
+	data = h.CallWithTimeout(t, asgCreateCommandLimit, "オートスケーリンググループを作成する (高レベルコマンド)",
 		"apprun-dedicated", "create-auto-scaling-group", clusterName, asgName,
 		"--zone", apprunDedicatedZone,
 		"--worker-service-class-path", workerServiceClassPath,
 		"--name-servers", "210.188.224.10",
 		"--min-nodes", "1", "--max-nodes", "1",
 		"--wait-timeout", workerNodeWaitLimit.String())
-	asgID := parseCreateAutoScalingGroupOutput(t, data)
+	asgID = parseCreateAutoScalingGroupOutput(t, data)
 	require.NotEqual(t, uuid.Nil, uuid.UUID(asgID), "created auto-scaling group should have an ID")
 
-	asgs := apprun_dedicated.NewAutoScalingGroupOp(sdkClient, clusterID)
 	verifyCreatedAutoScalingGroup(t, asgs, asgID, asgName)
 	waitForHealthyWorkerNode(t, apprun_dedicated.NewWorkerNodeOp(sdkClient, clusterID, asgID))
 
-	// 高レベルコマンドでオートスケーリンググループを削除する。
-	h.CallWithTimeout(t, createCommandLimit, "オートスケーリンググループを削除する (高レベルコマンド)",
-		"apprun-dedicated", "delete-auto-scaling-group", clusterName, asgName, "--force", "--no-wait")
+	// 高レベルコマンドでオートスケーリンググループを削除する。不在確認が削除完了の
+	// 確認を兼ねるため、削除の完了 (非同期) に間に合うよう --wait-timeout を渡す。
+	h.CallWithTimeout(t, deleteCommandLimit, "オートスケーリンググループを削除する (高レベルコマンド)",
+		"apprun-dedicated", "delete-auto-scaling-group", clusterName, asgName, "--force", "--no-wait", "--wait-timeout", deleteWaitTimeout.String())
 	requireAutoScalingGroupAbsent(t, asgs, asgID)
 
-	// 後片付け: 失敗時などにオートスケーリンググループが残っていれば削除する。
-	defer func() {
-		cleanupAutoScalingGroup(t, h, asgs, clusterID, asgID, asgName)
-	}()
-
 	// 高レベルコマンドでクラスタを削除する。依存リソースはこの時点で残っていない。
-	h.CallWithTimeout(t, createCommandLimit, "クラスタを削除する (高レベルコマンド)",
-		"apprun-dedicated", "delete-cluster", clusterName, "--force", "--no-wait")
+	h.CallWithTimeout(t, deleteCommandLimit, "クラスタを削除する (高レベルコマンド)",
+		"apprun-dedicated", "delete-cluster", clusterName, "--force", "--no-wait", "--wait-timeout", deleteWaitTimeout.String())
 
 	// 削除後の不在確認を SDK で行う。
 	requireClusterAbsent(t, clusters, clusterID)

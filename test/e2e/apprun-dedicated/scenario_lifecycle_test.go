@@ -73,9 +73,23 @@ const (
 	// createCommandLimit はクラスタとオートスケーリンググループの作成コマンドの
 	// 実行期限です。
 	createCommandLimit = 15 * time.Minute
+	// asgCreateCommandLimit は高レベル create-auto-scaling-group の実行期限です。
+	// CLI 側の待機タイムアウト (workerNodeWaitLimit) より長くし、CLI 自身の
+	// タイムアウト処理が完了するのを待てるようにします。
+	asgCreateCommandLimit = workerNodeWaitLimit + 5*time.Minute
 	// deleteAbsentLimit は削除後の不在確認の待機期限です。削除は非同期に
 	// 完了するため、不在になるまで再確認します。
 	deleteAbsentLimit = 10 * time.Minute
+	// deleteWaitTimeout は高レベルの削除コマンドに渡す削除後の不在確認の期限です。
+	// CLI の削除は不在確認が削除完了の確認を兼ねるため、不在確認の既定の期限
+	// (5 分) では削除の完了に間に合わない場合があります。ライブ E2E の実測では
+	// ワーカノード 1 台の削除完了に 10 分弱かかったため、余裕を持たせた値を
+	// 使います。SDK での不在確認と同じ根拠です。
+	deleteWaitTimeout = 15 * time.Minute
+	// deleteCommandLimit は高レベルの削除コマンドの実行期限です。CLI 側の
+	// 待機タイムアウト (deleteWaitTimeout) より長くし、CLI 自身のタイムアウト
+	// 処理が完了するのを待てるようにします。
+	deleteCommandLimit = deleteWaitTimeout + 5*time.Minute
 )
 
 // deployResult は deploy と rollback の JSON 出力を解析するための項目です。
@@ -750,6 +764,66 @@ func cleanupAutoScalingGroup(t *testing.T, h *helper.Helper, asgs *autoscalinggr
 	requireAutoScalingGroupAbsent(t, asgs, asgID)
 }
 
+// cleanupAutoScalingGroupByName は ID が確定する前に作成が打ち切られた場合の後片付けとして、
+// ランダムサフィックス付きの一意な名前でオートスケーリンググループを検索して削除します。
+// 作成前に requireNoAutoScalingGroupNamed で同名不在を検証済みであるため、見つかった
+// グループはこのテストの実行中に作成されたものだけです。1 件だけ見つかった場合に限り
+// 削除します。0 件なら何もしません。複数見つかった場合は対象を特定できないため
+// 削除せずエラーにします。
+func cleanupAutoScalingGroupByName(t *testing.T, h *helper.Helper, asgs *autoscalinggroup.AutoScalingGroupOp, clusterID v1.ClusterID, asgName string) {
+	t.Helper()
+
+	var matches []v1.AutoScalingGroupID
+	var cursor *v1.AutoScalingGroupID
+	for {
+		list, next, err := asgs.List(t.Context(), listPageSize, cursor)
+		if err != nil {
+			t.Errorf("list auto-scaling groups for cleanup: %v", err)
+			return
+		}
+		for i := range list {
+			if list[i].Name == asgName {
+				matches = append(matches, list[i].AutoScalingGroupID)
+			}
+		}
+		if next == nil {
+			break
+		}
+		cursor = next
+	}
+	switch len(matches) {
+	case 0:
+		return
+	case 1:
+		h.Call(t, "後片付け: オートスケーリンググループを削除する (名前で特定)",
+			"apprun-dedicated-api", "delete-auto-scaling-group", "--cluster-id", uuid.UUID(clusterID).String(), "--auto-scaling-group-id", uuid.UUID(matches[0]).String())
+		requireAutoScalingGroupAbsent(t, asgs, matches[0])
+	default:
+		t.Errorf("found %d auto-scaling groups named %q; refusing to delete", len(matches), asgName)
+	}
+}
+
+// requireNoAutoScalingGroupNamed は作成前に、同じ名前のオートスケーリンググループが
+// 存在しないことを SDK で確認します。この検証に成功した場合だけ、ID 未確定のまま
+// 打ち切られた作成の後片付けを名前で行えます。確認の実行は証跡に残らず、既存リソースを
+// 変更しません。
+func requireNoAutoScalingGroupNamed(t *testing.T, asgs *autoscalinggroup.AutoScalingGroupOp, name string) {
+	t.Helper()
+
+	var cursor *v1.AutoScalingGroupID
+	for {
+		list, next, err := asgs.List(t.Context(), listPageSize, cursor)
+		require.NoError(t, err, "list auto-scaling groups before create")
+		for _, g := range list {
+			require.NotEqual(t, name, g.Name, "auto-scaling group %q already exists; refusing to modify it", name)
+		}
+		if next == nil {
+			return
+		}
+		cursor = next
+	}
+}
+
 // requireAutoScalingGroupAbsent はオートスケーリンググループが削除後に存在しない
 // ことを確認します。削除は非同期に完了するため、`Deleting` の値にかかわらず
 // 不在になるまで期限付きで再確認します。
@@ -769,11 +843,11 @@ func requireAutoScalingGroupAbsent(t *testing.T, asgs *autoscalinggroup.AutoScal
 				"auto-scaling group %s should be reported as not found after deletion, got: %v", asgID, err)
 			return
 		}
-		t.Logf("auto-scaling group %s is still present (deleting=%t); waiting for deletion", asgID, detail.Deleting)
+		t.Logf("auto-scaling group %s is still present (deleting=%t); waiting for deletion", uuid.UUID(asgID).String(), detail.Deleting)
 
 		select {
 		case <-ctx.Done():
-			t.Errorf("auto-scaling group %s did not disappear within %s", asgID, deleteAbsentLimit)
+			t.Errorf("auto-scaling group %s did not disappear within %s", uuid.UUID(asgID).String(), deleteAbsentLimit)
 			return
 		case <-ticker.C:
 		}
@@ -824,7 +898,7 @@ func requireClusterAbsent(t *testing.T, clusters *cluster.ClusterOp, clusterID v
 
 		select {
 		case <-ctx.Done():
-			t.Errorf("cluster %s did not disappear within %s", clusterID, deleteAbsentLimit)
+			t.Errorf("cluster %s did not disappear within %s", uuid.UUID(clusterID).String(), deleteAbsentLimit)
 			return
 		case <-ticker.C:
 		}
