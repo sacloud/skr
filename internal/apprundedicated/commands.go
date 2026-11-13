@@ -222,8 +222,10 @@ func (c *InitCommand) Run(kongCtx *kong.Context) error {
 
 // DeployCommand は定義の内容をデプロイします。
 type DeployCommand struct {
-	App         string        `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
-	NoWait      bool          `name:"no-wait" help:"有効化後の反映待ちを省略します。"`
+	App string `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
+	// Wait は negatable な単一フラグで --wait / --no-wait の両方を受け付ける。
+	// 環境変数など値で指定するときは WAIT=true/false となり、名前と意味が一致する。
+	Wait        bool          `name:"wait" negatable:"" default:"true" help:"有効化後の反映待ちを行います。"`
 	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     DeployServiceFactory
 	runtime     Runtime
@@ -246,7 +248,7 @@ func (c *DeployCommand) Run(kongCtx *kong.Context) error {
 	ctx, cancel := commandContext()
 	defer cancel()
 	result, err := svc.Deploy(ctx, def, &apprundedicatedservice.DeployOptions{
-		NoWait:  c.NoWait,
+		NoWait:  !c.Wait,
 		Timeout: c.WaitTimeout,
 	})
 	if err != nil {
@@ -406,7 +408,7 @@ type RollbackCommand struct {
 	App         string        `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
 	Target      *int          `name:"target" placeholder:"VERSION" help:"有効化するバージョン番号。省略した場合、活性ならアクティブバージョンより前のバージョンのうち最大のものを、非活性なら最新のバージョンを切り替え先にします。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合や --app - の場合は必須です。"`
-	NoWait      bool          `name:"no-wait" help:"有効化後の反映待ちを省略します。"`
+	Wait        bool          `name:"wait" negatable:"" default:"true" help:"有効化後の反映待ちを行います。"`
 	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
@@ -435,7 +437,7 @@ func (c *RollbackCommand) Run(kongCtx *kong.Context) error {
 	}
 	result, err := svc.Rollback(ctx, def, &apprundedicatedservice.RollbackOptions{
 		Target:  target,
-		NoWait:  c.NoWait,
+		NoWait:  !c.Wait,
 		Timeout: c.WaitTimeout,
 	})
 	if err != nil {
@@ -448,7 +450,7 @@ func (c *RollbackCommand) Run(kongCtx *kong.Context) error {
 type DeactivateCommand struct {
 	App         string        `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合や --app - の場合は必須です。"`
-	NoWait      bool          `name:"no-wait" help:"停止待ちを省略します。"`
+	Wait        bool          `name:"wait" negatable:"" default:"true" help:"停止待ちを行います。"`
 	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
@@ -472,7 +474,7 @@ func (c *DeactivateCommand) Run(kongCtx *kong.Context) error {
 		return err
 	}
 	result, err := svc.Deactivate(ctx, def, &apprundedicatedservice.WaitOptions{
-		NoWait:  c.NoWait,
+		NoWait:  !c.Wait,
 		Timeout: c.WaitTimeout,
 	})
 	if err != nil {
@@ -485,7 +487,7 @@ func (c *DeactivateCommand) Run(kongCtx *kong.Context) error {
 type DeleteCommand struct {
 	App         string        `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合や --app - の場合は必須です。"`
-	NoWait      bool          `name:"no-wait" help:"停止待ちを省略します。削除自体と削除後の不在確認は行います。"`
+	Wait        bool          `name:"wait" negatable:"" default:"true" help:"停止待ちを行います。削除自体と削除後の不在確認は行います。"`
 	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
@@ -511,7 +513,7 @@ func (c *DeleteCommand) Run(kongCtx *kong.Context) error {
 	}
 	// delete は結果を出力しません (低レベルの delete と同じです)。
 	_, err = svc.Delete(ctx, def, &apprundedicatedservice.WaitOptions{
-		NoWait:  c.NoWait,
+		NoWait:  !c.Wait,
 		Timeout: c.WaitTimeout,
 	})
 	return err
@@ -526,7 +528,7 @@ type CreateAutoScalingGroupCommand struct {
 	NameServers            []string      `name:"name-servers" required:"" sep:"," help:"ネームサーバーの IPv4 アドレス。カンマ区切りで 1 ～ 3 個指定します。"`
 	MinNodes               int           `name:"min-nodes" required:"" placeholder:"N" help:"最小ノード数。"`
 	MaxNodes               int           `name:"max-nodes" required:"" placeholder:"N" help:"最大ノード数。"`
-	NoWait                 bool          `name:"no-wait" help:"作成後のワーカノード healthy 待ちを省略します。"`
+	Wait                   bool          `name:"wait" negatable:"" default:"true" help:"作成後のワーカノード healthy 待ちを行います。"`
 	WaitTimeout            time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。作成自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory                ServiceFactory
 	runtime                Runtime
@@ -551,7 +553,7 @@ func (c *CreateAutoScalingGroupCommand) Run(kongCtx *kong.Context) error {
 	ctx, cancel := commandContext()
 	defer cancel()
 	result, err := svc.CreateAutoScalingGroup(ctx, c.Cluster, c.Name, c.Zone, c.WorkerServiceClassPath, nameServers, minNodes, maxNodes, &apprundedicatedservice.CreateAutoScalingGroupOptions{
-		NoWait:  c.NoWait,
+		NoWait:  !c.Wait,
 		Timeout: c.WaitTimeout,
 	})
 	if err != nil {
@@ -565,7 +567,7 @@ type DeleteAutoScalingGroupCommand struct {
 	Cluster     string        `arg:"" name:"cluster" help:"クラスタの名前。"`
 	Name        string        `arg:"" name:"name" help:"オートスケーリンググループの名前。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合は必須です。"`
-	NoWait      bool          `name:"no-wait" help:"削除 API 呼び出し後の削除完了待ちを省略します。削除 API の呼び出しと削除後の不在確認は行います。"`
+	Wait        bool          `name:"wait" negatable:"" default:"true" help:"削除 API 呼び出し後の削除完了待ちを行います。削除 API の呼び出しと削除後の不在確認は行います。"`
 	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。削除自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
@@ -585,7 +587,7 @@ func (c *DeleteAutoScalingGroupCommand) Run(kongCtx *kong.Context) error {
 		return err
 	}
 	_, err = svc.DeleteAutoScalingGroup(ctx, c.Cluster, c.Name, &apprundedicatedservice.DeleteAutoScalingGroupOptions{
-		NoWait:  c.NoWait,
+		NoWait:  !c.Wait,
 		Timeout: c.WaitTimeout,
 	})
 	return err
@@ -595,7 +597,7 @@ func (c *DeleteAutoScalingGroupCommand) Run(kongCtx *kong.Context) error {
 type DeleteClusterCommand struct {
 	Cluster     string        `arg:"" name:"cluster" help:"クラスタの名前。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合は必須です。"`
-	NoWait      bool          `name:"no-wait" help:"削除 API 呼び出し後の削除完了待ちを省略します。依存確認、削除 API の呼び出し、削除後の不在確認は行います。"`
+	Wait        bool          `name:"wait" negatable:"" default:"true" help:"削除 API 呼び出し後の削除完了待ちを行います。依存確認、削除 API の呼び出し、削除後の不在確認は行います。"`
 	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。削除自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
@@ -615,7 +617,7 @@ func (c *DeleteClusterCommand) Run(kongCtx *kong.Context) error {
 		return err
 	}
 	_, err = svc.DeleteCluster(ctx, c.Cluster, &apprundedicatedservice.DeleteClusterOptions{
-		NoWait:  c.NoWait,
+		NoWait:  !c.Wait,
 		Timeout: c.WaitTimeout,
 	})
 	return err

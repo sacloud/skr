@@ -278,7 +278,7 @@ skr apprun-dedicated init <cluster> <application>
 
 `deploy` と `rollback` は、有効化した後、要求されたコンテナ数 (API の `DesiredCount`) と同じ数のコンテナが `running` 状態になるまで待ちます。`deactivate` と `delete` は停止の完了を待ちます。`create-auto-scaling-group` は、作成後にワーカノードが healthy 状態になるまで待ちます。
 
-- `--no-wait` で待機を省略します。既定は待機します。
+- `--wait` / `--no-wait` で待機を制御します。既定は待機し、`--no-wait` で省略します。どちらも同一オプションの別名で、後から指定した方が優先されます。
 - `--wait-timeout DURATION` で待機の期限を指定します。未指定のときは 5 分です。期限には待機中の API 呼び出しも含まれます。
 
 待機がタイムアウトした場合、有効化などの変更自体は完了していることがあります。タイムアウトの後は `status` や `containers` で状態を確認してください。

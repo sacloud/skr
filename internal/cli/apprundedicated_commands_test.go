@@ -38,7 +38,7 @@ func TestRunAppRunDedicatedHighLevelHelp(t *testing.T) {
 		},
 		{
 			args: []string{"apprun-dedicated", "deploy", "--help"},
-			want: []string{"--app=FILE|-", "--no-wait", "--wait-timeout", "5 分"},
+			want: []string{"--app=FILE|-", "--[no-]wait", "--wait-timeout", "5 分"},
 		},
 		{
 			args: []string{"apprun-dedicated", "rollback", "--help"},
@@ -54,19 +54,19 @@ func TestRunAppRunDedicatedHighLevelHelp(t *testing.T) {
 		},
 		{
 			args: []string{"apprun-dedicated", "delete", "--help"},
-			want: []string{"--force", "--no-wait", "--wait-timeout"},
+			want: []string{"--force", "--[no-]wait", "--wait-timeout"},
 		},
 		{
 			args: []string{"apprun-dedicated", "create-auto-scaling-group", "--help"},
-			want: []string{"--zone", "--worker-service-class-path", "--name-servers", "--min-nodes", "--max-nodes", "--no-wait", "--wait-timeout"},
+			want: []string{"--zone", "--worker-service-class-path", "--name-servers", "--min-nodes", "--max-nodes", "--[no-]wait", "--wait-timeout"},
 		},
 		{
 			args: []string{"apprun-dedicated", "delete-auto-scaling-group", "--help"},
-			want: []string{"--force", "--no-wait", "--wait-timeout"},
+			want: []string{"--force", "--[no-]wait", "--wait-timeout"},
 		},
 		{
 			args: []string{"apprun-dedicated", "delete-cluster", "--help"},
-			want: []string{"--force", "--no-wait", "--wait-timeout"},
+			want: []string{"--force", "--[no-]wait", "--wait-timeout"},
 		},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -421,6 +421,49 @@ func TestRunAppRunDedicatedInfrastructureCommandsWithSakumock(t *testing.T) {
 	require.NotEqual(t, 0, run([]string{"apprun-dedicated", "delete-cluster", "infra-cluster", "--force", "--no-wait"},
 		&stdoutMissingCluster, &stderrMissingCluster))
 	require.Contains(t, stderrMissingCluster.String(), "見つかりません")
+
+	violations := server.SpecViolations()
+	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)
+}
+
+// TestRunAppRunDedicatedWaitFlagForms は --no-wait の否定形への値指定が
+// 既定 (待機あり) と同じ扱いで機能することを確認します。negatable な単一
+// フラグは --wait / --no-wait / --no-wait=false のすべてを受け付けます。
+func TestRunAppRunDedicatedWaitFlagForms(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	server := apprunmock.NewTestServer(apprunmock.Config{})
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", server.TestURL())
+
+	runCommand := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		return stdout.Bytes()
+	}
+
+	// 準備として、低レベルコマンドでクラスタを作成します。
+	var createdCluster v1.ClusterIdentifier
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "create-cluster", "--request",
+		`{"name":"wait-flag-cluster","servicePrincipalID":"sp-000000000","ports":[{"port":443,"protocol":"https"}]}`), &createdCluster))
+
+	// --no-wait で作成します (待機を省略)。
+	var createdGroup struct {
+		AutoScalingGroupID string `json:"autoScalingGroupID"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated", "create-auto-scaling-group", "wait-flag-cluster", "asg-wait",
+		"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		"--name-servers", "210.188.224.10",
+		"--min-nodes", "1", "--max-nodes", "1", "--no-wait"), &createdGroup))
+	require.NotEmpty(t, createdGroup.AutoScalingGroupID, "create-auto-scaling-group should return the group ID")
+
+	// --no-wait=false は --wait (既定) と同じ扱いで、削除後の不在確認まで行います。
+	var stdout, stderr bytes.Buffer
+	require.Equal(t, 0, run([]string{"apprun-dedicated", "delete-auto-scaling-group", "wait-flag-cluster", "asg-wait", "--force", "--no-wait=false"},
+		&stdout, &stderr), "stderr: %s", stderr.String())
+	require.Empty(t, stdout.String(), "delete-auto-scaling-group output should be empty")
 
 	violations := server.SpecViolations()
 	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)
