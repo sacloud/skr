@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +32,7 @@ func TestCreateAutoScalingGroup(t *testing.T) {
 		var nodeAdded bool
 		err := runWithTicksAndHook(t, s, func() error {
 			var err error
-			result, err = s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", 1, 3, nil)
+			result, err = s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", []v1.Ipv4{"210.188.224.10"}, 1, 3, nil)
 			return err
 		}, func() {
 			if nodeAdded {
@@ -56,7 +57,7 @@ func TestCreateAutoScalingGroup(t *testing.T) {
 		f.addCluster(t, "c1")
 		s := newTestService(t, f)
 
-		result, err := s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", 1, 3, &CreateAutoScalingGroupOptions{NoWait: true})
+		result, err := s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", []v1.Ipv4{"210.188.224.10"}, 1, 3, &CreateAutoScalingGroupOptions{NoWait: true})
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.Equal(t, "asg1", result.Name)
@@ -66,7 +67,7 @@ func TestCreateAutoScalingGroup(t *testing.T) {
 		f := newFakeSDK(t)
 		s := newTestService(t, f)
 
-		_, err := s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", 1, 3, nil)
+		_, err := s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", []v1.Ipv4{"210.188.224.10"}, 1, 3, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "クラスタ \"c1\" が見つかりません")
 	})
@@ -77,7 +78,7 @@ func TestCreateAutoScalingGroup(t *testing.T) {
 		f.addAutoScalingGroup(t, "c1", "asg1", "is1a", "@cloudservice/worker/001", 1, 3)
 		s := newTestService(t, f)
 
-		_, err := s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", 1, 3, nil)
+		_, err := s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", []v1.Ipv4{"210.188.224.10"}, 1, 3, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "オートスケーリンググループ \"asg1\" は既に存在します")
 	})

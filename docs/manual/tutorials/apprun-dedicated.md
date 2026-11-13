@@ -20,6 +20,9 @@ skr は 2 つの階層のコマンドを提供します。
 | `skr apprun-dedicated containers` | `list-application-containers` |
 | `skr apprun-dedicated init` | アプリケーションとバージョンの参照から定義を復元 |
 | `skr apprun-dedicated diff` / `render` | 対応する単独の API 操作はありません |
+| `skr apprun-dedicated create-auto-scaling-group` | `create-auto-scaling-group` (+ 作成後の healthy 待ち) |
+| `skr apprun-dedicated delete-auto-scaling-group` | `delete-auto-scaling-group` (+ 削除後の不在確認) |
+| `skr apprun-dedicated delete-cluster` | 依存リソースの確認 + `delete-cluster` (+ 削除後の不在確認) |
 
 このチュートリアルでは、低レベルコマンドでクラスタとオートスケーリンググループを作成し、高レベルコマンドでアプリケーションをデプロイ・更新・ロールバック・削除します。
 
@@ -85,7 +88,7 @@ $ skr apprun-dedicated-api read-cluster "$CLUSTER_ID" --query '{clusterID, name,
 
 ## Step 3: オートスケーリンググループを作成し、ワーカノードの起動を待つ
 
-グループの作成リクエストを JSON ファイルとして用意します。`workerServiceClassPath` はワーカノードのスペック (CPU とメモリの組み合わせ) を示す値で、次のコマンドで選べる構成を確認します。このチュートリアルでは `1vcpu_2gb` を使い、ノード数を 1 台に固定します。インターフェースは共有セグメント (`upstream: "shared"`) に接続します。これらは[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)の構成と同じです。
+`workerServiceClassPath` はワーカノードのスペック (CPU とメモリの組み合わせ) を示す値で、次のコマンドで選べる構成を確認します。このチュートリアルでは `1vcpu_2gb` を使い、ノード数を 1 台に固定します。インターフェースは共有セグメントに接続する既定の設定を使います。
 
 ```console
 $ skr apprun-dedicated-api list-worker-service-classes --query 'map({path, name})'
@@ -102,35 +105,25 @@ $ skr apprun-dedicated-api list-worker-service-classes --query 'map({path, name}
 ]
 ```
 
-`ASG-NAME`、`ZONE`、`WORKER-SERVICE-CLASS-PATH` を置き換えて、次の内容を `asg.json` という名前で保存します。`WORKER-SERVICE-CLASS-PATH` には上の出力から選んだ `path` を指定します (例: `cloud/apprun/dedicated/worker/1vcpu_2gb`)。
-
-```json
-{
-  "name": "ASG-NAME",
-  "zone": "ZONE",
-  "workerServiceClassPath": "WORKER-SERVICE-CLASS-PATH",
-  "minNodes": 1,
-  "maxNodes": 1,
-  "interfaces": [
-    {
-      "interfaceIndex": 0,
-      "upstream": "shared",
-      "connectsToLB": false
-    }
-  ]
-}
-```
-
-`interfaceIndex` は 0 が必須です。`connectsToLB` はクラスタのロードバランサへインターフェースを接続する設定で、このチュートリアルでは使わないため `false` にします。
+高レベルコマンド `create-auto-scaling-group` でオートスケーリンググループを作成します。`--name-servers` には 1 ～ 3 個の IPv4 アドレスをカンマ区切りで指定します。以下の例では `210.188.224.10` を使っていますが、プロジェクトやゾーンに応じて適切なネームサーバーアドレスに置き換えてください。`--wait-timeout` を 20 分に設定して、ワーカノードが healthy になるまで待ちます。
 
 ```console
-$ ASG_ID=$(skr apprun-dedicated-api create-auto-scaling-group --cluster-id "$CLUSTER_ID" --request @asg.json --query '.autoScalingGroupID' | jq -er '.')
+$ ASG_ID=$(skr apprun-dedicated create-auto-scaling-group "$CLUSTER_NAME" "$ASG_NAME" \
+    --zone "$ZONE" \
+    --worker-service-class-path "$WORKER_SERVICE_CLASS_PATH" \
+    --name-servers 210.188.224.10 \
+    --min-nodes 1 --max-nodes 1 \
+    --wait-timeout 20m \
+    --query '.autoScalingGroupID' | jq -er '.')
+```
+
+コマンドが戻ったら、作成結果を確認します。
+
+```console
 $ skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '{autoScalingGroupID, name, zone, workerServiceClassPath, minNodes, maxNodes}'
 ```
 
-参照結果に指定した名前、ゾーン、サービスクラス、ノード数が表示されることを確認します。
-
-グループの作成後にワーカノードが自動で起動します。ノードの状態は次のコマンドで確認します。
+参照結果に指定した名前、ゾーン、サービスクラス、ノード数が表示されることを確認します。高レベルコマンドは healthy 待ちを行いますが、念のためノードの状態も確認できます。
 
 ```console
 $ skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '[.items[] | {status, createErrorMessage}]'
@@ -147,23 +140,7 @@ $ skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-s
 ]
 ```
 
-起動には時間がかかるため、15 秒間隔で最大 20 分、次のループで待ちます。いずれかのノードの `status` が `healthy` になったら待ちを終えて次へ進みます。`createErrorMessage` にメッセージが設定されているノードがあった場合はノードの作成に失敗しているため、待ちを続けても解消しないので、その場でループを中断します。確認コマンド自体が失敗した場合もそこで中断します。待ちの間は表示されません。
-
-```console
-$ READY=""
-$ for i in $(seq 80); do
-      STATE=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" 2>&1) || { echo "状態の確認に失敗しました: $STATE"; exit 1; }
-      case "$(echo "$STATE" | jq -r 'if any(.items[]; .createErrorMessage != null and .createErrorMessage != "") then "failed" elif any(.items[]; .status == "healthy") then "ready" else "waiting" end')" in
-          ready) READY=1; break ;;
-          failed) echo "ノードの作成に失敗しました: $STATE"; exit 1 ;;
-          *) sleep 15 ;;
-      esac
-  done
-$ [ -n "$READY" ] && echo "ワーカノードが healthy になりました" || { echo "20 分以内にワーカノードが healthy になりませんでした"; exit 1; }
-ワーカノードが healthy になりました
-```
-
-20 分を過ぎても `healthy` にならない場合は、ループの直後の確認が失敗して手順が止まります。次へ進まず、コンソールパネルでクラスタとオートスケーリンググループの状態を確認してください。
+`createErrorMessage` にメッセージが設定されているノードがあった場合はノードの作成に失敗しているため、コンソールパネルで状態を確認してください。
 
 ## Step 4: 定義ファイルを用意してデプロイする
 
@@ -417,40 +394,23 @@ apprun-dedicated: Application.Read: API Error 404: code 404: {Status:404 Title:.
 
 ## Step 8: クラスタとオートスケーリンググループを削除する
 
-オートスケーリンググループを削除します。削除の前に `read` で ID と名前、ゾーンがこの手順で作成したものと一致することを確認してください。一致しない場合は削除を中止してください。削除は非同期で、ワーカノードの削除も伴います。`deleting` が `true` の間は削除中です。削除後は、保持した `ASG_ID` が存在しなくなるまで (404 エラーになるまで)、15 秒間隔で最大 10 分確認を繰り返します。照会の失敗は削除の完了と扱わないため、404 以外のエラーで手順を中断します。
+高レベルコマンド `delete-auto-scaling-group` でオートスケーリンググループを削除します。削除前に確認プロンプトが表示されるため、非対話環境では `--force` が必要です。削除 API の呼び出しと削除後の不在確認をし、削除完了までの非同期待機は `--no-wait` で省略できます。CLI は 404 以外のエラーを削除完了と扱わないため、何らかの問題があった場合は中断されます。
 
 ```console
-$ DELETED=""
-$ skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '{autoScalingGroupID, name, zone, deleting}'
-$ skr apprun-dedicated-api delete-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID"
-$ for i in $(seq 40); do
-      OUT=$(skr apprun-dedicated-api read-auto-scaling-group --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" 2>&1) && { sleep 15; continue; }
-      case "$OUT" in
-          *"API Error 404"*) DELETED=1; break ;;
-          *) echo "削除の確認に失敗しました: $OUT"; exit 1 ;;
-      esac
-  done
-$ [ -n "$DELETED" ] && echo "削除が完了しました" || { echo "10 分以内に削除が完了しませんでした"; exit 1; }
-削除が完了しました
+$ skr apprun-dedicated delete-auto-scaling-group "$CLUSTER_NAME" "$ASG_NAME" --force --no-wait
 ```
 
-10 分を過ぎても削除が完了しない場合は、ループの直後の確認が失敗して手順が止まります。コンソールパネルでオートスケーリンググループの状態を確認してください。
-
-続けてクラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループ) がないことを確認してから実行してください。クラスタの削除も非同期で完了するため、保持した `CLUSTER_ID` が 404 になるまで (15 秒間隔で最大 10 分) 確認を繰り返します。404 以外のエラーで手順を中断します。
+続けて高レベルコマンド `delete-cluster` でクラスタを削除します。アプリケーションやオートスケーリンググループなどの依存リソースが残っている場合は列挙して中断されるため、前の手順で関連リソースを削除しておいてください。
 
 ```console
-$ skr apprun-dedicated-api read-cluster "$CLUSTER_ID" --query '{clusterID, name}'
-$ skr apprun-dedicated-api delete-cluster "$CLUSTER_ID"
-$ DELETED=""
-$ for i in $(seq 40); do
-      OUT=$(skr apprun-dedicated-api read-cluster "$CLUSTER_ID" 2>&1) && { sleep 15; continue; }
-      case "$OUT" in
-          *"API Error 404"*) DELETED=1; break ;;
-          *) echo "削除の確認に失敗しました: $OUT"; exit 1 ;;
-      esac
-  done
-$ [ -n "$DELETED" ] && echo "削除が完了しました" || { echo "10 分以内に削除が完了しませんでした"; exit 1; }
-削除が完了しました
+$ skr apprun-dedicated delete-cluster "$CLUSTER_NAME" --force --no-wait
+```
+
+削除後、クラスタが存在しないことを低レベルコマンドで確認できます。
+
+```console
+$ skr apprun-dedicated-api read-cluster "$CLUSTER_ID"
+apprun-dedicated: Cluster.Read: API Error 404: code 404: {Status:404 Title:...}
 ```
 
 ## まとめ

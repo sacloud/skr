@@ -1,14 +1,17 @@
 # AppRun 専有型の高レベルコマンド (`skr apprun-dedicated`)
 
-`skr apprun-dedicated` は、AppRun 専有型のアプリケーションを JSON の定義ファイル 1 つからデプロイ・運用する高レベルコマンドです。デプロイやロールバックの反映待ち、状態の確認、定義の差分確認を 1 つのコマンド群で行います。
+`skr apprun-dedicated` は、AppRun 専有型のアプリケーションを JSON の定義ファイル 1 つからデプロイ・運用し、オートスケーリンググループとクラスタの削除など、インフラライフサイクルの一部を操作する高レベルコマンドです。デプロイやロールバックの反映待ち、作成後の healthy 待ち、状態の確認、定義の差分確認を 1 つのコマンド群で行います。
 
 このページはコマンドの対象、構造、各サブコマンドの挙動と制約を説明するリファレンスです。最初から順に試す手順は [AppRun 専有型: 定義ファイルからアプリケーションをデプロイする](tutorials/apprun-dedicated.md) を参照してください。フラグと使用例の一覧は `--help` で確認できます。
 
 ## 対象と対象外
 
-対象はアプリケーションのライフサイクル (定義からのデプロイ、バージョンの切替、停止、削除) です。
+対象は次の 2 つです。
 
-対象外はインフラの構築と管理で、クラスタ、オートスケーリンググループ (ワーカノード)、クラスタロードバランサ、証明書、サービスクラスの操作は低レベルの `skr apprun-dedicated-api` が提供します。クラスタの作成を含むインフラ構築は、低レベルコマンドのほか Terraform などの別手段で行うこともできます。
+- アプリケーションのライフサイクル (定義からのデプロイ、バージョンの切替、停止、削除)。
+- インフラライフサイクルの一部。既存のクラスタに対するオートスケーリンググループの作成、オートスケーリンググループの削除、クラスタの削除です (`create-auto-scaling-group`、`delete-auto-scaling-group`、`delete-cluster`)。
+
+対象外はインフラの中でも、クラスタの作成、ロードバランサ、証明書、ワーカノードの draining、サービスクラスの一覧と選択です。これらは低レベルの `skr apprun-dedicated-api` が提供します。クラスタの作成を含むインフラ構築は、低レベルコマンドのほか Terraform などの別手段で行うこともできます。
 
 ## 概念
 
@@ -39,6 +42,9 @@ AppRun 専有型のリソースは次の階層で構成されます。用語の�
 | `rollback` | 既存のバージョンを有効化して切り替える | `update-application`、反映待ちの `read-application` と `list-application-containers` |
 | `deactivate` | アクティブバージョンを解除してアプリケーションを停止する | `update-application --deactivate`、停止待ちの `read-application` |
 | `delete` | アプリケーションとすべてのバージョンを削除する | `update-application --deactivate`、`delete-application`、削除後の不在確認 (`read-application`) |
+| `create-auto-scaling-group` | クラスタにオートスケーリンググループを作成する | `list-clusters`、`list-auto-scaling-groups`、`create-auto-scaling-group`、作成後の healthy 待ち |
+| `delete-auto-scaling-group` | クラスタのオートスケーリンググループを削除する | `list-clusters`、`list-auto-scaling-groups`、`delete-auto-scaling-group`、削除後の不在確認 |
+| `delete-cluster` | クラスタを削除する | `list-clusters`、`list-applications`、`list-auto-scaling-groups`、`delete-cluster`、削除後の不在確認 |
 
 デプロイ作業で毎回判断が必要な操作の組み合わせ (アプリケーションの検索または作成、`registryPasswordAction` の選択、反映待ち) は、高レベルコマンドが内部で行います。
 
@@ -225,6 +231,39 @@ skr apprun-dedicated delete --app=FILE|-
 
 アプリケーションとすべてのバージョンを削除します。アクティブバージョンがあれば先に解除し、停止を待ってから削除します。削除後は API の応答でアプリケーションが不在になったことを確認します。`--no-wait` を指定しても、削除自体と削除後の不在確認は行われます。
 
+### create-auto-scaling-group
+
+```
+skr apprun-dedicated create-auto-scaling-group <cluster> <name> \
+  --zone=ZONE \
+  --worker-service-class-path=PATH \
+  --name-servers=IPv4[,IPv4...] \
+  --min-nodes=N \
+  --max-nodes=N
+```
+
+クラスタにオートスケーリンググループを作成し、必要に応じてワーカノードが healthy になるまで待ちます。クラスタ名からクラスタを検索し、同名のグループが既に存在しないことを確認してから作成します。ネットワークインターフェースは共有セグメントに接続する既定の設定を使います。
+
+`--name-servers` は 1 ～ 3 個の IPv4 アドレスをカンマ区切りで指定します。`--min-nodes` と `--max-nodes` は 1 以上で、`--max-nodes` は `--min-nodes` 以上である必要があります。
+
+結果は JSON で出力され、`--query` で加工できます。
+
+### delete-auto-scaling-group
+
+```
+skr apprun-dedicated delete-auto-scaling-group <cluster> <name>
+```
+
+クラスタのオートスケーリンググループを削除します。削除 API の呼び出しと、削除後の不在確認をします。削除 API 呼び出しから実際に削除されるまでの待機は `--no-wait` で省略できます。実行前に確認を求め、`--force` で省略します。
+
+### delete-cluster
+
+```
+skr apprun-dedicated delete-cluster <cluster>
+```
+
+クラスタを削除します。削除前に関連リソース (アプリケーション、オートスケーリンググループなど) が残っていないことを確認し、残っている場合は列挙して中断します。削除 API の呼び出しと、削除後の不在確認をします。削除 API 呼び出しから実際に削除されるまでの待機は `--no-wait` で省略できます。実行前に確認を求め、`--force` で省略します。
+
 ### init
 
 ```
@@ -237,7 +276,7 @@ skr apprun-dedicated init <cluster> <application>
 
 ## 待機と反映の確認
 
-`deploy` と `rollback` は、有効化した後、要求されたコンテナ数 (API の `DesiredCount`) と同じ数のコンテナが `running` 状態になるまで待ちます。`deactivate` と `delete` は停止の完了を待ちます。
+`deploy` と `rollback` は、有効化した後、要求されたコンテナ数 (API の `DesiredCount`) と同じ数のコンテナが `running` 状態になるまで待ちます。`deactivate` と `delete` は停止の完了を待ちます。`create-auto-scaling-group` は、作成後にワーカノードが healthy 状態になるまで待ちます。
 
 - `--no-wait` で待機を省略します。既定は待機します。
 - `--wait-timeout DURATION` で待機の期限を指定します。未指定のときは 5 分です。期限には待機中の API 呼び出しも含まれます。
@@ -248,7 +287,7 @@ skr apprun-dedicated init <cluster> <application>
 
 ## 確認プロンプトと --force
 
-`rollback`、`deactivate`、`delete` は、実行前にクラスタ名、アプリケーション名、ID、現在の状態を表示して確認を求めます。`--force` で省略します。
+`rollback`、`deactivate`、`delete`、`delete-auto-scaling-group`、`delete-cluster` は、実行前にクラスタ名、アプリケーション名、ID、現在の状態を表示して確認を求めます。`--force` で省略します。
 
 標準入力が端末でない場合 (パイプ、リダイレクト、CI) や、`--app -` で定義を標準入力から読む場合は、確認の入力が取れないため `--force` が必須です。指定がなければ操作を開始せず、エラーになります。
 
@@ -256,9 +295,9 @@ skr apprun-dedicated init <cluster> <application>
 
 ## 出力
 
-`deploy`、`render`、`status`、`versions`、`containers`、`rollback`、`deactivate` は結果を JSON で出力し、グローバルフラグ `--query` で加工できます。進行状況のログは標準エラー出力に書き、標準出力は結果の JSON だけを含みます。
+`deploy`、`render`、`status`、`versions`、`containers`、`rollback`、`deactivate`、`create-auto-scaling-group` は結果を JSON で出力し、グローバルフラグ `--query` で加工できます。進行状況のログは標準エラー出力に書き、標準出力は結果の JSON だけを含みます。
 
-`init` は定義ファイルを書き出し、`diff` は unified diff、`delete` は何も出力しないため、この 3 つは `--query` に対応しません。指定した場合はエラーになります。
+`init` は定義ファイルを書き出し、`diff` は unified diff、`delete`、`delete-auto-scaling-group`、`delete-cluster` は何も出力しないため、この 5 つは `--query` に対応しません。指定した場合はエラーになります。
 
 ## 秘密情報の扱い
 

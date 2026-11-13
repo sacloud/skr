@@ -47,6 +47,8 @@ type CreateAutoScalingGroupResult struct {
 	Zone string `json:"zone"`
 	// WorkerServiceClassPath はワーカサービスクラスのパスです。
 	WorkerServiceClassPath string `json:"workerServiceClassPath"`
+	// NameServers はネームサーバーの IPv4 アドレスです。
+	NameServers []v1.Ipv4 `json:"nameServers"`
 	// MinNodes は最小ノード数です。
 	MinNodes int32 `json:"minNodes"`
 	// MaxNodes は最大ノード数です。
@@ -58,7 +60,7 @@ type CreateAutoScalingGroupResult struct {
 //
 // クラスタ名からクラスタを検索し、同名のグループが既に存在しないことを確認してから
 // 作成します。NoWait が true の場合、作成 API 呼び出し後の healthy 待ちを省略します。
-func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, groupName, zone, workerServiceClassPath string, minNodes, maxNodes int32, opts *CreateAutoScalingGroupOptions) (*CreateAutoScalingGroupResult, error) {
+func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, groupName, zone, workerServiceClassPath string, nameServers []v1.Ipv4, minNodes, maxNodes int32, opts *CreateAutoScalingGroupOptions) (*CreateAutoScalingGroupResult, error) {
 	if opts == nil {
 		opts = &CreateAutoScalingGroupOptions{}
 	}
@@ -81,9 +83,15 @@ func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, group
 	ident, err := asgAPI.Create(ctx, autoscalinggroup.CreateParams{
 		Name:                   groupName,
 		Zone:                   zone,
+		NameServers:            nameServers,
 		WorkerServiceClassPath: workerServiceClassPath,
 		MinNodes:               minNodes,
 		MaxNodes:               maxNodes,
+		Interfaces: []autoscalinggroup.NodeInterface{{
+			InterfaceIndex: 0,
+			Upstream:       "shared",
+			ConnectsToLB:   false,
+		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("オートスケーリンググループ %q の作成に失敗しました: %w", groupName, err)
@@ -99,6 +107,7 @@ func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, group
 		AutoScalingGroupID:     detail.AutoScalingGroupID,
 		Zone:                   detail.Zone,
 		WorkerServiceClassPath: detail.WorkerServiceClassPath,
+		NameServers:            detail.NameServers,
 		MinNodes:               detail.MinNodes,
 		MaxNodes:               detail.MaxNodes,
 	}
