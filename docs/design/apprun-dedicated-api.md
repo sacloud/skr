@@ -32,6 +32,8 @@ SDK v0.5.0 で追加されたクラスタロードバランサの参照・更新
 
 `internal/cli/apprundedicated_test.go` は sakumock の AppRun Dedicated server に対して、クラスタ、オートスケーリンググループ、ワーカノード、ロードバランサ、証明書、アプリケーション、バージョンの実際の CLI パスを実行します。ヘルプ、ID の受け渡し、入力ファイル、更新と削除を検証します。
 
+ワーカノード一覧の出力は API 応答の `addresses` の値 (CIDR 表記を含む) を加工せず出力します。低レベルコマンドが応答を加工しない契約を `internal/apprundedicatedapi` のテストで固定し、CIDR を取り除く処理は利用者側の jq として [`docs/manual/tutorials/apprun-dedicated.md`](../manual/tutorials/apprun-dedicated.md) に記載しています。
+
 is1b のライブ E2E は未実装です。課金を伴うライブ検証の入力、実行、安全なクリーンアップを整える作業を [#59](https://github.com/sacloud/skr/issues/59) で管理します。利用者向けチュートリアルは高レベル層と統合して [`docs/manual/tutorials/apprun-dedicated.md`](../manual/tutorials/apprun-dedicated.md) に作成済みです。
 
 ## 根拠

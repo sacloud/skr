@@ -16,6 +16,7 @@ package apprundedicatedapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -725,4 +726,65 @@ func TestListCommandsSendDefaultMaxItems(t *testing.T) {
 				"maxItems を期待値どおり 1 回だけ送ること")
 		})
 	}
+}
+
+// TestListWorkerNodesPreservesAPIAddress は、list-worker-nodes の出力が
+// API 応答の addresses の値をそのまま出力することを確認します。
+// 実 API は CIDR 付きのアドレス (例: 192.0.2.10/24) を返すことが
+// 2026-11-12 のライブ検証で確認されているため、低レベルコマンドが
+// 応答の値を加工しない契約をこのテストで固定します。
+func TestListWorkerNodesPreservesAPIAddress(t *testing.T) {
+	const (
+		clusterID = "13b9ea83-ddb0-4385-9533-3d693a6a310f"
+		asgID     = "9f4b8b62-9a45-4b7e-9b1e-2f5cf0a5a1b2"
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"workerNodes":[{
+			"workerNodeID":"01a1cb07-5678-9abc-def0-1234567890ab",
+			"resourceID":"123456789012",
+			"draining":false,
+			"status":"healthy",
+			"networkInterfaces":[{"interfaceIndex":0,"addresses":[{"address":"192.0.2.10/24"}]}],
+			"created":1731500000
+		}]}`))
+	}))
+	defer server.Close()
+	setAppRunTestEndpoint(t, server.URL)
+
+	grammar := struct {
+		WorkerNode WorkerNodeListCommand `cmd:"" name:"list-worker-nodes"`
+	}{}
+	parser := kong.Must(&grammar, kong.Name("skr"), kong.Writers(io.Discard, io.Discard),
+		kong.Exit(func(int) { t.Fatal("kong.Exit が呼ばれました") }))
+	kctx, err := parser.Parse([]string{"list-worker-nodes", "--cluster-id", clusterID, "--auto-scaling-group-id", asgID})
+	require.NoError(t, err)
+
+	var raw []byte
+	rt := Runtime{
+		ValidateOutput: func(*kong.Context) error { return nil },
+		NewClient:      func() (*v1.Client, error) { return NewClient(false) },
+		WriteOutput: func(_ *kong.Context, value any) error {
+			var err error
+			raw, err = json.Marshal(value)
+			return err
+		},
+	}
+	grammar.WorkerNode.runtime = rt
+
+	require.NoError(t, grammar.WorkerNode.Run(kctx))
+
+	var out struct {
+		Items []struct {
+			NetworkInterfaces []struct {
+				Addresses []string `json:"addresses"`
+			} `json:"networkInterfaces"`
+		} `json:"items"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &out))
+	require.NotEmpty(t, out.Items, "list-worker-nodes should return one node")
+	require.NotEmpty(t, out.Items[0].NetworkInterfaces, "the node should have one network interface")
+	require.Equal(t, []string{"192.0.2.10/24"}, out.Items[0].NetworkInterfaces[0].Addresses,
+		"list-worker-nodes は API の addresses を CIDR 付きのまま加工せず出力すること")
 }
