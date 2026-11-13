@@ -183,7 +183,7 @@ CLI 層の `definition_input.go` が読み込みを担います。
 
 待機の期限は、ポーリング間の確認だけでなく、待機中の API 呼び出し自体にも適用します。待機処理は待機期限を持つ context を `check` に渡し、`Containers`、`Read`、`Delete` などの呼び出しとリトライも期限で打ち切ります。呼び出し中に期限が過ぎた場合も、利用者には期限切れのエラーを返します。
 
-- `--no-wait` で待機を省略します。既定は待機します。
+- `--wait` / `--no-wait` で待機を制御します。既定は待機し、`--no-wait` で省略します。kong の negatable な単一フラグで、両者は同一オプションの別名です ([ADR 0082](../adr/0082-high-level-command-wait-options.md))。
 - `--wait-timeout` で期限を指定します。既定は 5 分です。期限を超えたらエラーにします。待機中の API 呼び出しもこの期限で打ち切ります。有効化自体は完了しているため、エラーメッセージに `status` や `containers` で状態を確認できることを示します。
 - 待機中の進行状況は標準エラー出力のログで示します。
 
@@ -244,16 +244,16 @@ rollback、deactivate、delete も同じポーリング機構を使います。
 ```text
 skr apprun-dedicated init CLUSTER APPLICATION [--output-file FILE]
 
-skr apprun-dedicated deploy --app FILE|- [--no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated deploy --app FILE|- [--wait | --no-wait] [--wait-timeout DURATION]
 skr apprun-dedicated diff --app FILE|-
 skr apprun-dedicated render --app FILE|-
 skr apprun-dedicated status --app FILE|-
 skr apprun-dedicated versions --app FILE|-
 skr apprun-dedicated containers --app FILE|-
 
-skr apprun-dedicated rollback --app FILE|- [--target VERSION] [--force] [--no-wait] [--wait-timeout DURATION]
-skr apprun-dedicated deactivate --app FILE|- [--force] [--no-wait] [--wait-timeout DURATION]
-skr apprun-dedicated delete --app FILE|- [--force] [--no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated rollback --app FILE|- [--target VERSION] [--force] [--wait | --no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated deactivate --app FILE|- [--force] [--wait | --no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated delete --app FILE|- [--force] [--wait | --no-wait] [--wait-timeout DURATION]
 ```
 
 末端コマンドは 10 個です。位置引数は `init` のクラスタ名とアプリケーション名のみです ([ADR 0075](../adr/0075-high-level-command-tier.md) に従い、対象を表す値は位置引数にします)。認証は低レベル層と同じ SDK のプロファイル機構を使い、グローバルフラグと共通の出力処理を接続します。
@@ -266,7 +266,7 @@ skr apprun-dedicated delete --app FILE|- [--force] [--no-wait] [--wait-timeout D
 | `--output-file FILE` | init | 出力先ファイル (既定 `application.json`)。既存ファイルは上書きしない |
 | `--target VERSION` | rollback | 有効化するバージョン番号 |
 | `--force` | rollback、deactivate、delete | 確認プロンプトを省略。標準入力が端末でない場合や `--app -` と併用する場合は必須 |
-| `--no-wait` | deploy、rollback、deactivate、delete | 待機を省略 |
+| `--wait` / `--no-wait` | deploy、rollback、deactivate、delete | 待機を制御 (既定は待機、`--no-wait` で省略)。negatable な単一フラグの別名 |
 | `--wait-timeout DURATION` | deploy、rollback、deactivate、delete | 待機の期限 (既定 5 分) |
 
 ### 確認プロンプト

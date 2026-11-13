@@ -254,7 +254,7 @@ skr apprun-dedicated create-auto-scaling-group <cluster> <name> \
 skr apprun-dedicated delete-auto-scaling-group <cluster> <name>
 ```
 
-クラスタのオートスケーリンググループを削除します。削除 API の呼び出しと、削除後の不在確認をします。削除 API 呼び出しから実際に削除されるまでの待機は `--no-wait` で省略できます。実行前に確認を求め、`--force` で省略します。
+クラスタのオートスケーリンググループを削除します。削除 API の呼び出しと、削除後の不在確認 (対象が見つからなくなるまでのポーリング) をします。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、`--no-wait` を指定しても行われます。実行前に確認を求め、`--force` で省略します。
 
 ### delete-cluster
 
@@ -262,7 +262,7 @@ skr apprun-dedicated delete-auto-scaling-group <cluster> <name>
 skr apprun-dedicated delete-cluster <cluster>
 ```
 
-クラスタを削除します。削除前に関連リソース (アプリケーション、オートスケーリンググループなど) が残っていないことを確認し、残っている場合は列挙して中断します。削除 API の呼び出しと、削除後の不在確認をします。削除 API 呼び出しから実際に削除されるまでの待機は `--no-wait` で省略できます。実行前に確認を求め、`--force` で省略します。
+クラスタを削除します。削除前に関連リソース (アプリケーション、オートスケーリンググループなど) が残っていないことを確認し、残っている場合は列挙して中断します。削除 API の呼び出しと、削除後の不在確認 (対象が見つからなくなるまでのポーリング) をします。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、`--no-wait` を指定しても行われます。実行前に確認を求め、`--force` で省略します。
 
 ### init
 
@@ -278,7 +278,7 @@ skr apprun-dedicated init <cluster> <application>
 
 `deploy` と `rollback` は、有効化した後、要求されたコンテナ数 (API の `DesiredCount`) と同じ数のコンテナが `running` 状態になるまで待ちます。`deactivate` と `delete` は停止の完了を待ちます。`create-auto-scaling-group` は、作成後にワーカノードが healthy 状態になるまで待ちます。
 
-- `--no-wait` で待機を省略します。既定は待機します。
+- `--wait` / `--no-wait` で待機を制御します。既定は待機し、`--no-wait` で省略します。どちらも同一オプションの別名で、後から指定した方が優先されます。
 - `--wait-timeout DURATION` で待機の期限を指定します。未指定のときは 5 分です。期限には待機中の API 呼び出しも含まれます。
 
 待機がタイムアウトした場合、有効化などの変更自体は完了していることがあります。タイムアウトの後は `status` や `containers` で状態を確認してください。
