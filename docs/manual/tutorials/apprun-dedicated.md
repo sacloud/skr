@@ -249,9 +249,11 @@ $ skr apprun-dedicated containers --app apprun-dedicated.json --query 'map({node
 ワーカノードの IP アドレスを取得し、サンプルアプリケーションにアクセスします。この構成ではワーカノードが共有セグメントに接続され、パケットフィルタを設定していないため、アプリケーションのポートへ外部から直接アクセスできます。[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)の動作確認も同じ方法です。実際のアプリケーションでは、パケットフィルタを設定して意図しないアクセスを防いでください。
 
 ```console
-$ NODE_IP=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '.items[0].networkInterfaces[0].addresses[0]' | jq -er '.')
+$ NODE_IP=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '.items[0].networkInterfaces[0].addresses[0]' | jq -er 'split("/")[0]')
 $ curl --fail --silent --show-error --connect-timeout 10 --max-time 60 --write-out '\nHTTP status: %{http_code}\n' "http://$NODE_IP:8080/"
 ```
+
+`addresses` の要素は CIDR 表記 (例: `192.0.2.10/24`) で返るため、`jq` の `split` でプレフィックス長を取り除いた IP アドレスを取り出します。
 
 成功条件は HTTP ステータス `200` と、本文が `Hello from AppRun!` であることです。サンプルイメージは `GET /` に対して HTTP 200 で本文 `Hello from AppRun!` (`Content-Type: text/plain`) を返します ([app.js](https://github.com/sacloud/apprun-samples/blob/main/tutorial/app.js))。次はこの実装に基づく表示例です。
 
