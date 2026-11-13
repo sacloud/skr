@@ -18,7 +18,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
 	"github.com/sacloud/sacloud-sdk-go/api/iaas/types"
@@ -81,7 +83,9 @@ func TestScenarioLocalRouter(t *testing.T) {
 
 	// 作成前に同名リソースが存在しないことを SDK で確認する。
 	// 確認の実行は証跡に残らず、既存リソースは変更しないまま終了する
-	require.Empty(t, lookupSwitches(t, switches, switchName),
+	switchMatches, err := lookupSwitches(t, switches, switchName)
+	require.NoError(t, err, "find existing switches")
+	require.Empty(t, switchMatches,
 		"switch name %q already exists; refusing to modify it", switchName)
 	existingLocalRouters, err := lookupLocalRouters(t, localRouters, name)
 	require.NoError(t, err, "find existing local routers")
@@ -98,6 +102,9 @@ func TestScenarioLocalRouter(t *testing.T) {
 	switchID := createdSwitch.ID
 
 	// 後片付け。defer の呼び出し順 (LIFO) により、ローカルルータの削除がスイッチの削除より先に実行されます
+	// verifiedState は直前に CLI で確認したローカルルータの状態です。
+	// 各ステップで応答と参照を確認するたびに更新し、後片付けは削除前にこの状態と再照合します
+	var verifiedState localRouterItem
 	var localRouterID types.ID
 	defer func() {
 		if err := cleanupSwitch(t, h, switches, switchName, switchID); err != nil {
@@ -105,7 +112,7 @@ func TestScenarioLocalRouter(t *testing.T) {
 		}
 	}()
 	defer func() {
-		if err := cleanupLocalRouter(t, h, localRouters, name, localRouterID); err != nil {
+		if err := cleanupLocalRouter(t, h, localRouters, name, localRouterID, &verifiedState); err != nil {
 			t.Errorf("local router cleanup failed: %v", err)
 		}
 	}()
@@ -129,6 +136,7 @@ func TestScenarioLocalRouter(t *testing.T) {
 		"the create response should contain the created local router")
 	verifyLocalRouterConnection(t, created, switchID.String(), "192.168.1.1", []string{"192.168.1.2", "192.168.1.3"}, 24, 100,
 		[]*iaas.LocalRouterStaticRoute{{Prefix: "192.168.10.0/24", NextHop: "192.168.1.254"}})
+	verifiedState = created
 
 	// find が名前の部分一致で作成したローカルルータを見つけられることを確認します
 	found := findLocalRouters(t, h, name)
@@ -161,6 +169,7 @@ func TestScenarioLocalRouter(t *testing.T) {
 		"the update should be reflected in the response")
 	verifyLocalRouterConnection(t, updated, switchID.String(), "192.168.1.1", []string{"192.168.1.2", "192.168.1.3"}, 24, 100,
 		[]*iaas.LocalRouterStaticRoute{{Prefix: "192.168.10.0/24", NextHop: "192.168.1.254"}})
+	verifiedState = updated
 
 	// read でも更新後の説明と接続設定の維持を確認します
 	read = readLocalRouter(t, h, localRouterID)
@@ -190,6 +199,7 @@ func TestScenarioLocalRouter(t *testing.T) {
 			{Prefix: "192.168.20.0/24", NextHop: "192.168.1.253"},
 			{Prefix: "192.168.21.0/24", NextHop: "192.168.1.253"},
 		})
+	verifiedState = settingsUpdated
 
 	read = readLocalRouter(t, h, localRouterID)
 	verifyLocalRouterConnection(t, read, switchID.String(), "192.168.1.1", []string{"192.168.1.4", "192.168.1.5"}, 24, 200,
@@ -197,6 +207,7 @@ func TestScenarioLocalRouter(t *testing.T) {
 			{Prefix: "192.168.20.0/24", NextHop: "192.168.1.253"},
 			{Prefix: "192.168.21.0/24", NextHop: "192.168.1.253"},
 		})
+	verifiedState = read
 
 	// ピアの稼働状態を取得します。ピアを設定していないため Peers は空配列です
 	getLocalRouterHealth(t, h, localRouterID)
@@ -325,20 +336,22 @@ func getLocalRouterHealth(t *testing.T, h *helper.Helper, id types.ID) {
 func getLocalRouterMonitor(t *testing.T, h *helper.Helper, id types.ID) {
 	t.Helper()
 
+	// 現在時刻を終端とする観測期間 (過去24時間) を指定します
+	end := time.Now().UTC()
+	start := end.Add(-24 * time.Hour)
 	window := h.Call(t, "ローカルルータのトラフィックモニタリングを取得する",
 		"local-router-api", "monitor-local-router", "--id", id.String(),
-		"--start", "2026-11-13T00:00:00Z", "--end", "2036-11-13T00:00:00Z")
+		"--start", start.Format(time.RFC3339), "--end", end.Format(time.RFC3339))
 	var values []json.RawMessage
 	require.NoError(t, json.Unmarshal(window, &values), "decode monitor values: %s", string(window))
 	require.NotNil(t, values, "monitor-local-router should return a JSON array")
 }
 
-// cleanupLocalRouter は後片付けです。作成直後に確認したローカルルータの ID を優して SDK で再照合し、
-// ID と許容する識別情報が一致する場合だけ削除します。保持した ID がないのに同名リソースが
+// cleanupLocalRouter は後片付けです。作成直後に確認したローカルルータの ID を優先して SDK で再照合し、
+// 直前に CLI で確認した状態 (ID・識別情報・接続設定) と一致する場合だけ削除します。保持した ID がないのに同名リソースが
 // 見つかった場合は、今回の作成物と確定できないため自動削除せず手動確認を要求します。
 // 削除は skr CLI で行い、削除後は SDK で不在を確認します。
-// 更新確認は説明を元に戻さないため、更新後の説明も許容します。
-func cleanupLocalRouter(t *testing.T, h *helper.Helper, localRouters *localrouterSDK.Service, name string, knownID types.ID) error {
+func cleanupLocalRouter(t *testing.T, h *helper.Helper, localRouters *localrouterSDK.Service, name string, knownID types.ID, verified *localRouterItem) error {
 	t.Helper()
 
 	id := knownID
@@ -355,14 +368,16 @@ func cleanupLocalRouter(t *testing.T, h *helper.Helper, localRouters *localroute
 		return errors.New("cannot confirm the created local router ID; manual cleanup required")
 	}
 
-	// 削除前に SDK で再照合し、保持した ID と許容する識別情報が一致する場合だけ削除する
+	// 削除前に SDK で再照合し、直前に確認した状態と一致する場合だけ削除する
 	current, err := localRouters.ReadWithContext(t.Context(), &localrouterSDK.ReadRequest{ID: id})
 	if err != nil {
 		return fmt.Errorf("cannot verify local router before cleanup: %w", err)
 	}
-	if current.ID != id || current.Name != name ||
-		(current.Description != localRouterDescription && current.Description != updatedLocalRouterDescription) {
-		return errors.New("cleanup refused: local router identity changed; manual cleanup required")
+	if verified == nil || verified.ID.IsEmpty() {
+		return errors.New("no verified state recorded for the local router; manual cleanup required")
+	}
+	if err := compareLocalRouterState(current, *verified); err != nil {
+		return fmt.Errorf("cleanup refused: local router state changed (%v); manual cleanup required", err)
 	}
 	// 削除などリソースを実際に変更する操作は、実行記録に残る skr CLI で行います
 	if _, _, err := h.CallAllowingFailure(t, "テスト用のローカルルータを削除する",
@@ -407,20 +422,68 @@ func lookupLocalRouters(t *testing.T, localRouters *localrouterSDK.Service, name
 			StaticRoutes: r.StaticRoutes,
 		})
 	}
-	// 1ページで取りきれない結果は不在の判断に使わない
-	require.Less(t, len(items), localRouterFindPageSize,
-		"local router find result page is full; cannot conclude absence of %q", name)
+	// 1ページで取りきれない結果は不在の判断に使えないため、エラーとして返します。
+	// 後片付け (defer) から呼ばれるため、テストを中断させずに error にします
+	if len(items) >= localRouterFindPageSize {
+		return nil, fmt.Errorf("find result page is full (%d items); cannot conclude absence of %q", len(items), name)
+	}
 	return items, nil
 }
 
-// cleanupSwitch は後片付けです。作成直後に確認したスイッチの ID を優して SDK で再照合し、
+// compareLocalRouterState は再照合したローカルルータが、直前に CLI で確認した状態と一致することを確認します。
+// nil と空スライスは同じものとして扱います。後片付け (defer) から呼ばれるため、テストを中断させずに error を返します。
+func compareLocalRouterState(current *iaas.LocalRouter, verified localRouterItem) error {
+	if current == nil {
+		return errors.New("the local router read for cleanup is nil")
+	}
+	if current.ID != verified.ID {
+		return fmt.Errorf("ID mismatch (verified %s, current %s)", verified.ID, current.ID)
+	}
+	if current.Name != verified.Name {
+		return fmt.Errorf("name mismatch (verified %q, current %q)", verified.Name, current.Name)
+	}
+	if current.Description != verified.Description {
+		return fmt.Errorf("description mismatch (verified %q, current %q)", verified.Description, current.Description)
+	}
+	if !reflect.DeepEqual(current.Switch, verified.Switch) {
+		return fmt.Errorf("switch connection mismatch (verified %+v, current %+v)", verified.Switch, current.Switch)
+	}
+	if !reflect.DeepEqual(current.Interface, verified.Interface) {
+		return fmt.Errorf("interface settings mismatch (verified %+v, current %+v)", verified.Interface, current.Interface)
+	}
+	if len(current.StaticRoutes) != len(verified.StaticRoutes) {
+		return fmt.Errorf("static routes mismatch (verified %d routes, current %d routes)",
+			len(verified.StaticRoutes), len(current.StaticRoutes))
+	}
+	for i := range current.StaticRoutes {
+		if !reflect.DeepEqual(current.StaticRoutes[i], verified.StaticRoutes[i]) {
+			return fmt.Errorf("static routes[%d] mismatch (verified %+v, current %+v)",
+				i, verified.StaticRoutes[i], current.StaticRoutes[i])
+		}
+	}
+	if len(current.Peers) != len(verified.Peers) {
+		return fmt.Errorf("peers mismatch (verified %d peers, current %d peers)",
+			len(verified.Peers), len(current.Peers))
+	}
+	for i := range current.Peers {
+		if !reflect.DeepEqual(current.Peers[i], verified.Peers[i]) {
+			return fmt.Errorf("peers[%d] mismatch", i)
+		}
+	}
+	return nil
+}
+
+// cleanupSwitch は後片付けです。作成直後に確認したスイッチの ID を優先して SDK で再照合し、
 // ID と名前が一致する場合だけ削除します。削除は skr CLI で行い、削除後は SDK で不在を確認します。
 func cleanupSwitch(t *testing.T, h *helper.Helper, switches *swytch.Service, name string, knownID types.ID) error {
 	t.Helper()
 
 	id := knownID
 	if id.IsEmpty() {
-		matches := lookupSwitches(t, switches, name)
+		matches, err := lookupSwitches(t, switches, name)
+		if err != nil {
+			return fmt.Errorf("cannot locate possibly created switch: %w", err)
+		}
 		if len(matches) == 0 {
 			return nil
 		}
@@ -441,7 +504,10 @@ func cleanupSwitch(t *testing.T, h *helper.Helper, switches *swytch.Service, nam
 	); err != nil {
 		return fmt.Errorf("delete test switch %s: %w", id, err)
 	}
-	matches := lookupSwitches(t, switches, name)
+	matches, err := lookupSwitches(t, switches, name)
+	if err != nil {
+		return fmt.Errorf("verify switch absence after cleanup: %w", err)
+	}
 	if len(matches) != 0 {
 		return fmt.Errorf("switch %q remains after cleanup; manual cleanup required", name)
 	}
@@ -449,7 +515,7 @@ func cleanupSwitch(t *testing.T, h *helper.Helper, switches *swytch.Service, nam
 }
 
 // lookupSwitches は SDK で名前でスイッチを検索します。
-func lookupSwitches(t *testing.T, switches *swytch.Service, name string) []switchResource {
+func lookupSwitches(t *testing.T, switches *swytch.Service, name string) ([]switchResource, error) {
 	t.Helper()
 
 	found, err := switches.FindWithContext(t.Context(), &swytch.FindRequest{
@@ -457,7 +523,9 @@ func lookupSwitches(t *testing.T, switches *swytch.Service, name string) []switc
 		Names: []string{name},
 		Count: localRouterFindPageSize,
 	})
-	require.NoError(t, err, "find switches by name %q", name)
+	if err != nil {
+		return nil, fmt.Errorf("find switches by name: %w", err)
+	}
 	items := make([]switchResource, 0, len(found))
 	for _, s := range found {
 		if s == nil {
@@ -465,7 +533,11 @@ func lookupSwitches(t *testing.T, switches *swytch.Service, name string) []switc
 		}
 		items = append(items, switchResource{ID: s.ID, Name: s.Name, Description: s.Description})
 	}
-	return items
+	// 1ページで取りきれない結果は不在の判断に使えないため、エラーとして返します
+	if len(items) >= localRouterFindPageSize {
+		return nil, fmt.Errorf("find result page is full (%d items); cannot conclude absence of %q", len(items), name)
+	}
+	return items, nil
 }
 
 // switchResource はスイッチの参照結果のうち、確認に使う項目です。

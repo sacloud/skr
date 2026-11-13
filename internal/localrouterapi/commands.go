@@ -317,8 +317,8 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 }
 
 type UpdateSettingsCommand struct {
-	Request                   *string  `help:"個別フラグと併用できません。UpdateSettingsRequest JSON を @path.json または -（標準入力）で指定します。Peers[].SecretKey など秘密情報を受け取れる API フィールドがあるため直接指定は受け付けません。未指定の設定は現状維持で、Peers や StaticRoutes に空配列を指定すると一覧を消去します。"`
-	ID                        *int64   `name:"id" help:"必須: 更新するローカルルータ ID。"`
+	Request                   *string  `help:"個別の設定フラグと併用できません。--id とは併用できます。UpdateSettingsRequest JSON を @path.json または -（標準入力）で指定します。Peers[].SecretKey など秘密情報を受け取れる API フィールドがあるため直接指定は受け付けません。未指定の設定は現状維持で、Peers や StaticRoutes に空配列を指定すると一覧を消去します。"`
+	ID                        *int64   `name:"id" help:"必須: 更新するローカルルータ ID。--request と併用できます。"`
 	SwitchID                  *string  `name:"switch-id" help:"任意: 接続するスイッチの ID (API の Switch.Code)。スイッチのフラグを指定するとスイッチ設定全体を置き換えます。"`
 	SwitchCategory            *string  `name:"switch-category" help:"任意: スイッチのカテゴリ (API の Switch.Category)。さくらのクラウドのスイッチは cloud、さくらの VPS などは vps です。"`
 	SwitchZoneID              *string  `name:"switch-zone-id" help:"任意: スイッチのゾーン (API の Switch.ZoneID)。is1b など、さくらのクラウドのスイッチではゾーン名です。"`
@@ -332,7 +332,7 @@ type UpdateSettingsCommand struct {
 }
 
 func (c *UpdateSettingsCommand) hasFlags() bool {
-	return c.ID != nil || c.hasSwitchFlags() || c.hasInterfaceFlags() || c.StaticRoutes != nil
+	return c.hasSwitchFlags() || c.hasInterfaceFlags() || c.StaticRoutes != nil
 }
 
 func (c *UpdateSettingsCommand) hasSwitchFlags() bool {
@@ -345,6 +345,10 @@ func (c *UpdateSettingsCommand) hasInterfaceFlags() bool {
 }
 
 func (c *UpdateSettingsCommand) Run(ctx *kong.Context) error {
+	// --id は対象リソースの指定であり設定フラグではないため、--request とも併用できます
+	if c.ID == nil {
+		return fmt.Errorf("--id が必要です")
+	}
 	request := &UpdateSettingsRequest{}
 	if c.Request != nil {
 		// Peers[].SecretKey など秘密情報を受け取れるため、保護したファイルまたは標準入力に限定します
@@ -354,10 +358,12 @@ func (c *UpdateSettingsCommand) Run(ctx *kong.Context) error {
 		if c.hasFlags() {
 			return fmt.Errorf("--request と個別フラグは併用できません")
 		}
-	} else {
-		if c.ID == nil {
-			return fmt.Errorf("--id または --request が必要です")
+		// リクエスト JSON に ID がある場合は --id と一致する必要があります
+		if request.ID != 0 && request.ID != types.ID(*c.ID) {
+			return fmt.Errorf("--id とリクエスト JSON の ID が一致しません")
 		}
+		request.ID = types.ID(*c.ID)
+	} else {
 		var err error
 		request, err = updateSettingsRequestFromFlags(c)
 		if err != nil {

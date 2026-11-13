@@ -102,6 +102,8 @@ $ skr local-router-api create --name "$LOCAL_ROUTER_NAME" \
 
 作成したローカルルータを名前で検索し、ID をシェル変数に取り込みます。`--name` は部分一致検索です。
 
+`read` や `find` の応答には、自分側のローカルルータの認証鍵 (`Status.SecretKeys`) や、ピア設定済みの場合はその `SecretKey` も含まれます。これらは API が所有者に返す値で、対向側のピア設定で使われます。応答全体をログに残す場合は取り扱いに注意してください。必要な項目だけを取り出すには、上の例のように `--query` で射影します。
+
 ```console
 $ LOCAL_ROUTER_ID=$(skr local-router-api find --name "$LOCAL_ROUTER_NAME" \
     --query 'map(select(.Name == "'"$LOCAL_ROUTER_NAME"'")) | sort_by(-.ID) | .[0].ID' | jq -er '.')
@@ -141,7 +143,7 @@ $ skr local-router-api read --id "$LOCAL_ROUTER_ID" \
 
 スイッチとインターフェースのフラグは、それぞれのグループ内で設定全体を組み立てます。スイッチ設定を変えずにインターフェースだけを更新する場合は、`--switch-*` を省略してインターフェースの 4 項目をすべて指定できます。逆にスタティックルートだけを変更する場合は、`--static-route` だけを指定します。
 
-`--request` と個別フラグは併用できません。未指定の設定を消す (ピアやスタティックルートの一覧を空にする) には、JSON で空配列を指定します。スイッチ接続そのものの解除は本コマンドの対応範囲外で、生の API 操作が必要です。
+`--request` と個別の設定フラグは併用できません (対象を指定する `--id` は併用できます)。未指定の設定を消す (ピアやスタティックルートの一覧を空にする) には、JSON で空配列を指定します。スイッチ接続そのものの解除は本コマンドの対応範囲外で、生の API 操作が必要です。
 
 ## Step 6: ピアを設定する (任意)
 
@@ -164,7 +166,7 @@ $ cat > "$WORK_DIR/peers-request.json" <<'EOF'
 EOF
 ```
 
-`ID` はピアのルータ ID、`SecretKey` はピア接続の相手と取り決めた認証鍵です。`PEER_SECRET_KEY` は実際の値に置き換えてください。編集が完了したら、`--request` に `@path` 形式で渡して適用します。
+`ID` はピアのルータ ID、`SecretKey` はピア接続の相手と取り決めた認証鍵です。`PEER_SECRET_KEY` は実際の値に置き換えてください。編集が完了したら、`--id` と `--request` に `@path` 形式の JSON を渡して適用します。
 
 ```console
 $ skr local-router-api update-settings --id "$LOCAL_ROUTER_ID" \
@@ -172,7 +174,7 @@ $ skr local-router-api update-settings --id "$LOCAL_ROUTER_ID" \
     --query '{ID,Name,Peers}'
 ```
 
-`--request` を指定すると個別フラグは使えません。未指定の設定は現在値が引き継がれます。ピアの一覧を消す場合は `"Peers": []` を指定します。確認が終わったらリクエストファイルを削除します。
+`--request` を指定すると個別の設定フラグは使えません (対象を指定する `--id` は併用できます)。未指定の設定は現在値が引き継がれます。ピアの一覧を消す場合は `"Peers": []` を指定します。確認が終わったらリクエストファイルを削除します。
 
 ```console
 $ rm "$WORK_DIR/peers-request.json"

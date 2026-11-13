@@ -307,7 +307,7 @@ func TestLocalRouterJSONInputAndMutualExclusion(t *testing.T) {
 	require.Contains(t, stderr, "--request は @path.json または -")
 	require.Nil(t, api.updateRequest, "inline JSON must not reach the API")
 
-	code, stderr = run("local-router-api", "update-settings", "--request", `{"ID":123}`)
+	code, stderr = run("local-router-api", "update-settings", "--id", "123", "--request", `{"ID":123}`)
 	require.Equal(t, 1, code, "inline JSON update-settings code=%d stderr=%q", code, stderr)
 	require.Contains(t, stderr, "--request は @path.json または -")
 	require.Nil(t, api.updateSettingsRequest, "inline JSON must not reach the API")
@@ -334,22 +334,30 @@ func TestLocalRouterJSONInputAndMutualExclusion(t *testing.T) {
 	require.NotNil(t, api.updateRequest.Description)
 	require.NotNil(t, api.updateRequest.StaticRoutes)
 
-	// 空配列の指定は一覧の消去になります
+	// 空配列の指定は一覧の消去になります。--id は --request と併用できます
 	settingsPath := filepath.Join(dir, "settings.json")
 	require.NoError(t, os.WriteFile(settingsPath, []byte(`{"ID":123,"StaticRoutes":[],"Peers":[]}`), 0o600))
-	code, stderr = run("local-router-api", "update-settings", "--request", "@"+settingsPath)
+	code, stderr = run("local-router-api", "update-settings", "--id", "123", "--request", "@"+settingsPath)
 	require.Equal(t, 0, code, "JSON update-settings code=%d stderr=%q", code, stderr)
 	require.NotNil(t, api.updateSettingsRequest, "JSON update-settings request = %+v", api.updateSettingsRequest)
+	require.EqualValues(t, 123, api.updateSettingsRequest.ID)
 	require.NotNil(t, api.updateSettingsRequest.StaticRoutes)
 	require.Empty(t, *api.updateSettingsRequest.StaticRoutes)
 	require.NotNil(t, api.updateSettingsRequest.Peers)
 	require.Empty(t, *api.updateSettingsRequest.Peers)
 
-	// --request と個別フラグは併用できません
+	// リクエスト JSON の ID と --id が不一致の場合はエラーになります
+	sent := api.updateSettingsRequest
+	code, stderr = run("local-router-api", "update-settings", "--id", "456", "--request", "@"+settingsPath)
+	require.Equal(t, 1, code, "ID mismatch code=%d stderr=%q", code, stderr)
+	require.Contains(t, stderr, "--id とリクエスト JSON の ID が一致しません")
+	require.Same(t, sent, api.updateSettingsRequest, "mismatched ID must not reach the API")
+
+	// --request と個別の設定フラグは併用できません (--id は併用できます)
 	for _, args := range [][]string{
 		{"local-router-api", "create", "--request", "@" + createPath, "--name", "x", "--request と個別フラグ"},
 		{"local-router-api", "update", "--request", "@" + updatePath, "--description", "d", "--request と個別フラグ"},
-		{"local-router-api", "update-settings", "--request", "@" + settingsPath, "--id", "123", "--request と個別フラグ"},
+		{"local-router-api", "update-settings", "--request", "@" + settingsPath, "--switch-id", "123456789012", "--request と個別フラグ"},
 		{"local-router-api", "update-settings", "--request", "@" + settingsPath, "--switch-id", "123456789012", "--request と個別フラグ"},
 		{"local-router-api", "find", "--request", `{"Names":["x"]}`, "--name", "x", "--request と個別フラグ"},
 		{"local-router-api", "read", "--request", `{"ID":123}`, "--id", "123", "--request と --id"},
@@ -392,7 +400,9 @@ func TestLocalRouterFlagValidationErrors(t *testing.T) {
 			"unknown key"},
 		{[]string{"local-router-api", "update", "--id", "123"}, "更新するフラグが必要です"},
 		{[]string{"local-router-api", "read"}, "--id または --request が必要です"},
-		{[]string{"local-router-api", "update-settings", "--switch-id", "123456789012"}, "--id または --request が必要です"},
+		{[]string{"local-router-api", "update-settings", "--switch-id", "123456789012"}, "--id が必要です"},
+		{[]string{"local-router-api", "update-settings"}, "--id が必要です"},
+		{[]string{"local-router-api", "update-settings", "--request", "{\"Peers\":[]}"}, "--id が必要です"},
 		{[]string{"local-router-api", "monitor-local-router", "--id", "123", "--start", "invalid"}, "RFC3339"},
 	} {
 		t.Run(strings.Join(test.args, "_"), func(t *testing.T) {

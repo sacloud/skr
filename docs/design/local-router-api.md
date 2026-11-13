@@ -16,14 +16,16 @@ service 層は Find / Read / Create / Update / Delete / Health / MonitorLocalRou
 | `create --name NAME [--description DESC] [--tags TAG,TAG] [--icon-id ID] [接続フラグ]` または `create --request JSON` | `CreateWithContext` | 個別フラグまたは作成 JSON。結果はローカルルータです |
 | `read --id ID` | `ReadWithContext` | ローカルルータ ID。結果はローカルルータです。ピアの `SecretKeys` を含みます |
 | `update --id ID [スカラーと接続フラグ]` または `update --request JSON` | `UpdateWithContext` | 部分更新。未指定は現状維持。結果はローカルルータです |
-| `update-settings --id ID [接続フラグ]` または `update-settings --request JSON` | `LocalRouterAPI.UpdateSettings` (skr マージアダプター) | 設定のみの部分更新。未指定は現状維持。結果はローカルルータです |
+| `update-settings --id ID [接続フラグ]` または `update-settings --id ID --request JSON` | `LocalRouterAPI.UpdateSettings` (skr マージアダプター) | 設定のみの部分更新。`--id` は常に必須で、`--request` と併用できます。未指定は現状維持。結果はローカルルータです |
 | `delete --id ID [--fail-if-not-found]` | `DeleteWithContext` | 成功時の出力はありません |
 | `health-status --id ID` | `HealthWithContext` | ピアごとの稼働状態と学習したルートです |
 | `monitor-local-router --id ID [--start RFC3339] [--end RFC3339]` | `MonitorLocalRouterWithContext` | 送受信バイト/秒の推移。未指定時は直近 1 時間です |
 
 ## リクエストと秘密情報
 
-Create / Update / UpdateSettings では個別フラグと `--request` を相互排他で受け付けます。`Peers[].SecretKey` は秘密情報のため、これらの操作の `--request` は `@path.json` または `-`（標準入力）のみを受け付け、インライン JSON は拒否します。Find / Read / Delete / Health / MonitorLocalRouter の `--request` はインラインと `@path.json` を受け付けます。
+Create / Update / UpdateSettings では個別の設定フラグと `--request` を相互排他で受け付けます。`update-settings` の `--id` は対象リソースの指定であり設定フラグではないため、`--request` とも併用できます。リクエスト JSON に `ID` を含めた場合、`--id` と一致しない入力は拒否します。`Peers[].SecretKey` は秘密情報のため、これらの操作の `--request` は `@path.json` または `-`（標準入力）のみを受け付け、インライン JSON は拒否します。Find / Read / Delete / Health / MonitorLocalRouter の `--request` はインラインと `@path.json` を受け付けます。
+
+`--trace` を指定すると、SDK が通信ログとしてリクエスト本文と応答本文をそのまま出力します。秘密情報を含むリクエストを送る操作 (`update-settings` の `--request` など) では、トレースログに秘密情報が含まれるため、ログの取り扱いに注意してください。この振る舞いは SDK の通信ログの仕様で、`--trace` を渡す全コマンド共通です。
 
 個別フラグは次の通りです。
 
@@ -62,7 +64,7 @@ $ go build -o skr ./cmd/skr
 $ SKR_E2E=1 go test ./test/e2e/local-router/
 ```
 
-シナリオはランダム名のスイッチ (is1b) とローカルルータを作成し、`update-settings` でスイッチ接続とインターフェース、スタティックルートを設定して、ヘルスステータスとモニタリングを確認します。`--name` での検索、メタデータの更新も行い、保持した ID と識別情報を照合してスイッチとローカルルータを削除し、不在を確認します。途中で失敗した場合は、作成されたリソースだけを削除します。後片付けは各リソースの作成直後に、削除と不在確認を含む `defer` としてその場で登録します。コマンドの入出力証跡は Git 管理外の `e2e-output/` 配下に Markdown で保存します。
+シナリオはランダム名のスイッチ (is1b) とローカルルータを作成し、`update-settings` でスイッチ接続とインターフェース、スタティックルートを設定して、ヘルスステータスとモニタリングを確認します。`--name` での検索、メタデータの更新も行い、後片付けでは保持した ID に加えて、直前に CLI で確認した状態 (識別情報と接続設定) と再照合して一致する場合だけ削除し、不在を確認します。不在の判断に使う検索結果が1ページに収まらない場合は、不在と判断せずエラーにします。途中で失敗した場合は、作成されたリソースだけを削除します。後片付けは各リソースの作成直後に、削除と不在確認を含む `defer` としてその場で登録します。コマンドの入出力証跡は Git 管理外の `e2e-output/` 配下に Markdown で保存します。
 
 ## ライブ検証で確認した API の挙動
 
