@@ -69,11 +69,16 @@ type Config struct {
 }
 
 type Operation struct {
-	Name             string `json:"name"`
-	CommandName      string `json:"command_name,omitempty"`
-	Help             string `json:"help"`
-	Method           string `json:"method"`
-	RequestType      string `json:"request_type,omitempty"`
+	Name        string `json:"name"`
+	CommandName string `json:"command_name,omitempty"`
+	Help        string `json:"help"`
+	Method      string `json:"method"`
+	RequestType string `json:"request_type,omitempty"`
+	// NoRequestFlag は --request フラグの生成を抑制します。query params を受ける
+	// list 操作など、API リクエスト JSON ではなく個別フラグのみで入力を受ける操作で
+	// 使います。request_type は必須のまま (SDK 呼び出しの型として使う) で、
+	// Request と個別フラグの併用チェック・JSON デコード経路を生成しません。
+	NoRequestFlag    bool   `json:"no_request_flag,omitempty"`
 	RequestByValue   bool   `json:"request_by_value,omitempty"`
 	RequestOptional  bool   `json:"request_optional,omitempty"`
 	RequestFileOnly  bool   `json:"request_file_only,omitempty"`
@@ -264,7 +269,9 @@ type {{.CommandType}} struct {
 {{- end }}
 {{- end }}
 {{- if .RequestType }}
+{{- if not .NoRequestFlag }}
 	Request *string {{if .RequestHelp}}{{helpTag .RequestHelp}}{{else}}{{helpTag "API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。"}}{{end}}
+{{- end }}
 {{- range .Flags }}
 	{{.Field}} *{{.Type}} {{flagTag .Name .Help .Separator}}
 {{- end }}
@@ -277,7 +284,54 @@ type {{.CommandType}} struct {
 }
 
 func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
-{{- if .RequestType }}
+{{- if and .RequestType .NoRequestFlag }}
+	request := &{{.RequestType}}{}
+{{- range .Flags }}
+{{- if .Required }}
+	if c.{{.Field}} == nil {
+		return fmt.Errorf("--{{.Name}} が必要です")
+	}
+{{- end }}
+	if c.{{.Field}} != nil {
+{{- if .Singleton }}
+		request.{{.Field}} = []string{*c.{{.Field}}}
+{{- else if .Conversion }}
+		value := {{.Conversion}}(*c.{{.Field}})
+{{- if .Pointer }}
+		request.{{.Field}} = &value
+{{- else }}
+		request.{{.Field}} = value
+{{- end }}
+{{- else if .Pointer }}
+		request.{{.Field}} = c.{{.Field}}
+{{- else }}
+		request.{{.Field}} = *c.{{.Field}}
+{{- end }}
+	}
+{{- end }}
+{{- range .RepeatedFlags }}
+{{- if .Required }}
+	if len(c.{{.Field}}) == 0 {
+		return fmt.Errorf("--{{.Name}} が必要です")
+	}
+{{- end }}
+	request.{{.Field}} = make([]string, len(c.{{.Field}}))
+	copy(request.{{.Field}}, c.{{.Field}})
+{{- end }}
+{{- if .RequestValidator }}
+	if err := {{.RequestValidator}}(request); err != nil {
+		return err
+	}
+{{- end }}
+{{- if .RequestTransform }}
+	if c.runtime.{{.RequestTransform}} == nil {
+		return fmt.Errorf("API リクエスト入力変換が設定されていません")
+	}
+	if err := c.runtime.{{.RequestTransform}}(c, request); err != nil {
+		return err
+	}
+{{- end }}
+{{- else if .RequestType }}
 	flagsSet := false
 {{- range .Flags }}
 	flagsSet = flagsSet || c.{{.Field}} != nil
@@ -557,6 +611,25 @@ func (c Config) Validate(mode Mode) error {
 		}
 		if operation.RequestFileOnly && operation.RequestType == "" {
 			return fmt.Errorf("operation %q request_file_only requires request_type", operation.Name)
+		}
+		// no_request_flag は個別フラグ経路だけで構築できる操作 (query params を受ける list など) のための設定。
+		// 手書き操作や request_type がない操作、フラグがない操作と組み合わせても意味がないため拒否します。
+		if operation.NoRequestFlag {
+			if operation.RequestType == "" {
+				return fmt.Errorf("operation %q no_request_flag requires request_type", operation.Name)
+			}
+			if operation.RequestInputTransform != "" {
+				return fmt.Errorf("operation %q no_request_flag cannot be combined with request_input_transform", operation.Name)
+			}
+			if operation.RequestFileOnly {
+				return fmt.Errorf("operation %q no_request_flag cannot be combined with request_file_only", operation.Name)
+			}
+			if operation.Handwritten {
+				return fmt.Errorf("operation %q no_request_flag cannot be combined with handwritten", operation.Name)
+			}
+			if len(operation.Flags) == 0 && len(operation.RepeatedFlags) == 0 {
+				return fmt.Errorf("operation %q no_request_flag requires flags or repeated_flags", operation.Name)
+			}
 		}
 		if operation.RequestFileOnly && (operation.RequestOptional || operation.Handwritten ||
 			len(operation.Flags) > 0 || len(operation.RepeatedFlags) > 0) {

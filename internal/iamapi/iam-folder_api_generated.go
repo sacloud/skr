@@ -13,7 +13,7 @@ import (
 )
 
 type FolderCommands struct {
-	List   FolderListCommand   "cmd:\"\" name:\"list-folders\" help:\"IAM フォルダを一覧表示します。ページングや絞り込みには --request または対応する個別フラグを指定します。\""
+	List   FolderListCommand   "cmd:\"\" name:\"list-folders\" help:\"IAM フォルダを一覧表示します。ページングや絞り込みには対応する個別フラグを指定します。\""
 	Create FolderCreateCommand "cmd:\"\" name:\"create-folder\" help:\"IAM フォルダを作成します。親フォルダを指定する場合は --parent-id を指定してください。\""
 	Read   FolderReadCommand   "cmd:\"\" name:\"read-folder\" help:\"ID を指定して IAM フォルダを読み取ります。\""
 	Update FolderUpdateCommand "cmd:\"\" name:\"update-folder\" help:\"IAM フォルダの名前と説明を更新します。説明を変更しない場合は --description を省略します。\""
@@ -56,7 +56,6 @@ func NewFolderCommands(runtime FolderRuntime, factory FolderAPIFactory) FolderCo
 }
 
 type FolderListCommand struct {
-	Request  *string "help:\"フォルダ一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。\""
 	Page     *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage  *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	Name     *string "name:\"name\" help:\"任意: 名前で絞り込みます。\""
@@ -66,37 +65,18 @@ type FolderListCommand struct {
 }
 
 func (c *FolderListCommand) Run(ctx *kong.Context) error {
-	flagsSet := false
-	flagsSet = flagsSet || c.Page != nil
-	flagsSet = flagsSet || c.PerPage != nil
-	flagsSet = flagsSet || c.Name != nil
-	flagsSet = flagsSet || c.ParentID != nil
-	if c.Request != nil && flagsSet {
-		return fmt.Errorf("--request と個別フラグは併用できません")
-	}
 	request := &folder.ListParams{}
-	if c.Request != nil {
-		if c.runtime.DecodeRequest == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
-			return err
-		}
-	} else {
-		if !flagsSet {
-		}
-		if c.Page != nil {
-			request.Page = c.Page
-		}
-		if c.PerPage != nil {
-			request.PerPage = c.PerPage
-		}
-		if c.Name != nil {
-			request.Name = c.Name
-		}
-		if c.ParentID != nil {
-			request.ParentID = c.ParentID
-		}
+	if c.Page != nil {
+		request.Page = c.Page
+	}
+	if c.PerPage != nil {
+		request.PerPage = c.PerPage
+	}
+	if c.Name != nil {
+		request.Name = c.Name
+	}
+	if c.ParentID != nil {
+		request.ParentID = c.ParentID
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

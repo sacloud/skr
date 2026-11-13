@@ -9,12 +9,11 @@
   "operations": [
     {
       "name": "List",
-      "help": "IAM フォルダを一覧表示します。ページングや絞り込みには --request または対応する個別フラグを指定します。",
+      "help": "IAM フォルダを一覧表示します。ページングや絞り込みには対応する個別フラグを指定します。",
       "method": "List",
       "request_type": "folder.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "フォルダ一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。",
       "response_type": "*v1.ListFoldersOK",
       "flags": [
         {
@@ -46,7 +45,8 @@
           "pointer": true
         }
       ],
-      "command_name": "list-folders"
+      "command_name": "list-folders",
+      "no_request_flag": true
     },
     {
       "name": "Create",

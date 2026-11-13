@@ -14,7 +14,6 @@
       "request_optional": true,
       "request_validator": "ValidateApplicationListRequest",
       "response_type": "*v1.HandlerListApplications",
-      "request_help": "ListApplicationsParams JSON。フラグと併用できません。直接指定、@path.json、または -（標準入力）に対応します。",
       "flags": [
         {
           "name": "page-num",
@@ -45,7 +44,8 @@
           "conversion": "NewOptApplicationSortOrder"
         }
       ],
-      "command_name": "list-applications"
+      "command_name": "list-applications",
+      "no_request_flag": true
     },
     {
       "name": "Read",
