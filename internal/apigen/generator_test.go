@@ -338,17 +338,21 @@ func TestGenerateNoRequestFlagSuppressesRequestButKeepsFlags(t *testing.T) {
 		},
 		Operations: []Operation{
 			{
-				Name:           "List",
-				Help:           "一覧を表示します。",
-				Method:         "List",
-				RequestType:    "example.ListParams",
-				RequestByValue: true,
-				NoRequestFlag:  true,
-				ResponseType:   "[]example.Resource",
+				Name:             "List",
+				Help:             "一覧を表示します。",
+				Method:           "List",
+				RequestType:      "example.ListParams",
+				RequestByValue:   true,
+				NoRequestFlag:    true,
+				ResponseType:     "[]example.Resource",
+				ValidateZone:     true,
+				RequestTransform: "TransformListRequest",
+				RequestValidator: "ValidateListRequest",
 				Flags: []Flag{
 					{Name: "page", Field: "Page", Type: "int", Help: "ページ番号。", Pointer: true},
 					{Name: "name", Field: "Name", Type: "string", Help: "名前。", Required: true},
 				},
+				RepeatedFlags: []RepeatedFlag{{Name: "item", Field: "Items", Help: "繰り返し指定します。"}},
 			},
 		},
 	}
@@ -374,9 +378,19 @@ func TestGenerateNoRequestFlagSuppressesRequestButKeepsFlags(t *testing.T) {
 		"Request *string",
 		"--request と個別フラグは併用できません",
 		"c.runtime.DecodeRequest(",
+		// repeated flags は transform に委ね、直接代入しない (通常経路と同じ契約)
+		"request.Items =",
 	} {
 		require.NotContains(t, string(source), notWant, "generated source contains %q", notWant)
 	}
+
+	// 通常経路と同じ順序で transform → ゾーン検証 → validator を生成する
+	transform := strings.Index(string(source), "c.runtime.TransformListRequest(c, request)")
+	zone := strings.Index(string(source), "zones.ValidateSingleZone(request.Zone)")
+	validate := strings.Index(string(source), "if err := ValidateListRequest(request); err != nil")
+	require.NotEqual(t, -1, transform)
+	require.Greater(t, zone, transform, "zone validation must follow transform")
+	require.Greater(t, validate, zone, "validation must follow zone validation")
 
 	second, err := Generate(config, ModeIaaS)
 	require.NoError(t, err, "second Generate() error")

@@ -45,6 +45,12 @@ func TestDecodeFolderCreateRequestUsesAPIFieldNames(t *testing.T) {
 	err := DecodeRequest(`{"name":"n","parent_id":1,"unknown_key":"x"}`, &unknown)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "decode request JSON")
+
+	// 有効な JSON の後ろに余分なデータがあっても拒否します
+	var trailing folder.CreateParams
+	err = DecodeRequest(`{"name":"n"}{"extra":1}`, &trailing)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "decode request JSON")
 }
 
 func TestDecodeProjectCreateRequestUsesAPIFieldNames(t *testing.T) {

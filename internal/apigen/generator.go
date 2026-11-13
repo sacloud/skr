@@ -309,25 +309,21 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 {{- end }}
 	}
 {{- end }}
-{{- range .RepeatedFlags }}
-{{- if .Required }}
-	if len(c.{{.Field}}) == 0 {
-		return fmt.Errorf("--{{.Name}} が必要です")
-	}
-{{- end }}
-	request.{{.Field}} = make([]string, len(c.{{.Field}}))
-	copy(request.{{.Field}}, c.{{.Field}})
-{{- end }}
-{{- if .RequestValidator }}
-	if err := {{.RequestValidator}}(request); err != nil {
-		return err
-	}
-{{- end }}
 {{- if .RequestTransform }}
 	if c.runtime.{{.RequestTransform}} == nil {
 		return fmt.Errorf("API リクエスト入力変換が設定されていません")
 	}
 	if err := c.runtime.{{.RequestTransform}}(c, request); err != nil {
+		return err
+	}
+{{- end }}
+{{- if .ValidateZone }}
+	if err := zones.ValidateSingleZone(request.Zone); err != nil {
+		return err
+	}
+{{- end }}
+{{- if .RequestValidator }}
+	if err := {{.RequestValidator}}(request); err != nil {
 		return err
 	}
 {{- end }}

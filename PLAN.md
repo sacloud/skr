@@ -165,7 +165,7 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 ## `--request` の適用範囲の見直し
 
-全ドメインの `--request` デコード先を監査し ([#75](https://github.com/sacloud/skr/issues/75))、`--request` を request body 用の引数と位置づけました ([ADR 0085](docs/adr/0085-request-flag-scope.md))。query params を受ける ogen 系 list 操作では個別フラグが全 query params をカバーしているため、`--request` を廃止し、生成器に `no_request_flag` 設定を追加しました。IAM 6 操作、AppRun 2 操作、Security Control 2 操作の 10 コマンドに適用済みです。IaaS の find は GET + リクエストボディという API 形式のため `--request` を維持します。IAM の folder / project create は json タグのない手書きラッパー型へのデコードで `parent_id` / `parent_folder_id` が黙って無視される実害があったため、wire 名タグ付き中間構造体による明示変換 (`DisallowUnknownFields` 併用) で修正済みです。organization / projectapikey は既に明示変換で対応済みでした。手書きラッパー型への json タグ追加は SDK 側への提案事項です ([#75](https://github.com/sacloud/skr/issues/75))。
+全ドメインの `--request` デコード先を監査し ([#75](https://github.com/sacloud/skr/issues/75))、`--request` を request body 用の引数と位置づけました ([ADR 0085](docs/adr/0085-request-flag-scope.md))。query params を受ける ogen 系 list 操作では個別フラグが全 query params をカバーしているため、`--request` を廃止し、生成器に `no_request_flag` 設定を追加しました。IAM 7 操作 (folder、project、project-api-key、scim、service-policy の list-rule-templates、service-principal の list と list-keys)、AppRun 2 操作、Security Control 2 操作の 11 コマンドに適用済みです。IaaS の find は GET + リクエストボディという API 形式のため `--request` を維持します。IAM の folder / project create は json タグのない手書きラッパー型へのデコードで `parent_id` / `parent_folder_id` が黙って無視される実害があったため、wire 名タグ付き中間構造体による明示変換 (`DisallowUnknownFields` 併用) で修正済みです。organization / projectapikey は既に明示変換で対応済みでした。手書きラッパー型への json タグ追加は SDK 側への提案事項です ([#75](https://github.com/sacloud/skr/issues/75))。
 
 ## CLI 機能の改善候補: `--query-raw` (jq -r 相当の生出力)
 

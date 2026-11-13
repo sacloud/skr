@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -498,6 +499,20 @@ func readTextInput(path, flag, subject string) (string, error) {
 	return value, nil
 }
 
+// decodeStrictRequest は未知のフィールドと末尾の余分なデータを拒否して JSON をデコードします。
+// json タグを持たない SDK params 型への明示変換で使います (ADR 0085)。
+func decodeStrictRequest(data []byte, destination any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(destination); err != nil {
+		return fmt.Errorf("decode request JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return fmt.Errorf("decode request JSON: unexpected data after JSON object")
+	}
+	return nil
+}
+
 // DecodeRequest は --request の JSON をデコードし、@path.json 形式もサポートします。
 func DecodeRequest(input string, destination any) error {
 	var data []byte
@@ -520,10 +535,8 @@ func DecodeRequest(input string, destination any) error {
 			Description *string `json:"description"`
 			ParentID    *int    `json:"parent_id"`
 		}
-		decoder := json.NewDecoder(bytes.NewReader(data))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&apiRequest); err != nil {
-			return fmt.Errorf("decode request JSON: %w", err)
+		if err := decodeStrictRequest(data, &apiRequest); err != nil {
+			return err
 		}
 		*request = folder.CreateParams{
 			Name:        apiRequest.Name,
@@ -539,10 +552,8 @@ func DecodeRequest(input string, destination any) error {
 			Description    string `json:"description"`
 			ParentFolderID *int   `json:"parent_folder_id"`
 		}
-		decoder := json.NewDecoder(bytes.NewReader(data))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&apiRequest); err != nil {
-			return fmt.Errorf("decode request JSON: %w", err)
+		if err := decodeStrictRequest(data, &apiRequest); err != nil {
+			return err
 		}
 		*request = project.CreateParams{
 			Code:           apiRequest.Code,

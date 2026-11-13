@@ -20,7 +20,7 @@
 
 - `--request` は request body を表す引数と位置づける。query params や path params をマッピングする用途には生成しない。
 - query params を受ける list 操作の入力は個別フラグに統一し、`--request` を廃止する。生成器に `no_request_flag` 設定を追加し、`request_type` を持つ生成操作でも `--request` の生成を抑制できるようにする。`request_type` は SDK 呼び出しの型として必要なため残し、設定検証で `handwritten`、`request_file_only`、`request_input_transform`、フラグなし操作との併用を拒否する。
-- 適用対象は、IAM list 6 操作 (folder、project、project-api-key、scim、service-policy の list-rule-templates、service-principal の list と list-keys)、AppRun list 2 操作、Security Control list 2 操作である。
+- 適用対象は、IAM list 7 操作 (folder、project、project-api-key、scim、service-policy の list-rule-templates、service-principal の list と list-keys)、AppRun list 2 操作、Security Control list 2 操作である。
 - IaaS の find および読み取り系操作 (`Find`、`List`、`list-subnet`、`list-parameter`) は `--request` を維持する。IaaS の検索は GET + body という API 形式であり、`FindRequest` JSON は body として送信される。
 - IAM の `folder.CreateParams` と `project.CreateParams` は request body 用の `--request` を維持し、既に対策済みの projectapikey と同じ wire 名タグ付き中間構造体による明示変換 (`DisallowUnknownFields` 併用) で `parent_id` と `parent_folder_id` のマッピングを修正する。
 - query params を受ける list 操作の個別フラグは、対応する query params をすべてカバーする。SDK が params 型にフィールドを追加した場合は個別フラグの追加で追従する。
