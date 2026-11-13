@@ -14,7 +14,7 @@
 
 // Package apprundedicated は AppRun 専有型の高レベルコマンド層です。
 // 定義ファイル (--app) を入力として、デプロイ、ロールバック、状態の確認など
-// 10 個の操作を提供します。
+// 13 個の操作を提供します。
 //
 // service 層は service/apprun-dedicated-service-go モジュールに切り出してあり
 // (ADR 0077、ADR 0079)、このパッケージは定義の読み込み、確認プロンプト、
@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -133,32 +134,38 @@ var errAborted = errors.New("操作を中止しました")
 
 // Commands は skr apprun-dedicated 配下のコマンド群です。
 type Commands struct {
-	Init       InitCommand       `cmd:"" help:"デプロイ済みのアプリケーションから定義ファイルを生成します。アクティブバージョンがあればその内容から、なければ最新のバージョンから定義を復元します。バージョンが 1 つもない場合は識別子だけの定義を生成します。registryPassword と secret=true の環境変数の値は API から取得できないため、生成される定義には含まれません。同名のファイルが既に存在する場合は上書きせずにエラーになります。"`
-	Deploy     DeployCommand     `cmd:"" help:"定義ファイルの内容をデプロイします。クラスタとアプリケーションを検索し、見つからなければアプリケーションを作成して、定義から新しいバージョンを作成して有効化します。registryPassword は定義に値があれば新しく登録し (registryPasswordAction: new)、値がなくアクティブバージョンがあれば維持し (keep)、初回デプロイで値がなければ削除します (remove)。有効化後、要求されたコンテナ数と同じ数のコンテナが running になるまで待ちます (--no-wait で省略)。トレースが有効な場合は実行しません。"`
-	Diff       DiffCommand       `cmd:"" help:"ローカルの定義とデプロイ済みの現状を比較し、unified diff 形式で標準出力へ出力します。現状はアクティブバージョンの内容です。アプリケーションが存在しないか非活性の場合は、識別子だけの定義を現状とします。registryPassword と secret=true の環境変数の値、registryPasswordAction は応答で取得できないため比較から除外し、その旨を標準エラー出力に示します。差分がなければ標準出力には何も出力しません。このコマンドは --query には対応せず、指定した場合はエラーになります。"`
-	Render     RenderCommand     `cmd:"" help:"定義を読み込み、検証と正規化を行った結果を JSON で出力します。registryPassword と secret=true の環境変数の値は出力に含めません。API には接続しません。"`
-	Status     StatusCommand     `cmd:"" help:"アプリケーションの状態を表示します。アプリケーションの ID、名前、アクティブバージョン、DesiredCount と、アクティブバージョンの内容 (イメージ、CPU、メモリ、スケーリング方式、アクティブノード数) を表示します。registryPassword は表示しません。"`
-	Versions   VersionsCommand   `cmd:"" help:"アプリケーションのバージョンの一覧を表示します。バージョン番号、イメージ、アクティブノード数、アクティブかどうか、作成日時 (UTC) を表示します。"`
-	Containers ContainersCommand `cmd:"" help:"コンテナの配置を表示します。ノードごとのコンテナの状態を表示します。"`
-	Rollback   RollbackCommand   `cmd:"" help:"既存のバージョンを有効化して、有効なバージョンを切り替えます。新しいバージョンは作成しません。--target でバージョン番号を指定できます。省略した場合、活性ならアクティブバージョンより前のバージョンのうち最大のものを、非活性なら最新のバージョンを切り替え先にします。実行前に現在の状態を表示して確認します (--force で省略)。"`
-	Deactivate DeactivateCommand `cmd:"" help:"アプリケーションのアクティブバージョンを解除して停止します。アプリケーションとバージョンは残ります。実行前に現在の状態を表示して確認します (--force で省略)。"`
-	Delete     DeleteCommand     `cmd:"" help:"アプリケーションを削除します。アクティブバージョンがあれば解除して停止を待ってから削除します。実行前に現在の状態を表示して確認します (--force で省略)。"`
+	Init                   InitCommand                   `cmd:"" help:"デプロイ済みのアプリケーションから定義ファイルを生成します。アクティブバージョンがあればその内容から、なければ最新のバージョンから定義を復元します。バージョンが 1 つもない場合は識別子だけの定義を生成します。registryPassword と secret=true の環境変数の値は API から取得できないため、生成される定義には含まれません。同名のファイルが既に存在する場合は上書きせずにエラーになります。"`
+	Deploy                 DeployCommand                 `cmd:"" help:"定義ファイルの内容をデプロイします。クラスタとアプリケーションを検索し、見つからなければアプリケーションを作成して、定義から新しいバージョンを作成して有効化します。registryPassword は定義に値があれば新しく登録し (registryPasswordAction: new)、値がなくアクティブバージョンがあれば維持し (keep)、初回デプロイで値がなければ削除します (remove)。有効化後、要求されたコンテナ数と同じ数のコンテナが running になるまで待ちます (--no-wait で省略)。トレースが有効な場合は実行しません。"`
+	Diff                   DiffCommand                   `cmd:"" help:"ローカルの定義とデプロイ済みの現状を比較し、unified diff 形式で標準出力へ出力します。現状はアクティブバージョンの内容です。アプリケーションが存在しないか非活性の場合は、識別子だけの定義を現状とします。registryPassword と secret=true の環境変数の値、registryPasswordAction は応答で取得できないため比較から除外し、その旨を標準エラー出力に示します。差分がなければ標準出力には何も出力しません。このコマンドは --query には対応せず、指定した場合はエラーになります。"`
+	Render                 RenderCommand                 `cmd:"" help:"定義を読み込み、検証と正規化を行った結果を JSON で出力します。registryPassword と secret=true の環境変数の値は出力に含めません。API には接続しません。"`
+	Status                 StatusCommand                 `cmd:"" help:"アプリケーションの状態を表示します。アプリケーションの ID、名前、アクティブバージョン、DesiredCount と、アクティブバージョンの内容 (イメージ、CPU、メモリ、スケーリング方式、アクティブノード数) を表示します。registryPassword は表示しません。"`
+	Versions               VersionsCommand               `cmd:"" help:"アプリケーションのバージョンの一覧を表示します。バージョン番号、イメージ、アクティブノード数、アクティブかどうか、作成日時 (UTC) を表示します。"`
+	Containers             ContainersCommand             `cmd:"" help:"コンテナの配置を表示します。ノードごとのコンテナの状態を表示します。"`
+	Rollback               RollbackCommand               `cmd:"" help:"既存のバージョンを有効化して、有効なバージョンを切り替えます。新しいバージョンは作成しません。--target でバージョン番号を指定できます。省略した場合、活性ならアクティブバージョンより前のバージョンのうち最大のものを、非活性なら最新のバージョンを切り替え先にします。実行前に現在の状態を表示して確認します (--force で省略)。"`
+	Deactivate             DeactivateCommand             `cmd:"" help:"アプリケーションのアクティブバージョンを解除して停止します。アプリケーションとバージョンは残ります。実行前に現在の状態を表示して確認します (--force で省略)。"`
+	Delete                 DeleteCommand                 `cmd:"" help:"アプリケーションを削除します。アクティブバージョンがあれば解除して停止を待ってから削除します。実行前に現在の状態を表示して確認します (--force で省略)。"`
+	CreateAutoScalingGroup CreateAutoScalingGroupCommand `cmd:"" name:"create-auto-scaling-group" help:"クラスタにオートスケーリンググループを作成し、ワーカノードが healthy になるまで待ちます。ネットワークインターフェースは共有セグメントに接続する既定の設定を使います。"`
+	DeleteAutoScalingGroup DeleteAutoScalingGroupCommand `cmd:"" name:"delete-auto-scaling-group" help:"クラスタのオートスケーリンググループを削除します。削除 API の呼び出しと削除後の不在確認を行い、削除 API 呼び出しから実際に削除されるまでの待機は --no-wait で省略できます。実行前に確認を求めます (--force で省略)。"`
+	DeleteCluster          DeleteClusterCommand          `cmd:"" name:"delete-cluster" help:"クラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループなど) が残っていれば列挙して中断します。削除 API の呼び出しと削除後の不在確認を行い、削除 API 呼び出しから実際に削除されるまでの待機は --no-wait で省略できます。実行前に確認を求めます (--force で省略)。"`
 }
 
 // NewCommands は runtime と factory を各コマンドへ一括注入します。
 // deploy は秘密情報を扱うため、トレース設定を検査する専用の factory を受け取ります。
 func NewCommands(runtime Runtime, factory ServiceFactory, deployFactory DeployServiceFactory) Commands {
 	return Commands{
-		Init:       InitCommand{factory: factory, runtime: runtime},
-		Deploy:     DeployCommand{factory: deployFactory, runtime: runtime},
-		Diff:       DiffCommand{factory: factory, runtime: runtime},
-		Render:     RenderCommand{runtime: runtime},
-		Status:     StatusCommand{factory: factory, runtime: runtime},
-		Versions:   VersionsCommand{factory: factory, runtime: runtime},
-		Containers: ContainersCommand{factory: factory, runtime: runtime},
-		Rollback:   RollbackCommand{factory: factory, runtime: runtime},
-		Deactivate: DeactivateCommand{factory: factory, runtime: runtime},
-		Delete:     DeleteCommand{factory: factory, runtime: runtime},
+		Init:                   InitCommand{factory: factory, runtime: runtime},
+		Deploy:                 DeployCommand{factory: deployFactory, runtime: runtime},
+		Diff:                   DiffCommand{factory: factory, runtime: runtime},
+		Render:                 RenderCommand{runtime: runtime},
+		Status:                 StatusCommand{factory: factory, runtime: runtime},
+		Versions:               VersionsCommand{factory: factory, runtime: runtime},
+		Containers:             ContainersCommand{factory: factory, runtime: runtime},
+		Rollback:               RollbackCommand{factory: factory, runtime: runtime},
+		Deactivate:             DeactivateCommand{factory: factory, runtime: runtime},
+		Delete:                 DeleteCommand{factory: factory, runtime: runtime},
+		CreateAutoScalingGroup: CreateAutoScalingGroupCommand{factory: factory, runtime: runtime},
+		DeleteAutoScalingGroup: DeleteAutoScalingGroupCommand{factory: factory, runtime: runtime},
+		DeleteCluster:          DeleteClusterCommand{factory: factory, runtime: runtime},
 	}
 }
 
@@ -508,6 +515,168 @@ func (c *DeleteCommand) Run(kongCtx *kong.Context) error {
 		Timeout: c.WaitTimeout,
 	})
 	return err
+}
+
+// CreateAutoScalingGroupCommand はクラスタにオートスケーリンググループを作成します。
+type CreateAutoScalingGroupCommand struct {
+	Cluster                string        `arg:"" name:"cluster" help:"クラスタの名前。"`
+	Name                   string        `arg:"" name:"name" help:"オートスケーリンググループの名前。クラスタ内で一意である必要があります。"`
+	Zone                   string        `name:"zone" required:"" help:"オートスケーリンググループのゾーン。"`
+	WorkerServiceClassPath string        `name:"worker-service-class-path" required:"" help:"ワーカノードのサービスクラスパス。"`
+	NameServers            []string      `name:"name-servers" required:"" sep:"," help:"ネームサーバーの IPv4 アドレス。カンマ区切りで 1 ～ 3 個指定します。"`
+	MinNodes               int           `name:"min-nodes" required:"" placeholder:"N" help:"最小ノード数。"`
+	MaxNodes               int           `name:"max-nodes" required:"" placeholder:"N" help:"最大ノード数。"`
+	NoWait                 bool          `name:"no-wait" help:"作成後のワーカノード healthy 待ちを省略します。"`
+	WaitTimeout            time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。作成自体は完了している場合があります。未指定のときは 5 分です。"`
+	factory                ServiceFactory
+	runtime                Runtime
+}
+
+func (c *CreateAutoScalingGroupCommand) Run(kongCtx *kong.Context) error {
+	if err := c.runtime.validateOutput(kongCtx); err != nil {
+		return err
+	}
+	minNodes, maxNodes, err := nodeCountFlags(c.MinNodes, c.MaxNodes)
+	if err != nil {
+		return err
+	}
+	nameServers, err := parseNameServers(c.NameServers)
+	if err != nil {
+		return err
+	}
+	svc, err := newService(c.factory)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := commandContext()
+	defer cancel()
+	result, err := svc.CreateAutoScalingGroup(ctx, c.Cluster, c.Name, c.Zone, c.WorkerServiceClassPath, nameServers, minNodes, maxNodes, &apprundedicatedservice.CreateAutoScalingGroupOptions{
+		NoWait:  c.NoWait,
+		Timeout: c.WaitTimeout,
+	})
+	if err != nil {
+		return err
+	}
+	return c.runtime.writeOutput(kongCtx, result)
+}
+
+// DeleteAutoScalingGroupCommand はクラスタのオートスケーリンググループを削除します。
+type DeleteAutoScalingGroupCommand struct {
+	Cluster     string        `arg:"" name:"cluster" help:"クラスタの名前。"`
+	Name        string        `arg:"" name:"name" help:"オートスケーリンググループの名前。"`
+	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合は必須です。"`
+	NoWait      bool          `name:"no-wait" help:"削除 API 呼び出し後の削除完了待ちを省略します。削除 API の呼び出しと削除後の不在確認は行います。"`
+	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。削除自体は完了している場合があります。未指定のときは 5 分です。"`
+	factory     ServiceFactory
+	runtime     Runtime
+}
+
+func (c *DeleteAutoScalingGroupCommand) Run(kongCtx *kong.Context) error {
+	if err := c.runtime.rejectQuery(kongCtx); err != nil {
+		return err
+	}
+	svc, err := newService(c.factory)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := commandContext()
+	defer cancel()
+	if err := confirmResourceDeletion(kongCtx, c.runtime, c.Cluster, "オートスケーリンググループ", c.Name, c.Force); err != nil {
+		return err
+	}
+	_, err = svc.DeleteAutoScalingGroup(ctx, c.Cluster, c.Name, &apprundedicatedservice.DeleteAutoScalingGroupOptions{
+		NoWait:  c.NoWait,
+		Timeout: c.WaitTimeout,
+	})
+	return err
+}
+
+// DeleteClusterCommand はクラスタを削除します。
+type DeleteClusterCommand struct {
+	Cluster     string        `arg:"" name:"cluster" help:"クラスタの名前。"`
+	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合は必須です。"`
+	NoWait      bool          `name:"no-wait" help:"削除 API 呼び出し後の削除完了待ちを省略します。依存確認、削除 API の呼び出し、削除後の不在確認は行います。"`
+	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。削除自体は完了している場合があります。未指定のときは 5 分です。"`
+	factory     ServiceFactory
+	runtime     Runtime
+}
+
+func (c *DeleteClusterCommand) Run(kongCtx *kong.Context) error {
+	if err := c.runtime.rejectQuery(kongCtx); err != nil {
+		return err
+	}
+	svc, err := newService(c.factory)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := commandContext()
+	defer cancel()
+	if err := confirmResourceDeletion(kongCtx, c.runtime, c.Cluster, "", "", c.Force); err != nil {
+		return err
+	}
+	_, err = svc.DeleteCluster(ctx, c.Cluster, &apprundedicatedservice.DeleteClusterOptions{
+		NoWait:  c.NoWait,
+		Timeout: c.WaitTimeout,
+	})
+	return err
+}
+
+// parseNameServers は --name-servers の値を検証して v1.Ipv4 のスライスに変換します。
+func parseNameServers(values []string) ([]v1.Ipv4, error) {
+	if len(values) == 0 {
+		return nil, fmt.Errorf("--name-servers には 1 ～ 3 個の IPv4 アドレスを指定してください")
+	}
+	if len(values) > 3 {
+		return nil, fmt.Errorf("--name-servers には 3 個以下の IPv4 アドレスを指定してください")
+	}
+	servers := make([]v1.Ipv4, 0, len(values))
+	for _, v := range values {
+		ip := net.ParseIP(v)
+		if ip == nil || ip.To4() == nil {
+			return nil, fmt.Errorf("--name-servers に IPv4 アドレスではない値が含まれています: %s", v)
+		}
+		servers = append(servers, v1.Ipv4(v))
+	}
+	return servers, nil
+}
+
+// nodeCountFlags は --min-nodes と --max-nodes の値を検証して int32 に変換します。
+func nodeCountFlags(minNodes, maxNodes int) (int32, int32, error) {
+	if minNodes < 1 || minNodes > math.MaxInt32 {
+		return 0, 0, fmt.Errorf("--min-nodes には 1 以上 %d 以下の整数を指定してください", math.MaxInt32)
+	}
+	if maxNodes < 1 || maxNodes > math.MaxInt32 {
+		return 0, 0, fmt.Errorf("--max-nodes には 1 以上 %d 以下の整数を指定してください", math.MaxInt32)
+	}
+	if maxNodes < minNodes {
+		return 0, 0, fmt.Errorf("--max-nodes は --min-nodes 以上である必要があります")
+	}
+	return int32(minNodes), int32(maxNodes), nil
+}
+
+// confirmResourceDeletion は定義を持たないリソースの削除前に確認プロンプトを出します。
+// force が true の場合は表示と確認を行わずに続行します。標準入力が端末でない場合は、
+// 確認への応答を読み込めないため --force を必須にします。
+func confirmResourceDeletion(kongCtx *kong.Context, runtime Runtime, cluster, kind, name string, force bool) error {
+	if force {
+		return nil
+	}
+	if name == "" {
+		_, _ = fmt.Fprintf(kongCtx.Stderr, "対象: クラスタ %s\n", cluster)
+	} else {
+		_, _ = fmt.Fprintf(kongCtx.Stderr, "対象: クラスタ %s の %s %s\n", cluster, kind, name)
+	}
+	if !runtime.isTerminal() {
+		return errors.New("確認プロンプトを利用できないため --force を指定してください。標準入力が端末でない場合は確認への応答を読み込めません")
+	}
+	confirmed, err := readConfirm(runtime.stdin(), kongCtx.Stderr)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		return errAborted
+	}
+	return nil
 }
 
 // confirmOperation は変更系操作の実行前に、対象の現在の状態を表示して確認します。

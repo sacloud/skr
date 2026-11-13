@@ -34,7 +34,7 @@ func TestRunAppRunDedicatedHighLevelHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"apprun-dedicated", "--help"},
-			want: []string{"init", "deploy", "diff", "render", "status", "versions", "containers", "rollback", "deactivate", "delete", "--app"},
+			want: []string{"init", "deploy", "diff", "render", "status", "versions", "containers", "rollback", "deactivate", "delete", "create-auto-scaling-group", "delete-auto-scaling-group", "delete-cluster", "--app"},
 		},
 		{
 			args: []string{"apprun-dedicated", "deploy", "--help"},
@@ -54,6 +54,18 @@ func TestRunAppRunDedicatedHighLevelHelp(t *testing.T) {
 		},
 		{
 			args: []string{"apprun-dedicated", "delete", "--help"},
+			want: []string{"--force", "--no-wait", "--wait-timeout"},
+		},
+		{
+			args: []string{"apprun-dedicated", "create-auto-scaling-group", "--help"},
+			want: []string{"--zone", "--worker-service-class-path", "--name-servers", "--min-nodes", "--max-nodes", "--no-wait", "--wait-timeout"},
+		},
+		{
+			args: []string{"apprun-dedicated", "delete-auto-scaling-group", "--help"},
+			want: []string{"--force", "--no-wait", "--wait-timeout"},
+		},
+		{
+			args: []string{"apprun-dedicated", "delete-cluster", "--help"},
 			want: []string{"--force", "--no-wait", "--wait-timeout"},
 		},
 	} {
@@ -327,9 +339,122 @@ func TestRunAppRunDedicatedInputErrors(t *testing.T) {
 			{"apprun-dedicated", "diff", "--app", definitionPath, "--query", ".name"},
 			{"apprun-dedicated", "init", "c1", "app1", "--query", ".name"},
 			{"apprun-dedicated", "delete", "--app", definitionPath, "--query", ".name"},
+			{"apprun-dedicated", "delete-auto-scaling-group", "c1", "asg1", "--query", ".name"},
+			{"apprun-dedicated", "delete-cluster", "c1", "--query", ".name"},
 		} {
 			message := runError(args...)
 			require.Contains(t, message, "--query には対応しません")
 		}
+	})
+}
+
+func TestRunAppRunDedicatedInfrastructureCommandsWithSakumock(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	server := apprunmock.NewTestServer(apprunmock.Config{})
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", server.TestURL())
+
+	runCommand := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		return stdout.Bytes()
+	}
+
+	// 準備として、低レベルコマンドでクラスタを作成します。
+	var createdCluster v1.ClusterIdentifier
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "create-cluster", "--request",
+		`{"name":"infra-cluster","servicePrincipalID":"sp-000000000","ports":[{"port":443,"protocol":"https"}]}`), &createdCluster))
+	// create-auto-scaling-group でオートスケーリンググループを作成します。
+	var createdGroup struct {
+		Cluster                string `json:"cluster"`
+		Name                   string `json:"name"`
+		AutoScalingGroupID     string `json:"autoScalingGroupID"`
+		Zone                   string `json:"zone"`
+		WorkerServiceClassPath string `json:"workerServiceClassPath"`
+		MinNodes               int32  `json:"minNodes"`
+		MaxNodes               int32  `json:"maxNodes"`
+	}
+	data := runCommand("apprun-dedicated", "create-auto-scaling-group", "infra-cluster", "infra-asg",
+		"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		"--name-servers", "210.188.224.10",
+		"--min-nodes", "1", "--max-nodes", "1", "--no-wait")
+	require.NoError(t, json.Unmarshal(data, &createdGroup))
+	require.Equal(t, "infra-cluster", createdGroup.Cluster)
+	require.Equal(t, "infra-asg", createdGroup.Name)
+	require.NotEmpty(t, createdGroup.AutoScalingGroupID)
+	require.Equal(t, "is1a", createdGroup.Zone)
+	require.Equal(t, "cloud/apprun/dedicated/worker/1vcpu_2gb", createdGroup.WorkerServiceClassPath)
+	require.EqualValues(t, 1, createdGroup.MinNodes)
+	require.EqualValues(t, 1, createdGroup.MaxNodes)
+
+	// 同名のグループを作成しようとすると、既存エラーになります。
+	var stdoutDup, stderrDup bytes.Buffer
+	require.NotEqual(t, 0, run([]string{"apprun-dedicated", "create-auto-scaling-group", "infra-cluster", "infra-asg",
+		"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		"--name-servers", "210.188.224.10",
+		"--min-nodes", "1", "--max-nodes", "1", "--no-wait"}, &stdoutDup, &stderrDup))
+	require.Contains(t, stderrDup.String(), "既に存在します")
+
+	// delete-auto-scaling-group でグループを削除します。出力はありません。
+	var stdoutDeleteASG, stderrDeleteASG bytes.Buffer
+	require.Equal(t, 0, run([]string{"apprun-dedicated", "delete-auto-scaling-group", "infra-cluster", "infra-asg", "--force", "--no-wait"},
+		&stdoutDeleteASG, &stderrDeleteASG))
+	require.Empty(t, stdoutDeleteASG.String(), "delete-auto-scaling-group output should be empty")
+
+	// 削除済みのグループを再度削除しようとすると、見つからないエラーになります。
+	var stdoutMissingASG, stderrMissingASG bytes.Buffer
+	require.NotEqual(t, 0, run([]string{"apprun-dedicated", "delete-auto-scaling-group", "infra-cluster", "infra-asg", "--force", "--no-wait"},
+		&stdoutMissingASG, &stderrMissingASG))
+	require.Contains(t, stderrMissingASG.String(), "見つかりません")
+
+	// delete-cluster でクラスタを削除します。アプリケーションなどの依存リソースは残っていません。
+	var stdoutDeleteCluster, stderrDeleteCluster bytes.Buffer
+	require.Equal(t, 0, run([]string{"apprun-dedicated", "delete-cluster", "infra-cluster", "--force", "--no-wait"},
+		&stdoutDeleteCluster, &stderrDeleteCluster))
+	require.Empty(t, stdoutDeleteCluster.String(), "delete-cluster output should be empty")
+
+	// 削除済みのクラスタを再度削除しようとすると、見つからないエラーになります。
+	var stdoutMissingCluster, stderrMissingCluster bytes.Buffer
+	require.NotEqual(t, 0, run([]string{"apprun-dedicated", "delete-cluster", "infra-cluster", "--force", "--no-wait"},
+		&stdoutMissingCluster, &stderrMissingCluster))
+	require.Contains(t, stderrMissingCluster.String(), "見つかりません")
+
+	violations := server.SpecViolations()
+	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)
+}
+
+func TestRunAppRunDedicatedInfrastructureInputErrors(t *testing.T) {
+	runError := func(args ...string) string {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		require.NotEqual(t, 0, run(args, &stdout, &stderr), "run(%v) should fail", args)
+		return stderr.String()
+	}
+
+	t.Run("--min-nodes は 1 以上です", func(t *testing.T) {
+		message := runError("apprun-dedicated", "create-auto-scaling-group", "c1", "asg1",
+			"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
+			"--name-servers", "210.188.224.10",
+			"--min-nodes", "0", "--max-nodes", "1")
+		require.Contains(t, message, "--min-nodes")
+	})
+
+	t.Run("--max-nodes は --min-nodes 以上です", func(t *testing.T) {
+		message := runError("apprun-dedicated", "create-auto-scaling-group", "c1", "asg1",
+			"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
+			"--name-servers", "210.188.224.10",
+			"--min-nodes", "2", "--max-nodes", "1")
+		require.Contains(t, message, "--max-nodes")
+	})
+
+	t.Run("--name-servers は IPv4 アドレスです", func(t *testing.T) {
+		message := runError("apprun-dedicated", "create-auto-scaling-group", "c1", "asg1",
+			"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
+			"--name-servers", "not-an-ip",
+			"--min-nodes", "1", "--max-nodes", "1")
+		require.Contains(t, message, "IPv4")
 	})
 }

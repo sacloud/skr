@@ -54,8 +54,11 @@ apprun-dedicated-api list-worker-nodes deferred #59 クラスタ作成を前提�
 apprun-dedicated-api read-worker-node deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated-api update-worker-node-draining deferred #59 クラスタ作成を前提とし実行コストが大きいため
 apprun-dedicated containers live
+apprun-dedicated create-auto-scaling-group live
 apprun-dedicated deactivate live
 apprun-dedicated delete live
+apprun-dedicated delete-auto-scaling-group live
+apprun-dedicated delete-cluster live
 apprun-dedicated deploy live
 apprun-dedicated diff live
 apprun-dedicated init live
