@@ -426,9 +426,10 @@ func TestRunAppRunDedicatedInfrastructureCommandsWithSakumock(t *testing.T) {
 	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)
 }
 
-// TestRunAppRunDedicatedWaitFlagForms は --no-wait の否定形への値指定が
-// 既定 (待機あり) と同じ扱いで機能することを確認します。negatable な単一
-// フラグは --wait / --no-wait / --no-wait=false のすべてを受け付けます。
+// TestRunAppRunDedicatedWaitFlagForms は negatable な単一フラグの --wait、
+// --no-wait、--no-wait=false の各形式が同じ待機オプションとして機能することを
+// 確認します。sakumock の削除は即座に完了するため待機の有無を実行結果からは
+// 区別できませんが、各形式が受け付けられ、既定 (待機あり) の経路を通ることを検証します。
 func TestRunAppRunDedicatedWaitFlagForms(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
@@ -453,17 +454,33 @@ func TestRunAppRunDedicatedWaitFlagForms(t *testing.T) {
 	var createdGroup struct {
 		AutoScalingGroupID string `json:"autoScalingGroupID"`
 	}
-	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated", "create-auto-scaling-group", "wait-flag-cluster", "asg-wait",
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated", "create-auto-scaling-group", "wait-flag-cluster", "asg-nowait",
 		"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
 		"--name-servers", "210.188.224.10",
 		"--min-nodes", "1", "--max-nodes", "1", "--no-wait"), &createdGroup))
 	require.NotEmpty(t, createdGroup.AutoScalingGroupID, "create-auto-scaling-group should return the group ID")
 
-	// --no-wait=false は --wait (既定) と同じ扱いで、削除後の不在確認まで行います。
-	var stdout, stderr bytes.Buffer
-	require.Equal(t, 0, run([]string{"apprun-dedicated", "delete-auto-scaling-group", "wait-flag-cluster", "asg-wait", "--force", "--no-wait=false"},
-		&stdout, &stderr), "stderr: %s", stderr.String())
-	require.Empty(t, stdout.String(), "delete-auto-scaling-group output should be empty")
+	// --wait を陽に指定して削除します (既定と同じ待機ありの経路を通ります)。
+	var stdoutWait, stderrWait bytes.Buffer
+	require.Equal(t, 0, run([]string{"apprun-dedicated", "delete-auto-scaling-group", "wait-flag-cluster", "asg-nowait", "--force", "--wait"},
+		&stdoutWait, &stderrWait), "stderr: %s", stderrWait.String())
+	require.Empty(t, stdoutWait.String(), "delete-auto-scaling-group output should be empty")
+
+	// 2 つ目のグループを --no-wait で作成し、--no-wait=false で削除します。
+	// --no-wait=false は --wait (既定) と同じ扱いです。
+	var createdGroup2 struct {
+		AutoScalingGroupID string `json:"autoScalingGroupID"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated", "create-auto-scaling-group", "wait-flag-cluster", "asg-nowait-false",
+		"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
+		"--name-servers", "210.188.224.10",
+		"--min-nodes", "1", "--max-nodes", "1", "--no-wait"), &createdGroup2))
+	require.NotEmpty(t, createdGroup2.AutoScalingGroupID)
+
+	var stdoutFalse, stderrFalse bytes.Buffer
+	require.Equal(t, 0, run([]string{"apprun-dedicated", "delete-auto-scaling-group", "wait-flag-cluster", "asg-nowait-false", "--force", "--no-wait=false"},
+		&stdoutFalse, &stderrFalse), "stderr: %s", stderrFalse.String())
+	require.Empty(t, stdoutFalse.String(), "delete-auto-scaling-group output should be empty")
 
 	violations := server.SpecViolations()
 	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)

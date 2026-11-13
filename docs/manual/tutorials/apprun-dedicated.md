@@ -394,7 +394,7 @@ apprun-dedicated: Application.Read: API Error 404: code 404: {Status:404 Title:.
 
 ## Step 8: クラスタとオートスケーリンググループを削除する
 
-高レベルコマンド `delete-auto-scaling-group` でオートスケーリンググループを削除します。削除前に確認プロンプトが表示されるため、非対話環境では `--force` が必要です。削除 API の呼び出しと削除後の不在確認をし、削除完了までの非同期待機は `--no-wait` で省略できます。CLI は 404 以外のエラーを削除完了と扱わないため、何らかの問題があった場合は中断されます。
+高レベルコマンド `delete-auto-scaling-group` でオートスケーリンググループを削除します。削除前に確認プロンプトが表示されるため、非対話環境では `--force` が必要です。削除 API の呼び出しと削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、`--no-wait` を指定しても行われます。CLI は 404 以外のエラーを削除完了と扱わないため、何らかの問題があった場合は中断されます。
 
 ```console
 $ skr apprun-dedicated delete-auto-scaling-group "$CLUSTER_NAME" "$ASG_NAME" --force --no-wait

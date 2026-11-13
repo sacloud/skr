@@ -121,10 +121,11 @@ func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, group
 
 // DeleteAutoScalingGroupOptions は DeleteAutoScalingGroup の待機に関するオプションです。
 type DeleteAutoScalingGroupOptions struct {
-	// NoWait が true の場合、削除 API 呼び出し後の削除完了待ちを省略します。
-	// 削除 API の呼び出しと削除後の不在確認は常に行います。
+	// NoWait は削除 API 呼び出し後の待機の扱いです。削除は API 側で非同期に完了するため、
+	// 削除後の不在確認 (対象が見つからなくなるまでのポーリング) が削除完了の確認を兼ね、
+	// NoWait にかかわらず常に行います。
 	NoWait bool
-	// Timeout は削除完了待ちのタイムアウトです。零値の場合は DefaultWaitTimeout を使います。
+	// Timeout は削除後の不在確認のタイムアウトです。零値の場合は DefaultWaitTimeout を使います。
 	Timeout time.Duration
 }
 
@@ -177,10 +178,11 @@ func (s *Service) DeleteAutoScalingGroup(ctx context.Context, clusterName, group
 
 // DeleteClusterOptions は DeleteCluster の待機に関するオプションです。
 type DeleteClusterOptions struct {
-	// NoWait が true の場合、削除 API 呼び出し後の削除完了待ちを省略します。
-	// 依存確認、削除 API の呼び出し、削除後の不在確認は常に行います。
+	// NoWait は削除 API 呼び出し後の待機の扱いです。依存確認、削除 API の呼び出し、
+	// 削除後の不在確認 (対象が見つからなくなるまでのポーリング) は NoWait にかかわらず
+	// 常に行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ねます。
 	NoWait bool
-	// Timeout は削除完了待ちのタイムアウトです。零値の場合は DefaultWaitTimeout を使います。
+	// Timeout は削除後の不在確認のタイムアウトです。零値の場合は DefaultWaitTimeout を使います。
 	Timeout time.Duration
 }
 

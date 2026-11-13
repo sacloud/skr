@@ -145,8 +145,8 @@ type Commands struct {
 	Deactivate             DeactivateCommand             `cmd:"" help:"アプリケーションのアクティブバージョンを解除して停止します。アプリケーションとバージョンは残ります。実行前に現在の状態を表示して確認します (--force で省略)。"`
 	Delete                 DeleteCommand                 `cmd:"" help:"アプリケーションを削除します。アクティブバージョンがあれば解除して停止を待ってから削除します。実行前に現在の状態を表示して確認します (--force で省略)。"`
 	CreateAutoScalingGroup CreateAutoScalingGroupCommand `cmd:"" name:"create-auto-scaling-group" help:"クラスタにオートスケーリンググループを作成し、ワーカノードが healthy になるまで待ちます。ネットワークインターフェースは共有セグメントに接続する既定の設定を使います。"`
-	DeleteAutoScalingGroup DeleteAutoScalingGroupCommand `cmd:"" name:"delete-auto-scaling-group" help:"クラスタのオートスケーリンググループを削除します。削除 API の呼び出しと削除後の不在確認を行い、削除 API 呼び出しから実際に削除されるまでの待機は --no-wait で省略できます。実行前に確認を求めます (--force で省略)。"`
-	DeleteCluster          DeleteClusterCommand          `cmd:"" name:"delete-cluster" help:"クラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループなど) が残っていれば列挙して中断します。削除 API の呼び出しと削除後の不在確認を行い、削除 API 呼び出しから実際に削除されるまでの待機は --no-wait で省略できます。実行前に確認を求めます (--force で省略)。"`
+	DeleteAutoScalingGroup DeleteAutoScalingGroupCommand `cmd:"" name:"delete-auto-scaling-group" help:"クラスタのオートスケーリンググループを削除します。削除 API の呼び出しと削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、--no-wait を指定しても行われます。実行前に確認を求めます (--force で省略)。"`
+	DeleteCluster          DeleteClusterCommand          `cmd:"" name:"delete-cluster" help:"クラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループなど) が残っていれば列挙して中断します。削除 API の呼び出しと削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、--no-wait を指定しても行われます。実行前に確認を求めます (--force で省略)。"`
 }
 
 // NewCommands は runtime と factory を各コマンドへ一括注入します。
@@ -224,7 +224,7 @@ func (c *InitCommand) Run(kongCtx *kong.Context) error {
 type DeployCommand struct {
 	App string `name:"app" required:"" placeholder:"FILE|-" help:"定義ファイルのパス。- で標準入力から読み込みます。skr apprun-dedicated init で生成したファイルを指定できます。"`
 	// Wait は negatable な単一フラグで --wait / --no-wait の両方を受け付ける。
-	// 環境変数など値で指定するときは WAIT=true/false となり、名前と意味が一致する。
+	// 値付き指定 (--wait=true / --no-wait=false) のときも名前と意味が一致する。
 	Wait        bool          `name:"wait" negatable:"" default:"true" help:"有効化後の反映待ちを行います。"`
 	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     DeployServiceFactory
@@ -567,8 +567,8 @@ type DeleteAutoScalingGroupCommand struct {
 	Cluster     string        `arg:"" name:"cluster" help:"クラスタの名前。"`
 	Name        string        `arg:"" name:"name" help:"オートスケーリンググループの名前。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合は必須です。"`
-	Wait        bool          `name:"wait" negatable:"" default:"true" help:"削除 API 呼び出し後の削除完了待ちを行います。削除 API の呼び出しと削除後の不在確認は行います。"`
-	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。削除自体は完了している場合があります。未指定のときは 5 分です。"`
+	Wait        bool          `name:"wait" negatable:"" default:"true" help:"削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、--no-wait を指定しても行われます。"`
+	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"不在確認のタイムアウト。確認中の API 呼び出しもこの期限で打ち切ります。削除自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
 }
@@ -597,8 +597,8 @@ func (c *DeleteAutoScalingGroupCommand) Run(kongCtx *kong.Context) error {
 type DeleteClusterCommand struct {
 	Cluster     string        `arg:"" name:"cluster" help:"クラスタの名前。"`
 	Force       bool          `name:"force" help:"確認プロンプトを省略します。標準入力が端末でない場合は必須です。"`
-	Wait        bool          `name:"wait" negatable:"" default:"true" help:"削除 API 呼び出し後の削除完了待ちを行います。依存確認、削除 API の呼び出し、削除後の不在確認は行います。"`
-	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。削除自体は完了している場合があります。未指定のときは 5 分です。"`
+	Wait        bool          `name:"wait" negatable:"" default:"true" help:"依存確認、削除 API の呼び出し、削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、--no-wait を指定しても行われます。"`
+	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"不在確認のタイムアウト。確認中の API 呼び出しもこの期限で打ち切ります。削除自体は完了している場合があります。未指定のときは 5 分です。"`
 	factory     ServiceFactory
 	runtime     Runtime
 }
