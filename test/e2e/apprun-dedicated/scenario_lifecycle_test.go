@@ -80,6 +80,16 @@ const (
 	// deleteAbsentLimit は削除後の不在確認の待機期限です。削除は非同期に
 	// 完了するため、不在になるまで再確認します。
 	deleteAbsentLimit = 10 * time.Minute
+	// deleteWaitTimeout は高レベルの削除コマンドに渡す削除後の不在確認の期限です。
+	// CLI の削除は不在確認が削除完了の確認を兼ねるため、不在確認の既定の期限
+	// (5 分) では削除の完了に間に合わない場合があります。ライブ E2E の実測では
+	// ワーカノード 1 台の削除完了に 10 分弱かかったため、余裕を持たせた値を
+	// 使います。SDK での不在確認と同じ根拠です。
+	deleteWaitTimeout = 15 * time.Minute
+	// deleteCommandLimit は高レベルの削除コマンドの実行期限です。CLI 側の
+	// 待機タイムアウト (deleteWaitTimeout) より長くし、CLI 自身のタイムアウト
+	// 処理が完了するのを待てるようにします。
+	deleteCommandLimit = deleteWaitTimeout + 5*time.Minute
 )
 
 // deployResult は deploy と rollback の JSON 出力を解析するための項目です。
@@ -811,11 +821,11 @@ func requireAutoScalingGroupAbsent(t *testing.T, asgs *autoscalinggroup.AutoScal
 				"auto-scaling group %s should be reported as not found after deletion, got: %v", asgID, err)
 			return
 		}
-		t.Logf("auto-scaling group %s is still present (deleting=%t); waiting for deletion", asgID, detail.Deleting)
+		t.Logf("auto-scaling group %s is still present (deleting=%t); waiting for deletion", uuid.UUID(asgID).String(), detail.Deleting)
 
 		select {
 		case <-ctx.Done():
-			t.Errorf("auto-scaling group %s did not disappear within %s", asgID, deleteAbsentLimit)
+			t.Errorf("auto-scaling group %s did not disappear within %s", uuid.UUID(asgID).String(), deleteAbsentLimit)
 			return
 		case <-ticker.C:
 		}
@@ -866,7 +876,7 @@ func requireClusterAbsent(t *testing.T, clusters *cluster.ClusterOp, clusterID v
 
 		select {
 		case <-ctx.Done():
-			t.Errorf("cluster %s did not disappear within %s", clusterID, deleteAbsentLimit)
+			t.Errorf("cluster %s did not disappear within %s", uuid.UUID(clusterID).String(), deleteAbsentLimit)
 			return
 		case <-ticker.C:
 		}

@@ -97,14 +97,15 @@ func TestScenarioAppRunDedicatedInfrastructureLifecycle(t *testing.T) {
 	verifyCreatedAutoScalingGroup(t, asgs, asgID, asgName)
 	waitForHealthyWorkerNode(t, apprun_dedicated.NewWorkerNodeOp(sdkClient, clusterID, asgID))
 
-	// 高レベルコマンドでオートスケーリンググループを削除する。
-	h.CallWithTimeout(t, createCommandLimit, "オートスケーリンググループを削除する (高レベルコマンド)",
-		"apprun-dedicated", "delete-auto-scaling-group", clusterName, asgName, "--force", "--no-wait")
+	// 高レベルコマンドでオートスケーリンググループを削除する。不在確認が削除完了の
+	// 確認を兼ねるため、削除の完了 (非同期) に間に合うよう --wait-timeout を渡す。
+	h.CallWithTimeout(t, deleteCommandLimit, "オートスケーリンググループを削除する (高レベルコマンド)",
+		"apprun-dedicated", "delete-auto-scaling-group", clusterName, asgName, "--force", "--no-wait", "--wait-timeout", deleteWaitTimeout.String())
 	requireAutoScalingGroupAbsent(t, asgs, asgID)
 
 	// 高レベルコマンドでクラスタを削除する。依存リソースはこの時点で残っていない。
-	h.CallWithTimeout(t, createCommandLimit, "クラスタを削除する (高レベルコマンド)",
-		"apprun-dedicated", "delete-cluster", clusterName, "--force", "--no-wait")
+	h.CallWithTimeout(t, deleteCommandLimit, "クラスタを削除する (高レベルコマンド)",
+		"apprun-dedicated", "delete-cluster", clusterName, "--force", "--no-wait", "--wait-timeout", deleteWaitTimeout.String())
 
 	// 削除後の不在確認を SDK で行う。
 	requireClusterAbsent(t, clusters, clusterID)
