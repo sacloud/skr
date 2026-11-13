@@ -21,7 +21,7 @@ import (
 
 var (
 	// Version はアプリバージョンです。
-	Version = "0.2.0"
+	Version = "0.2.1"
 	// Revision は Git コミットの短縮ハッシュです。
 	Revision = "xxxxxx" // ビルド時に設定される
 )

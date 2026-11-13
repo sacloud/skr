@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.2.1](https://github.com/sacloud/skr/compare/v0.2.0...v0.2.1) - 2026-11-13
+
+### 🚀 Changes
+- ADR 0082, 0083: 高レベルコマンドの待機オプションと AppRun Dedicated ライフサイクルスケルトン by @tokuhirom in https://github.com/sacloud/skr/pull/258
+- apprun-dedicated: インフラライフサイクル操作をサービス層に追加 by @tokuhirom in https://github.com/sacloud/skr/pull/259
+- apprun-dedicated: インフラライフサイクル高レベルコマンドと E2E・マニュアルを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/263
+- apprun-dedicated: 待機オプションを negatable な --wait 単一フラグに変更 by @tokuhirom in https://github.com/sacloud/skr/pull/264
+- apprun-dedicated: ワーカノード待機条件を Status ベースに修正し E2E の後片付けを強化 by @tokuhirom in https://github.com/sacloud/skr/pull/265
+### 📦 Dependency Updates
+- go: bump golang.org/x/term from 0.47.0 to 0.48.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/261
+- go: bump github.com/sacloud/sacloud-sdk-go from 0.5.0 to 0.6.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/262
+
 ## [v0.2.0](https://github.com/sacloud/skr/compare/v0.1.0...v0.2.0) - 2026-11-12
 
 ### 🚀 Changes
