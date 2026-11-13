@@ -31,6 +31,7 @@ import (
 	"github.com/sacloud/skr/internal/gslbapi"
 	"github.com/sacloud/skr/internal/iamapi"
 	"github.com/sacloud/skr/internal/kmsapi"
+	"github.com/sacloud/skr/internal/localrouterapi"
 	"github.com/sacloud/skr/internal/networkingsuiteapi"
 	"github.com/sacloud/skr/internal/objectstorageapi"
 	"github.com/sacloud/skr/internal/proxylbapi"
@@ -50,6 +51,7 @@ type cli struct {
 	Config                    configCommand                      `cmd:"" help:"Manage configuration profiles."`
 	IaaSAPI                   iaasAPICommand                     `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
 	GSLBAPI                   gslbapi.Commands                   `cmd:"" name:"gslb-api" help:"さくらのクラウド GSLB を操作します。実サーバーへのヘルスチェックを行い、DNS 応答先を制御します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/gslb/index.html"`
+	LocalRouterAPI            localrouterapi.Commands            `cmd:"" name:"local-router-api" help:"さくらのクラウドのローカルルータを操作します。拠点間やゾーン間をまたぐ閉域網 (L3) ネットワークを構成し、スイッチ接続、インターフェース、スタティックルート、ピア接続を設定できます。ローカルルータはグローバルリソースで、ゾーンの指定は不要です。ピア設定の SecretKey など秘密情報を含むリクエストは保護したファイルまたは標準入力から読み込みます。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/network/localrouter.html"`
 	ProxyLBAPI                proxylbapi.Commands                `cmd:"" name:"proxylb-api" help:"さくらのクラウド エンハンスドロードバランサ (ProxyLB) を操作します。複数の配下サーバーへのロードバランス、HTTPS 対応、ソーリーサーバーなどを設定できます。エンハンスドロードバランサはグローバルリソースで、ゾーンの指定は不要です。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/enhanced-lb/index.html"`
 	EventbusAPI               eventbusapi.Commands               `cmd:"" name:"eventbus-api" help:"スケジュールまたはイベント検知をきっかけにジョブを実行する EventBus を操作します。CommonServiceItem 操作は --provider-class で種別 (eventbusprocessconfiguration、eventbusschedule、eventbustrigger) を指定します。実行先を eventbusprocessconfiguration で定義し、スケジュールまたはトリガーから参照します。認証には SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数を使用します。結果は JSON で出力します。--query で必要な項目を抽出できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
 	Eventbus                  eventbus.Commands                  `cmd:"" name:"eventbus" help:"EventBus の実行設定、スケジュール、トリガーを操作します。実行設定でジョブの宛先を定義し、スケジュール (開始日時からの繰り返し) またはトリガー (イベント検知) から実行します。宛先別の個別フラグで入力し、完全な JSON 入力が必要なときは eventbus-api を使ってください。実行設定の secret は --secret-file で指定した保護したファイルまたは標準入力から読み込みます。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。ジョブ実行はベストエフォート型で、厳密なリアルタイム性は保証されません。詳細: https://manual.sakura.ad.jp/cloud/appliance/eventbus/about.html"`
@@ -114,6 +116,7 @@ func newCLI() *cli {
 	result := &cli{}
 	result.initIaaSAPI()
 	result.initGSLBAPI()
+	result.initLocalRouterAPI()
 	result.initProxyLBAPI()
 	result.initEventbusAPI()
 	result.initEventbus()
