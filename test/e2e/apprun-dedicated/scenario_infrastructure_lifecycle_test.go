@@ -72,9 +72,10 @@ func TestScenarioAppRunDedicatedInfrastructureLifecycle(t *testing.T) {
 	// 高レベルコマンドでオートスケーリンググループを作成する。
 	asgs := apprun_dedicated.NewAutoScalingGroupOp(sdkClient, clusterID)
 
-	// 作成前に後片付けを登録する。作成コマンドがタイムアウトで打ち切られた場合も
-	// グループが残らないようにするため、ID が確定する前の後片付けはランダムサフィックス
-	// 付きの一意な名前で検索する。ID が確定した後は ID と名前を再照合して削除する。
+	// 作成前に同名のグループが存在しないことを SDK で確認する。この検証に成功した
+	// 場合だけ、作成がタイムアウトで打ち切られて ID が確定しなかった場合の後片付けを
+	// 一意な名前で行える。ID が確定した後の後片付けは ID と名前を再照合して削除する。
+	requireNoAutoScalingGroupNamed(t, asgs, asgName)
 	var asgID v1.AutoScalingGroupID
 	defer func() {
 		if asgID != (v1.AutoScalingGroupID{}) {

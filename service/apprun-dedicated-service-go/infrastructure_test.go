@@ -70,12 +70,13 @@ func TestCreateAutoScalingGroup(t *testing.T) {
 		f.addCluster(t, "c1")
 		s := newTestService(t, f)
 
+		var node *fakeWorkerNode
 		err := runWithTicksAndHook(t, s, func() error {
 			_, err := s.CreateAutoScalingGroup(t.Context(), "c1", "asg1", "is1a", "@cloudservice/worker/001", []v1.Ipv4{"210.188.224.10"}, 1, 3, nil)
 			return err
 		}, func() {
-			if len(f.workerNodes) == 0 {
-				f.addWorkerNode(t, "c1", "asg1", v1.WorkerNodeStatusUnhealthy)
+			if node == nil {
+				node = f.addWorkerNode(t, "c1", "asg1", v1.WorkerNodeStatusUnhealthy)
 			}
 		})
 		require.Error(t, err)

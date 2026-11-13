@@ -766,8 +766,9 @@ func cleanupAutoScalingGroup(t *testing.T, h *helper.Helper, asgs *autoscalinggr
 
 // cleanupAutoScalingGroupByName は ID が確定する前に作成が打ち切られた場合の後片付けとして、
 // ランダムサフィックス付きの一意な名前でオートスケーリンググループを検索して削除します。
-// 名前が一致するグループはこのテストの実行中に作成されたものだけなので、1 件だけ見つかった
-// 場合に限り削除します。0 件なら何もしません。複数見つかった場合は対象を特定できないため
+// 作成前に requireNoAutoScalingGroupNamed で同名不在を検証済みであるため、見つかった
+// グループはこのテストの実行中に作成されたものだけです。1 件だけ見つかった場合に限り
+// 削除します。0 件なら何もしません。複数見つかった場合は対象を特定できないため
 // 削除せずエラーにします。
 func cleanupAutoScalingGroupByName(t *testing.T, h *helper.Helper, asgs *autoscalinggroup.AutoScalingGroupOp, clusterID v1.ClusterID, asgName string) {
 	t.Helper()
@@ -799,6 +800,27 @@ func cleanupAutoScalingGroupByName(t *testing.T, h *helper.Helper, asgs *autosca
 		requireAutoScalingGroupAbsent(t, asgs, matches[0])
 	default:
 		t.Errorf("found %d auto-scaling groups named %q; refusing to delete", len(matches), asgName)
+	}
+}
+
+// requireNoAutoScalingGroupNamed は作成前に、同じ名前のオートスケーリンググループが
+// 存在しないことを SDK で確認します。この検証に成功した場合だけ、ID 未確定のまま
+// 打ち切られた作成の後片付けを名前で行えます。確認の実行は証跡に残らず、既存リソースを
+// 変更しません。
+func requireNoAutoScalingGroupNamed(t *testing.T, asgs *autoscalinggroup.AutoScalingGroupOp, name string) {
+	t.Helper()
+
+	var cursor *v1.AutoScalingGroupID
+	for {
+		list, next, err := asgs.List(t.Context(), listPageSize, cursor)
+		require.NoError(t, err, "list auto-scaling groups before create")
+		for _, g := range list {
+			require.NotEqual(t, name, g.Name, "auto-scaling group %q already exists; refusing to modify it", name)
+		}
+		if next == nil {
+			return
+		}
+		cursor = next
 	}
 }
 
