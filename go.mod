@@ -8,7 +8,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.20
-	github.com/sacloud/sacloud-sdk-go v0.5.0
+	github.com/sacloud/sacloud-sdk-go v0.6.0
 	github.com/sacloud/sakumock v0.14.0
 	github.com/sacloud/skr/service/apprun-dedicated-service-go v0.0.0-20261111101751-0fe301d8481e
 	github.com/sacloud/skr/service/eventbus-service-go v0.0.0-00010101000000-000000000000
