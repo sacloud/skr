@@ -47,6 +47,8 @@ type CreateAutoScalingGroupResult struct {
 	Zone string `json:"zone"`
 	// WorkerServiceClassPath はワーカサービスクラスのパスです。
 	WorkerServiceClassPath string `json:"workerServiceClassPath"`
+	// NameServers はネームサーバーの IPv4 アドレスです。
+	NameServers []v1.Ipv4 `json:"nameServers"`
 	// MinNodes は最小ノード数です。
 	MinNodes int32 `json:"minNodes"`
 	// MaxNodes は最大ノード数です。
@@ -105,6 +107,7 @@ func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, group
 		AutoScalingGroupID:     detail.AutoScalingGroupID,
 		Zone:                   detail.Zone,
 		WorkerServiceClassPath: detail.WorkerServiceClassPath,
+		NameServers:            detail.NameServers,
 		MinNodes:               detail.MinNodes,
 		MaxNodes:               detail.MaxNodes,
 	}
