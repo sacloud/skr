@@ -37,7 +37,8 @@
           "help": "任意: 前回の list 出力の prevPageToken。前ページを取得します。"
         }
       ],
-      "command_name": "automated-actions-list"
+      "command_name": "automated-actions-list",
+      "no_request_flag": true
     },
     {
       "name": "Read",

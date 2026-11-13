@@ -15,8 +15,10 @@
 package iamapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,8 +26,10 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/sacloud/sacloud-sdk-go/api/iam"
+	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/folder"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/group"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/organization"
+	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/project"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/projectapikey"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/user"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
@@ -495,6 +499,20 @@ func readTextInput(path, flag, subject string) (string, error) {
 	return value, nil
 }
 
+// decodeStrictRequest は未知のフィールドと末尾の余分なデータを拒否して JSON をデコードします。
+// json タグを持たない SDK params 型への明示変換で使います (ADR 0085)。
+func decodeStrictRequest(data []byte, destination any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(destination); err != nil {
+		return fmt.Errorf("decode request JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return fmt.Errorf("decode request JSON: unexpected data after JSON object")
+	}
+	return nil
+}
+
 // DecodeRequest は --request の JSON をデコードし、@path.json 形式もサポートします。
 func DecodeRequest(input string, destination any) error {
 	var data []byte
@@ -508,6 +526,42 @@ func DecodeRequest(input string, destination any) error {
 		data = []byte(input)
 	}
 	switch request := destination.(type) {
+	case *folder.CreateParams:
+		// folder.CreateParams は json タグを持たないため、API の wire 名タグ付き中間構造体で
+		// 明示変換します。未知のフィールドは拒否し、SDK が params 型にフィールドを追加した
+		// ときの追従漏れをエラーとして顕在化させます (ADR 0085)。
+		var apiRequest struct {
+			Name        string  `json:"name"`
+			Description *string `json:"description"`
+			ParentID    *int    `json:"parent_id"`
+		}
+		if err := decodeStrictRequest(data, &apiRequest); err != nil {
+			return err
+		}
+		*request = folder.CreateParams{
+			Name:        apiRequest.Name,
+			Description: apiRequest.Description,
+			ParentID:    apiRequest.ParentID,
+		}
+		return nil
+	case *project.CreateParams:
+		// project.CreateParams も folder.CreateParams と同じ理由で明示変換します (ADR 0085)。
+		var apiRequest struct {
+			Code           string `json:"code"`
+			Name           string `json:"name"`
+			Description    string `json:"description"`
+			ParentFolderID *int   `json:"parent_folder_id"`
+		}
+		if err := decodeStrictRequest(data, &apiRequest); err != nil {
+			return err
+		}
+		*request = project.CreateParams{
+			Code:           apiRequest.Code,
+			Name:           apiRequest.Name,
+			Description:    apiRequest.Description,
+			ParentFolderID: apiRequest.ParentFolderID,
+		}
+		return nil
 	case *organization.GetServicePolicyParams:
 		var apiRequest struct {
 			IsActive *bool                                 `json:"is_active"`

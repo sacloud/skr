@@ -14,7 +14,6 @@
       "request_type": "projectapikey.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "API キー一覧のページング・並び順条件を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListApiKeysOK",
       "flags": [
         {
@@ -40,7 +39,8 @@
           "conversion": "v1.ListApiKeysOrdering"
         }
       ],
-      "command_name": "list-api-keys"
+      "command_name": "list-api-keys",
+      "no_request_flag": true
     },
     {
       "name": "Create",

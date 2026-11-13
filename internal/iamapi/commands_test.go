@@ -23,10 +23,51 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/folder"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/organization"
+	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/project"
 	"github.com/sacloud/sacloud-sdk-go/api/iam/apis/projectapikey"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/iam/apis/v1"
+	"github.com/stretchr/testify/require"
 )
+
+func TestDecodeFolderCreateRequestUsesAPIFieldNames(t *testing.T) {
+	var request folder.CreateParams
+	require.NoError(t, DecodeRequest(`{"name":"team-folder","description":"test","parent_id":12345}`, &request))
+	require.Equal(t, "team-folder", request.Name)
+	require.NotNil(t, request.Description)
+	require.Equal(t, "test", *request.Description)
+	require.NotNil(t, request.ParentID)
+	require.Equal(t, 12345, *request.ParentID)
+
+	// 未知のフィールドは拒否します (ADR 0085)
+	var unknown folder.CreateParams
+	err := DecodeRequest(`{"name":"n","parent_id":1,"unknown_key":"x"}`, &unknown)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "decode request JSON")
+
+	// 有効な JSON の後ろに余分なデータがあっても拒否します
+	var trailing folder.CreateParams
+	err = DecodeRequest(`{"name":"n"}{"extra":1}`, &trailing)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "decode request JSON")
+}
+
+func TestDecodeProjectCreateRequestUsesAPIFieldNames(t *testing.T) {
+	var request project.CreateParams
+	require.NoError(t, DecodeRequest(`{"code":"proj","name":"team-project","description":"test","parent_folder_id":54321}`, &request))
+	require.Equal(t, "proj", request.Code)
+	require.Equal(t, "team-project", request.Name)
+	require.Equal(t, "test", request.Description)
+	require.NotNil(t, request.ParentFolderID)
+	require.Equal(t, 54321, *request.ParentFolderID)
+
+	// snake_case 以外のキー (parentFolderID など) は拒否されます
+	var unknown project.CreateParams
+	err := DecodeRequest(`{"code":"proj","name":"n","parentFolderID":1}`, &unknown)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "decode request JSON")
+}
 
 func TestDecodeProjectAPIKeyRequestUsesAPIFieldNames(t *testing.T) {
 	createJSON := `{"project_id":7,"name":"test-key","description":"test","server_resource_id":"srv-1","iam_roles":["resource-viewer"],"zone_id":"is1a"}`

@@ -33,7 +33,6 @@
       "request_type": "servicepolicy.ListRuleTemplatesParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "ルールテンプレートの絞り込み条件 JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListServicePolicyRuleTemplatesOK",
       "flags": [
         {
@@ -73,7 +72,8 @@
           "conversion": "v1.ListServicePolicyRuleTemplatesType"
         }
       ],
-      "command_name": "list-service-policy-rule-templates"
+      "command_name": "list-service-policy-rule-templates",
+      "no_request_flag": true
     }
   ],
   "wiring_target": "IAMAPI.ServicePolicy",

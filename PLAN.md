@@ -163,6 +163,10 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 網羅表、未検証コマンドの一覧、段階的なタスク、命名ルールの適用状況は[ライブ E2E の対応状況](docs/design/live-e2e-coverage.md)に記録しています。末端コマンドごとの状況は [ADR 0065](docs/adr/0065-e2e-command-coverage-baseline.md) に従い [`test/e2e/command-coverage/baseline.txt`](test/e2e/command-coverage/baseline.txt) に記録し、`make e2e-coverage` で検証します。2026-10-28 の baseline 作成時に、iam-api の旧 runner が `iam-api group update` を実行していない網羅漏れを検出し、未整備として記録しました。2026-10-29 の移行時に `group update` のカバレッジを追加し、baseline を live に更新しました。
 
+## `--request` の適用範囲の見直し
+
+全ドメインの `--request` デコード先を監査し ([#75](https://github.com/sacloud/skr/issues/75))、`--request` を request body 用の引数と位置づけました ([ADR 0085](docs/adr/0085-request-flag-scope.md))。query params を受ける ogen 系 list 操作では個別フラグが全 query params をカバーしているため、`--request` を廃止し、生成器に `no_request_flag` 設定を追加しました。IAM 7 操作 (folder、project、project-api-key、scim、service-policy の list-rule-templates、service-principal の list と list-keys)、AppRun 2 操作、Security Control 2 操作の 11 コマンドに適用済みです。IaaS の find は GET + リクエストボディという API 形式のため `--request` を維持します。IAM の folder / project create は json タグのない手書きラッパー型へのデコードで `parent_id` / `parent_folder_id` が黙って無視される実害があったため、wire 名タグ付き中間構造体による明示変換 (`DisallowUnknownFields` 併用) で修正済みです。organization / projectapikey は既に明示変換で対応済みでした。手書きラッパー型への json タグ追加は SDK 側への提案事項です ([#75](https://github.com/sacloud/skr/issues/75))。
+
 ## CLI 機能の改善候補: `--query-raw` (jq -r 相当の生出力)
 
 `--query` は式の評価に内蔵の gojq を使うが、結果は常に JSON として出力するため、文字列スカラーが引用符付きで出力され、シェル変数への取り込みには `jq -er '.'` が必要です。2026-11-11 時点のチュートリアルでは、ID の抽出を `--query '...' | jq -er '.'` で記述しています。引用符なしの生出力モードとして `--query-raw` フラグを追加すると、この手順から jq を不要にできます (実装は未着手)。

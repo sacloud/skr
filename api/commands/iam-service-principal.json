@@ -15,7 +15,6 @@
       "request_type": "serviceprincipal.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "サービスプリンシパル一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListServicePrincipalsOK",
       "flags": [
         {
@@ -48,7 +47,8 @@
           "conversion": "v1.ListServicePrincipalsOrdering"
         }
       ],
-      "command_name": "list-service-principals"
+      "command_name": "list-service-principals",
+      "no_request_flag": true
     },
     {
       "name": "Create",
@@ -154,7 +154,6 @@
       "request_type": "serviceprincipal.ListKeysParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "キー一覧のページング・並び順条件 JSON。直接指定するか @path.json で読み込みます。--request と個別フラグは併用できません。",
       "response_type": "*v1.ListServicePrincipalKeysOK",
       "arguments": [
         {
@@ -188,7 +187,8 @@
           "conversion": "v1.ListServicePrincipalKeysOrdering"
         }
       ],
-      "command_name": "list-service-principal-keys"
+      "command_name": "list-service-principal-keys",
+      "no_request_flag": true
     },
     {
       "name": "UploadKey",

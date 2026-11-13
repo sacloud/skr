@@ -17,6 +17,8 @@
 
 ## Consequences
 
+`--request` は API の request body を表す引数であり、query params や path params をマッピングする用途には生成しません。query params を受ける list 操作は個別フラグに統一し、生成器では `no_request_flag` 設定で `--request` の生成を抑制できます ([ADR 0085](0085-request-flag-scope.md))。IaaS の find は GET にリクエストボディを付けて送る API 形式のため、`FindRequest` JSON は body 用途として維持します。
+
 [ADR 0049](0049-internet-workflow-options.md) により、Internet、Server、Disk の Find では単一名の部分一致検索を `--name` で指定できます。文字列を分割せず1要素の `Names` に変換し、複数名の指定は JSON に残します。また、Internet Delete の `--force` と `--fail-if-not-found` は API フィールドではなく削除の動作オプションとして公開します。
 
 Server Create の限定的なディスクと NIC の指定は、[ADR 0041](0041-server-repeatable-disk-and-nic-options.md) により反復可能な構造化オプションを使う例外とします。その他の複雑な入力を JSON に残す方針は維持します。
