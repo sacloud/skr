@@ -283,6 +283,14 @@ kms-api read-key live
 kms-api rotate-key live
 kms-api schedule-key-destruction live
 kms-api update-key live
+local-router-api create live
+local-router-api delete live
+local-router-api find live
+local-router-api health-status live
+local-router-api monitor-local-router live
+local-router-api read live
+local-router-api update live
+local-router-api update-settings live
 networking-suite-api create-interface-connection live
 networking-suite-api create-subnet live
 networking-suite-api create-subnet-group live
