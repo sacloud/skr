@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.2.2](https://github.com/sacloud/skr/compare/v0.2.1...v0.2.2) - 2026-11-13
+
+### 🚀 Changes
+- local-router-api: ローカルルータ API コマンドを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/268
+- apprun-dedicated: チュートリアルのノード IP 取得を CIDR 表記に対応 by @tokuhirom in https://github.com/sacloud/skr/pull/270
+
 ## [v0.2.1](https://github.com/sacloud/skr/compare/v0.2.0...v0.2.1) - 2026-11-13
 
 ### 🚀 Changes
