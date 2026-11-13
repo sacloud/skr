@@ -83,7 +83,12 @@ func TestScenarioAppRunDedicatedInfrastructureLifecycle(t *testing.T) {
 	verifyCreatedAutoScalingGroup(t, asgs, asgID, asgName)
 	waitForHealthyWorkerNode(t, apprun_dedicated.NewWorkerNodeOp(sdkClient, clusterID, asgID))
 
-	// 後片付け: 高レベルコマンドでオートスケーリンググループを削除する。
+	// 高レベルコマンドでオートスケーリンググループを削除する。
+	h.CallWithTimeout(t, createCommandLimit, "オートスケーリンググループを削除する (高レベルコマンド)",
+		"apprun-dedicated", "delete-auto-scaling-group", clusterName, asgName, "--force", "--no-wait")
+	requireAutoScalingGroupAbsent(t, asgs, asgID)
+
+	// 後片付け: 失敗時などにオートスケーリンググループが残っていれば削除する。
 	defer func() {
 		cleanupAutoScalingGroup(t, h, asgs, clusterID, asgID, asgName)
 	}()
