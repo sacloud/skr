@@ -73,6 +73,10 @@ const (
 	// createCommandLimit はクラスタとオートスケーリンググループの作成コマンドの
 	// 実行期限です。
 	createCommandLimit = 15 * time.Minute
+	// asgCreateCommandLimit は高レベル create-auto-scaling-group の実行期限です。
+	// CLI 側の待機タイムアウト (workerNodeWaitLimit) より長くし、CLI 自身の
+	// タイムアウト処理が完了するのを待てるようにします。
+	asgCreateCommandLimit = workerNodeWaitLimit + 5*time.Minute
 	// deleteAbsentLimit は削除後の不在確認の待機期限です。削除は非同期に
 	// 完了するため、不在になるまで再確認します。
 	deleteAbsentLimit = 10 * time.Minute
@@ -748,6 +752,44 @@ func cleanupAutoScalingGroup(t *testing.T, h *helper.Helper, asgs *autoscalinggr
 	h.Call(t, "後片付け: オートスケーリンググループを削除する",
 		"apprun-dedicated-api", "delete-auto-scaling-group", "--cluster-id", uuid.UUID(clusterID).String(), "--auto-scaling-group-id", uuid.UUID(asgID).String())
 	requireAutoScalingGroupAbsent(t, asgs, asgID)
+}
+
+// cleanupAutoScalingGroupByName は ID が確定する前に作成が打ち切られた場合の後片付けとして、
+// ランダムサフィックス付きの一意な名前でオートスケーリンググループを検索して削除します。
+// 名前が一致するグループはこのテストの実行中に作成されたものだけなので、1 件だけ見つかった
+// 場合に限り削除します。0 件なら何もしません。複数見つかった場合は対象を特定できないため
+// 削除せずエラーにします。
+func cleanupAutoScalingGroupByName(t *testing.T, h *helper.Helper, asgs *autoscalinggroup.AutoScalingGroupOp, clusterID v1.ClusterID, asgName string) {
+	t.Helper()
+
+	var matches []v1.AutoScalingGroupID
+	var cursor *v1.AutoScalingGroupID
+	for {
+		list, next, err := asgs.List(t.Context(), listPageSize, cursor)
+		if err != nil {
+			t.Errorf("list auto-scaling groups for cleanup: %v", err)
+			return
+		}
+		for i := range list {
+			if list[i].Name == asgName {
+				matches = append(matches, list[i].AutoScalingGroupID)
+			}
+		}
+		if next == nil {
+			break
+		}
+		cursor = next
+	}
+	switch len(matches) {
+	case 0:
+		return
+	case 1:
+		h.Call(t, "後片付け: オートスケーリンググループを削除する (名前で特定)",
+			"apprun-dedicated-api", "delete-auto-scaling-group", "--cluster-id", uuid.UUID(clusterID).String(), "--auto-scaling-group-id", uuid.UUID(matches[0]).String())
+		requireAutoScalingGroupAbsent(t, asgs, matches[0])
+	default:
+		t.Errorf("found %d auto-scaling groups named %q; refusing to delete", len(matches), asgName)
+	}
 }
 
 // requireAutoScalingGroupAbsent はオートスケーリンググループが削除後に存在しない

@@ -272,7 +272,12 @@ func (s *Service) findAutoScalingGroup(ctx context.Context, api autoscalinggroup
 }
 
 // waitWorkerNodesHealthy は指定されたオートスケーリンググループの全ワーカノードが
-// healthy になるまで待機します。全ページを走査します。
+// healthy になるまで待機します。完了条件は API のワーカノード一覧応答の Status で、
+// すべてのノードが healthy 状態のときに完了とします。全ページを走査します。
+//
+// 一覧応答には healthy フィールドが含まれず (SDK の WorkerNode.List は Summary を
+// Detail に変換して Healthy を常にゼロ値にする)、実 API でも healthy は status と
+// 乖離して返るため、Healthy ではなく Status を完了条件に使います。
 func (s *Service) waitWorkerNodesHealthy(ctx context.Context, clusterID v1.ClusterID, asgID v1.AutoScalingGroupID, timeout time.Duration) error {
 	wnAPI := s.newWorkerNodeAPI(clusterID, asgID)
 	return s.poll(ctx, timeout, func(ctx context.Context) (bool, error) {
@@ -287,7 +292,7 @@ func (s *Service) waitWorkerNodesHealthy(ctx context.Context, clusterID v1.Clust
 				found = true
 			}
 			for _, node := range nodes {
-				if !node.Healthy {
+				if node.Status != v1.WorkerNodeStatusHealthy {
 					return false, nil
 				}
 			}

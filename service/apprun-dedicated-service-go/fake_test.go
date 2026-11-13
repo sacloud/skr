@@ -88,12 +88,13 @@ func (a *fakeAutoScalingGroup) readAutoScalingGroup() v1.ReadAutoScalingGroup {
 	}
 }
 
-// fakeWorkerNode はメモリ上のワーカノードです。
+// fakeWorkerNode はメモリ上のワーカノードです。実 API の一覧応答には healthy
+// フィールドがないため、状態は Status だけで表します。
 type fakeWorkerNode struct {
 	clusterID          v1.ClusterID
 	autoScalingGroupID v1.AutoScalingGroupID
 	workerNodeID       v1.WorkerNodeID
-	healthy            bool
+	status             v1.WorkerNodeStatus
 	deleted            bool
 }
 
@@ -206,7 +207,7 @@ func (f *fakeSDK) addAutoScalingGroup(t *testing.T, clusterName, name, zone, wor
 	return asg
 }
 
-func (f *fakeSDK) addWorkerNode(t *testing.T, clusterName, asgName string, healthy bool) *fakeWorkerNode {
+func (f *fakeSDK) addWorkerNode(t *testing.T, clusterName, asgName string, status v1.WorkerNodeStatus) *fakeWorkerNode {
 	t.Helper()
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -234,10 +235,18 @@ func (f *fakeSDK) addWorkerNode(t *testing.T, clusterName, asgName string, healt
 		clusterID:          c.clusterID,
 		autoScalingGroupID: asg.autoScalingGroupID,
 		workerNodeID:       v1.WorkerNodeID(f.newID()),
-		healthy:            healthy,
+		status:             status,
 	}
 	f.workerNodes = append(f.workerNodes, node)
 	return node
+}
+
+// setWorkerNodeStatus はワーカノードの状態を変更します。
+func (f *fakeSDK) setWorkerNodeStatus(t *testing.T, node *fakeWorkerNode, status v1.WorkerNodeStatus) {
+	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	node.status = status
 }
 
 // newID は重複しない識別子を返します。255 を超えると下位 8 ビットが折り返しますが、
@@ -556,7 +565,7 @@ func (f *fakeWorkerNodeAPI) List(ctx context.Context, maxItems int64, cursor *v1
 		if n.clusterID != f.clusterID || n.autoScalingGroupID != f.autoScalingGroupID || n.deleted {
 			continue
 		}
-		items = append(items, workernode.WorkerNodeDetail{WorkerNodeID: n.workerNodeID, Healthy: n.healthy})
+		items = append(items, workernode.WorkerNodeDetail{WorkerNodeID: n.workerNodeID, Status: n.status})
 	}
 	f.sdk.mu.Unlock()
 	return pageItems(items, maxItems, cursor, func(r workernode.WorkerNodeDetail) v1.WorkerNodeID { return r.WorkerNodeID })
@@ -574,7 +583,8 @@ func (f *fakeWorkerNodeAPI) Read(ctx context.Context, id v1.WorkerNodeID) (*work
 		}
 		return &workernode.WorkerNodeDetail{
 			WorkerNodeID: n.workerNodeID,
-			Healthy:      n.healthy,
+			Status:       n.status,
+			Healthy:      n.status == v1.WorkerNodeStatusHealthy,
 		}, nil
 	}
 	return nil, notFoundError("worker node not found")
