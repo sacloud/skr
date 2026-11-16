@@ -19,7 +19,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"github.com/stretchr/testify/require"
 )
 
@@ -122,24 +121,6 @@ func TestReadConfirm(t *testing.T) {
 		require.False(t, got)
 		require.Contains(t, promptOut.String(), "y または n を入力してください")
 	})
-}
-
-func TestCheckTraceSettings(t *testing.T) {
-	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
-	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
-	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
-
-	var plain saclient.Client
-	require.NoError(t, plain.SetEnviron(os.Environ()))
-	require.NoError(t, CheckTraceSettings(&plain))
-
-	var traced saclient.Client
-	require.NoError(t, traced.SetEnviron(os.Environ()))
-	require.NoError(t, traced.SetWith(saclient.WithTraceMode("all")))
-	err := CheckTraceSettings(&traced)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "deploy")
-	require.Contains(t, err.Error(), "トレースを無効にしてください")
 }
 
 func TestVersionNumberFlag(t *testing.T) {

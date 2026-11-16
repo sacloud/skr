@@ -32,9 +32,6 @@ func (c *cli) initEventbus() {
 		func() (*eventbusapi.Service, error) {
 			return newEventbusService(c.Trace)
 		},
-		func() (*eventbusapi.Service, error) {
-			return newEventbusSecretService(c.Trace)
-		},
 	)
 }
 
@@ -43,24 +40,6 @@ func (c *cli) initEventbus() {
 func newEventbusService(trace bool) (*eventbusapi.Service, error) {
 	client, err := saclient.New(trace)
 	if err != nil {
-		return nil, err
-	}
-	v1Client, err := eventbussdk.NewClient(client)
-	if err != nil {
-		return nil, err
-	}
-	return eventbusapi.New(v1Client), nil
-}
-
-// newEventbusSecretService は set-secret 用の Service を構築します。
-// secret を扱う操作では、実行前に実効トレース設定を検査し、
-// トレースが有効な場合は秘密情報が記録されるおそれがあるため実行しません。
-func newEventbusSecretService(trace bool) (*eventbusapi.Service, error) {
-	client, err := saclient.New(trace)
-	if err != nil {
-		return nil, err
-	}
-	if err := eventbus.CheckTraceSettings(client); err != nil {
 		return nil, err
 	}
 	v1Client, err := eventbussdk.NewClient(client)

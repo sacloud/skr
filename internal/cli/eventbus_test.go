@@ -54,7 +54,7 @@ func TestRunEventbusCommandHelp(t *testing.T) {
 		},
 		{
 			args: []string{"eventbus", "process-configuration", "set-secret", "--help"},
-			want: []string{"実行設定 ID", "--secret-file", "@path", "-", "インライン", "トレース"},
+			want: []string{"実行設定 ID", "--secret-file", "@path", "-", "インライン"},
 		},
 		{
 			args: []string{"eventbus", "schedule", "create", "--help"},
@@ -359,12 +359,6 @@ func TestEventbusCommandInputErrors(t *testing.T) {
 			args: []string{"eventbus", "process-configuration", "set-secret", "123",
 				"--secret-file", "@/missing/secret-input.json"},
 			want: "開けません",
-		},
-		{
-			name: "trace is refused for secret operations",
-			args: []string{"--trace", "eventbus", "process-configuration", "set-secret", "123",
-				"--secret-file", "@" + secretPath},
-			want: "トレースを無効にしてください",
 		},
 		{
 			name: "invalid query is rejected before the API call",

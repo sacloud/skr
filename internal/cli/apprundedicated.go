@@ -45,9 +45,6 @@ func (c *cli) initAppRunDedicated() {
 		func() (*apprundedicatedservice.Service, error) {
 			return newAppRunDedicatedService(c.Trace)
 		},
-		func() (*apprundedicatedservice.Service, error) {
-			return newAppRunDedicatedDeployService(c.Trace)
-		},
 	)
 }
 
@@ -56,25 +53,6 @@ func (c *cli) initAppRunDedicated() {
 func newAppRunDedicatedService(trace bool) (*apprundedicatedservice.Service, error) {
 	client, err := clientconfig.New(trace)
 	if err != nil {
-		return nil, err
-	}
-	v1Client, err := apprunsdk.NewClient(client)
-	if err != nil {
-		return nil, err
-	}
-	return apprundedicatedservice.New(v1Client), nil
-}
-
-// newAppRunDedicatedDeployService は deploy 用の Service を構築します。
-// deploy は registryPassword や secret=true の環境変数の値をリクエスト本文に
-// 含め得るため、実行前に実効トレース設定を検査し、トレースが有効な場合は
-// 秘密情報が記録されるおそれがあるため実行しません。
-func newAppRunDedicatedDeployService(trace bool) (*apprundedicatedservice.Service, error) {
-	client, err := clientconfig.New(trace)
-	if err != nil {
-		return nil, err
-	}
-	if err := apprundedicated.CheckTraceSettings(client); err != nil {
 		return nil, err
 	}
 	v1Client, err := apprunsdk.NewClient(client)

@@ -114,7 +114,7 @@ $ skr iaas-api icon create --name ICON-NAME --image-file ./icon.png --tags tutor
 API コマンドの結果は JSON で出力します。
 `--query` に jq 式を指定すると、API の結果を加工できます。詳しくは[API 出力の jq 加工ガイド](docs/manual/query.md)を参照してください。
 
-`--trace` では HTTP リクエストとレスポンスを出力します。認証情報などが含まれる場合があるため、取り扱いに注意してください。
+`--trace` では HTTP リクエストとレスポンスの本文をそのまま出力します。PlainKey、シークレット値、OriginGuard.Token などの秘密情報も含まれるため、ログを共有・保存する場合は値が含まれていないか確認してください。
 `skr http` の使い方は[HTTP リクエストのガイド](docs/manual/http-request.md)を参照してください。
 
 ## usacloud との違い

@@ -121,7 +121,7 @@ func TestRunConfigCurrentWithoutSelection(t *testing.T) {
 func TestRunTraceHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	require.Equal(t, 0, run([]string{"--trace", "--help"}, &stdout, &stderr), "stderr: %s", stderr.String())
-	for _, text := range []string{"--trace", "認証情報"} {
+	for _, text := range []string{"--trace", "秘密情報"} {
 		require.Contains(t, stdout.String(), text, "help output does not contain %q", text)
 	}
 }

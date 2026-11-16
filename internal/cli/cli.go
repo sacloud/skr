@@ -44,7 +44,7 @@ import (
 )
 
 type cli struct {
-	Trace                     bool                               `name:"trace" help:"SDK の HTTP リクエストとレスポンスをトレースします。認証情報などが出力される場合があります。"`
+	Trace                     bool                               `name:"trace" help:"SDK の HTTP リクエストとレスポンスをトレースします。リクエストやレスポンスの本文がそのまま出力され、PlainKey、シークレット値、OriginGuard.Token などの秘密情報も含まれます。ログを共有・保存する場合は値が含まれていないか確認してください。"`
 	Version                   kong.VersionFlag                   `name:"version" help:"Print version information and quit."`
 	Query                     *string                            `name:"query" help:"jq 式で API の JSON 出力を加工します。例: --query 'map({ID,Name})'"`
 	VersionCmd                versionCommand                     `cmd:"" name:"version" help:"Print version information."`

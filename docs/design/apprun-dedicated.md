@@ -44,7 +44,7 @@ service/apprun-dedicated-service-go/
 internal/apprundedicated/
   commands.go               # kong コマンド (定義読み込みと service 呼び出し)
   definition_input.go       # 定義ファイルの読み込み (--app、標準入力、未知フィールド拒否)
-  confirm.go                # 確認プロンプトとトレース設定の検査
+  confirm.go                # 確認プロンプト
   diff.go                   # unified diff の生成 (LCS、文脈行、色付き出力)
   *_test.go
 ```
@@ -296,7 +296,7 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 
 - `registryPassword` と `secret=true` の環境変数の値は、定義ファイル (または標準入力) からのみ入力します。フラグは設けません。
 - service 層は秘密情報をログ・エラー・出力に含めません。デプロイのリクエスト構築で秘密情報を扱う処理は、値を構造体として受け渡します。
-- SDK のトレース実装はリクエスト本文を出力します。デプロイ (`registryPassword` や `secret=true` の環境変数を含み得る) では、EventBus と同じ方式で、CLI 層の ServiceFactory が SDK の実効トレース設定 (`TraceMode` など) を検査します。トレースが有効なら、定義の読み込み・送信の前にエラーを返します。検査は必須の設計要素であり、省略しません ([EventBus 高レベルコマンドの設計](eventbus.md) の secret の扱いと同じ判断です)。
+- SDK のトレース実装はリクエスト本文をそのまま出力します。デプロイ (`registryPassword` や `secret=true` の環境変数を含み得る) では、`--trace` や環境変数・プロファイルでトレースが有効な場合に値がログへ記録されます。実行を拒否せず、`--trace` のヘルプとこの設計文書で注意喚起します ([ADR 0086](../adr/0086-trace-secret-information.md))。
 - `status` と `versions` の射影から `registryPassword` を除外します (`secret=true` の環境変数の `value` は API が null を返すため、そのまま出力します)。
 - 定義ファイルに秘密情報を書く場合のファイル権限への注意をヘルプとチュートリアルに記載します。標準入力 (`--app -`) は CI などでファイルを作らずに済む経路として案内します。
 - Jsonnet のネイティブ関数 (`env`、`secret`) がなく、定義内に秘密情報を平文で書かざるを得ない点は、Jsonnet 非対応の制約として ADR に記録済みです ([ADR 0079](../adr/0079-apprun-dedicated-high-level-commands.md))。
@@ -319,7 +319,7 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 - 待機: ポーリング間隔、完了条件 (要求されたコンテナ数 (`DesiredCount`) と同じ数のコンテナがすべて `running`)、期限での打ち切り、ポーリング中の参照エラーの継続、`--no-wait` でポーリングしないこと。fake の時計・ticker を差し替え可能にして検証します。
 - エラー系: 必須フィールドの欠落、`scalingMode` とスケール設定の整合、`loadBalancerPort` と `host` の整合、クラスタ不在、同名アプリの他クラスタ混在、削除前の再照合失敗で削除 API を呼ばないこと、タイムアウト。
 - 変換: `VersionDetail` → 定義の正規化 (diff・init 用)、`registryPassword` と secret 環境変数の除外、`created` の RFC3339 変換。
-- 安全性: deploy で `registryPassword` が fake に渡ったリクエスト以外の場所に現れないこと、trace 有効時 (CLI 層の ServiceFactory での検査) の拒否。
+- 安全性: deploy で `registryPassword` が fake に渡ったリクエスト以外の場所に現れないこと。
 
 ### CLI 層の単体テスト
 
@@ -334,7 +334,7 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 - `internal/cli` の sakumock テストで、10 個の末端コマンドの正常系を実際の CLI パスと SDK を通して検証します。sakumock の `apprundedicated` サーバー (v0.14.0) を使います。既存の低レベル層のテスト (`internal/cli/apprundedicated_test.go`) と同じサーバーを共有します。
 - sakumock で待機条件 (コンテナの `running` 遷移) が再現できない場合は、SDK が読むステータスと応答型を再現する HTTP テストサーバーで補います (`SAKURA_ENDPOINTS_*` によるエンドポイント差し替え)。[EventBus 高レベルコマンドの設計](eventbus.md) のテスト方針と同じ方式です。
 - service 層の通信テストは service/apprun-dedicated-service-go に置き、sakumock へ実際の SDK を接続して wire 形式と操作の流れを検証します。
-- 秘密情報: 定義ファイル・標準入力・fake リクエストのいずれの経路でも、stdout・stderr・ログ・エラーに `registryPassword` が現れないことを確認します。トレース有効時 (環境変数・プロファイル) に秘密情報を含む操作が拒否されることを確認します。
+- 秘密情報: 定義ファイル・標準入力・fake リクエストのいずれの経路でも、stdout・stderr・ログ・エラーに `registryPassword` が現れないことを確認します。
 
 ### ライブ E2E
 

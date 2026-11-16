@@ -55,11 +55,6 @@ type Runtime struct {
 // Service を返します。
 type ServiceFactory func() (*eventbusapi.Service, error)
 
-// SecretServiceFactory は set-secret 専用の Service を返します。
-// secret を扱う操作では実行前にトレース設定を検査するため、
-// 通常の操作と別の factory を受け取ります。
-type SecretServiceFactory func() (*eventbusapi.Service, error)
-
 func (r Runtime) validateOutput(kongCtx *kong.Context) error {
 	if r.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
@@ -83,15 +78,6 @@ func newService(factory ServiceFactory) (*eventbusapi.Service, error) {
 	return factory()
 }
 
-// newSecretService は set-secret 用の factory から Service を構築します。
-// newSecretService は set-secret 用の factory から Service を構築します。
-func newSecretService(factory SecretServiceFactory) (*eventbusapi.Service, error) {
-	if factory == nil {
-		return nil, fmt.Errorf("API クライアントが設定されていません")
-	}
-	return factory()
-}
-
 // commandContext は EventBus コマンド専用の実行境界を作ります。
 // 割り込みシグナルで context がキャンセルされるため、読み取りと変更操作の間に
 // 割り込まれた場合も service 層の確認が変更を続行させません。
@@ -107,8 +93,7 @@ type Commands struct {
 }
 
 // NewCommands は runtime と factory を各コマンドへ一括注入します。
-// set-secret だけ secret を扱うための専用 factory を受け取ります。
-func NewCommands(runtime Runtime, factory ServiceFactory, secretFactory SecretServiceFactory) Commands {
+func NewCommands(runtime Runtime, factory ServiceFactory) Commands {
 	return Commands{
 		ProcessConfiguration: ProcessConfigurationCommands{
 			List:      ProcessListCommand{factory: factory, runtime: runtime},
@@ -116,7 +101,7 @@ func NewCommands(runtime Runtime, factory ServiceFactory, secretFactory SecretSe
 			Create:    ProcessCreateCommand{factory: factory, runtime: runtime},
 			Update:    ProcessUpdateCommand{factory: factory, runtime: runtime},
 			Delete:    ProcessDeleteCommand{factory: factory, runtime: runtime},
-			SetSecret: ProcessSetSecretCommand{factory: secretFactory, runtime: runtime},
+			SetSecret: ProcessSetSecretCommand{factory: factory, runtime: runtime},
 		},
 		Schedule: ScheduleCommands{
 			List:   ScheduleListCommand{factory: factory, runtime: runtime},
@@ -142,7 +127,7 @@ type ProcessConfigurationCommands struct {
 	Create    ProcessCreateCommand    `cmd:"" help:"実行設定を作成します。宛先 (--destination) に応じてパラメーターが変わります: simplenotification は --group-id と --message、simplemq は --queue-name と --content、autoscale は --action と --resource-id を指定します。未指定のパラメーターは空文字列として送信します。"`
 	Update    ProcessUpdateCommand    `cmd:"" help:"実行設定を更新します。指定した項目だけを変更し、未指定の項目は現状維持します。--destination を変更した場合、旧宛先のパラメーターは引き継がれず、指定のないパラメーターは空文字列として送信されるため、新宛先のパラメーターを指定してください。読み取りと更新の間に他の変更がないことは検証しません。"`
 	Delete    ProcessDeleteCommand    `cmd:"" help:"実行設定を削除します。削除対象は API から再取得し、リソース種別 (Provider.Class) と設定の種類が一致しない場合は削除しません。"`
-	SetSecret ProcessSetSecretCommand `cmd:"" name:"set-secret" help:"実行設定の secret を登録または置き換えます。secret は --secret-file で保護したファイル (@path) または標準入力 (-) から読み込みます。値を引数やインライン JSON に含めることはできません。SimpleMQ 宛先は {\"APIKey\":\"...\"}、それ以外の宛先は {\"AccessToken\":\"...\",\"AccessTokenSecret\":\"...\"} を指定します。トレースが有効な場合は実行しません。"`
+	SetSecret ProcessSetSecretCommand `cmd:"" name:"set-secret" help:"実行設定の secret を登録または置き換えます。secret は --secret-file で保護したファイル (@path) または標準入力 (-) から読み込みます。値を引数やインライン JSON に含めることはできません。SimpleMQ 宛先は {\"APIKey\":\"...\"}、それ以外の宛先は {\"AccessToken\":\"...\",\"AccessTokenSecret\":\"...\"} を指定します。--trace と併用すると secret の値がログに出力されます。"`
 }
 
 // ProcessListCommand は実行設定の一覧を表示します。
@@ -316,12 +301,12 @@ func (c *ProcessDeleteCommand) Run(_ *kong.Context) error {
 type ProcessSetSecretCommand struct {
 	ID         string `arg:"" name:"id" help:"secret を登録する実行設定 ID。skr eventbus process-configuration list の出力で確認できます。"`
 	SecretFile string `name:"secret-file" required:"" help:"secret の JSON。@path で保護したファイル、- で標準入力から読み込みます。SimpleMQ 宛先は {\"APIKey\":\"...\"}、それ以外は {\"AccessToken\":\"...\",\"AccessTokenSecret\":\"...\"} の形式です。"`
-	factory    SecretServiceFactory
+	factory    ServiceFactory
 	runtime    Runtime
 }
 
 func (c *ProcessSetSecretCommand) Run(_ *kong.Context) error {
-	svc, err := newSecretService(c.factory)
+	svc, err := newService(c.factory)
 	if err != nil {
 		return err
 	}

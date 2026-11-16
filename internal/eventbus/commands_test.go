@@ -59,7 +59,7 @@ func (h *commandHarness) runtime() Runtime {
 // テストで検証します。
 func (h *commandHarness) runError(t *testing.T, factory ServiceFactory, args ...string) error {
 	t.Helper()
-	commands := NewCommands(h.runtime(), factory, nil)
+	commands := NewCommands(h.runtime(), factory)
 	parser, err := kong.New(&commands, kong.Name("skr"))
 	require.NoError(t, err)
 	ctx, err := parser.Parse(args[1:])

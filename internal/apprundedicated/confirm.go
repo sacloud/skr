@@ -20,8 +20,6 @@ import (
 	"io"
 	"os"
 	"strings"
-
-	saclient "github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
 
 // stdinIsTerminal は標準入力が端末かどうかを返します。
@@ -58,21 +56,4 @@ func readConfirm(stdin io.Reader, promptOut io.Writer) (bool, error) {
 			_, _ = fmt.Fprintln(promptOut, "y または n を入力してください。")
 		}
 	}
-}
-
-// CheckTraceSettings は deploy の前に、SDK の実効トレース設定を検査します。
-//
-// deploy は registryPassword や secret=true の環境変数の値をリクエスト本文に含める
-// ため、トレースが有効な場合は値がログへ出力されるおそれがあります。設定解決の
-// エラーを見逃さないよう解決を先に行い、TraceMode が有効な場合は定義の読み込みと
-// 送信の前に操作を実行させずにエラーを返します。認証情報を含み得る設定全体は
-// 返さず、エラーメッセージにも含めません。
-func CheckTraceSettings(client *saclient.Client) error {
-	if _, err := client.Profile(); err != nil {
-		return fmt.Errorf("SDK の設定を解決できません: %w", err)
-	}
-	if mode, ok := client.JSON()["TraceMode"]; ok {
-		return fmt.Errorf("deploy は秘密情報を含むリクエストを送信するため、トレースを無効にしてください (有効な TraceMode: %v)", mode)
-	}
-	return nil
 }

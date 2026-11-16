@@ -143,20 +143,6 @@ func equalStrings(got, want []string) bool {
 	return true
 }
 
-// CheckTraceSettings は secret を扱う操作の前に、SDK の実効トレース設定を検査します。
-// 設定解決のエラーを見逃さないよう解決を先に行い、TraceMode が有効な場合は
-// 秘密情報がログへ出力されるおそれがあるため、操作を実行させずにエラーを返します。
-// 認証情報を含み得る設定全体は返さず、エラーメッセージにも含めません。
-func CheckTraceSettings(client *saclient.Client) error {
-	if _, err := client.Profile(); err != nil {
-		return fmt.Errorf("SDK の設定を解決できません: %w", err)
-	}
-	if mode, ok := client.JSON()["TraceMode"]; ok {
-		return fmt.Errorf("secret を扱う操作ではトレースを無効にしてください (有効な TraceMode: %v)", mode)
-	}
-	return nil
-}
-
 // SanitizeSecretError は set-secret のエラーを安全な診断情報へ変換します。
 // API エラーの原因や応答本文には secret や認証情報が含まれるおそのため、
 // 分類だけを伝え、詳細は展開しません。それ以外のエラーはそのまま返します。

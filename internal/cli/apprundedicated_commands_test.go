@@ -329,11 +329,6 @@ func TestRunAppRunDedicatedInputErrors(t *testing.T) {
 		require.Contains(t, message, "見つかりません")
 	})
 
-	t.Run("トレースが有効な deploy は実行しません", func(t *testing.T) {
-		message := runError("--trace", "apprun-dedicated", "deploy", "--app", definitionPath)
-		require.Contains(t, message, "トレースを無効にしてください")
-	})
-
 	t.Run("JSON 以外の出力のコマンドは --query を拒否します", func(t *testing.T) {
 		for _, args := range [][]string{
 			{"apprun-dedicated", "diff", "--app", definitionPath, "--query", ".name"},
