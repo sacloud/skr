@@ -46,7 +46,7 @@ func TestRunKmsAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"kms-api", "create-key", "--help"},
-			want: []string{"--name", "--description", "--plain-key-file", "--request", "@path.json", "標準入力", "認証情報"},
+			want: []string{"--name", "--description", "--plain-key-file", "--request", "@path.json", "標準入力", "秘密情報"},
 		},
 		{
 			args: []string{"kms-api", "update-key", "--help"},

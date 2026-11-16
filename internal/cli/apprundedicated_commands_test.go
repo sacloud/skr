@@ -17,7 +17,10 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -261,6 +264,51 @@ func TestRunAppRunDedicatedCommandsWithSakumock(t *testing.T) {
 	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)
 }
 
+// TestRunAppRunDedicatedDeployWithTrace はトレースが有効でも deploy が拒否されず実行されることを確認します (ADR 0086)。
+func TestRunAppRunDedicatedDeployWithTrace(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	server := apprunmock.NewTestServer(apprunmock.Config{})
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", server.TestURL())
+
+	// SDK の tracer は log パッケージへ出力するため、テストでは握りつぶします。
+	originalLogWriter := log.Writer()
+	t.Cleanup(func() { log.SetOutput(originalLogWriter) })
+	log.SetOutput(io.Discard)
+
+	runCommand := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		return stdout.Bytes()
+	}
+
+	// 準備として、低レベルコマンドでクラスタを作成します。
+	var createdCluster v1.ClusterIdentifier
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "create-cluster", "--request",
+		`{"name":"cli-cluster","servicePrincipalID":"sp-000000000","ports":[{"port":443,"protocol":"https"}]}`), &createdCluster))
+
+	definitionPath := filepath.Join(t.TempDir(), "application.json")
+	definition := `{"cluster":"cli-cluster","name":"cli-app","image":"ghcr.io/example/app:v1","cpu":1000,"memory":1024,` +
+		`"scalingMode":"manual","fixedScale":1,"registryUsername":"user","registryPassword":"SECRET-PASSWORD"}`
+	require.NoError(t, os.WriteFile(definitionPath, []byte(definition), 0o600))
+
+	// --trace を付けても deploy は実行されます。リクエスト本文の秘密情報はトレース出力へ記録されるため、ログの取り扱いに注意します。
+	var deployed struct {
+		Cluster       string `json:"cluster"`
+		Application   string `json:"application"`
+		ApplicationID string `json:"applicationID"`
+		Version       int32  `json:"version"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("--trace", "apprun-dedicated", "deploy", "--app", definitionPath, "--no-wait"), &deployed))
+	require.Equal(t, "cli-cluster", deployed.Cluster)
+	require.Equal(t, "cli-app", deployed.Application)
+	require.NotEmpty(t, deployed.ApplicationID, "deploy should return the application ID")
+	require.Equal(t, int32(1), deployed.Version)
+}
+
 func TestRunAppRunDedicatedInputErrors(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
@@ -327,11 +375,6 @@ func TestRunAppRunDedicatedInputErrors(t *testing.T) {
 	t.Run("存在しないアプリケーションは見つからないことを示します", func(t *testing.T) {
 		message := runError("apprun-dedicated", "status", "--app", definitionPath)
 		require.Contains(t, message, "見つかりません")
-	})
-
-	t.Run("トレースが有効な deploy は実行しません", func(t *testing.T) {
-		message := runError("--trace", "apprun-dedicated", "deploy", "--app", definitionPath)
-		require.Contains(t, message, "トレースを無効にしてください")
 	})
 
 	t.Run("JSON 以外の出力のコマンドは --query を拒否します", func(t *testing.T) {

@@ -57,13 +57,8 @@ type Runtime struct {
 }
 
 // ServiceFactory は service/apprun-dedicated-service-go の Service を返します。
-// deploy 以外の操作で使います。
+// すべての高レベル操作で同じ factory を使います。
 type ServiceFactory func() (*apprundedicatedservice.Service, error)
-
-// DeployServiceFactory は deploy 専用の Service を返します。
-// deploy は registryPassword や secret=true の環境変数の値を送信するため、
-// 実行前にトレース設定を検査する factory を受け取ります。
-type DeployServiceFactory func() (*apprundedicatedservice.Service, error)
 
 func (r Runtime) validateOutput(kongCtx *kong.Context) error {
 	if r.ValidateOutput == nil {
@@ -106,16 +101,8 @@ func (r Runtime) loadDefinition(input string) (*apprundedicatedservice.Applicati
 	return loadDefinition(r.stdin(), input)
 }
 
-// newService は deploy 以外の操作用の factory から Service を構築します。
+// newService は factory から Service を構築します。
 func newService(factory ServiceFactory) (*apprundedicatedservice.Service, error) {
-	if factory == nil {
-		return nil, fmt.Errorf("API クライアントが設定されていません")
-	}
-	return factory()
-}
-
-// newDeployService は deploy 用の factory から Service を構築します。
-func newDeployService(factory DeployServiceFactory) (*apprundedicatedservice.Service, error) {
 	if factory == nil {
 		return nil, fmt.Errorf("API クライアントが設定されていません")
 	}
@@ -135,7 +122,7 @@ var errAborted = errors.New("操作を中止しました")
 // Commands は skr apprun-dedicated 配下のコマンド群です。
 type Commands struct {
 	Init                   InitCommand                   `cmd:"" help:"デプロイ済みのアプリケーションから定義ファイルを生成します。アクティブバージョンがあればその内容から、なければ最新のバージョンから定義を復元します。バージョンが 1 つもない場合は識別子だけの定義を生成します。registryPassword と secret=true の環境変数の値は API から取得できないため、生成される定義には含まれません。同名のファイルが既に存在する場合は上書きせずにエラーになります。"`
-	Deploy                 DeployCommand                 `cmd:"" help:"定義ファイルの内容をデプロイします。クラスタとアプリケーションを検索し、見つからなければアプリケーションを作成して、定義から新しいバージョンを作成して有効化します。registryPassword は定義に値があれば新しく登録し (registryPasswordAction: new)、値がなくアクティブバージョンがあれば維持し (keep)、初回デプロイで値がなければ削除します (remove)。有効化後、要求されたコンテナ数と同じ数のコンテナが running になるまで待ちます (--no-wait で省略)。トレースが有効な場合は実行しません。"`
+	Deploy                 DeployCommand                 `cmd:"" help:"定義ファイルの内容をデプロイします。クラスタとアプリケーションを検索し、見つからなければアプリケーションを作成して、定義から新しいバージョンを作成して有効化します。registryPassword は定義に値があれば新しく登録し (registryPasswordAction: new)、値がなくアクティブバージョンがあれば維持し (keep)、初回デプロイで値がなければ削除します (remove)。有効化後、要求されたコンテナ数と同じ数のコンテナが running になるまで待ちます (--no-wait で省略)。トレース (--trace、または SAKURA_TRACE_MODE などの SDK 設定) が有効な場合は、秘密情報がログへ出力されます。"`
 	Diff                   DiffCommand                   `cmd:"" help:"ローカルの定義とデプロイ済みの現状を比較し、unified diff 形式で標準出力へ出力します。現状はアクティブバージョンの内容です。アプリケーションが存在しないか非活性の場合は、識別子だけの定義を現状とします。registryPassword と secret=true の環境変数の値、registryPasswordAction は応答で取得できないため比較から除外し、その旨を標準エラー出力に示します。差分がなければ標準出力には何も出力しません。このコマンドは --query には対応せず、指定した場合はエラーになります。"`
 	Render                 RenderCommand                 `cmd:"" help:"定義を読み込み、検証と正規化を行った結果を JSON で出力します。registryPassword と secret=true の環境変数の値は出力に含めません。API には接続しません。"`
 	Status                 StatusCommand                 `cmd:"" help:"アプリケーションの状態を表示します。アプリケーションの ID、名前、アクティブバージョン、DesiredCount と、アクティブバージョンの内容 (イメージ、CPU、メモリ、スケーリング方式、アクティブノード数) を表示します。registryPassword は表示しません。"`
@@ -150,11 +137,10 @@ type Commands struct {
 }
 
 // NewCommands は runtime と factory を各コマンドへ一括注入します。
-// deploy は秘密情報を扱うため、トレース設定を検査する専用の factory を受け取ります。
-func NewCommands(runtime Runtime, factory ServiceFactory, deployFactory DeployServiceFactory) Commands {
+func NewCommands(runtime Runtime, factory ServiceFactory) Commands {
 	return Commands{
 		Init:                   InitCommand{factory: factory, runtime: runtime},
-		Deploy:                 DeployCommand{factory: deployFactory, runtime: runtime},
+		Deploy:                 DeployCommand{factory: factory, runtime: runtime},
 		Diff:                   DiffCommand{factory: factory, runtime: runtime},
 		Render:                 RenderCommand{runtime: runtime},
 		Status:                 StatusCommand{factory: factory, runtime: runtime},
@@ -227,7 +213,7 @@ type DeployCommand struct {
 	// 値付き指定 (--wait=true / --no-wait=false) のときも名前と意味が一致する。
 	Wait        bool          `name:"wait" negatable:"" default:"true" help:"有効化後の反映待ちを行います。"`
 	WaitTimeout time.Duration `name:"wait-timeout" placeholder:"DURATION" help:"待機のタイムアウト。待機中の API 呼び出しもこの期限で打ち切ります。有効化や停止などの変更自体は完了している場合があります。未指定のときは 5 分です。"`
-	factory     DeployServiceFactory
+	factory     ServiceFactory
 	runtime     Runtime
 }
 
@@ -235,9 +221,8 @@ func (c *DeployCommand) Run(kongCtx *kong.Context) error {
 	if err := c.runtime.validateOutput(kongCtx); err != nil {
 		return err
 	}
-	// deploy は秘密情報を含むリクエストを送信するため、定義の読み込みの前に
-	// factory の構築時点でトレース設定を検査します。
-	svc, err := newDeployService(c.factory)
+	// 定義の読み込みの前に Service を構築し、設定解決のエラーを早期に検出します。
+	svc, err := newService(c.factory)
 	if err != nil {
 		return err
 	}

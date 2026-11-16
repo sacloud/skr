@@ -17,6 +17,8 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,7 +56,7 @@ func TestRunEventbusCommandHelp(t *testing.T) {
 		},
 		{
 			args: []string{"eventbus", "process-configuration", "set-secret", "--help"},
-			want: []string{"実行設定 ID", "--secret-file", "@path", "-", "インライン", "トレース"},
+			want: []string{"実行設定 ID", "--secret-file", "@path", "-", "インライン"},
 		},
 		{
 			args: []string{"eventbus", "schedule", "create", "--help"},
@@ -298,6 +300,48 @@ func TestEventbusCommandsWithSakumock(t *testing.T) {
 	require.Len(t, projectedEmpty, 0, "projected output = %#v, want empty", projectedEmpty)
 }
 
+// TestRunEventbusSetSecretWithTrace はトレースが有効でも set-secret が拒否されず実行されることを確認します (ADR 0086)。
+func TestRunEventbusSetSecretWithTrace(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	server := eventbusmock.NewTestServer(eventbusmock.Config{})
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_EVENTBUS", server.TestURL())
+
+	// SDK の tracer は log パッケージへ出力するため、テストでは握りつぶします。
+	originalLogWriter := log.Writer()
+	t.Cleanup(func() { log.SetOutput(originalLogWriter) })
+	log.SetOutput(io.Discard)
+
+	runCommand := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		return stdout.Bytes()
+	}
+
+	// 実行設定を作成します。
+	var process eventbusapi.ProcessConfigurationOutput
+	require.NoError(t, json.Unmarshal(runCommand("eventbus", "process-configuration", "create",
+		"--name", "mock-process", "--destination", "simplemq",
+		"--queue-name", "mock-queue", "--content", "hello",
+	), &process))
+
+	secretPath := filepath.Join(t.TempDir(), "secret-input.json")
+	require.NoError(t, os.WriteFile(secretPath, []byte(`{"APIKey":"SECRET-TRACE-VALUE"}`), 0o600))
+
+	// --trace を付けても set-secret は実行されます。secret の値はトレース出力へ記録されるため、ログの取り扱いに注意します。
+	runCommand("--trace", "eventbus", "process-configuration", "set-secret", process.ID, "--secret-file", "@"+secretPath)
+	stored, ok := server.Secret(process.ID)
+	require.True(t, ok, "secret should be stored on the mock server")
+	var storedSecret struct {
+		APIKey string
+	}
+	require.NoError(t, json.Unmarshal(stored, &storedSecret))
+	require.Equal(t, "SECRET-TRACE-VALUE", storedSecret.APIKey, "stored secret = %s", stored)
+}
+
 func TestEventbusCommandInputErrors(t *testing.T) {
 	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
 	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
@@ -359,12 +403,6 @@ func TestEventbusCommandInputErrors(t *testing.T) {
 			args: []string{"eventbus", "process-configuration", "set-secret", "123",
 				"--secret-file", "@/missing/secret-input.json"},
 			want: "開けません",
-		},
-		{
-			name: "trace is refused for secret operations",
-			args: []string{"--trace", "eventbus", "process-configuration", "set-secret", "123",
-				"--secret-file", "@" + secretPath},
-			want: "トレースを無効にしてください",
 		},
 		{
 			name: "invalid query is rejected before the API call",
