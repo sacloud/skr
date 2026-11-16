@@ -127,7 +127,7 @@ type ProcessConfigurationCommands struct {
 	Create    ProcessCreateCommand    `cmd:"" help:"実行設定を作成します。宛先 (--destination) に応じてパラメーターが変わります: simplenotification は --group-id と --message、simplemq は --queue-name と --content、autoscale は --action と --resource-id を指定します。未指定のパラメーターは空文字列として送信します。"`
 	Update    ProcessUpdateCommand    `cmd:"" help:"実行設定を更新します。指定した項目だけを変更し、未指定の項目は現状維持します。--destination を変更した場合、旧宛先のパラメーターは引き継がれず、指定のないパラメーターは空文字列として送信されるため、新宛先のパラメーターを指定してください。読み取りと更新の間に他の変更がないことは検証しません。"`
 	Delete    ProcessDeleteCommand    `cmd:"" help:"実行設定を削除します。削除対象は API から再取得し、リソース種別 (Provider.Class) と設定の種類が一致しない場合は削除しません。"`
-	SetSecret ProcessSetSecretCommand `cmd:"" name:"set-secret" help:"実行設定の secret を登録または置き換えます。secret は --secret-file で保護したファイル (@path) または標準入力 (-) から読み込みます。値を引数やインライン JSON に含めることはできません。SimpleMQ 宛先は {\"APIKey\":\"...\"}、それ以外の宛先は {\"AccessToken\":\"...\",\"AccessTokenSecret\":\"...\"} を指定します。--trace と併用すると secret の値がログに出力されます。"`
+	SetSecret ProcessSetSecretCommand `cmd:"" name:"set-secret" help:"実行設定の secret を登録または置き換えます。secret は --secret-file で保護したファイル (@path) または標準入力 (-) から読み込みます。値を引数やインライン JSON に含めることはできません。SimpleMQ 宛先は {\"APIKey\":\"...\"}、それ以外の宛先は {\"AccessToken\":\"...\",\"AccessTokenSecret\":\"...\"} を指定します。トレース (--trace、または SAKURA_TRACE_MODE などの SDK 設定) が有効な場合は、secret の値がログへ出力されます。"`
 }
 
 // ProcessListCommand は実行設定の一覧を表示します。
