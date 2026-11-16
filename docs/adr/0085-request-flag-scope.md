@@ -32,7 +32,7 @@
 - body 用 `--request` の残る実害は folder / project create の2型で、明示変換の追加により解消される。`DisallowUnknownFields` の併用により、将来 SDK が params 型にフィールドを追加したときのデコード時追従漏れはエラーとして顕在化する。
 - list 操作から JSON 経路がなくなるため、SDK が params 型にフィールドを追加した場合に個別フラグを追加しないと、その query params が指定できなくなる。デコード時に黙って無視される機構 (1) に比べ、欠落がヘルプの記載差として観察しやすい。
 - IAM の手書きラッパー型への json タグ追加は sacloud-sdk-go 側の変更であり、長期的な改善として SDK 側へ提案する。タグが付いた時点で skr 側の明示変換 (中間構造体) は撤去できる。
-- エンコード時に落ちる機構 (2) は生成器では検出できないため、`--request` を維持するドメインでは decode から SDK 送信形への変換までを検証する round-trip テストを設ける。既知の例として、gslb / proxylb の service 層手書き型は read 出力 (`iaas.ProxyLB`) が持つ `OriginGuard`、`StrictRule` を update 入力型が持たない。
+- エンコード時に落ちる機構 (2) は生成器では検出できないため、`--request` を維持するドメインでは decode から SDK 送信形への変換までを検証する round-trip テストを設ける。例として、gslb / proxylb の update は service 層の手書き入力型を経由するため、read 出力 (`iaas.ProxyLB`) には存在する `OriginGuard` や `StrictRule` が update 入力型に存在しない場合、`DisallowUnknownFields` では検出できず wire まで検証するテストでのみ把握できる。現在の SDK (v0.6.0) では update 入力型もこれらのフィールドを持つことを round-trip テストで固定している。テストの実装は proxylb / gslb / kms / secretmanager / IaaS find・create に置く。
 
 ## Alternatives considered
 

@@ -241,3 +241,85 @@ func (api *diskAPITestDouble) DeleteWithContext(_ context.Context, request *disk
 	api.deleteRequest = request
 	return nil
 }
+
+// iaasWireCaller は SDK が送信するリクエストの body envelope を記録します。
+// IaaS の検索系 API は GET + リクエストボディで検索条件を送信します。
+type iaasWireCaller struct {
+	response []byte
+	method   string
+	uri      string
+	body     map[string]any
+}
+
+func (caller *iaasWireCaller) Do(_ context.Context, method, uri string, body any) ([]byte, error) {
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(data, &caller.body); err != nil {
+			return nil, err
+		}
+	}
+	caller.method, caller.uri = method, uri
+	return caller.response, nil
+}
+
+// TestIaaSDiskFindRequestRoundTrip は --request JSON から GET リクエストの body envelope
+// までの変換 (round-trip) を検証します。decode だけでは捉えられない「エンコード時に落ちる」
+// 欠落を wire body の検証で捉えます (ADR 0085)。
+func TestIaaSDiskFindRequestRoundTrip(t *testing.T) {
+	caller := &iaasWireCaller{
+		response: []byte(`{"Total":1,"From":0,"Count":1,"Disks":[{"ID":123,"Name":"disk1","SizeMB":20480,"Availability":"available"}]}`),
+	}
+	commandLine := newCLI()
+	setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return diskapi.NewAPI(caller), nil })
+
+	requestJSON := `{"Zone":"is1b","Names":["web-"],"Tags":["production"],"Sort":[{"Key":"Name","Order":0},{"Key":"SizeMB","Order":1}],"Count":7,"From":2}`
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"iaas-api", "disk", "find", "--request", requestJSON}, &stdout, &stderr, commandLine)
+	require.Equal(t, 0, code, "stderr: %s", stderr.String())
+
+	require.Equal(t, "GET", caller.method, "uri = %s", caller.uri)
+	require.Contains(t, caller.uri, "/is1b/api/cloud/1.1/disk", "unexpected URI")
+	// ページングとソートが wire envelope まで届く。昇順はキー名のみ、降順は "-" 接頭辞
+	require.EqualValues(t, 7, caller.body["Count"], "wire body = %#v", caller.body)
+	require.EqualValues(t, 2, caller.body["From"], "unexpected value")
+	require.Equal(t, []any{"Name", "-SizeMB"}, caller.body["Sort"], "unexpected value")
+	// 名前は部分一致検索で envelope に入る。1 要素の AndEqual は wire 上は単一文字列。
+	// Tags は SDK の TagsAndEqual (OR 条件) で配列のまま渡されるため、wire 上はネストした配列
+	filter, ok := caller.body["Filter"].(map[string]any)
+	require.True(t, ok, "wire body = %#v", caller.body)
+	require.Equal(t, "web-", filter["Name"], "wire filter = %#v", filter)
+	require.Equal(t, []any{[]any{"production"}}, filter["Tags.Name"], "wire filter = %#v", filter)
+}
+
+// TestIaaSDiskCreateRequestRoundTrip は --request JSON から POST リクエストの wire body
+// までの変換 (round-trip) を検証します。SizeGB から SizeMB への変換と KMS キーの
+// envelope 形式を含めて固定します (ADR 0085)。
+func TestIaaSDiskCreateRequestRoundTrip(t *testing.T) {
+	caller := &iaasWireCaller{
+		response: []byte(`{"Disk":{"ID":123,"Name":"json-disk","SizeMB":20480,"Availability":"available"}}`),
+	}
+	commandLine := newCLI()
+	setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return diskapi.NewAPI(caller), nil })
+
+	requestJSON := `{"Zone":"is1b","Name":"json-disk","Description":"json-description","DiskPlanID":4,"Connection":"virtio","SizeGB":20,"Tags":["test"],"EncryptionAlgorithm":"aes-256-xts","KMSKeyID":987654321012}`
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"iaas-api", "disk", "create", "--request", requestJSON}, &stdout, &stderr, commandLine)
+	require.Equal(t, 0, code, "stderr: %s", stderr.String())
+
+	require.Equal(t, "POST", caller.method, "uri = %s", caller.uri)
+	require.Contains(t, caller.uri, "/is1b/api/cloud/1.1/disk", "unexpected URI")
+	disk, ok := caller.body["Disk"].(map[string]any)
+	require.True(t, ok, "wire body = %#v", caller.body)
+	require.Equal(t, "json-disk", disk["Name"], "wire body = %#v", caller.body)
+	require.Equal(t, "json-description", disk["Description"], "unexpected value")
+	require.Equal(t, "aes-256-xts", disk["EncryptionAlgorithm"], "unexpected value")
+	// SizeGB は API の SizeMB に変換されて送信される
+	require.EqualValues(t, 20480, disk["SizeMB"], "wire disk = %#v", disk)
+	// KMSKeyID は KMS キー参照の envelope 形式に変換される
+	kmsKey, ok := caller.body["KMSKey"].(map[string]any)
+	require.True(t, ok, "wire body = %#v", caller.body)
+	require.EqualValues(t, 987654321012, kmsKey["ID"], "unexpected value")
+}

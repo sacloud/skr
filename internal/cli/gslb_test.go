@@ -19,6 +19,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -228,6 +230,30 @@ func (caller *gslbAPICaller) Do(_ context.Context, method, uri string, body any)
 	return []byte(`{"CommonServiceItem":{"ID":321,"Name":"sdk-created","Settings":{"GSLB":{"DelayLoop":10,"HealthCheck":{"Protocol":"ping"},"Servers":[{"IPAddress":"192.0.2.10","Enabled":"True","Weight":5}]}},"Status":{"FQDN":"site-321.gslbN.sakura.ne.jp"}}}`), nil
 }
 
+// gslbRoundTripCaller は SDK が送信する wire body を記録し、Read 応答を固定値で返します。
+// --request JSON から wire への変換 (round-trip) を検証するために使います。
+type gslbRoundTripCaller struct {
+	readBody     []byte
+	updateMethod string
+	updateURI    string
+	updateBody   map[string]any
+}
+
+func (caller *gslbRoundTripCaller) Do(_ context.Context, method, uri string, body any) ([]byte, error) {
+	if method == "GET" {
+		return caller.readBody, nil
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &caller.updateBody); err != nil {
+		return nil, err
+	}
+	caller.updateMethod, caller.updateURI = method, uri
+	return caller.readBody, nil
+}
+
 func TestGSLBCLIUsesSDKRequestConversion(t *testing.T) {
 	caller := &gslbAPICaller{}
 	commandLine := newCLI()
@@ -272,4 +298,42 @@ func reflectStrings(actual, expected []string) bool {
 		}
 	}
 	return true
+}
+
+// TestGSLBJSONRequestRoundTrip は --request JSON から SDK が送信する wire body までの
+// 変換 (round-trip) を検証します。decode だけでは捉えられない「エンコード時に落ちる」欠落を
+// wire body の検証で捉えます (ADR 0085)。
+func TestGSLBJSONRequestRoundTrip(t *testing.T) {
+	commandLine := newCLI()
+	current := `{"CommonServiceItem":{"ID":123,"Name":"gslb-current","Description":"current-desc","Settings":{"GSLB":{"DelayLoop":10,"HealthCheck":{"Protocol":"ping"},"Weighted":"False","Servers":[{"IPAddress":"192.0.2.10","Enabled":"True","Weight":5}],"SorryServer":"192.0.2.99"}},"SettingsHash":"current-hash"},"Status":{"FQDN":"site-123.gslbN.sakura.ne.jp"}}`
+	caller := &gslbRoundTripCaller{readBody: []byte(current)}
+	setGSLBAPIFactory(commandLine, func() (gslbapi.API, error) { return gslb.New(caller), nil })
+
+	dir := t.TempDir()
+	updatePath := filepath.Join(dir, "update.json")
+	updateJSON := `{"ID":123,"Description":"json-updated","DestinationServers":[{"IPAddress":"192.0.2.20","Enabled":"True","Weight":10}],"SorryServer":"192.0.2.98"}`
+	require.NoError(t, os.WriteFile(updatePath, []byte(updateJSON), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"gslb-api", "update", "--request", "@" + updatePath}, &stdout, &stderr, commandLine)
+	require.Equal(t, 0, code, "update: stderr %q", stderr.String())
+	require.Equal(t, "PUT", caller.updateMethod, "update URI = %s", caller.updateURI)
+
+	item, ok := caller.updateBody["CommonServiceItem"].(map[string]any)
+	require.True(t, ok, "SDK request body = %#v", caller.updateBody)
+	gslbSettings := item["Settings"].(map[string]any)["GSLB"].(map[string]any)
+	// --request で指定した項目が wire まで届く。DestinationServers は wire では Servers になる
+	require.Equal(t, "json-updated", item["Description"], "wire item = %#v", item)
+	servers := gslbSettings["Servers"].([]any)
+	require.Len(t, servers, 1, "wire gslbSettings = %#v", gslbSettings)
+	server := servers[0].(map[string]any)
+	require.Equal(t, "192.0.2.20", server["IPAddress"], "unexpected value")
+	require.Equal(t, "True", server["Enabled"], "unexpected value")
+	require.Equal(t, "10", server["Weight"], "unexpected value")
+	require.Equal(t, "192.0.2.98", gslbSettings["SorryServer"], "unexpected value")
+	// --request に含まれない項目は SDK が現在値を引き継ぐ
+	require.EqualValues(t, 10, gslbSettings["DelayLoop"], "wire gslbSettings = %#v", gslbSettings)
+	require.Equal(t, "ping", gslbSettings["HealthCheck"].(map[string]any)["Protocol"], "unexpected value")
+	// update 入力型に存在しない API フィールド (Status 系) は wire に現れない
+	require.NotContains(t, item, "Status", "wire item = %#v", item)
 }

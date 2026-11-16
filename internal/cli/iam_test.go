@@ -104,8 +104,8 @@ func TestRunIAMAPIHelp(t *testing.T) {
 			want: []string{"--request", "--name", "--description", "name と description は必須"},
 		},
 		{
-			args: []string{"iam-api", "list-service-principal-keys", "--help"},
-			want: []string{"--page", "--per-page", "--ordering"},
+			args:    []string{"iam-api", "list-service-principal-keys", "--help"},
+			want:    []string{"--page", "--per-page", "--ordering"},
 			notWant: []string{"--request"},
 		},
 		{
