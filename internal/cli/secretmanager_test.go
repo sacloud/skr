@@ -17,6 +17,9 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -228,4 +231,48 @@ func TestSecretManagerAPIWithSakumock(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(runCommand("secretmanager-api", "list-vaults", "--query", `map(select(.ID == "`+vaultID+`"))`), &remainingVaults))
 	require.Len(t, remainingVaults, 0, "deleted vault remains in list: %+v", remainingVaults)
+}
+
+// TestSecretManagerAPIJSONRequestRoundTrip は --request JSON から SDK が送信する wire body
+// までの変換 (round-trip) を検証します。decode だけでは捉えられない「エンコード時に落ちる」
+// 欠落を wire body の検証で捉えます (ADR 0085)。
+func TestSecretManagerAPIJSONRequestRoundTrip(t *testing.T) {
+	var recorded struct {
+		method string
+		path   string
+		body   map[string]any
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		recorded.method, recorded.path = r.Method, r.URL.Path
+		if len(data) > 0 {
+			require.NoError(t, json.Unmarshal(data, &recorded.body), "request body = %s", data)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"is_ok":true,"Vault":{"ID":"sm-vault-1","CreatedAt":"2026-11-16T00:00:00Z","ModifiedAt":"2026-11-16T00:00:00Z","Name":"json-vault","Description":"json-description","KmsKeyID":"123456789012","Tags":["tag1"]}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	t.Setenv("SAKURA_ENDPOINTS_SECRETMANAGER", server.URL)
+
+	dir := t.TempDir()
+	requestPath := filepath.Join(dir, "create-vault.json")
+	requestJSON := `{"Name":"json-vault","Description":"json-description","KmsKeyID":"123456789012","Tags":["tag1","tag2"]}`
+	require.NoError(t, os.WriteFile(requestPath, []byte(requestJSON), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	require.Equal(t, 0, run([]string{"secretmanager-api", "create-vault", "--request", "@" + requestPath}, &stdout, &stderr), "stderr: %s", stderr.String())
+
+	require.Equal(t, "POST", recorded.method, "path = %s", recorded.path)
+	vault, ok := recorded.body["Vault"].(map[string]any)
+	require.True(t, ok, "wire body = %#v", recorded.body)
+	require.Equal(t, "json-vault", vault["Name"], "wire body = %#v", recorded.body)
+	require.Equal(t, "json-description", vault["Description"], "unexpected value")
+	require.Equal(t, "123456789012", vault["KmsKeyID"], "unexpected value")
+	require.Equal(t, []any{"tag1", "tag2"}, vault["Tags"], "unexpected value")
 }

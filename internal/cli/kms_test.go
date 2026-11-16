@@ -18,6 +18,9 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -242,4 +245,49 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 		require.Contains(t, []string{keyID, imported.ID}, key.ID)
 		require.Equal(t, "pending_destruction", key.Status)
 	}
+}
+
+// TestKmsAPIJSONRequestRoundTrip は --request JSON から SDK が送信する wire body までの
+// 変換 (round-trip) を検証します。decode だけでは捉えられない「エンコード時に落ちる」欠落を
+// wire body の検証で捉えます (ADR 0085)。PlainKey は秘密情報を受け取れる API フィールドですが、
+// 値はテスト用のダミーです。
+func TestKmsAPIJSONRequestRoundTrip(t *testing.T) {
+	var recorded struct {
+		method string
+		path   string
+		body   map[string]any
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		recorded.method, recorded.path = r.Method, r.URL.Path
+		if len(data) > 0 {
+			require.NoError(t, json.Unmarshal(data, &recorded.body), "request body = %s", data)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"is_ok":true,"Key":{"ID":"kms-key-1","CreatedAt":"2026-11-16T00:00:00Z","ModifiedAt":"2026-11-16T00:00:00Z","Name":"json-key","Description":"json-description","Status":"active","KeyOrigin":"imported","LatestVersion":1,"ServiceClass":"cloud/kms/key","Tags":["tag1"]}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	t.Setenv("SAKURA_ENDPOINTS_KMS", server.URL)
+
+	dir := t.TempDir()
+	requestPath := filepath.Join(dir, "create-key.json")
+	requestJSON := `{"Name":"json-key","Description":"json-description","Tags":["tag1","tag2"],"PlainKey":"0123456789abcdef0123456789abcdef"}`
+	require.NoError(t, os.WriteFile(requestPath, []byte(requestJSON), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	require.Equal(t, 0, run([]string{"kms-api", "create-key", "--request", "@" + requestPath}, &stdout, &stderr), "stderr: %s", stderr.String())
+
+	require.Equal(t, "POST", recorded.method, "path = %s", recorded.path)
+	key, ok := recorded.body["Key"].(map[string]any)
+	require.True(t, ok, "wire body = %#v", recorded.body)
+	require.Equal(t, "json-key", key["Name"], "wire body = %#v", recorded.body)
+	require.Equal(t, "json-description", key["Description"], "unexpected value")
+	require.Equal(t, []any{"tag1", "tag2"}, key["Tags"], "unexpected value")
+	require.Equal(t, "0123456789abcdef0123456789abcdef", key["PlainKey"], "unexpected value")
 }

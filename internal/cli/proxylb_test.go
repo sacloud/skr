@@ -471,6 +471,30 @@ func (caller *proxylbAPICaller) Do(_ context.Context, method, uri string, body a
 	return []byte(`{"CommonServiceItem":{"ID":321,"Name":"sdk-created","Settings":{"ProxyLB":{"HealthCheck":{"Protocol":"http","DelayLoop":10},"BindPorts":[{"ProxyMode":"http","Port":80}],"Servers":[{"IPAddress":"192.0.2.10","Port":80,"Enabled":true,"ServerGroup":"","ProxySSL":false}]}},"Status":{"FQDN":"321.proxylb.jp","Region":"is1"}}}`), nil
 }
 
+// proxylbRoundTripCaller は SDK が送信する wire body を記録し、Read 応答を固定値で返します。
+// --request JSON から wire への変換 (round-trip) を検証するために使います。
+type proxylbRoundTripCaller struct {
+	readBody     []byte
+	updateMethod string
+	updateURI    string
+	updateBody   map[string]any
+}
+
+func (caller *proxylbRoundTripCaller) Do(_ context.Context, method, uri string, body any) ([]byte, error) {
+	if method == "GET" {
+		return caller.readBody, nil
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &caller.updateBody); err != nil {
+		return nil, err
+	}
+	caller.updateMethod, caller.updateURI = method, uri
+	return caller.readBody, nil
+}
+
 func TestProxyLBCLIUsesSDKRequestConversion(t *testing.T) {
 	caller := &proxylbAPICaller{}
 	commandLine := newCLI()
@@ -542,6 +566,79 @@ func TestProxyLBSetCertificatesInput(t *testing.T) {
 	require.Len(t, api.setCertificatesRequest.AdditionalCerts, 1)
 	require.Contains(t, api.setCertificatesRequest.AdditionalCerts[0].ServerCertificate, "additional")
 	require.Contains(t, api.setCertificatesRequest.AdditionalCerts[0].PrivateKey, "additional-key")
+}
+
+// TestProxyLBJSONRequestRoundTrip は --request JSON から SDK が送信する wire body までの
+// 変換 (round-trip) を検証します。decode だけでは捉えられない「エンコード時に落ちる」欠落を
+// wire body の検証で捉えます (ADR 0085)。
+func TestProxyLBJSONRequestRoundTrip(t *testing.T) {
+	commandLine := newCLI()
+	current := `{"CommonServiceItem":{"ID":123,"Name":"proxylb-current","Description":"current-desc","Settings":{"ProxyLB":{"HealthCheck":{"Protocol":"http","DelayLoop":10,"Path":"/"},"BindPorts":[{"ProxyMode":"http","Port":80}],"Rules":[{"Host":"current.example.com","Path":"/cur","ServerGroup":"grp"}]},"SettingsHash":"current-hash"},"Status":{"FQDN":"123.proxylb.jp","Region":"is1"}}}`
+	caller := &proxylbRoundTripCaller{readBody: []byte(current)}
+	setProxyLBAPIFactory(commandLine, func() (proxylbapi.API, error) { return proxylbSDK.New(caller), nil })
+
+	dir := t.TempDir()
+	updatePath := filepath.Join(dir, "update.json")
+	updateJSON := `{"ID":123,"Description":"json-updated","Rules":[{"Host":"updated.example.com","Path":"/upd","ServerGroup":"upd-grp"}],"OriginGuard":{"Token":"dummy-guard-token"},"StickySession":{"Method":"cookie","Enabled":true}}`
+	require.NoError(t, os.WriteFile(updatePath, []byte(updateJSON), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"proxylb-api", "update", "--request", "@" + updatePath}, &stdout, &stderr, commandLine)
+	require.Equal(t, 0, code, "update: stderr %q", stderr.String())
+	require.Equal(t, "PUT", caller.updateMethod, "update URI = %s", caller.updateURI)
+
+	item, ok := caller.updateBody["CommonServiceItem"].(map[string]any)
+	require.True(t, ok, "SDK request body = %#v", caller.updateBody)
+	settings := item["Settings"].(map[string]any)
+	proxyLB := settings["ProxyLB"].(map[string]any)
+	// --request で指定した項目が wire まで届く。Rules は専用フラグのない API フィールド
+	require.Equal(t, "json-updated", item["Description"], "wire item = %#v", item)
+	rules, ok := proxyLB["Rules"].([]any)
+	require.True(t, ok, "wire proxyLB = %#v", proxyLB)
+	require.Len(t, rules, 1, "wire proxyLB = %#v", proxyLB)
+	rule := rules[0].(map[string]any)
+	require.Equal(t, "updated.example.com", rule["Host"], "unexpected value")
+	require.Equal(t, "/upd", rule["Path"], "unexpected value")
+	require.Equal(t, "upd-grp", rule["ServerGroup"], "unexpected value")
+	// OriginGuard.Token は秘密情報を受け取れる API フィールド。値はテスト用のダミー
+	require.Equal(t, "dummy-guard-token", proxyLB["OriginGuard"].(map[string]any)["Token"], "wire proxyLB = %#v", proxyLB)
+	sticky := proxyLB["StickySession"].(map[string]any)
+	require.Equal(t, "cookie", sticky["Method"], "unexpected value")
+	require.Equal(t, true, sticky["Enabled"], "unexpected value")
+	// --request に含まれない項目は SDK が現在値を引き継ぐ
+	healthCheck := proxyLB["HealthCheck"].(map[string]any)
+	require.Equal(t, "http", healthCheck["Protocol"], "unexpected value")
+	require.EqualValues(t, 10, healthCheck["DelayLoop"], "unexpected value")
+	require.Equal(t, "/", healthCheck["Path"], "unexpected value")
+	bindPorts := proxyLB["BindPorts"].([]any)
+	require.Len(t, bindPorts, 1, "unexpected value")
+	require.EqualValues(t, 80, bindPorts[0].(map[string]any)["Port"], "unexpected value")
+	// update 入力型に存在しない API フィールド (Status 系) は wire に現れない
+	require.NotContains(t, item, "Status", "wire item = %#v", item)
+
+	// create も --request から wire まで通る
+	caller2 := &proxylbRoundTripCaller{readBody: []byte(current)}
+	commandLine2 := newCLI()
+	setProxyLBAPIFactory(commandLine2, func() (proxylbapi.API, error) { return proxylbSDK.New(caller2), nil })
+	createPath := filepath.Join(dir, "create.json")
+	createJSON := `{"Name":"json-created","Plan":100,"Region":"is1","HealthCheck":{"Protocol":"tcp","DelayLoop":15},"BindPorts":[{"ProxyMode":"https","Port":443,"SupportHttp2":true}],"Gzip":{"Enabled":true}}`
+	require.NoError(t, os.WriteFile(createPath, []byte(createJSON), 0o600))
+
+	var stdout2, stderr2 bytes.Buffer
+	code = runCLI([]string{"proxylb-api", "create", "--request", "@" + createPath}, &stdout2, &stderr2, commandLine2)
+	require.Equal(t, 0, code, "create: stderr %q", stderr2.String())
+
+	item2, ok := caller2.updateBody["CommonServiceItem"].(map[string]any)
+	require.True(t, ok, "SDK request body = %#v", caller2.updateBody)
+	proxyLB2 := item2["Settings"].(map[string]any)["ProxyLB"].(map[string]any)
+	require.Equal(t, "json-created", item2["Name"], "wire item = %#v", item2)
+	bindPort2 := proxyLB2["BindPorts"].([]any)[0].(map[string]any)
+	require.Equal(t, "https", bindPort2["ProxyMode"], "unexpected value")
+	require.EqualValues(t, 443, bindPort2["Port"], "unexpected value")
+	require.Equal(t, true, bindPort2["SupportHttp2"], "unexpected value")
+	require.Equal(t, true, proxyLB2["Gzip"].(map[string]any)["Enabled"], "wire proxyLB = %#v", proxyLB2)
+	// create の未指定のタイムアウトは CLI が既定値を補完する
+	require.EqualValues(t, 10, proxyLB2["Timeout"].(map[string]any)["InactiveSec"], "wire proxyLB = %#v", proxyLB2)
 }
 
 func TestProxyLBSetCertificatesStdin(t *testing.T) {
