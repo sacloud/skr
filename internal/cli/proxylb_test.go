@@ -579,7 +579,7 @@ func TestProxyLBJSONRequestRoundTrip(t *testing.T) {
 
 	dir := t.TempDir()
 	updatePath := filepath.Join(dir, "update.json")
-	updateJSON := `{"ID":123,"Description":"json-updated","Rules":[{"Host":"updated.example.com","Path":"/upd","ServerGroup":"upd-grp"}],"OriginGuard":{"Token":"dummy-guard-token"},"StickySession":{"Method":"cookie","Enabled":true}}`
+	updateJSON := `{"ID":123,"Description":"json-updated","Rules":[{"Host":"updated.example.com","Path":"/upd","ServerGroup":"upd-grp"}],"OriginGuard":{"Token":"dummy-guard-token"},"StickySession":{"Method":"cookie","Enabled":true},"StrictRule":{"Enabled":true}}`
 	require.NoError(t, os.WriteFile(updatePath, []byte(updateJSON), 0o600))
 
 	var stdout, stderr bytes.Buffer
@@ -602,6 +602,7 @@ func TestProxyLBJSONRequestRoundTrip(t *testing.T) {
 	require.Equal(t, "upd-grp", rule["ServerGroup"], "unexpected value")
 	// OriginGuard.Token は秘密情報を受け取れる API フィールド。値はテスト用のダミー
 	require.Equal(t, "dummy-guard-token", proxyLB["OriginGuard"].(map[string]any)["Token"], "wire proxyLB = %#v", proxyLB)
+	require.Equal(t, true, proxyLB["StrictRule"].(map[string]any)["Enabled"], "wire proxyLB = %#v", proxyLB)
 	sticky := proxyLB["StickySession"].(map[string]any)
 	require.Equal(t, "cookie", sticky["Method"], "unexpected value")
 	require.Equal(t, true, sticky["Enabled"], "unexpected value")
