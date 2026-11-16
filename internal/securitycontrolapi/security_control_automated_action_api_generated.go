@@ -51,7 +51,6 @@ func NewAutomatedActionCommands(runtime AutomatedActionRuntime, factory Automate
 }
 
 type AutomatedActionListCommand struct {
-	Request  *string "help:\"API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。\""
 	PageSize *int    "name:\"page-size\" help:\"任意: 1 ページの取得件数。\""
 	Next     *string "name:\"next\" help:\"任意: 前回の list 出力の nextPageToken。次ページを取得します。\""
 	Prev     *string "name:\"prev\" help:\"任意: 前回の list 出力の prevPageToken。前ページを取得します。\""
@@ -60,36 +59,18 @@ type AutomatedActionListCommand struct {
 }
 
 func (c *AutomatedActionListCommand) Run(ctx *kong.Context) error {
-	flagsSet := false
-	flagsSet = flagsSet || c.PageSize != nil
-	flagsSet = flagsSet || c.Next != nil
-	flagsSet = flagsSet || c.Prev != nil
-	if c.Request != nil && flagsSet {
-		return fmt.Errorf("--request と個別フラグは併用できません")
-	}
 	request := &v1.AutomatedActionsListParams{}
-	if c.Request != nil {
-		if c.runtime.DecodeRequest == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
-			return err
-		}
-	} else {
-		if !flagsSet {
-		}
-		if c.PageSize != nil {
-			value := v1.NewOptInt(*c.PageSize)
-			request.PageSize = value
-		}
-		if c.Next != nil {
-			value := v1.NewOptString(*c.Next)
-			request.Next = value
-		}
-		if c.Prev != nil {
-			value := v1.NewOptString(*c.Prev)
-			request.Prev = value
-		}
+	if c.PageSize != nil {
+		value := v1.NewOptInt(*c.PageSize)
+		request.PageSize = value
+	}
+	if c.Next != nil {
+		value := v1.NewOptString(*c.Next)
+		request.Next = value
+	}
+	if c.Prev != nil {
+		value := v1.NewOptString(*c.Prev)
+		request.Prev = value
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

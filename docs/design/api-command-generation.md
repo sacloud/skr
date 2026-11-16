@@ -96,6 +96,8 @@ $ make generate-api API_CONFIG=api/commands/eventbus.json API_OUTPUT=internal/ev
 
 リクエストを持つ操作では `--request` にインライン JSON または `@path.json` を指定できます。個別フラグを設定した場合は `--request` と併用できません。JSON 経路では個別フラグの必須指定を要求せず、フラグ経路では必須フラグと、少なくとも 1 つのフラグの指定を確認してから SDK を呼び出します。IaaS API のトップレベル `Tags` 配列は例外として `--tags` でも指定できますが、JSON 経路での `Tags` 配列も引き続き利用でき、両経路を混在させることはできません。その他の配列、map、union、nullable 値、秘密情報など生成器の単純な型で表現しない入力は `--request` に残します。
 
+`--request` は API の request body を表す引数です ([ADR 0085](../adr/0085-request-flag-scope.md))。query params や path params をマッピングする用途には生成しません。query params を受ける list 操作では個別フラグに入力を統一し、`no_request_flag: true` を指定して `--request` の生成を抑制します。`request_type` は SDK 呼び出しの型として必要なため残し、設定検証で `handwritten`、`request_file_only`、`request_input_transform`、フラグなし操作との併用を拒否します。`no_request_flag` を指定した操作は、フラグからリクエスト型を構築するだけの `Run` を生成し、JSON デコード経路と相互排他チェックを生成しません。IaaS の find は GET にリクエストボディを付けて送る API 形式のため、`FindRequest` JSON は body として維持します。
+
 秘密情報を含む可能性があり、インライン JSON を引数として受け付けない操作には `request_file_only: true` を指定します。この設定には `request_type` が必要です。`request_optional`、`handwritten`、`flags`、`repeated_flags` との併用は設定検証で拒否します。生成コマンドは `--request` を必須とし、入力値として `@path.json` または `-`（標準入力）だけを受け付けます。JSON の読み込みと SDK 型への変換は既存の Runtime decoder が行います。
 
 この規則は生成器の共通設定で扱う入力を対象とします。複雑な操作を JSON 専用と機械的に決めず、主要な作業に必要な値をサービス固有の個別フラグや厳密な反復可能オプションで表現できるか検討します。独自構文を設ける場合はユーザーと合意し、サービスパッケージの実装とテスト、ヘルプ、チュートリアル、ADR、設計文書に記録します。特定サービス向けの構文を他の配列や操作へ自動的に一般化しません。
@@ -139,6 +141,8 @@ $ make generate-wiring
 ## 手書きコードとの境界
 
 [ADR 0047](../adr/0047-minimize-cli-request-body-validation.md) に従い、CLI の検証は入力経路と CLI 固有の制約を中心にします。本文の必須項目、値の範囲、サービス上の相関制約は SDK と API に委ね、`request.Validate()` の重複呼び出しは行いません。`validate_zone` と、無視される補助入力を防ぐ Archive の未知 OSType 拒否は維持します。変更項目のない更新も SDK へ渡し、そのエラーを利用者へ返します。EventBus の `Set*Provider` は入力補完なので残します。
+
+`--request` を維持するドメインでは、デコード先の型に json タグがない場合、wire 名のキーが黙って無視されないことを単体テストで固定します。値が落ちる経路には 2 種類あります ([ADR 0085](../adr/0085-request-flag-scope.md))。wire 名キーがタグなし型に結びつかない「デコード時に落ちる」機構は `DisallowUnknownFields` でエラー化できます。デコード先の型自体にフィールドが存在しない「エンコード時に落ちる」機構は round-trip テストでのみ捉えられ、デコード結果から SDK が送信する形への変換までを検証します。手書きラッパー型をデコード先に使う操作では、wire 名タグ付き中間構造体による明示変換と `DisallowUnknownFields` を採用します。SDK の params 型にフィールドが追加されたときの追従漏れをエラーとして顕在化させます (iamapi の `DecodeRequest` がこの方式です)。
 
 生成ファイルは編集せず、設定を直して再生成します。`package` はリソース単位で指定し、コマンド、API interface、factory、runtime の型名はモードと操作名から導出します (ADR 0067)。生成コマンド package は `internal/` 配下に配置して CLI 本体から分離し、`Runtime` callbacks で JSON decoder、出力の事前検証、出力処理を受け取ります。リクエスト検証関数はコマンドと同じ package に置き、生成コードから直接呼び出します。設定した関数が存在しない場合や引数型が一致しない場合はビルド時に検出されます。[ADR 0044](../adr/0044-typed-request-validator-callbacks.md) に従い、文字列キー、`any` による振り分け、CLI の検証 callback 接続は使いません。生成されたコマンド群の `Runtime` と SDK API factory は `New...Commands(runtime, factory)` でまとめて注入し、setter による段階的な初期化を避けます。[ADR 0045](../adr/0045-initialize-api-commands-with-constructors.md) を参照してください。
 

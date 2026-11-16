@@ -56,7 +56,6 @@ func NewProjectCommands(runtime ProjectRuntime, factory ProjectAPIFactory) Proje
 }
 
 type ProjectListCommand struct {
-	Request        *string "help:\"プロジェクト一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。\""
 	Page           *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage        *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	Ordering       *string "name:\"ordering\" help:\"任意: 並び順を API の ordering 値で指定します。\""
@@ -67,42 +66,22 @@ type ProjectListCommand struct {
 }
 
 func (c *ProjectListCommand) Run(ctx *kong.Context) error {
-	flagsSet := false
-	flagsSet = flagsSet || c.Page != nil
-	flagsSet = flagsSet || c.PerPage != nil
-	flagsSet = flagsSet || c.Ordering != nil
-	flagsSet = flagsSet || c.IamRole != nil
-	flagsSet = flagsSet || c.ParentFolderID != nil
-	if c.Request != nil && flagsSet {
-		return fmt.Errorf("--request と個別フラグは併用できません")
-	}
 	request := &project.ListParams{}
-	if c.Request != nil {
-		if c.runtime.DecodeRequest == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
-			return err
-		}
-	} else {
-		if !flagsSet {
-		}
-		if c.Page != nil {
-			request.Page = c.Page
-		}
-		if c.PerPage != nil {
-			request.PerPage = c.PerPage
-		}
-		if c.Ordering != nil {
-			value := v1.ListProjectsOrdering(*c.Ordering)
-			request.Ordering = &value
-		}
-		if c.IamRole != nil {
-			request.IamRole = c.IamRole
-		}
-		if c.ParentFolderID != nil {
-			request.ParentFolderID = c.ParentFolderID
-		}
+	if c.Page != nil {
+		request.Page = c.Page
+	}
+	if c.PerPage != nil {
+		request.PerPage = c.PerPage
+	}
+	if c.Ordering != nil {
+		value := v1.ListProjectsOrdering(*c.Ordering)
+		request.Ordering = &value
+	}
+	if c.IamRole != nil {
+		request.IamRole = c.IamRole
+	}
+	if c.ParentFolderID != nil {
+		request.ParentFolderID = c.ParentFolderID
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

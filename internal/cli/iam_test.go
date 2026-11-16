@@ -105,7 +105,8 @@ func TestRunIAMAPIHelp(t *testing.T) {
 		},
 		{
 			args: []string{"iam-api", "list-service-principal-keys", "--help"},
-			want: []string{"--request", "--page", "--per-page", "--ordering"},
+			want: []string{"--page", "--per-page", "--ordering"},
+			notWant: []string{"--request"},
 		},
 		{
 			args: []string{"iam-api", "issue-service-principal-token", "--help"},
@@ -564,7 +565,6 @@ func TestIAMAPIExtendedMutationsWithSakumock(t *testing.T) {
 	require.True(t, foundKey, "service principal key list returned %#v, want key %s", listedKeys, servicePrincipalKey.ID)
 	require.NoError(t, json.Unmarshal(runCommand(
 		"iam-api", "list-service-principal-keys", servicePrincipalID,
-		"--request", `{"page":1,"per_page":10,"ordering":"created_at"}`,
 	), &listedKeys))
 	foundKey = false
 	for _, key := range listedKeys.Items {
@@ -896,9 +896,7 @@ func TestIAMAPICommandInputErrors(t *testing.T) {
 		{"iam-api", "update-scim-configuration", "1", "--request", `{"name":"from-json"}`, "--name", "from-flag"},
 		{"iam-api", "update-service-principal", "1"},
 		{"iam-api", "update-service-principal", "1", "--request", `{"name":"from-json"}`, "--name", "from-flag"},
-		{"iam-api", "list-service-principal-keys", "1", "--request", "{}", "--page", "1"},
 		{"iam-api", "update-organization-id-policy"},
-		{"iam-api", "list-folders", "--request", "{}", "--page", "1"},
 		{"iam-api", "list-trusted-devices"},
 		{"iam-api", "issue-service-principal-token"},
 		{"iam-api", "issue-service-principal-token", "--assertion-file", "/missing/assertion.txt"},

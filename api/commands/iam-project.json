@@ -14,7 +14,6 @@
       "request_type": "project.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "プロジェクト一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。個別フラグと併用できません。",
       "response_type": "*v1.ListProjectsOK",
       "flags": [
         {
@@ -54,7 +53,8 @@
           "pointer": true
         }
       ],
-      "command_name": "list-projects"
+      "command_name": "list-projects",
+      "no_request_flag": true
     },
     {
       "name": "Create",

@@ -77,7 +77,6 @@ func NewServicePrincipalCommands(runtime ServicePrincipalRuntime, factory Servic
 }
 
 type ServicePrincipalListCommand struct {
-	Request   *string "help:\"サービスプリンシパル一覧のページング・絞り込み条件を含む JSON。直接指定するか @path.json で読み込みます。\""
 	Page      *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage   *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	ProjectID *int    "name:\"project-id\" help:\"任意: プロジェクト ID で絞り込みます。\""
@@ -87,38 +86,19 @@ type ServicePrincipalListCommand struct {
 }
 
 func (c *ServicePrincipalListCommand) Run(ctx *kong.Context) error {
-	flagsSet := false
-	flagsSet = flagsSet || c.Page != nil
-	flagsSet = flagsSet || c.PerPage != nil
-	flagsSet = flagsSet || c.ProjectID != nil
-	flagsSet = flagsSet || c.Ordering != nil
-	if c.Request != nil && flagsSet {
-		return fmt.Errorf("--request と個別フラグは併用できません")
-	}
 	request := &serviceprincipal.ListParams{}
-	if c.Request != nil {
-		if c.runtime.DecodeRequest == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
-			return err
-		}
-	} else {
-		if !flagsSet {
-		}
-		if c.Page != nil {
-			request.Page = c.Page
-		}
-		if c.PerPage != nil {
-			request.PerPage = c.PerPage
-		}
-		if c.ProjectID != nil {
-			request.ProjectID = c.ProjectID
-		}
-		if c.Ordering != nil {
-			value := v1.ListServicePrincipalsOrdering(*c.Ordering)
-			request.Ordering = &value
-		}
+	if c.Page != nil {
+		request.Page = c.Page
+	}
+	if c.PerPage != nil {
+		request.PerPage = c.PerPage
+	}
+	if c.ProjectID != nil {
+		request.ProjectID = c.ProjectID
+	}
+	if c.Ordering != nil {
+		value := v1.ListServicePrincipalsOrdering(*c.Ordering)
+		request.Ordering = &value
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")
@@ -328,7 +308,6 @@ func (c *ServicePrincipalDeleteCommand) Run(ctx *kong.Context) error {
 
 type ServicePrincipalListKeysCommand struct {
 	ID       int     "arg:\"\" name:\"id\" help:\"キーを一覧表示するサービスプリンシパル ID。\""
-	Request  *string "help:\"キー一覧のページング・並び順条件 JSON。直接指定するか @path.json で読み込みます。--request と個別フラグは併用できません。\""
 	Page     *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage  *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	Ordering *string "name:\"ordering\" help:\"任意: 並び順を API の ordering 値で指定します。\""
@@ -337,34 +316,16 @@ type ServicePrincipalListKeysCommand struct {
 }
 
 func (c *ServicePrincipalListKeysCommand) Run(ctx *kong.Context) error {
-	flagsSet := false
-	flagsSet = flagsSet || c.Page != nil
-	flagsSet = flagsSet || c.PerPage != nil
-	flagsSet = flagsSet || c.Ordering != nil
-	if c.Request != nil && flagsSet {
-		return fmt.Errorf("--request と個別フラグは併用できません")
-	}
 	request := &serviceprincipal.ListKeysParams{}
-	if c.Request != nil {
-		if c.runtime.DecodeRequest == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
-			return err
-		}
-	} else {
-		if !flagsSet {
-		}
-		if c.Page != nil {
-			request.Page = c.Page
-		}
-		if c.PerPage != nil {
-			request.PerPage = c.PerPage
-		}
-		if c.Ordering != nil {
-			value := v1.ListServicePrincipalKeysOrdering(*c.Ordering)
-			request.Ordering = &value
-		}
+	if c.Page != nil {
+		request.Page = c.Page
+	}
+	if c.PerPage != nil {
+		request.PerPage = c.PerPage
+	}
+	if c.Ordering != nil {
+		value := v1.ListServicePrincipalKeysOrdering(*c.Ordering)
+		request.Ordering = &value
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

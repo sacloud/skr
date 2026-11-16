@@ -55,7 +55,6 @@ func NewApplicationCommands(runtime ApplicationRuntime, factory ApplicationAPIFa
 }
 
 type ApplicationListCommand struct {
-	Request   *string "help:\"ListApplicationsParams JSON。フラグと併用できません。直接指定、@path.json、または -（標準入力）に対応します。\""
 	PageNum   *int    "name:\"page-num\" help:\"取得するページ番号。\""
 	PageSize  *int    "name:\"page-size\" help:\"1ページあたりの項目数。\""
 	SortField *string "name:\"sort-field\" help:\"並び替えに使うフィールド名。\""
@@ -65,41 +64,22 @@ type ApplicationListCommand struct {
 }
 
 func (c *ApplicationListCommand) Run(ctx *kong.Context) error {
-	flagsSet := false
-	flagsSet = flagsSet || c.PageNum != nil
-	flagsSet = flagsSet || c.PageSize != nil
-	flagsSet = flagsSet || c.SortField != nil
-	flagsSet = flagsSet || c.SortOrder != nil
-	if c.Request != nil && flagsSet {
-		return fmt.Errorf("--request と個別フラグは併用できません")
-	}
 	request := &v1.ListApplicationsParams{}
-	if c.Request != nil {
-		if c.runtime.DecodeRequest == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
-			return err
-		}
-	} else {
-		if !flagsSet {
-		}
-		if c.PageNum != nil {
-			value := v1.NewOptInt(*c.PageNum)
-			request.PageNum = value
-		}
-		if c.PageSize != nil {
-			value := v1.NewOptInt(*c.PageSize)
-			request.PageSize = value
-		}
-		if c.SortField != nil {
-			value := v1.NewOptString(*c.SortField)
-			request.SortField = value
-		}
-		if c.SortOrder != nil {
-			value := NewOptApplicationSortOrder(*c.SortOrder)
-			request.SortOrder = value
-		}
+	if c.PageNum != nil {
+		value := v1.NewOptInt(*c.PageNum)
+		request.PageNum = value
+	}
+	if c.PageSize != nil {
+		value := v1.NewOptInt(*c.PageSize)
+		request.PageSize = value
+	}
+	if c.SortField != nil {
+		value := v1.NewOptString(*c.SortField)
+		request.SortField = value
+	}
+	if c.SortOrder != nil {
+		value := NewOptApplicationSortOrder(*c.SortOrder)
+		request.SortOrder = value
 	}
 	if err := ValidateApplicationListRequest(request); err != nil {
 		return err

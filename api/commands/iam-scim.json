@@ -14,7 +14,6 @@
       "request_type": "scim.ListParams",
       "request_by_value": true,
       "request_optional": true,
-      "request_help": "ユーザープロビジョニング設定一覧のページング条件を含む JSON。直接指定するか @path.json で読み込みます。",
       "response_type": "*v1.ListScimConfigurationsOK",
       "flags": [
         {
@@ -32,7 +31,8 @@
           "pointer": true
         }
       ],
-      "command_name": "list-scim-configurations"
+      "command_name": "list-scim-configurations",
+      "no_request_flag": true
     },
     {
       "name": "Create",

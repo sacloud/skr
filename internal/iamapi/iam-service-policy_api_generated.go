@@ -109,7 +109,6 @@ func (c *ServicePolicyIsEnabledCommand) Run(ctx *kong.Context) error {
 }
 
 type ServicePolicyListRuleTemplatesCommand struct {
-	Request *string "help:\"ルールテンプレートの絞り込み条件 JSON。直接指定するか @path.json で読み込みます。\""
 	Page    *int    "name:\"page\" help:\"任意: 取得するページ番号。\""
 	PerPage *int    "name:\"per-page\" help:\"任意: 1 ページあたりの取得件数。\""
 	Name    *string "name:\"name\" help:\"任意: 名前で絞り込みます。\""
@@ -120,42 +119,22 @@ type ServicePolicyListRuleTemplatesCommand struct {
 }
 
 func (c *ServicePolicyListRuleTemplatesCommand) Run(ctx *kong.Context) error {
-	flagsSet := false
-	flagsSet = flagsSet || c.Page != nil
-	flagsSet = flagsSet || c.PerPage != nil
-	flagsSet = flagsSet || c.Name != nil
-	flagsSet = flagsSet || c.Code != nil
-	flagsSet = flagsSet || c.Type != nil
-	if c.Request != nil && flagsSet {
-		return fmt.Errorf("--request と個別フラグは併用できません")
-	}
 	request := &servicepolicy.ListRuleTemplatesParams{}
-	if c.Request != nil {
-		if c.runtime.DecodeRequest == nil {
-			return fmt.Errorf("API リクエスト処理が設定されていません")
-		}
-		if err := c.runtime.DecodeRequest(*c.Request, request); err != nil {
-			return err
-		}
-	} else {
-		if !flagsSet {
-		}
-		if c.Page != nil {
-			request.Page = c.Page
-		}
-		if c.PerPage != nil {
-			request.PerPage = c.PerPage
-		}
-		if c.Name != nil {
-			request.Name = c.Name
-		}
-		if c.Code != nil {
-			request.Code = c.Code
-		}
-		if c.Type != nil {
-			value := v1.ListServicePolicyRuleTemplatesType(*c.Type)
-			request.Type = &value
-		}
+	if c.Page != nil {
+		request.Page = c.Page
+	}
+	if c.PerPage != nil {
+		request.PerPage = c.PerPage
+	}
+	if c.Name != nil {
+		request.Name = c.Name
+	}
+	if c.Code != nil {
+		request.Code = c.Code
+	}
+	if c.Type != nil {
+		value := v1.ListServicePolicyRuleTemplatesType(*c.Type)
+		request.Type = &value
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

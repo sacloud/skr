@@ -14,7 +14,6 @@
       "request_optional": true,
       "request_validator": "ValidateVersionListRequest",
       "response_type": "*v1.HandlerListVersions",
-      "request_help": "ListApplicationVersionsParams JSON。フラグと併用できません。直接指定、@path.json、または -（標準入力）に対応します。",
       "arguments": [
         {
           "name": "application-id",
@@ -55,7 +54,8 @@
           "conversion": "NewOptVersionSortOrder"
         }
       ],
-      "command_name": "list-application-versions"
+      "command_name": "list-application-versions",
+      "no_request_flag": true
     },
     {
       "name": "Read",

@@ -329,6 +329,142 @@ func TestValidateZoneSetting(t *testing.T) {
 	}
 }
 
+func TestGenerateNoRequestFlagSuppressesRequestButKeepsFlags(t *testing.T) {
+	config := Config{
+		Package:  "exampleapi",
+		Resource: "Example API",
+		Imports: map[string]string{
+			"example": "github.com/example/sdk/api/example",
+		},
+		Operations: []Operation{
+			{
+				Name:             "List",
+				Help:             "一覧を表示します。",
+				Method:           "List",
+				RequestType:      "example.ListParams",
+				RequestByValue:   true,
+				NoRequestFlag:    true,
+				ResponseType:     "[]example.Resource",
+				ValidateZone:     true,
+				RequestTransform: "TransformListRequest",
+				RequestValidator: "ValidateListRequest",
+				Flags: []Flag{
+					{Name: "page", Field: "Page", Type: "int", Help: "ページ番号。", Pointer: true},
+					{Name: "name", Field: "Name", Type: "string", Help: "名前。", Required: true},
+				},
+				RepeatedFlags: []RepeatedFlag{{Name: "item", Field: "Items", Help: "繰り返し指定します。"}},
+			},
+		},
+	}
+
+	source, err := Generate(config, ModeIaaS)
+	require.NoError(t, err, "Generate() error")
+	_, err = parser.ParseFile(token.NewFileSet(), "generated.go", source, parser.AllErrors)
+	require.NoError(t, err, "generated source does not parse")
+
+	for _, want := range []string{
+		// 個別フラグは残る
+		`name:\"page\" help:\"ページ番号。\"`,
+		// flags から request を構築し、required はフラグ経路で検証する
+		"request := &example.ListParams{}",
+		"if c.Name == nil",
+		"return fmt.Errorf(\"--name が必要です\")",
+		"request.Page = c.Page",
+		"op.List(context.Background(), *request)",
+	} {
+		require.Contains(t, string(source), want, "generated source does not contain %q", want)
+	}
+	for _, notWant := range []string{
+		"Request *string",
+		"--request と個別フラグは併用できません",
+		"c.runtime.DecodeRequest(",
+		// repeated flags は transform に委ね、直接代入しない (通常経路と同じ契約)
+		"request.Items =",
+	} {
+		require.NotContains(t, string(source), notWant, "generated source contains %q", notWant)
+	}
+
+	// 通常経路と同じ順序で transform → ゾーン検証 → validator を生成する
+	transform := strings.Index(string(source), "c.runtime.TransformListRequest(c, request)")
+	zone := strings.Index(string(source), "zones.ValidateSingleZone(request.Zone)")
+	validate := strings.Index(string(source), "if err := ValidateListRequest(request); err != nil")
+	require.NotEqual(t, -1, transform)
+	require.Greater(t, zone, transform, "zone validation must follow transform")
+	require.Greater(t, validate, zone, "validation must follow zone validation")
+
+	second, err := Generate(config, ModeIaaS)
+	require.NoError(t, err, "second Generate() error")
+	require.Equal(t, string(source), string(second), "Generate() output is not deterministic")
+}
+
+func TestValidateNoRequestFlagConstraints(t *testing.T) {
+	base := Config{
+		Package:  "exampleapi",
+		Resource: "Example API",
+		Imports: map[string]string{
+			"example": "github.com/example/sdk/api/example",
+		},
+		Operations: []Operation{
+			{
+				Name:          "List",
+				Help:          "一覧を表示します。",
+				Method:        "List",
+				RequestType:   "example.ListParams",
+				NoRequestFlag: true,
+				Flags: []Flag{
+					{Name: "page", Field: "Page", Type: "int", Help: "ページ番号。"},
+				},
+			},
+		},
+	}
+
+	cases := []struct {
+		name    string
+		mutate  func(*Config)
+		wantErr string
+	}{
+		{
+			name:    "request_type がない",
+			mutate:  func(c *Config) { c.Operations[0].RequestType = "" },
+			wantErr: "no_request_flag requires request_type",
+		},
+		{
+			name:    "handwritten と併用",
+			mutate:  func(c *Config) { c.Operations[0].Handwritten = true },
+			wantErr: "no_request_flag cannot be combined with handwritten",
+		},
+		{
+			name:    "request_file_only と併用",
+			mutate:  func(c *Config) { c.Operations[0].RequestFileOnly = true },
+			wantErr: "no_request_flag cannot be combined with request_file_only",
+		},
+		{
+			name: "request_input_transform と併用",
+			mutate: func(c *Config) {
+				c.Operations[0].Handwritten = true
+				c.Operations[0].RequestInputTransform = "AdjustRequest"
+			},
+			wantErr: "no_request_flag cannot be combined with request_input_transform",
+		},
+		{
+			name:    "フラグがない",
+			mutate:  func(c *Config) { c.Operations[0].Flags = nil },
+			wantErr: "no_request_flag requires flags or repeated_flags",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := base
+			// Operations スライスはテストケース間で共有しない
+			config.Operations = append([]Operation(nil), base.Operations...)
+			tc.mutate(&config)
+			_, err := Generate(config, ModeIaaS)
+			require.Error(t, err, "Generate() should fail")
+			require.Contains(t, err.Error(), tc.wantErr, "unexpected error")
+		})
+	}
+}
+
 func TestGenerateOptionalRequest(t *testing.T) {
 	config := Config{
 		Package:  "exampleapi",
