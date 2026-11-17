@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.2.2](https://github.com/sacloud/skr/compare/v0.2.1...v0.2.2) - 2026-11-17
+
+### 🚀 Changes
+- local-router-api: ローカルルータ API コマンドを追加 by @tokuhirom in https://github.com/sacloud/skr/pull/268
+- apprun-dedicated: チュートリアルのノード IP 取得を CIDR 表記に対応 by @tokuhirom in https://github.com/sacloud/skr/pull/270
+- --request を request body 用に限定し、list 操作は個別フラグに統一 by @tokuhirom in https://github.com/sacloud/skr/pull/271
+- --request の round-trip テストを追加し、wire までの変換を固定する by @tokuhirom in https://github.com/sacloud/skr/pull/272
+- トレースと秘密情報の方針を注意喚起に統一する by @tokuhirom in https://github.com/sacloud/skr/pull/273
+- IAM の SDK 提案を取りやめ、skr 内部で完結させる方針を記録する by @tokuhirom in https://github.com/sacloud/skr/pull/275
+- --request を受け付ける全コマンドに単体テストを要求するルールを導入する by @tokuhirom in https://github.com/sacloud/skr/pull/276
+- sacloud-sdk-go v0.7.0 を取り込む by @tokuhirom in https://github.com/sacloud/skr/pull/277
+
 ## [v0.2.1](https://github.com/sacloud/skr/compare/v0.2.0...v0.2.1) - 2026-11-13
 
 ### 🚀 Changes
