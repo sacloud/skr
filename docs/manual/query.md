@@ -18,6 +18,12 @@ $ skr iaas-api switch find --zone ZONE --query 'map({ID,Name})'
 
 `map({ID,Name})` は各要素の ID と名前だけを残します。空一覧は `[]` として出力するため、削除後の確認にも使えます。項目名は対象 API の JSON 出力に合わせて指定してください。
 
-`--query` は jq 式を Go で実装した [gojq](https://github.com/itchyny/gojq) で評価します。jq コマンド本体のインストールは不要です。jq と実装の差異や未対応機能については [gojq の説明](https://github.com/itchyny/gojq#differences-from-jq)を確認してください。
+検索結果の ID や名前をシェル変数に取り込む場合は、文字列を引用符なしで出力する `--query-raw` を使えます。文字列の結果は生文字列で出力し、文字列以外 (null、数値、真偽値、配列、オブジェクト) は `--query` と同じ JSON で出力します。`--query` と `--query-raw` は同時に指定できません。
 
-`--query` は API コマンドの結果に適用されます。`skr http` のレスポンス本文は加工されず、そのまま出力されます。
+```console
+$ SWITCH_ID=$(skr iaas-api switch find --zone ZONE --name NAME --query-raw 'map(select(.Name == "NAME")) | .[0].ID')
+```
+
+`--query` と `--query-raw` は jq 式を Go で実装した [gojq](https://github.com/itchyny/gojq) で評価します。jq コマンド本体のインストールは不要です。jq と実装の差異や未対応機能については [gojq の説明](https://github.com/itchyny/gojq#differences-from-jq)を確認してください。
+
+`--query` と `--query-raw` は API コマンドの結果に適用されます。`skr http` のレスポンス本文は加工されず、そのまま出力されます。

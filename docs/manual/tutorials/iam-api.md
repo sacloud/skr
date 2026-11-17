@@ -78,8 +78,7 @@ $ skr iam-api list-service-principals --query '.items | map(select(.name == "iam
 ```console
 $ umask 077
 $ vi password.txt
-$ skr iam-api create-user --name iam-tutorial-user --code e2e_iam_tutorial_user --description "IAM tutorial user" --password-file password.txt > user-result.json
-$ USER_ID=$(jq -er '.id' user-result.json)
+$ USER_ID=$(skr iam-api create-user --name iam-tutorial-user --code e2e_iam_tutorial_user --description "IAM tutorial user" --password-file password.txt --query-raw '.id')
 $ rm password.txt
 ```
 
@@ -153,8 +152,7 @@ $ skr iam-api read-user "$USER_ID" --query '{id,email}'
 グループ名と説明を指定して作成します。説明は空文字列も指定できます。グループを更新するときは名前と説明の両方を指定してください。
 
 ```console
-$ skr iam-api create-group --name iam-tutorial-group --description "IAM tutorial group" > group-result.json
-$ GROUP_ID=$(jq -er '.id' group-result.json)
+$ GROUP_ID=$(skr iam-api create-group --name iam-tutorial-group --description "IAM tutorial group" --query-raw '.id')
 $ skr iam-api update-group "$GROUP_ID" --name iam-tutorial-group --description "IAM tutorial group (updated)"
 $ skr iam-api read-group "$GROUP_ID"
 ```
@@ -266,14 +264,11 @@ $ skr iam-api list-service-principals --query '.items | map({id,name,project_id,
 フォルダを作成し、その ID を使ってプロジェクトを作成します。プロジェクトコードは名前とは別に指定し、組織内で重複しない値にしてください。例では `iamtutorialproject20261008` を使っています。日付部分を実行日に合わせるなど、既存のプロジェクトコードと重ならない値に変更してください。サービスプリンシパルはプロジェクト ID を指定して作成します。
 
 ```console
-$ skr iam-api create-folder --name iam-tutorial-folder --description "IAM tutorial folder" > folder-result.json
-$ FOLDER_ID=$(jq -er '.id' folder-result.json)
-$ skr iam-api create-project --code iamtutorialproject20261008 --name iam-tutorial-project \
-  --description "IAM tutorial project" --parent-folder-id "$FOLDER_ID" > project-result.json
-$ PROJECT_ID=$(jq -er '.id' project-result.json)
-$ skr iam-api create-service-principal --project-id "$PROJECT_ID" \
-  --name iam-tutorial-principal --description "IAM tutorial service principal" > principal-result.json
-$ PRINCIPAL_ID=$(jq -er '.id' principal-result.json)
+$ FOLDER_ID=$(skr iam-api create-folder --name iam-tutorial-folder --description "IAM tutorial folder" --query-raw '.id')
+$ PROJECT_ID=$(skr iam-api create-project --code iamtutorialproject20261008 --name iam-tutorial-project \
+  --description "IAM tutorial project" --parent-folder-id "$FOLDER_ID" --query-raw '.id')
+$ PRINCIPAL_ID=$(skr iam-api create-service-principal --project-id "$PROJECT_ID" \
+  --name iam-tutorial-principal --description "IAM tutorial service principal" --query-raw '.id')
 ```
 
 作成した ID を使ってフォルダとプロジェクトを更新し、読み取りと一覧の両方で結果を確認します。更新では名前と説明を指定した値で置き換えます。
@@ -381,8 +376,7 @@ $ skr iam-api list-projects --query '.items | map(select(.name == "iam-tutorial-
 []
 $ skr iam-api list-folders --query '.items | map(select(.name == "iam-tutorial-folder") | {id,name})'
 []
-$ rm -f user-result.json group-result.json folder-result.json project-result.json principal-result.json \
-  policy-bindings.json policy-result.json project-policy-bindings.json folder-policy-bindings.json
+$ rm -f policy-bindings.json policy-result.json project-policy-bindings.json folder-policy-bindings.json
 ```
 
 名前で絞り込んだ一覧が `[]` であることを確認します。別の名前を使った場合は、一覧確認の `--query` にもその名前を指定してください。変更前のポリシーバインディングを保存した `*-original.json` は、復元が不要であることを確認してから削除してください。チュートリアルで作成していないリソースやポリシーは削除・変更しないでください。

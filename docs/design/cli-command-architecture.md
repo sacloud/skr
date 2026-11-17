@@ -93,7 +93,7 @@ IaaS の各操作で対象ゾーンを指定します。フラグまたは JSON 
 
 API コマンドの結果は JSON のみで出力し、SDK が返すデータ形状とインデントを維持します。[ADR 0030](../adr/0030-remove-table-output.md) に従い、`--output` と出力形式の選択処理を廃止します。プロファイルの `cli.default_output_type` と `DefaultOutputType` は参照しません。
 
-API コマンドではグローバル `--query` に jq 式を指定できます。クエリは API の結果全体に適用し、複数の結果値は JSON として順に出力します。評価には Go 実装の gojq を使い、外部 jq バイナリには依存しません。`skr http` の生レスポンスには適用しません。
+API コマンドではグローバル `--query` に jq 式を指定できます。クエリは API の結果全体に適用し、複数の結果値は JSON として順に出力します。評価には Go 実装の gojq を使い、外部 jq バイナリには依存しません。`skr http` の生レスポンスには適用しません。グローバル `--query-raw` ([ADR 0087](../adr/0087-query-raw-flag.md)) は `--query` と同じ式を評価し、文字列の結果だけ引用符なしの生文字列で出力します (jq の `-r` に準拠)。文字列以外は `--query` と同じ JSON 出力です。`--query` と `--query-raw` は同時に指定できません。
 
 Runtime は `ValidateOutput(ctx)` と `WriteOutput(ctx, value)` を受け取ります。結果を返す操作ではクエリの構文とコンパイルを API 呼び出し前に検証します。評価に失敗した場合は途中の結果を書き込みません。表示用の E2E 一覧では `map({ID,Name})` などで必要な項目を投影し、空一覧は `[]` として確認します。後始末と安全性検証には必要な識別情報を残します。
 

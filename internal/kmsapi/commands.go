@@ -143,7 +143,7 @@ func (c *KeyEncryptCommand) Run(ctx *kong.Context) error {
 // 復号結果をバイト列のまま出力するため手書きで実装しています。
 type KeyDecryptCommand struct {
 	ID         string `arg:"" help:"復号に使う KMS キー ID。"`
-	CipherFile string `name:"cipher-file" required:"" help:"必須: encrypt-data-with-key が出力した暗号文 (base64 テキスト) のファイル。- の場合は標準入力から読み込みます。encrypt-data-with-key の JSON 出力をリダイレクトしたファイルもそのまま使えます。復号した平文はバイト列のまま標準出力に出力され、--query は適用されません。"`
+	CipherFile string `name:"cipher-file" required:"" help:"必須: encrypt-data-with-key が出力した暗号文 (base64 テキスト) のファイル。- の場合は標準入力から読み込みます。encrypt-data-with-key の JSON 出力をリダイレクトしたファイルもそのまま使えます。復号した平文はバイト列のまま標準出力に出力され、--query と --query-raw は適用されません。"`
 	factory    KeyAPIFactory
 	runtime    KeyRuntime
 }

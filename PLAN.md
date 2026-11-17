@@ -169,15 +169,14 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 `--request` を受け付けるすべての末端コマンド (2026-11-18 時点で157 操作) には、渡したリクエスト JSON の解釈と送信内容を検証する単体テストを用意する方針にしました。対象の網羅は `TestRequestCommandCoverageBaseline` (`internal/cli/request_command_coverage_test.go`) が kong のコマンドモデルを走査し、`internal/cli/testdata/request-command-baseline.txt` との照合で固定します。カバレッジ調査で未検証だった 38 操作 (ipaddress 3、ipv6addr 5、ipv6net 2、internet 5、zone 1、gslb 2、proxylb 7、kms 1、secretmanager 1、networking-suite 4、security-control 1、simple-notification 2、IAM 2、eventbus 2) の単体テストを追加済みで、残りの操作は既存テストで `--request` 経路を検証しています。
 
-## CLI 機能の改善候補: `--query-raw` (jq -r 相当の生出力)
+## CLI 機能の改善: `--query-raw` (jq -r 相当の生出力)
 
-`--query` は式の評価に内蔵の gojq を使うが、結果は常に JSON として出力するため、文字列スカラーが引用符付きで出力され、シェル変数への取り込みには `jq -er '.'` が必要です。2026-11-11 時点のチュートリアルでは、ID の抽出を `--query '...' | jq -er '.'` で記述しています。引用符なしの生出力モードとして `--query-raw` フラグを追加すると、この手順から jq を不要にできます (実装は未着手)。
+`--query` は式の評価に内蔵の gojq を使い、結果は常に JSON として出力します。文字列スカラーは引用符付きで出力され、シェル変数への取り込みには `jq -er '.'` が必要でした。2026-11-17 に引用符なしの生出力モードとして `--query-raw` フラグを追加し ([ADR 0087](docs/adr/0087-query-raw-flag.md))、チュートリアルの ID 取得手順と AGENTS.md の ID 取得ガイドラインを `--query-raw` ベースへ更新しました。文字列の抽出に外部 jq コマンドは不要になりました。文字列以外の抽出や加工には引き続き `--query` と外部 jq を使います。
 
-- 位置づけ: `internal/cli/cli.go` のルート共通フラグ (--query と同様に全サブコマンドで使える)。kong の `xor` タグで --query と相互排他にする
-- 式の評価は --query と同じ gojq。結果ごとの出力のみ変える
-- 出力: 文字列は引用符なしの生文字列、null は `null`、数値・真偽値は JSON 表記、配列・オブジェクトは整形 JSON。複数結果は各行に 1 件、0 件は空出力で終了コード 0 (jq -r の挙動に準拠)
-- 影響範囲: `internal/cli/query.go` と `internal/cli/cli.go` のみ (--query はルート共通フラグのため生成コードへの影響なし)。writeQueryOutput の単体テスト (文字列・数値・null・オブジェクト・複数結果・0 件) と CLI 経由の相互排他テストを追加する
-- 導入時: ADR を作成し、チュートリアルの ID 取得手順と AGENTS.md の ID 取得ガイドラインを --query-raw ベースへ更新する
+- 位置づけ: `internal/cli/cli.go` のルート共通フラグです (--query と同様に全サブコマンドで使えます)。kong の `xor` タグで --query と相互排他にします
+- 式の評価は --query と同じ gojq で、結果ごとの出力のみ変えます
+- 出力: 文字列は引用符なしの生文字列、null は `null`、数値・真偽値は JSON 表記、配列・オブジェクトは整形 JSON です。複数結果は各行に 1 件、0 件は空出力で終了コード 0 です (jq -r の挙動に準拠)
+- jq の `-e` (結果の有無による終了コード制御) は提供しません。必要になったときに別途検討します
 
 ## CLI のキャンセル伝播の対応状況
 
