@@ -407,7 +407,7 @@ func TestIaaSInternetCommandsBuildSDKRequests(t *testing.T) {
 	require.EqualValues(t, 456, api.updateSubnetRequests[0].SubnetID, "unexpected value")
 	require.Equal(t, "192.0.2.1", api.updateSubnetRequests[0].NextHop, "unexpected value")
 
-	output, _, code := run("read-ipv6", "--request", `{"Zone":"test-zone","ID":123}`)
+	output, stderr, code := run("read-ipv6", "--request", `{"Zone":"test-zone","ID":123}`)
 	require.Equal(t, 0, code, "read-ipv6 JSON: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
 	require.Len(t, api.readIPv6Requests, 1, "ReadIPv6 request = %+v, want values from JSON", api.readIPv6Requests)

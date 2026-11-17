@@ -40,7 +40,8 @@ func requestCommandPaths(t *testing.T) []string {
 				hasRequest = true
 			}
 		}
-		if hasRequest {
+		// --request は末端コマンドだけが受け付ける契約のため、子を持つノードでは収集しない
+		if hasRequest && node.Leaf() {
 			paths = append(paths, node.Path())
 		}
 		for _, child := range node.Children {

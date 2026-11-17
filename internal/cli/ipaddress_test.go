@@ -165,7 +165,6 @@ func TestIaaSIPAddressCommandsUseSDKRequests(t *testing.T) {
 }
 
 func TestIaaSIPAddressRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
-	api := &ipAddressTestDouble{}
 	for _, args := range [][]string{
 		{"list"},
 		{"list", "--zone", "is1b", "--request", `{"Zone":"is1b"}`},
@@ -186,9 +185,9 @@ func TestIaaSIPAddressRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {
 			require.NotEqual(t, 0, code, "%v: code %d stdout %q stderr %q; want validation error", args, code, stdout.String(), stderr.String())
 			require.EqualValues(t, 0, stdout.Len(), "unexpected value")
 			require.NotEqualValues(t, 0, stderr.Len(), "unexpected value")
+			require.EqualValues(t, 0, len(testDouble.listRequests)+len(testDouble.readRequests)+len(testDouble.updateRequests), "invalid requests reached API: %+v", testDouble)
 		})
 	}
-	require.EqualValues(t, 0, len(api.listRequests)+len(api.readRequests)+len(api.updateRequests), "invalid requests reached API: %+v", api)
 }
 
 func TestIaaSIPAddressPropagatesAPIErrors(t *testing.T) {
