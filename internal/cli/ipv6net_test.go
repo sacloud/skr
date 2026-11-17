@@ -108,7 +108,7 @@ func TestIaaSIPv6NetCommandsUseSDKRequests(t *testing.T) {
 	require.Equal(t, 2, api.findRequests[0].From, "unexpected value")
 
 	// find: --request 経路。絞り込み条件と Sort は JSON で指定する
-	_, stderr, code = run("find", "--request", `{"Zone":"is1b","SwitchIDs":["123"],"SwitchNames":["sw"],"InternetIDs":["456"],"InternetNames":["rt"],"Sort":[{"Key":"IPv6Prefix","Order":1}],"Count":10,"From":20}`)
+	_, stderr, code = run("find", "--request", `{"Zone":"is1b","SwitchIDs":["123"],"SwitchNames":["sw"],"InternetIDs":["456"],"InternetNames":["rt"],"Sort":["-IPv6Prefix"],"Count":10,"From":20}`)
 	require.Equal(t, 0, code, "find JSON: code %d, stderr %q", code, stderr)
 	require.Empty(t, stderr, "should be empty")
 	require.Len(t, api.findRequests, 2, "Find request = %+v, want filters and sort from JSON", api.findRequests)

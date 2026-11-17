@@ -211,9 +211,10 @@ func (c *ClusterListCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[cluster.ClusterDetail], error) {
+	// 一覧 API はサマリーを返すため、クラスタ一覧は ReadClusterSummary のまま出力します。
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.ReadClusterSummary], error) {
 		items, next, err := apprun_dedicated.NewClusterOp(client).List(ctx, c.MaxItems, cursor)
-		return page[cluster.ClusterDetail]{Items: items, NextCursor: next}, err
+		return page[v1.ReadClusterSummary]{Items: items, NextCursor: next}, err
 	})
 }
 
@@ -612,9 +613,10 @@ func (c *WorkerNodeListCommand) Run(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[workernode.WorkerNodeDetail], error) {
+	// 一覧 API はサマリーを返すため、ワーカノード一覧は WorkerNodeSummary のまま出力します。
+	return runValue(ctx, c.runtime, func(ctx context.Context, client *v1.Client) (page[v1.WorkerNodeSummary], error) {
 		items, next, err := apprun_dedicated.NewWorkerNodeOp(client, clusterID, groupID).List(ctx, c.MaxItems, cursor)
-		return page[workernode.WorkerNodeDetail]{Items: items, NextCursor: next}, err
+		return page[v1.WorkerNodeSummary]{Items: items, NextCursor: next}, err
 	})
 }
 

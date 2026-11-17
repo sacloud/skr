@@ -1,7 +1,7 @@
 # AppRun Dedicated API コマンド設計
 
 - Status: API commands implemented; live E2E and tutorial tracked in [#59](https://github.com/sacloud/skr/issues/59)
-- SDK: `github.com/sacloud/sacloud-sdk-go v0.5.0`
+- SDK: `github.com/sacloud/sacloud-sdk-go v0.7.0`
 - Related ADR: [ADR 0027](../adr/0027-apprun-dedicated-api-commands.md)
 
 同じデプロイフローを JSON 定義ファイルから行う高レベルコマンド `skr apprun-dedicated` の設計は [AppRun Dedicated 高レベルコマンドの設計](apprun-dedicated.md) にあります。インフラの構築管理 (クラスタ作成を含む) と、バージョン作成・有効化を含む個別の操作は本書の低レベルコマンドが担います。
@@ -16,7 +16,7 @@
 
 各操作は SDK の公開オペレーションに対応し、階層リソースの ID は名前付きフラグまたは位置引数で指定します。ページング結果は `items` と `nextCursor` を含む JSON 形状で出力します。一覧操作の `--max-items` の既定値は 20 です。実 API は受け付ける上限を超えるページサイズを HTTP 400 で拒否するため、既定値はその範囲内に収めています。
 
-SDK v0.5.0 で追加されたクラスタロードバランサの参照・更新と limits の参照は CLI 未対応です。operationId 派生名の `read-cluster-load-balancer`、`patch-cluster-load-balancer`、`read-limits` として [#202](https://github.com/sacloud/skr/issues/202) で対応します。
+SDK で追加されたクラスタロードバランサの参照・更新と limits の参照は CLI 未対応です。operationId 派生名の `read-cluster-load-balancer`、`patch-cluster-load-balancer`、`read-limits` として [#202](https://github.com/sacloud/skr/issues/202) で対応します。
 
 ## 入力と安全な扱い
 
@@ -41,4 +41,4 @@ is1b のライブ E2E は未実装です。課金を伴うライブ検証の入�
 - [AppRun 専有型の概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html)
 - [クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)
 - [技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)
-- [SDK v0.5.0 AppRun Dedicated API](https://github.com/sacloud/sacloud-sdk-go/tree/v0.5.0/api/apprun-dedicated)
+- [SDK v0.7.0 AppRun Dedicated API](https://github.com/sacloud/sacloud-sdk-go/tree/v0.7.0/api/apprun-dedicated)

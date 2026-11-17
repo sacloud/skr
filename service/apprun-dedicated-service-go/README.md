@@ -1,6 +1,6 @@
 # apprun-dedicated-service-go
 
-さくらのクラウド AppRun Dedicated のアプリケーションを、デプロイから削除まで一連の操作として扱う高レベルライブラリです。`sacloud-sdk-go` の [`api/apprun-dedicated`](https://github.com/sacloud/sacloud-sdk-go/tree/v0.5.0/api/apprun-dedicated) が公開する低レベルなアプリケーション・バージョン操作を隠蔽し、ライブラリのコードを読むだけで使える doc comment と例を提供します。
+さくらのクラウド AppRun Dedicated のアプリケーションを、デプロイから削除まで一連の操作として扱う高レベルライブラリです。`sacloud-sdk-go` の [`api/apprun-dedicated`](https://github.com/sacloud/sacloud-sdk-go/tree/v0.7.0/api/apprun-dedicated) が公開する低レベルなアプリケーション・バージョン操作を隠蔽し、ライブラリのコードを読むだけで使える doc comment と例を提供します。
 
 ## 提供する機能
 

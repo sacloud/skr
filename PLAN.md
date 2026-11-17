@@ -4,7 +4,7 @@
 
 高レベル `eventbus` を実装しました。実行設定の list / read / create / update / delete / set-secret と、スケジュール・トリガーの list / read / create / update / delete の16末端コマンドを公開しています。service 層は CLI 非依存の独立モジュール [service/eventbus-service-go](service/eventbus-service-go/) ([ADR 0077](docs/adr/0077-eventbus-service-library.md)) に切り出してあり、条件パーサー、CLI 接続、秘密入力処理 (`--secret-file` の `@path` と標準入力) は `internal/eventbus` にあります。単体テストと実際の SDK・sakumock を通す通信テストが成功しています。Crontab の受け渡し・読み戻しは通信テストで確認しています。評価タイムゾーンは JST との利用者の確認結果を受領し、公開文書用の一次情報の参照追加を残しています。StartsAt との発火上の関係と実発火は未検証です。ライブ E2E は 2026-11-10 に `test/e2e/eventbus/` のシナリオで成功し、スイッチ作成イベントによる SimpleMQ 配送 (本文更新前後) も確認しました。チュートリアルは [docs/manual/tutorials/eventbus.md](docs/manual/tutorials/eventbus.md)、ユーザーズマニュアルは [docs/manual/eventbus.md](docs/manual/eventbus.md) ([ADR 0081](docs/adr/0081-high-level-command-users-manual.md)) にあります。設計は [EventBus](docs/design/eventbus.md) を参照してください。
 
-対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.5.0](https://github.com/sacloud/sacloud-sdk-go/tree/v0.5.0) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。SDK の配置ではなく実際の API route とドメインに基づいて CLI の境界を決めます。`service/iaas` に含まれる API でも、System API や CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
+対象 SDK は `go.mod` で指定している [sacloud-sdk-go v0.7.0](https://github.com/sacloud/sacloud-sdk-go/tree/v0.7.0) です。IaaS は `service/iaas` のサービスパッケージ、IaaS 以外は `api` 直下の API ドメインを棚卸ししています。SDK の配置ではなく実際の API route とドメインに基づいて CLI の境界を決めます。`service/iaas` に含まれる API でも、System API や CommonServiceItem を使うものは `iaas-api` のリソース候補と分けて管理します。
 
 一覧は SDK の提供範囲を把握するためのもので、すべてのパッケージをそのまま CLI コマンドにすることを決めるものではありません。各パッケージで公開操作、入力、出力、固有の検証を確認し、対応範囲を明示して段階的に実装します。コマンドの階層は `<domain>-api <resource>` とし、SDK の型だけから公開操作や入力の意味を推測しません。詳細は [ADR 0016](docs/adr/0016-generate-low-level-api-commands.md) に従います。
 
@@ -80,7 +80,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 
 IaaS API のコマンド階層は SDK のサービスパッケージ名ではなく、実際の API route に合わせます。たとえば `/api/cloud/1.1/product/server` は `iaas-api product server`、`/api/cloud/1.1/public/price` は `iaas-api public price` です。低レベル API 操作が SDK にある場合は `sacloud-sdk-go/api/iaas` を直接使い、Find の応答 envelope を含む API 応答モデルを JSON 出力します。JSON は SDK の型から再エンコードするため HTTP body のバイト列そのものではありません。既存 IaaS コマンドの他の出力経路は別途段階的に見直します。
 
-SDK v0.5.0 の route を確認し、未実装候補の CLI 階層を次のように整理します。
+SDK v0.5.0 の時点で route を棚卸しし、未実装候補の CLI 階層を次のように整理しました。v0.7.0 の SDK でも表の API は同じ `service/iaas` パッケージとして存在するため、この整理を現行 SDK でも踏襲します。
 
 | API | route | CLI 階層 |
 | --- | --- | --- |

@@ -778,13 +778,17 @@ func TestListWorkerNodesPreservesAPIAddress(t *testing.T) {
 	var out struct {
 		Items []struct {
 			NetworkInterfaces []struct {
-				Addresses []string `json:"addresses"`
+				Addresses []struct {
+					Address string `json:"address"`
+				} `json:"addresses"`
 			} `json:"networkInterfaces"`
 		} `json:"items"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &out))
 	require.NotEmpty(t, out.Items, "list-worker-nodes should return one node")
 	require.NotEmpty(t, out.Items[0].NetworkInterfaces, "the node should have one network interface")
-	require.Equal(t, []string{"192.0.2.10/24"}, out.Items[0].NetworkInterfaces[0].Addresses,
+	require.Equal(t, []struct {
+		Address string `json:"address"`
+	}{{Address: "192.0.2.10/24"}}, out.Items[0].NetworkInterfaces[0].Addresses,
 		"list-worker-nodes は API の addresses を CIDR 付きのまま加工せず出力すること")
 }

@@ -29,7 +29,7 @@ type FindRequest struct {
 	Zone    string
 	Count   int
 	From    int
-	Sort    []string
+	Sort    search.SortKeys
 	Filter  map[string]any
 	Include []string
 	Exclude []string
@@ -70,16 +70,7 @@ func (request *FindRequest) findCondition() *iaas.FindCondition {
 			condition.Filter[filterKey] = filterValue(filterKey, value)
 		}
 	}
-	if len(request.Sort) > 0 {
-		condition.Sort = make(search.SortKeys, 0, len(request.Sort))
-		for _, key := range request.Sort {
-			if strings.HasPrefix(key, "-") {
-				condition.Sort = append(condition.Sort, search.SortKeyDesc(strings.TrimPrefix(key, "-")))
-			} else {
-				condition.Sort = append(condition.Sort, search.SortKeyAsc(key))
-			}
-		}
-	}
+	condition.Sort = request.Sort
 	return condition
 }
 

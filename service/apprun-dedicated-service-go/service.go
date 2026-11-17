@@ -115,7 +115,8 @@ func (e *ApplicationNotFoundError) Error() string {
 }
 
 // findCluster はクラスタ名でクラスタを検索します。見つからない場合はエラーを返します。
-func (s *Service) findCluster(ctx context.Context, name string) (*cluster.ClusterDetail, error) {
+// 一覧 API はサマリーを返すため、クラスタ ID と名前の検索にはサマリーで十分です。
+func (s *Service) findCluster(ctx context.Context, name string) (*v1.ReadClusterSummary, error) {
 	var cursor *v1.ClusterID
 	for {
 		list, next, err := s.clusterAPI.List(ctx, listPageSize, cursor)

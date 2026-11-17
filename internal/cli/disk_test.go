@@ -275,7 +275,7 @@ func TestIaaSDiskFindRequestRoundTrip(t *testing.T) {
 	commandLine := newCLI()
 	setDiskAPIFactory(commandLine, func() (diskapi.API, error) { return diskapi.NewAPI(caller), nil })
 
-	requestJSON := `{"Zone":"is1b","Names":["web-"],"Tags":["production"],"Sort":[{"Key":"Name","Order":0},{"Key":"SizeMB","Order":1}],"Count":7,"From":2}`
+	requestJSON := `{"Zone":"is1b","Names":["web-"],"Tags":["production"],"Sort":["Name","-SizeMB"],"Count":7,"From":2}`
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"iaas-api", "disk", "find", "--request", requestJSON}, &stdout, &stderr, commandLine)
 	require.Equal(t, 0, code, "stderr: %s", stderr.String())

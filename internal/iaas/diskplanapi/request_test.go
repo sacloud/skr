@@ -17,6 +17,9 @@ package diskplanapi
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFindRequestUnmarshalJSON(t *testing.T) {
@@ -65,6 +68,17 @@ func TestFindRequestUnmarshalJSON(t *testing.T) {
 		},
 		{name: "rejects string filter", input: `{"Filter":"invalid"}`, wantError: true},
 		{name: "rejects array filter", input: `{"Filter":["invalid"]}`, wantError: true},
+		{
+			name:  "sort accepts string keys",
+			input: `{"Zone":"is1b","Sort":["Name","-MemoryMB"]}`,
+			check: func(t *testing.T, request *FindRequest) {
+				t.Helper()
+				// sacloud-sdk-go v0.7.0 の search.SortKeys は文字列形式 (昇順 "Name"、降順 "-Name") をデコードする
+				want := search.SortKeys{search.SortKeyAsc("Name"), search.SortKeyDesc("MemoryMB")}
+				require.Equal(t, want, request.Sort)
+			},
+		},
+		{name: "rejects object sort keys", input: `{"Zone":"is1b","Sort":[{"Key":"Name","Order":1}]}`, wantError: true},
 		{name: "allows unknown fields", input: `{"Zone":"is1b","Unknown":"ignored"}`},
 		{name: "rejects trailing JSON", input: `{"Zone":"is1b"} {}`, wantError: true},
 	} {

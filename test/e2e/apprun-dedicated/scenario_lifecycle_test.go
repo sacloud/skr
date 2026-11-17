@@ -517,8 +517,8 @@ func waitForHealthyWorkerNode(t *testing.T, nodes *workernode.WorkerNodeOp) {
 			if n.Status == v1.WorkerNodeStatusHealthy {
 				return
 			}
-			if n.CreateErrorMessage != nil && *n.CreateErrorMessage != "" {
-				t.Fatalf("worker node creation failed: %s", *n.CreateErrorMessage)
+			if n.CreateErrorMessage.IsSet() && n.CreateErrorMessage.Value != "" {
+				t.Fatalf("worker node creation failed: %s", n.CreateErrorMessage.Value)
 			}
 		}
 

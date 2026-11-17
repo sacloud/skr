@@ -6,7 +6,7 @@
 
 ## 入力と出力
 
-- Find は任意の `--count` と `--from` を受け付けます。検索名 (`Names`) と Sort は SDK `FindRequest` JSON を使います。Sort は `Key` と `Order` を持つオブジェクトの配列です。JSON は直接入力または `@path.json` で指定でき、個別フラグとの併用はできません。
+- Find は任意の `--count` と `--from` を受け付けます。検索名 (`Names`) と Sort は SDK `FindRequest` JSON を使います。Sort は `"Name"` (昇順)、`"-Name"` (降順) の文字列配列です (sacloud-sdk-go v0.7.0 の `search.SortKeys`)。JSON は直接入力または `@path.json` で指定でき、個別フラグとの併用はできません。
 - Read は Region ID を必須とし、`--id` または `ReadRequest` JSON を受け付けます。JSON と `--id` は併用できません。
 - 結果は他の IaaS コマンドと同じ JSON 出力処理に渡します。`--query` で必要な項目に絞れます。
 

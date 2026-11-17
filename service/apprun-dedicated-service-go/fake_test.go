@@ -416,20 +416,20 @@ type fakeClusterAPI struct {
 	sdk *fakeSDK
 }
 
-func (f *fakeClusterAPI) List(ctx context.Context, maxItems int64, cursor *v1.ClusterID) ([]cluster.ClusterDetail, *v1.ClusterID, error) {
+func (f *fakeClusterAPI) List(ctx context.Context, maxItems int64, cursor *v1.ClusterID) ([]v1.ReadClusterSummary, *v1.ClusterID, error) {
 	if f.sdk.listErr != nil {
 		return nil, nil, f.sdk.listErr
 	}
 	f.sdk.mu.Lock()
-	var items []cluster.ClusterDetail
+	var items []v1.ReadClusterSummary
 	for _, c := range f.sdk.clusters {
 		if c.deleted {
 			continue
 		}
-		items = append(items, cluster.ClusterDetail{ClusterID: c.clusterID, Name: c.name})
+		items = append(items, v1.ReadClusterSummary{ClusterID: c.clusterID, Name: c.name})
 	}
 	f.sdk.mu.Unlock()
-	return pageItems(items, maxItems, cursor, func(c cluster.ClusterDetail) v1.ClusterID { return c.ClusterID })
+	return pageItems(items, maxItems, cursor, func(c v1.ReadClusterSummary) v1.ClusterID { return c.ClusterID })
 }
 
 func (f *fakeClusterAPI) Create(ctx context.Context, params cluster.CreateParams) (*v1.ClusterIdentifier, error) {
@@ -558,17 +558,17 @@ type fakeWorkerNodeAPI struct {
 	autoScalingGroupID v1.AutoScalingGroupID
 }
 
-func (f *fakeWorkerNodeAPI) List(ctx context.Context, maxItems int64, cursor *v1.WorkerNodeID) ([]workernode.WorkerNodeDetail, *v1.WorkerNodeID, error) {
+func (f *fakeWorkerNodeAPI) List(ctx context.Context, maxItems int64, cursor *v1.WorkerNodeID) ([]v1.WorkerNodeSummary, *v1.WorkerNodeID, error) {
 	f.sdk.mu.Lock()
-	var items []workernode.WorkerNodeDetail
+	var items []v1.WorkerNodeSummary
 	for _, n := range f.sdk.workerNodes {
 		if n.clusterID != f.clusterID || n.autoScalingGroupID != f.autoScalingGroupID || n.deleted {
 			continue
 		}
-		items = append(items, workernode.WorkerNodeDetail{WorkerNodeID: n.workerNodeID, Status: n.status})
+		items = append(items, v1.WorkerNodeSummary{WorkerNodeID: n.workerNodeID, Status: n.status})
 	}
 	f.sdk.mu.Unlock()
-	return pageItems(items, maxItems, cursor, func(r workernode.WorkerNodeDetail) v1.WorkerNodeID { return r.WorkerNodeID })
+	return pageItems(items, maxItems, cursor, func(r v1.WorkerNodeSummary) v1.WorkerNodeID { return r.WorkerNodeID })
 }
 
 func (f *fakeWorkerNodeAPI) Read(ctx context.Context, id v1.WorkerNodeID) (*workernode.WorkerNodeDetail, error) {
