@@ -57,7 +57,7 @@ func TestRunIaaSAPIHelp(t *testing.T) {
 		},
 		{
 			args:    []string{"iaas-api", "switch", "find", "--help"},
-			want:    []string{`"Zone":"tk1v"`, `"Names":["example"]`, "--tags", "カンマ区切り", "Sort", "有効な Key", "取得件数", "--zone", "併用不可"},
+			want:    []string{`"Zone":"tk1v"`, `"Names":["example"]`, "--tags", "カンマ区切り", "Sort", "文字列配列", `"-Name"`, "取得件数", "--zone", "併用不可"},
 			notWant: []string{"--zone all"},
 		},
 		{

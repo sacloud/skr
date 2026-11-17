@@ -53,7 +53,7 @@ func NewCommands(runtime Runtime, factory APIFactory) Commands {
 }
 
 type FindCommand struct {
-	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort (ソートキーの配列) は JSON で指定します。Sort の要素は Key (API のソート対象フィールド名) と Order (0: 昇順、1: 降順) を持つオブジェクトです。有効な Key は対象 API の仕様で確認してください。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"Names\\\":[\\\"example\\\"]}'。フラグ例: skr iaas-api switch find --zone tk1v --tags production,web\""
+	Request *string   "help:\"個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: Tags は --tags でカンマ区切り、または JSON 配列で指定できます。Count と From は個別フラグ、Names (名前の文字列配列) と Sort は JSON で指定します。Sort は昇順が \\\"Name\\\"、降順が \\\"-Name\\\" の文字列配列です (例: [\\\"-CreatedAt\\\"])。有効なキーは対象 API の仕様で確認してください。例: --request='{\\\"Zone\\\":\\\"tk1v\\\",\\\"Names\\\":[\\\"example\\\"]}'。フラグ例: skr iaas-api switch find --zone tk1v --tags production,web\""
 	Zone    *string   "name:\"zone\" help:\"必須: 対象ゾーン名。例: --zone tk1v\""
 	Tags    *[]string "name:\"tags\" help:\"任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。\" sep:\",\""
 	Count   *int      "name:\"count\" help:\"任意: 取得件数 (整数)。\""

@@ -430,5 +430,5 @@ apprun-dedicated: Cluster.Read: API Error 404: code 404: {Status:404 Title:...}
 - [AppRun 専有型 API ドキュメント](https://manual.sakura.ad.jp/api/cloud/apprun-dedicated/)
 - [AppRun クイックスタート (サンプルアプリケーション)](https://manual.sakura.ad.jp/cloud/apprun/getting_started.html)
 - [サンプルイメージの実装 (apprun-samples tutorial)](https://github.com/sacloud/apprun-samples/blob/main/tutorial/app.js)
-- [sacloud-sdk-go v0.5.0: AppRun Dedicated API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.5.0/api/apprun-dedicated)
+- [sacloud-sdk-go v0.7.0: AppRun Dedicated API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.7.0/api/apprun-dedicated)
 - [apprun-dedicated service (skr の service 層)](https://github.com/sacloud/skr/tree/main/service/apprun-dedicated-service-go)

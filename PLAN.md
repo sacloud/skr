@@ -80,7 +80,7 @@ Simple Notification の group／destination API も CommonServiceItem を使い�
 
 IaaS API のコマンド階層は SDK のサービスパッケージ名ではなく、実際の API route に合わせます。たとえば `/api/cloud/1.1/product/server` は `iaas-api product server`、`/api/cloud/1.1/public/price` は `iaas-api public price` です。低レベル API 操作が SDK にある場合は `sacloud-sdk-go/api/iaas` を直接使い、Find の応答 envelope を含む API 応答モデルを JSON 出力します。JSON は SDK の型から再エンコードするため HTTP body のバイト列そのものではありません。既存 IaaS コマンドの他の出力経路は別途段階的に見直します。
 
-SDK v0.5.0 の route を確認し、未実装候補の CLI 階層を次のように整理します。
+SDK v0.5.0 の時点で route を棚卸しし、未実装候補の CLI 階層を次のように整理しました。v0.7.0 の SDK でも表の API は同じ `service/iaas` パッケージとして存在するため、この整理を現行 SDK でも踏襲します。
 
 | API | route | CLI 階層 |
 | --- | --- | --- |
