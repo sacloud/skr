@@ -86,7 +86,7 @@ $ skr simplemq-api update-queue QUEUE-ID --request @queue-settings.json
 
 ```console
 $ umask 077
-$ skr simplemq-api rotate-api-key QUEUE-ID | jq -er .APIKey > simplemq.key
+$ skr simplemq-api rotate-api-key QUEUE-ID --query-raw '.APIKey' > simplemq.key
 ```
 
 キュー名は `QUEUE-NAME` の値に置き換えます。メッセージ本文は API 定義に従い、最大256000文字で、英数字と `+`、`/`、`=` のみを使います。次の例では `HelloSimpleMQ` を送信します。

@@ -80,7 +80,7 @@ func (c *SecretCreateCommand) Run(ctx *kong.Context) error {
 }
 
 // SecretUnveilCommand はシークレットの値を取得するコマンドです。値をそのまま
-// 標準出力へ出力するため --query は適用されず、手書きで実装しています。
+// 標準出力へ出力するため --query と --query-raw は適用されず、手書きで実装しています。
 type SecretUnveilCommand struct {
 	VaultID string `arg:"" help:"シークレットが属する Vault のリソース ID。"`
 	Name    string `arg:"" help:"取得するシークレット名。"`

@@ -102,10 +102,10 @@ $ skr security-control-api evaluation-rules-list
 $ skr security-control-api evaluation-rules-list --query '.items | map(select(.isEnabled) | {id: .rule.evaluationRuleId})'
 ```
 
-ルール ID をシェル変数に取り込み、1 件を参照します。`--query` の結果も JSON 出力のため文字列には引用符が付きます。`jq -er '.'` で引用符を取り除いて取り込みます。評価ルールの ID は固定のため、以降の手順では `server-no-public-ip` を使います。
+ルール ID をシェル変数に取り込み、1 件を参照します。文字列の抽出には `--query-raw` を使うと引用符なしで取り込めます。評価ルールの ID は固定のため、以降の手順では `server-no-public-ip` を使います。
 
 ```console
-$ RULE_ID=$(skr security-control-api evaluation-rules-list --query '.items[] | select(.rule.evaluationRuleId == "server-no-public-ip") | .rule.evaluationRuleId' | jq -er '.')
+$ RULE_ID=$(skr security-control-api evaluation-rules-list --query-raw '.items[] | select(.rule.evaluationRuleId == "server-no-public-ip") | .rule.evaluationRuleId')
 $ echo "$RULE_ID"
 $ skr security-control-api evaluation-rules-read "$RULE_ID"
 ```
@@ -207,7 +207,7 @@ $ skr simple-notification-api group list --query '.CommonServiceItems | map({ID,
 通知先グループ ID をシェル変数に取り込みます。名前で絞り込む場合は選択条件を明記してください。
 
 ```console
-$ GROUP_ID=$(skr simple-notification-api group list --query '.CommonServiceItems[] | select(.Name == "NOTIFICATION-GROUP-NAME") | .ID' | jq -er '.')
+$ GROUP_ID=$(skr simple-notification-api group list --query-raw '.CommonServiceItems[] | select(.Name == "NOTIFICATION-GROUP-NAME") | .ID')
 $ echo "$GROUP_ID"
 ```
 
@@ -215,7 +215,7 @@ $ echo "$GROUP_ID"
 
 ```console
 $ ACTION_NAME="security-control-tutorial-action"
-$ ACTION_ID=$(skr security-control-api automated-actions-create --name "$ACTION_NAME" --execution-condition 'event.evaluationResult.status == "REJECTED"' --is-enabled=false --service-principal-id 'SERVICE-PRINCIPAL-ID' --notification-group-id "$GROUP_ID" --query '.automatedActionId' | jq -er '.')
+$ ACTION_ID=$(skr security-control-api automated-actions-create --name "$ACTION_NAME" --execution-condition 'event.evaluationResult.status == "REJECTED"' --is-enabled=false --service-principal-id 'SERVICE-PRINCIPAL-ID' --notification-group-id "$GROUP_ID" --query-raw '.automatedActionId')
 $ echo "$ACTION_ID"
 ```
 

@@ -22,35 +22,35 @@ import (
 )
 
 func validateOutput(ctx *kong.Context) error {
-	query, set, err := queryExpression(ctx)
+	flag, set, err := queryFlagFromContext(ctx)
 	if err != nil {
 		return err
 	}
 	if set {
-		_, err := compileQuery(query)
+		_, err := compileQuery(flag)
 		return err
 	}
 	return nil
 }
 
 func writeOutput(ctx *kong.Context, value any) error {
-	if query, set, err := queryExpression(ctx); err != nil {
+	if flag, set, err := queryFlagFromContext(ctx); err != nil {
 		return err
 	} else if set {
-		return writeQueryOutput(ctx.Stdout, query, value)
+		return writeQueryOutput(ctx.Stdout, flag, value)
 	}
 	encoder := json.NewEncoder(ctx.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(value)
 }
 
-// rejectQuery は JSON 以外の出力を持つコマンド向けに、--query の指定をエラーにします。
+// rejectQuery は JSON 以外の出力を持つコマンド向けに、--query と --query-raw の指定をエラーにします。
 // 指定を暗黙に無視すると利用者の意図と異なる出力になるため、対応しないことを明示します。
 func rejectQuery(ctx *kong.Context) error {
-	if _, set, err := queryExpression(ctx); err != nil {
+	if _, set, err := queryFlagFromContext(ctx); err != nil {
 		return err
 	} else if set {
-		return fmt.Errorf("このコマンドの出力は JSON ではないため --query には対応しません")
+		return fmt.Errorf("このコマンドの出力は JSON ではないため --query と --query-raw には対応しません")
 	}
 	return nil
 }

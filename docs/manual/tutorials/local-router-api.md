@@ -45,7 +45,7 @@ $ skr iaas-api switch create --zone is1b \
     --name "$SWITCH_NAME" --description "Temporary switch for local router tutorial" \
     --query '{ID,Name,Zone}'
 $ SWITCH_ID=$(skr iaas-api switch find --zone is1b --name "$SWITCH_NAME" \
-    --query 'map(select(.Name == "'"$SWITCH_NAME"'")) | sort_by(-.ID) | .[0].ID' | jq -er '.')
+    --query-raw 'map(select(.Name == "'"$SWITCH_NAME"'")) | sort_by(-.ID) | .[0].ID')
 $ echo "$SWITCH_ID"
 ```
 
@@ -106,7 +106,7 @@ $ skr local-router-api create --name "$LOCAL_ROUTER_NAME" \
 
 ```console
 $ LOCAL_ROUTER_ID=$(skr local-router-api find --name "$LOCAL_ROUTER_NAME" \
-    --query 'map(select(.Name == "'"$LOCAL_ROUTER_NAME"'")) | sort_by(-.ID) | .[0].ID' | jq -er '.')
+    --query-raw 'map(select(.Name == "'"$LOCAL_ROUTER_NAME"'")) | sort_by(-.ID) | .[0].ID')
 $ skr local-router-api read --id "$LOCAL_ROUTER_ID" \
     --query '{ID,Name,Switch,Interface,StaticRoutes}'
 ```

@@ -80,11 +80,11 @@ $ skr apprun-dedicated-api list-clusters --query '[.items[] | {clusterID, name}]
 ```
 
 ```console
-$ CLUSTER_ID=$(skr apprun-dedicated-api create-cluster --request @cluster.json --query '.clusterID' | jq -er '.')
+$ CLUSTER_ID=$(skr apprun-dedicated-api create-cluster --request @cluster.json --query-raw '.clusterID')
 $ skr apprun-dedicated-api read-cluster "$CLUSTER_ID" --query '{clusterID, name, servicePrincipalID, hasLetsEncryptEmail}'
 ```
 
-参照結果に指定した名前とサービスプリンシパル ID が表示されることを確認します。`hasLetsEncryptEmail` は `false` です。以降の手順で使う `CLUSTER_ID` はコマンド出力から取り込んだ値です (`--query` は JSON で出力するため、文字列は `jq -er '.'` でデコードしてから変数に入れます。以降も同じ手順です)。
+参照結果に指定した名前とサービスプリンシパル ID が表示されることを確認します。`hasLetsEncryptEmail` は `false` です。以降の手順で使う `CLUSTER_ID` はコマンド出力から取り込んだ値です (文字列の抽出には `--query-raw` を使うと引用符なしで取り込めます。以降も同じ手順です)。
 
 ## Step 3: オートスケーリンググループを作成し、ワーカノードの起動を待つ
 
@@ -114,7 +114,7 @@ $ ASG_ID=$(skr apprun-dedicated create-auto-scaling-group "$CLUSTER_NAME" "$ASG_
     --name-servers 210.188.224.10 \
     --min-nodes 1 --max-nodes 1 \
     --wait-timeout 20m \
-    --query '.autoScalingGroupID' | jq -er '.')
+    --query-raw '.autoScalingGroupID')
 ```
 
 コマンドが戻ったら、作成結果を確認します。
@@ -194,7 +194,7 @@ $ skr apprun-dedicated deploy --app apprun-dedicated.json
 後の手順で使うアプリケーション ID を変数に取り込みます。
 
 ```console
-$ APP_ID=$(skr apprun-dedicated status --app apprun-dedicated.json --query '.application.applicationID' | jq -er '.')
+$ APP_ID=$(skr apprun-dedicated status --app apprun-dedicated.json --query-raw '.application.applicationID')
 ```
 
 ## Step 5: 動作を確認する
@@ -249,11 +249,11 @@ $ skr apprun-dedicated containers --app apprun-dedicated.json --query 'map({node
 ワーカノードの IP アドレスを取得し、サンプルアプリケーションにアクセスします。この構成ではワーカノードが共有セグメントに接続され、パケットフィルタを設定していないため、アプリケーションのポートへ外部から直接アクセスできます。[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)の動作確認も同じ方法です。実際のアプリケーションでは、パケットフィルタを設定して意図しないアクセスを防いでください。
 
 ```console
-$ NODE_IP=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query '.items[0].networkInterfaces[0].addresses[0]' | jq -er 'split("/")[0]')
+$ NODE_IP=$(skr apprun-dedicated-api list-worker-nodes --cluster-id "$CLUSTER_ID" --auto-scaling-group-id "$ASG_ID" --query-raw '.items[0].networkInterfaces[0].addresses[0] | split("/")[0]')
 $ curl --fail --silent --show-error --connect-timeout 10 --max-time 60 --write-out '\nHTTP status: %{http_code}\n' "http://$NODE_IP:8080/"
 ```
 
-`addresses` の要素は CIDR 表記 (例: `192.0.2.10/24`) で返るため、`jq` の `split` でプレフィックス長を取り除いた IP アドレスを取り出します。
+`addresses` の要素は CIDR 表記 (例: `192.0.2.10/24`) で返るため、jq 式の `split` でプレフィックス長を取り除いた IP アドレスを取り出し、`--query-raw` で引用符なしで取り込みます。
 
 成功条件は HTTP ステータス `200` と、本文が `Hello from AppRun!` であることです。サンプルイメージは `GET /` に対して HTTP 200 で本文 `Hello from AppRun!` (`Content-Type: text/plain`) を返します ([app.js](https://github.com/sacloud/apprun-samples/blob/main/tutorial/app.js))。次はこの実装に基づく表示例です。
 

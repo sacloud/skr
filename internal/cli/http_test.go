@@ -269,7 +269,7 @@ func TestRunHTTPCommandHelp(t *testing.T) {
 		"HTTPS",
 		"標準入力",
 		"SDK の認証情報",
-		"--query による加工は行いません",
+		"--query と --query-raw による加工は行いません",
 		"SIGINT (Ctrl+C) または SIGTERM を受けるとリクエストを中断します",
 		"SAKURA_API_REQUEST_TIMEOUT",
 		"SAKURACLOUD_API_REQUEST_TIMEOUT",

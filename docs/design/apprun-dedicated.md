@@ -277,7 +277,7 @@ skr apprun-dedicated delete --app FILE|- [--force] [--wait | --no-wait] [--wait-
 
 ## 出力設計
 
-出力は JSON で、`--query` による絞り込みを低レベル層と同じ方式で受け付けます ([ADR 0030](../adr/0030-remove-table-output.md))。進行状況のログは標準エラー出力に書き、標準出力は結果の JSON だけを含めます。JSON 以外の出力を持つ `init`、`diff`、`delete` は `--query` を受け付けず、指定した場合はエラーにします (指定を暗黙に無視しない)。
+出力は JSON で、`--query` による絞り込みを低レベル層と同じ方式で受け付けます ([ADR 0030](../adr/0030-remove-table-output.md))。進行状況のログは標準エラー出力に書き、標準出力は結果の JSON だけを含めます。JSON 以外の出力を持つ `init`、`diff`、`delete` は `--query` と `--query-raw` を受け付けず、指定した場合はエラーにします (指定を暗黙に無視しない)。
 
 init は既存ファイルの保護を `O_EXCL` 付きの作成で行います。存在確認と書き込みの間に別のプロセスが同じパスへ書き込む競合を避け、上書きを防止します。
 
