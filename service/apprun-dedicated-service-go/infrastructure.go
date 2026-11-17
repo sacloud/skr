@@ -22,7 +22,6 @@ import (
 	"time"
 
 	autoscalinggroup "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/autoscalinggroup"
-	cluster "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
@@ -64,11 +63,11 @@ func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, group
 	if opts == nil {
 		opts = &CreateAutoScalingGroupOptions{}
 	}
-	clusterDetail, err := s.findCluster(ctx, clusterName)
+	clusterSummary, err := s.findCluster(ctx, clusterName)
 	if err != nil {
 		return nil, err
 	}
-	asgAPI := s.newAutoScalingGroupAPI(clusterDetail.ClusterID)
+	asgAPI := s.newAutoScalingGroupAPI(clusterSummary.ClusterID)
 	if _, err := s.findAutoScalingGroup(ctx, asgAPI, clusterName, groupName); err == nil {
 		return nil, fmt.Errorf("クラスタ %q にオートスケーリンググループ %q は既に存在します", clusterName, groupName)
 	} else {
@@ -112,7 +111,7 @@ func (s *Service) CreateAutoScalingGroup(ctx context.Context, clusterName, group
 		MaxNodes:               detail.MaxNodes,
 	}
 	if !opts.NoWait {
-		if err := s.waitWorkerNodesHealthy(ctx, clusterDetail.ClusterID, detail.AutoScalingGroupID, opts.Timeout); err != nil {
+		if err := s.waitWorkerNodesHealthy(ctx, clusterSummary.ClusterID, detail.AutoScalingGroupID, opts.Timeout); err != nil {
 			return nil, fmt.Errorf("ワーカノードの healthy 待ちに失敗しました (オートスケーリンググループ %q の作成は完了しています): %w", groupName, err)
 		}
 	}
@@ -147,11 +146,11 @@ func (s *Service) DeleteAutoScalingGroup(ctx context.Context, clusterName, group
 	if opts == nil {
 		opts = &DeleteAutoScalingGroupOptions{}
 	}
-	clusterDetail, err := s.findCluster(ctx, clusterName)
+	clusterSummary, err := s.findCluster(ctx, clusterName)
 	if err != nil {
 		return nil, err
 	}
-	asgAPI := s.newAutoScalingGroupAPI(clusterDetail.ClusterID)
+	asgAPI := s.newAutoScalingGroupAPI(clusterSummary.ClusterID)
 	asgDetail, err := s.findAutoScalingGroup(ctx, asgAPI, clusterName, groupName)
 	if err != nil {
 		return nil, err
@@ -203,11 +202,11 @@ func (s *Service) DeleteCluster(ctx context.Context, clusterName string, opts *D
 	if opts == nil {
 		opts = &DeleteClusterOptions{}
 	}
-	clusterDetail, err := s.findCluster(ctx, clusterName)
+	clusterSummary, err := s.findCluster(ctx, clusterName)
 	if err != nil {
 		return nil, err
 	}
-	deps, err := s.listClusterDependencies(ctx, clusterDetail)
+	deps, err := s.listClusterDependencies(ctx, clusterSummary)
 	if err != nil {
 		return nil, err
 	}
@@ -219,15 +218,15 @@ func (s *Service) DeleteCluster(ctx context.Context, clusterName string, opts *D
 	}
 	result := &DeleteClusterResult{
 		Name:      clusterName,
-		ClusterID: clusterDetail.ClusterID,
+		ClusterID: clusterSummary.ClusterID,
 	}
-	if err := s.clusterAPI.Delete(ctx, clusterDetail.ClusterID); err != nil {
+	if err := s.clusterAPI.Delete(ctx, clusterSummary.ClusterID); err != nil {
 		if !saclient.IsNotFoundError(err) {
 			return nil, fmt.Errorf("クラスタ %q の削除に失敗しました: %w", clusterName, err)
 		}
 		return result, nil
 	}
-	if err := s.confirmClusterDeleted(ctx, clusterDetail.ClusterID, opts.Timeout); err != nil {
+	if err := s.confirmClusterDeleted(ctx, clusterSummary.ClusterID, opts.Timeout); err != nil {
 		return nil, fmt.Errorf("クラスタ %q の削除後の不在確認に失敗しました: %w", clusterName, err)
 	}
 	return result, nil
@@ -340,7 +339,7 @@ type clusterDependency struct {
 }
 
 // listClusterDependencies はクラスタに残っている削除対象外のリソースを列挙します。
-func (s *Service) listClusterDependencies(ctx context.Context, clusterDetail *cluster.ClusterDetail) ([]clusterDependency, error) {
+func (s *Service) listClusterDependencies(ctx context.Context, clusterSummary *v1.ReadClusterSummary) ([]clusterDependency, error) {
 	var deps []clusterDependency
 	var appCursor *v1.ApplicationID
 	for {
@@ -349,7 +348,7 @@ func (s *Service) listClusterDependencies(ctx context.Context, clusterDetail *cl
 			return nil, fmt.Errorf("アプリケーションの一覧取得に失敗しました: %w", err)
 		}
 		for i := range apps {
-			if apps[i].ClusterID != clusterDetail.ClusterID {
+			if apps[i].ClusterID != clusterSummary.ClusterID {
 				continue
 			}
 			deps = append(deps, clusterDependency{kind: "application", name: apps[i].Name})
@@ -359,7 +358,7 @@ func (s *Service) listClusterDependencies(ctx context.Context, clusterDetail *cl
 		}
 		appCursor = next
 	}
-	asgAPI := s.newAutoScalingGroupAPI(clusterDetail.ClusterID)
+	asgAPI := s.newAutoScalingGroupAPI(clusterSummary.ClusterID)
 	var asgCursor *v1.AutoScalingGroupID
 	for {
 		asgs, next, err := asgAPI.List(ctx, listPageSize, asgCursor)

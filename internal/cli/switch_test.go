@@ -306,7 +306,7 @@ func TestSwitchCreateRequiresZoneAndName(t *testing.T) {
 
 func TestSwitchHelpJSONExamplesDecode(t *testing.T) {
 	var find switchapi.FindRequest
-	err := decodeRequest(`{"Zone":"tk1v","Names":["example"],"Sort":[{"Key":"Name","Order":0}]}`, &find)
+	err := decodeRequest(`{"Zone":"tk1v","Names":["example"],"Sort":["Name"]}`, &find)
 	require.NoError(t, err)
 	if find.Zone != "tk1v" || len(find.Names) != 1 || find.Names[0] != "example" ||
 		len(find.Sort) != 1 || find.Sort[0].Key != "Name" || find.Sort[0].Order != 0 {

@@ -52,7 +52,7 @@ func TestFindCommandSupportsNoInputAndOptionalFlags(t *testing.T) {
 func TestFindCommandDecodesJSONWithoutMergingAndRejectsFlagCombination(t *testing.T) {
 	api := &findAPITestDouble{}
 	command := newFindCommand(api)
-	requestJSON := `{"Names":["region"],"Sort":[{"Key":"Name"}]}`
+	requestJSON := `{"Names":["region"],"Sort":["Name"]}`
 	command.Request = &requestJSON
 	require.NoError(t, command.Run(&kong.Context{}))
 	require.NotNil(t, api.request)

@@ -70,12 +70,12 @@ func (s *Service) Deploy(ctx context.Context, def *ApplicationDefinition, opts *
 		opts = &DeployOptions{}
 	}
 
-	clusterDetail, err := s.findCluster(ctx, def.Cluster)
+	clusterSummary, err := s.findCluster(ctx, def.Cluster)
 	if err != nil {
 		return nil, err
 	}
 
-	detail, created, err := s.findOrCreateApplication(ctx, def, clusterDetail.ClusterID)
+	detail, created, err := s.findOrCreateApplication(ctx, def, clusterSummary.ClusterID)
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/sacloud/sacloud-sdk-go/api/iaas"
+	"github.com/sacloud/sacloud-sdk-go/api/iaas/search"
 )
 
 func TestSDKAPIFindUsesLowLevelOperationAndPreservesResponse(t *testing.T) {
@@ -33,7 +34,7 @@ func TestSDKAPIFindUsesLowLevelOperationAndPreservesResponse(t *testing.T) {
 		Filter:  map[string]any{"Name": "test-plan", "CPU>=": 4},
 		Count:   1,
 		From:    1,
-		Sort:    []string{"-CPU"},
+		Sort:    search.SortKeys{search.SortKeyDesc("CPU")},
 		Include: []string{"Name"},
 		Exclude: []string{"Description"},
 	})

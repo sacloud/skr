@@ -121,7 +121,7 @@ func TestIaaSServiceClassFindUsesSDKCaller(t *testing.T) {
 		},
 		{
 			name:     "JSON request",
-			args:     []string{"--request", `{"Zone":"json-zone","Count":5,"From":8,"Sort":[{"Key":"Name","Order":1}]}`},
+			args:     []string{"--request", `{"Zone":"json-zone","Count":5,"From":8,"Sort":["-Name"]}`},
 			zone:     "json-zone",
 			count:    5,
 			from:     8,

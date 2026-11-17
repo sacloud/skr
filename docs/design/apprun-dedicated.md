@@ -2,7 +2,7 @@
 
 - Status: 設計中 (実装は未着手)
 - ADR: [ADR 0079](../adr/0079-apprun-dedicated-high-level-commands.md)
-- SDK: `github.com/sacloud/sacloud-sdk-go` v0.5.0
+- SDK: `github.com/sacloud/sacloud-sdk-go` v0.7.0
 - 関連: [ADR 0005](../adr/0005-low-level-and-high-level-command-tiers.md)、[ADR 0027](../adr/0027-apprun-dedicated-api-commands.md)、[ADR 0075](../adr/0075-high-level-command-tier.md)、[ADR 0077](../adr/0077-eventbus-service-library.md)
 - 参考実装: [fujiwara/apprun-dedicated-cli](https://github.com/fujiwara/apprun-dedicated-cli)
 
@@ -90,7 +90,7 @@ func (s *Service) Init(ctx context.Context, clusterName, applicationName string)
 | `name` | string | 必須 | アプリケーション名 (CLI 固有。API には送らない) |
 | `cpu` | integer | 必須 | API の `cpu` |
 | `memory` | integer | 必須 | API の `memory` |
-| `scalingMode` | string | 必須 | API の `scalingMode`。SDK v0.5.0 の値は `manual`、`cpu` |
+| `scalingMode` | string | 必須 | API の `scalingMode`。SDK の値は `manual`、`cpu` |
 | `fixedScale` | integer | 任意 | `manual` 方式のインスタンス数 (API の `fixedScale`) |
 | `minScale` | integer | 任意 | `cpu` 方式の下限 (API の `minScale`) |
 | `maxScale` | integer | 任意 | `cpu` 方式の上限 (API の `maxScale`) |

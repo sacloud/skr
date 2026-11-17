@@ -46,7 +46,7 @@ $ skr iaas-api product server find --zone ZONE --count 10 --from 0 --query '.Ser
 }
 ```
 
-`Filter` の文字列値は部分一致で検索し、配列値は OR 条件として検索します。
+`Filter` の文字列値は部分一致で検索し、配列値は OR 条件として検索します。並び替えは `Sort` に `"CPU"` (昇順)、`"-CPU"` (降順) のような文字列配列を指定します。
 
 ```console
 $ skr iaas-api product server find --request @server-plan-find.json --query '.ServerPlans | map({ID,Name,CPU,MemoryMB,Availability})'

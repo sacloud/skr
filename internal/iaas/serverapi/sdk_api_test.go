@@ -79,7 +79,7 @@ func TestFindPassesSortToAPI(t *testing.T) {
 	sdk := &sdkAPI{op: serverOp}
 	sort := search.SortKeys{search.SortKeyDesc("CreatedAt")}
 	var request FindRequest
-	require.NoError(t, json.Unmarshal([]byte(`{"Zone":"is1b","Sort":[{"Key":"CreatedAt","Order":1}],"Count":10,"From":20}`), &request))
+	require.NoError(t, json.Unmarshal([]byte(`{"Zone":"is1b","Sort":["-CreatedAt"],"Count":10,"From":20}`), &request))
 
 	_, err := sdk.FindWithContext(context.Background(), &request)
 
