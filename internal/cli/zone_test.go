@@ -16,6 +16,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
@@ -88,6 +89,38 @@ func TestIaaSZoneFindWithLocalMockAndQuery(t *testing.T) {
 	var names []string
 	require.NoError(t, json.Unmarshal([]byte(queryOutput), &names), "decode query output %q", queryOutput)
 	require.Equal(t, []string{"test-zone-a", "test-zone-b"}, names, "configured zone names")
+}
+
+// zoneTestDouble は Zone API のリクエストを記録します。sakumock の Zone find は
+// リクエストボディを無視するため、--request の解釈はこのテストダブルで検証します。
+type zoneTestDouble struct {
+	findRequests []*zoneapi.FindRequest
+}
+
+func (api *zoneTestDouble) FindWithContext(_ context.Context, request *zoneapi.FindRequest) ([]*iaas.Zone, error) {
+	api.findRequests = append(api.findRequests, request)
+	return []*iaas.Zone{}, nil
+}
+
+func (api *zoneTestDouble) ReadWithContext(_ context.Context, request *zoneapi.ReadRequest) (*iaas.Zone, error) {
+	return &iaas.Zone{ID: request.ID}, nil
+}
+
+// TestIaaSZoneFindWithRequestJSON は --request 経路で検索条件を JSON から指定できることを検証します。
+func TestIaaSZoneFindWithRequestJSON(t *testing.T) {
+	api := &zoneTestDouble{}
+	commandLine := newCLI()
+	setZoneAPIFactory(commandLine, func() (zoneapi.API, error) {
+		return api, nil
+	})
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"iaas-api", "zone", "find", "--request", `{"Names":["json-zone"],"Count":10,"From":20}`}, &stdout, &stderr, commandLine)
+	require.Equal(t, 0, code, "find --request stderr: %s", stderr.String())
+	require.Len(t, api.findRequests, 1, "Find request = %+v, want values from JSON", api.findRequests)
+	request := api.findRequests[0]
+	require.Equal(t, []string{"json-zone"}, request.Names, "unexpected value")
+	require.Equal(t, 10, request.Count, "unexpected value")
+	require.Equal(t, 20, request.From, "unexpected value")
 }
 
 func TestIaaSZoneReadWithLocalMock(t *testing.T) {

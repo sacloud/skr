@@ -64,7 +64,7 @@ func TestNetworkingSuiteCommandsUseSDKRequests(t *testing.T) {
 		"IPAddress": "10.0.0.10", "Subnet": map[string]string{"SRN": testSubnetSRN},
 	}
 	var got []string
-	var gotCreateSubnet, gotCreateConnection map[string]any
+	var gotCreateSubnet, gotUpdateSubnet, gotCreateConnection map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		got = append(got, request.Method+" "+request.URL.Path)
@@ -83,6 +83,9 @@ func TestNetworkingSuiteCommandsUseSDKRequests(t *testing.T) {
 		case "GET /api/cloud/1.1/networking-suite/subnets/2345678901":
 			_ = json.NewEncoder(writer).Encode(map[string]any{"Subnet": subnet})
 		case "PUT /api/cloud/1.1/networking-suite/subnets/2345678901":
+			if err := json.NewDecoder(request.Body).Decode(&gotUpdateSubnet); err != nil {
+				t.Errorf("decode subnet update body: %v", err)
+			}
 			_ = json.NewEncoder(writer).Encode(map[string]any{"Subnet": subnet})
 		case "DELETE /api/cloud/1.1/networking-suite/subnets/2345678901",
 			"DELETE /api/cloud/1.1/networking-suite/interface-connections/3456789012":
@@ -129,13 +132,44 @@ func TestNetworkingSuiteCommandsUseSDKRequests(t *testing.T) {
 	if err := createSubnet.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
+	if !reflect.DeepEqual(gotCreateSubnet, map[string]any{
+		"Name": "subnet", "Description": "subnet description", "IPv4AddressRangeCIDR": "10.0.0.0/24",
+		"Zone": map[string]any{"Code": "is1b"}, "SubnetGroup": map[string]any{"SRN": testGroupSRN},
+	}) {
+		t.Errorf("subnet create request = %#v", gotCreateSubnet)
+	}
+	// --request 経路でも同じ wire body になる
+	jsonCreateSubnet := SubnetCreateCommand{
+		Request: new(`{"Name":"json-subnet","Description":"json subnet","IPv4AddressRangeCIDR":"10.0.0.0/24","Zone":{"Code":"is1b"},"SubnetGroup":{"SRN":"` + testGroupSRN + `"}}`),
+		runtime: runtime,
+	}
+	if err := jsonCreateSubnet.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotCreateSubnet, map[string]any{
+		"Name": "json-subnet", "Description": "json subnet", "IPv4AddressRangeCIDR": "10.0.0.0/24",
+		"Zone": map[string]any{"Code": "is1b"}, "SubnetGroup": map[string]any{"SRN": testGroupSRN},
+	}) {
+		t.Errorf("subnet create request via --request = %#v", gotCreateSubnet)
+	}
 	if err := (&SubnetReadCommand{SRN: testSubnetSRN, runtime: runtime}).Run(ctx); err != nil {
 		t.Fatal(err)
+	}
+	if err := (&SubnetUpdateCommand{
+		SRN: testSubnetSRN, Request: new(`{"Name":"json-renamed","Description":"json renamed"}`), runtime: runtime,
+	}).Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotUpdateSubnet, map[string]any{"Name": "json-renamed", "Description": "json renamed"}) {
+		t.Errorf("subnet update request via --request = %#v", gotUpdateSubnet)
 	}
 	if err := (&SubnetUpdateCommand{
 		SRN: testSubnetSRN, Name: new("subnet"), Description: new("updated"), runtime: runtime,
 	}).Run(ctx); err != nil {
 		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotUpdateSubnet, map[string]any{"Name": "subnet", "Description": "updated"}) {
+		t.Errorf("subnet update request = %#v", gotUpdateSubnet)
 	}
 	if err := (&SubnetDeleteCommand{SRN: testSubnetSRN, runtime: runtime}).Run(ctx); err != nil {
 		t.Fatal(err)
@@ -159,12 +193,6 @@ func TestNetworkingSuiteCommandsUseSDKRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(gotCreateSubnet, map[string]any{
-		"Name": "subnet", "Description": "subnet description", "IPv4AddressRangeCIDR": "10.0.0.0/24",
-		"Zone": map[string]any{"Code": "is1b"}, "SubnetGroup": map[string]any{"SRN": testGroupSRN},
-	}) {
-		t.Errorf("subnet create request = %#v", gotCreateSubnet)
-	}
 	if !reflect.DeepEqual(gotCreateConnection, map[string]any{
 		"Interface": map[string]any{"SRN": interfaceSRN}, "Subnet": map[string]any{"SRN": testSubnetSRN},
 		"EphemeralIPv4Address": ipAddress,
@@ -174,7 +202,9 @@ func TestNetworkingSuiteCommandsUseSDKRequests(t *testing.T) {
 	want := []string{
 		"GET /api/cloud/1.1/networking-suite/subnets",
 		"POST /api/cloud/1.1/networking-suite/subnets",
+		"POST /api/cloud/1.1/networking-suite/subnets",
 		"GET /api/cloud/1.1/networking-suite/subnets/2345678901",
+		"PUT /api/cloud/1.1/networking-suite/subnets/2345678901",
 		"PUT /api/cloud/1.1/networking-suite/subnets/2345678901",
 		"DELETE /api/cloud/1.1/networking-suite/subnets/2345678901",
 		"POST /api/cloud/1.1/networking-suite/interface-connections",
@@ -185,8 +215,8 @@ func TestNetworkingSuiteCommandsUseSDKRequests(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("requests = %#v, want %#v", got, want)
 	}
-	if len(outputs) != 7 {
-		t.Errorf("output count = %d, want 7", len(outputs))
+	if len(outputs) != 9 {
+		t.Errorf("output count = %d, want 9", len(outputs))
 	}
 }
 
@@ -251,6 +281,21 @@ func TestSubnetGroupCommandsUseSDKRequests(t *testing.T) {
 	if err := commands.SubnetGroup.List.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
+	// --request 経路でも同じ wire body になる。Request は個別フラグと併用できないため
+	// Request のみを指定する
+	jsonCreate := SubnetGroupCreateCommand{
+		Request: new(`{"Name":"json-group","Description":"json description","IPv4AddressRangeCIDR":"10.0.0.0/20","Region":{"Code":"is1"}}`),
+		runtime: runtime,
+	}
+	if err := jsonCreate.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotCreate, map[string]any{
+		"Name": "json-group", "Description": "json description",
+		"IPv4AddressRangeCIDR": "10.0.0.0/20", "Region": map[string]any{"Code": "is1"},
+	}) {
+		t.Errorf("create request via --request = %#v", gotCreate)
+	}
 	commands.SubnetGroup.Create = SubnetGroupCreateCommand{
 		Name: new("test-group"), Description: new("test description"),
 		IPv4AddressRange: new("10.0.0.0/20"), Region: new("is1"), runtime: runtime,
@@ -271,6 +316,18 @@ func TestSubnetGroupCommandsUseSDKRequests(t *testing.T) {
 	if err := update.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
+	if !reflect.DeepEqual(gotUpdate, map[string]any{"Name": "changed-group", "Description": "changed description"}) {
+		t.Errorf("update request = %#v", gotUpdate)
+	}
+	jsonUpdate := SubnetGroupUpdateCommand{
+		SRN: testGroupSRN, Request: new(`{"Name":"json-changed","Description":"json changed"}`), runtime: runtime,
+	}
+	if err := jsonUpdate.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotUpdate, map[string]any{"Name": "json-changed", "Description": "json changed"}) {
+		t.Errorf("update request via --request = %#v", gotUpdate)
+	}
 	deleteCommand := SubnetGroupDeleteCommand{SRN: testGroupSRN, runtime: runtime}
 	if err := deleteCommand.Run(ctx); err != nil {
 		t.Fatal(err)
@@ -282,21 +339,20 @@ func TestSubnetGroupCommandsUseSDKRequests(t *testing.T) {
 	}) {
 		t.Errorf("create request = %#v", gotCreate)
 	}
-	if !reflect.DeepEqual(gotUpdate, map[string]any{"Name": "changed-group", "Description": "changed description"}) {
-		t.Errorf("update request = %#v", gotUpdate)
-	}
 	wantMethods := []string{
 		"GET /api/cloud/1.1/networking-suite/subnet-groups",
 		"POST /api/cloud/1.1/networking-suite/subnet-groups",
+		"POST /api/cloud/1.1/networking-suite/subnet-groups",
 		"GET /api/cloud/1.1/networking-suite/subnet-groups/1234567890",
+		"PUT /api/cloud/1.1/networking-suite/subnet-groups/1234567890",
 		"PUT /api/cloud/1.1/networking-suite/subnet-groups/1234567890",
 		"DELETE /api/cloud/1.1/networking-suite/subnet-groups/1234567890",
 	}
 	if !reflect.DeepEqual(gotMethods, wantMethods) {
 		t.Errorf("requests = %v, want %v", gotMethods, wantMethods)
 	}
-	if len(outputs) != 4 {
-		t.Fatalf("output count = %d, want 4", len(outputs))
+	if len(outputs) != 6 {
+		t.Fatalf("output count = %d, want 6", len(outputs))
 	}
 }
 

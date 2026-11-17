@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alecthomas/kong"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/eventbus/apis/v1"
 )
 
@@ -197,6 +198,92 @@ func TestUpdateSecretCommandErrors(t *testing.T) {
 				t.Fatalf("error = %v, want wrapped %v", err, test.wrapped)
 			}
 		})
+	}
+}
+
+// commonServiceItemTestDouble は CommonServiceItem 操作のリクエストを記録します。
+type commonServiceItemTestDouble struct {
+	createRequests []v1.CreateCommonServiceItemRequest
+	updateIDs      []string
+	updateRequests []v1.UpdateCommonServiceItemRequest
+}
+
+func (api *commonServiceItemTestDouble) List(context.Context) ([]v1.CommonServiceItem, error) {
+	return nil, nil
+}
+
+func (api *commonServiceItemTestDouble) Read(context.Context, string) (*v1.CommonServiceItem, error) {
+	return &v1.CommonServiceItem{}, nil
+}
+
+func (api *commonServiceItemTestDouble) Create(_ context.Context, request v1.CreateCommonServiceItemRequest) (*v1.CommonServiceItem, error) {
+	api.createRequests = append(api.createRequests, request)
+	return &v1.CommonServiceItem{}, nil
+}
+
+func (api *commonServiceItemTestDouble) Update(_ context.Context, id string, request v1.UpdateCommonServiceItemRequest) (*v1.CommonServiceItem, error) {
+	api.updateIDs = append(api.updateIDs, id)
+	api.updateRequests = append(api.updateRequests, request)
+	return &v1.CommonServiceItem{}, nil
+}
+
+func (api *commonServiceItemTestDouble) Delete(context.Context, string) error {
+	return nil
+}
+
+// TestCommonServiceItemCommandsUseSDKRequests は --request 経路で作成・更新コマンドを実行し、
+// --provider-class の値がリクエストの Provider に反映されることを検証します。
+func TestCommonServiceItemCommandsUseSDKRequests(t *testing.T) {
+	api := &commonServiceItemTestDouble{}
+	runtime := CommonServiceItemRuntime{
+		DecodeRequest:                 func(input string, destination any) error { return json.Unmarshal([]byte(input), destination) },
+		SetCreateRequestProviderInput: SetCreateRequestProviderInput,
+		SetUpdateRequestProviderInput: SetUpdateRequestProviderInput,
+		ValidateOutput:                func(*kong.Context) error { return nil },
+		WriteOutput:                   func(*kong.Context, any) error { return nil },
+	}
+	factory := func(ProviderClass string) (CommonServiceItemAPI, error) { return api, nil }
+	ctx := &kong.Context{}
+
+	createRequest := `{"CommonServiceItem":{"Name":"json-trigger","Settings":{"Source":"sakuracloud://switch/123","Types":["SwitchUpdated"],"ProcessConfigurationID":"456"}}}`
+	createCommand := CommonServiceItemCreateCommand{
+		ProviderClass: "eventbustrigger",
+		Request:       &createRequest,
+		runtime:       runtime,
+		factory:       factory,
+	}
+	if err := createCommand.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(api.createRequests) != 1 {
+		t.Fatalf("create request count = %d", len(api.createRequests))
+	}
+	created := api.createRequests[0].CommonServiceItem
+	if created.Provider.Class != v1.ProviderClassEventbustrigger || created.Name != "json-trigger" {
+		t.Fatalf("created item = %#v", created)
+	}
+	if created.Settings.Type != v1.TriggerSettingsSettings || created.Settings.TriggerSettings.Source != "sakuracloud://switch/123" ||
+		len(created.Settings.TriggerSettings.Types.Value) != 1 || created.Settings.TriggerSettings.Types.Value[0] != "SwitchUpdated" {
+		t.Fatalf("created settings = %#v", created.Settings)
+	}
+
+	updateRequest := `{"CommonServiceItem":{"Name":"json-trigger-renamed"}}`
+	updateCommand := CommonServiceItemUpdateCommand{
+		ProviderClass: "eventbustrigger",
+		ID:            "123456789012",
+		Request:       &updateRequest,
+		runtime:       runtime,
+		factory:       factory,
+	}
+	if err := updateCommand.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(api.updateRequests) != 1 || api.updateIDs[0] != "123456789012" {
+		t.Fatalf("update request = %+v, ids = %v", api.updateRequests, api.updateIDs)
+	}
+	updated := api.updateRequests[0].CommonServiceItem
+	if !updated.Provider.Set || updated.Provider.Value.Class != v1.ProviderClassEventbustrigger || !updated.Name.Set || updated.Name.Value != "json-trigger-renamed" {
+		t.Fatalf("updated item = %#v", updated)
 	}
 }
 

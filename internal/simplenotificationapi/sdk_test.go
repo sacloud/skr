@@ -158,6 +158,91 @@ func TestCommonServiceItemCommandsUseSDKRequestAndResponse(t *testing.T) {
 	}
 }
 
+// TestSendMessageAndReorderViaRequestJSON は --request 経路でメッセージ送信と
+// ルーティング順序変更を行い、個別フラグ経由と同じ wire body になることを検証します。
+func TestSendMessageAndReorderViaRequestJSON(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "test-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "test-secret")
+
+	var sendBody, reorderBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			t.Errorf("read request body: %v", err)
+		}
+		switch request.Method + " " + request.URL.Path {
+		case "POST /api/cloud/1.1/commonserviceitem/123456789013/simplenotification/message":
+			if err := json.Unmarshal(body, &sendBody); err != nil {
+				t.Errorf("decode send request: %v", err)
+			}
+			writer.Header().Set("Content-Type", "application/json")
+			writer.WriteHeader(http.StatusAccepted)
+			_, _ = fmt.Fprint(writer, `{"is_ok":true}`)
+		case "PUT /api/cloud/1.1/commonserviceitem/simplenotification/routing/reorder":
+			if err := json.Unmarshal(body, &reorderBody); err != nil {
+				t.Errorf("decode reorder request: %v", err)
+			}
+			writer.Header().Set("Content-Type", "application/json")
+			writer.WriteHeader(http.StatusAccepted)
+			_, _ = fmt.Fprint(writer, `{"is_ok":true}`)
+		default:
+			t.Errorf("unexpected SDK request: %s %s", request.Method, request.URL.Path)
+			http.Error(writer, "unexpected request", http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client, err := clientconfig.New(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiClient, err := simplenotification.NewClientWithAPIRootURL(client, server.URL+"/api/cloud/1.1/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := CommonServiceItemRuntime{
+		DecodeRequest:  DecodeRequest,
+		ValidateOutput: func(*kong.Context) error { return nil },
+		WriteOutput:    func(*kong.Context, any) error { return nil },
+	}
+
+	// send-notification: --request 経路。Message は個別フラグと同じ wire 名で指定する
+	sendRequest := `{"Message":"json notification"}`
+	sendCommand := CommonServiceItemSendMessageCommand{
+		ID:      "123456789013",
+		Request: &sendRequest,
+		runtime: runtime,
+		factory: func(string) (CommonServiceItemAPI, error) {
+			return simplenotification.NewGroupOp(apiClient), nil
+		},
+	}
+	if err := sendCommand.Run(&kong.Context{}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(sendBody, map[string]any{"Message": "json notification"}) {
+		t.Errorf("send body via --request = %#v", sendBody)
+	}
+
+	// reorder-notification-routing: --request 経路のみの操作
+	reorderRequest := `{"Orders":[{"RoutingID":"123456789014","PriorityRank":1}]}`
+	reorderCommand := CommonServiceItemReorderCommand{
+		Request: &reorderRequest,
+		runtime: runtime,
+		factory: func(string) (CommonServiceItemAPI, error) {
+			return simplenotification.NewRoutingOp(apiClient), nil
+		},
+	}
+	if err := reorderCommand.Run(&kong.Context{}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(reorderBody, map[string]any{
+		"Orders": []any{map[string]any{"RoutingID": "123456789014", "PriorityRank": float64(1)}},
+	}) {
+		t.Errorf("reorder body via --request = %#v", reorderBody)
+	}
+}
+
 func TestCommonServiceItemUpdateSettingsThroughSDK(t *testing.T) {
 	for _, test := range []struct {
 		name     string

@@ -22,6 +22,9 @@ import (
 	"github.com/sacloud/skr/internal/iaas/diskplanapi"
 	"github.com/sacloud/skr/internal/iaas/internetapi"
 	"github.com/sacloud/skr/internal/iaas/internetplanapi"
+	ipaddressapi "github.com/sacloud/skr/internal/iaas/ipaddressapi"
+	ipv6addrapi "github.com/sacloud/skr/internal/iaas/ipv6addrapi"
+	ipv6netapi "github.com/sacloud/skr/internal/iaas/ipv6netapi"
 	"github.com/sacloud/skr/internal/iaas/licenseinfoapi"
 	"github.com/sacloud/skr/internal/iaas/packetfilterapi"
 	"github.com/sacloud/skr/internal/iaas/privatehostplanapi"
@@ -65,6 +68,24 @@ func setInternetAPIFactory(commandLine *cli, factory internetapi.APIFactory) {
 
 func setInternetPlanAPIFactory(commandLine *cli, factory internetplanapi.APIFactory) {
 	commandLine.IaaSAPI.Product.Internet = internetplanapi.NewCommands(internetplanapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, factory)
+}
+
+func setIPAddressAPIFactory(commandLine *cli, factory ipaddressapi.APIFactory) {
+	commandLine.IaaSAPI.IPAddress = ipaddressapi.NewCommands(ipaddressapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, factory)
+}
+
+func setIPv6AddrAPIFactory(commandLine *cli, factory ipv6addrapi.APIFactory) {
+	commandLine.IaaSAPI.IPv6Addr = ipv6addrapi.NewCommands(ipv6addrapi.Runtime{
+		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
+	}, factory)
+}
+
+func setIPv6NetAPIFactory(commandLine *cli, factory ipv6netapi.APIFactory) {
+	commandLine.IaaSAPI.IPv6Net = ipv6netapi.NewCommands(ipv6netapi.Runtime{
 		DecodeRequest: decodeRequest, ValidateOutput: validateOutput, WriteOutput: writeOutput,
 	}, factory)
 }

@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -246,6 +247,23 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqualValues(t, 0, folder.ID, "folder create returned %#v", folder)
 	require.Equal(t, "mock-folder", folder.Name, "unexpected value")
+	// --request 経路でも wire 名のキーで作成できる。親は先に作成したフォルダーを指定し、
+	// wire 名の parent_id が送信されたことを作成結果で確認する
+	var jsonFolder struct {
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		ParentID    *int   `json:"parent_id"`
+	}
+	jsonFolderRequest := fmt.Sprintf(`{"name":"json-folder","description":"via request","parent_id":%d}`, folder.ID)
+	require.NoError(t, json.Unmarshal(runCommand(
+		"iam-api", "create-folder", "--request", jsonFolderRequest,
+	), &jsonFolder))
+	require.NotEqualValues(t, 0, jsonFolder.ID, "folder create with --request returned %#v", jsonFolder)
+	require.Equal(t, "json-folder", jsonFolder.Name, "unexpected value")
+	require.Equal(t, "via request", jsonFolder.Description, "unexpected value")
+	require.NotNil(t, jsonFolder.ParentID, "parent_id in --request JSON was ignored: %#v", jsonFolder)
+	require.Equal(t, folder.ID, *jsonFolder.ParentID, "unexpected value")
 	var childFolder struct {
 		ID int `json:"id"`
 	}
@@ -279,7 +297,7 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 			break
 		}
 	}
-	require.Len(t, projectedFolders, 2, "projected folder list = %#v, want both created folders including %d", projectedFolders, folder.ID)
+	require.Len(t, projectedFolders, 3, "projected folder list = %#v, want all created folders including %d", projectedFolders, folder.ID)
 	require.True(t, foundRootFolder, "unexpected value")
 	var folderList struct {
 		Items []struct {
@@ -307,6 +325,21 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 	), &project))
 	require.NotEqualValues(t, 0, project.ID, "project create returned %#v", project)
 	require.Equal(t, "mock-project", project.Name, "unexpected value")
+	// --request 経路でも wire 名のキーで作成できる。parent_folder_id に先に作成したフォルダーを
+	// 指定し、wire 名変換が行われたことを作成結果で確認する
+	var jsonProject struct {
+		ID             int    `json:"id"`
+		Name           string `json:"name"`
+		ParentFolderID *int   `json:"parent_folder_id"`
+	}
+	jsonProjectRequest := fmt.Sprintf(`{"code":"mock-project-code-json","name":"json-project","description":"via request","parent_folder_id":%d}`, folder.ID)
+	require.NoError(t, json.Unmarshal(runCommand(
+		"iam-api", "create-project", "--request", jsonProjectRequest,
+	), &jsonProject))
+	require.NotEqualValues(t, 0, jsonProject.ID, "project create with --request returned %#v", jsonProject)
+	require.Equal(t, "json-project", jsonProject.Name, "unexpected value")
+	require.NotNil(t, jsonProject.ParentFolderID, "parent_folder_id in --request JSON was ignored: %#v", jsonProject)
+	require.Equal(t, folder.ID, *jsonProject.ParentFolderID, "unexpected value")
 	runCommand(
 		"iam-api", "move-projects", "--ids", strconv.Itoa(project.ID), "--parent-folder-id", strconv.Itoa(folder.ID),
 	)

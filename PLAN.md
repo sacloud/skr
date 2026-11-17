@@ -167,6 +167,8 @@ SDK の `api` 直下には、IaaS 以外に次の API ドメインがありま�
 
 全ドメインの `--request` デコード先を監査し ([#75](https://github.com/sacloud/skr/issues/75))、`--request` を request body 用の引数と位置づけました ([ADR 0085](docs/adr/0085-request-flag-scope.md))。query params を受ける ogen 系 list 操作では個別フラグが全 query params をカバーしているため、`--request` を廃止し、生成器に `no_request_flag` 設定を追加しました。IAM 7 操作 (folder、project、project-api-key、scim、service-policy の list-rule-templates、service-principal の list と list-keys)、AppRun 2 操作、Security Control 2 操作の 11 コマンドに適用済みです。IaaS の find は GET + リクエストボディという API 形式のため `--request` を維持します。IAM の folder / project create は json タグのない手書きラッパー型へのデコードで `parent_id` / `parent_folder_id` が黙って無視される実害があったため、wire 名タグ付き中間構造体による明示変換 (`DisallowUnknownFields` 併用) で修正済みです。organization / projectapikey は既に明示変換で対応済みでした。手書きラッパー型は Go コードでの利用を想定した SDK の設計であり、wire 形式の JSON をそのままデコード先に使うのは skr 固有の要件のため、json タグの追加は SDK 側へ提案せず skr 内部の中間構造体で完結させます ([#75](https://github.com/sacloud/skr/issues/75))。
 
+`--request` を受け付けるすべての末端コマンド (2026-11-18 時点で157 操作) には、渡したリクエスト JSON の解釈と送信内容を検証する単体テストを用意する方針にしました。対象の網羅は `TestRequestCommandCoverageBaseline` (`internal/cli/request_command_coverage_test.go`) が kong のコマンドモデルを走査し、`internal/cli/testdata/request-command-baseline.txt` との照合で固定します。カバレッジ調査で未検証だった 38 操作 (ipaddress 3、ipv6addr 5、ipv6net 2、internet 5、zone 1、gslb 2、proxylb 7、kms 1、secretmanager 1、networking-suite 4、security-control 1、simple-notification 2、IAM 2、eventbus 2) の単体テストを追加済みで、残りの操作は既存テストで `--request` 経路を検証しています。
+
 ## CLI 機能の改善候補: `--query-raw` (jq -r 相当の生出力)
 
 `--query` は式の評価に内蔵の gojq を使うが、結果は常に JSON として出力するため、文字列スカラーが引用符付きで出力され、シェル変数への取り込みには `jq -er '.'` が必要です。2026-11-11 時点のチュートリアルでは、ID の抽出を `--query '...' | jq -er '.'` で記述しています。引用符なしの生出力モードとして `--query-raw` フラグを追加すると、この手順から jq を不要にできます (実装は未着手)。

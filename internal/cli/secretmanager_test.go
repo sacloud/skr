@@ -171,6 +171,21 @@ func TestSecretManagerAPIWithSakumock(t *testing.T) {
 	require.Equal(t, "mock-vault-renamed", updated.Name, "unexpected value")
 	require.Equal(t, "renamed", updated.Description, "unexpected value")
 
+	// --request 経路でも同じ SDK リクエストになる。Tags は個別フラグ経路では送信されないため JSON で指定する
+	var jsonUpdated struct {
+		ID          string   `json:"ID"`
+		Name        string   `json:"Name"`
+		Description string   `json:"Description"`
+		Tags        []string `json:"Tags"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand(
+		"secretmanager-api", "update-vault", vaultID, "--request", `{"Name":"json-vault","Description":"json-desc","Tags":["team-a"]}`,
+	), &jsonUpdated))
+	require.Equal(t, vaultID, jsonUpdated.ID, "unexpected value")
+	require.Equal(t, "json-vault", jsonUpdated.Name, "unexpected value")
+	require.Equal(t, "json-desc", jsonUpdated.Description, "unexpected value")
+	require.Equal(t, []string{"team-a"}, jsonUpdated.Tags, "unexpected value")
+
 	// シークレットの作成 (upsert)
 	dir := t.TempDir()
 	valueFile := filepath.Join(dir, "value.txt")
