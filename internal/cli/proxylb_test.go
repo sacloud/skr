@@ -293,6 +293,49 @@ func TestProxyLBCommandOperations(t *testing.T) {
 	run("proxylb-api", "monitor-connection", "--id", "123")
 	require.NotNil(t, api.monitorConnectionRequest, "monitor-connection request = %+v", api.monitorConnectionRequest)
 	require.EqualValues(t, 123, api.monitorConnectionRequest.ID, "unexpected value")
+
+	// --request 経路でも同じ SDK リクエストになる
+	jsonAPI := &proxylbAPITestDouble{}
+	jsonCommandLine := newCLI()
+	setProxyLBAPIFactory(jsonCommandLine, func() (proxylbapi.API, error) { return jsonAPI, nil })
+	runJSON := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		require.Equal(t, 0, runCLI(args, &stdout, &stderr, jsonCommandLine), "stderr: %s", stderr.String())
+		require.EqualValues(t, 0, stderr.Len(), "run(%v) stderr=%q", args, stderr.String())
+		return stdout.Bytes()
+	}
+
+	runJSON("proxylb-api", "find", "--request", `{"Names":["json-proxylb"],"Tags":["web"],"Count":3,"From":2}`)
+	require.NotNil(t, jsonAPI.findRequest, "find request = %+v", jsonAPI.findRequest)
+	require.Equal(t, []string{"json-proxylb"}, jsonAPI.findRequest.Names, "unexpected value")
+	require.True(t, reflectStrings(jsonAPI.findRequest.Tags, []string{"web"}), "unexpected value")
+	require.Equal(t, 3, jsonAPI.findRequest.Count, "unexpected value")
+	require.Equal(t, 2, jsonAPI.findRequest.From, "unexpected value")
+
+	runJSON("proxylb-api", "read", "--request", `{"ID":123}`)
+	require.NotNil(t, jsonAPI.readRequest, "read request = %+v", jsonAPI.readRequest)
+	require.EqualValues(t, 123, jsonAPI.readRequest.ID, "unexpected value")
+
+	runJSON("proxylb-api", "get-certificates", "--request", `{"ID":123}`)
+	require.NotNil(t, jsonAPI.getCertificatesRequest, "get-certificates request = %+v", jsonAPI.getCertificatesRequest)
+	require.EqualValues(t, 123, jsonAPI.getCertificatesRequest.ID, "unexpected value")
+
+	runJSON("proxylb-api", "delete-certificates", "--request", `{"ID":123}`)
+	require.NotNil(t, jsonAPI.deleteCertificatesRequest, "delete-certificates request = %+v", jsonAPI.deleteCertificatesRequest)
+	require.EqualValues(t, 123, jsonAPI.deleteCertificatesRequest.ID, "unexpected value")
+
+	runJSON("proxylb-api", "renew-lets-encrypt-cert", "--request", `{"ID":123}`)
+	require.NotNil(t, jsonAPI.renewRequest, "renew-lets-encrypt-cert request = %+v", jsonAPI.renewRequest)
+	require.EqualValues(t, 123, jsonAPI.renewRequest.ID, "unexpected value")
+
+	runJSON("proxylb-api", "health-status", "--request", `{"ID":123}`)
+	require.NotNil(t, jsonAPI.healthStatusRequest, "health-status request = %+v", jsonAPI.healthStatusRequest)
+	require.EqualValues(t, 123, jsonAPI.healthStatusRequest.ID, "unexpected value")
+
+	runJSON("proxylb-api", "monitor-connection", "--request", `{"ID":123}`)
+	require.NotNil(t, jsonAPI.monitorConnectionRequest, "monitor-connection request = %+v", jsonAPI.monitorConnectionRequest)
+	require.EqualValues(t, 123, jsonAPI.monitorConnectionRequest.ID, "unexpected value")
 }
 
 func TestProxyLBMonitorConnectionCondition(t *testing.T) {

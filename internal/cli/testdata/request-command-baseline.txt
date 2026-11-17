@@ -1,0 +1,157 @@
+iaas-api archive find
+iaas-api archive read
+iaas-api database find
+iaas-api database read
+iaas-api database create
+iaas-api database update
+iaas-api database delete
+iaas-api database boot
+iaas-api database shutdown
+iaas-api database reset
+iaas-api database monitor-cpu
+iaas-api database monitor-disk
+iaas-api database monitor-interface
+iaas-api database monitor-database
+iaas-api database list-parameter
+iaas-api disk find
+iaas-api disk read
+iaas-api disk create
+iaas-api disk update
+iaas-api disk delete
+iaas-api icon find
+iaas-api icon read
+iaas-api icon create
+iaas-api icon update
+iaas-api icon delete
+iaas-api internet find
+iaas-api internet read
+iaas-api internet create
+iaas-api internet update
+iaas-api internet delete
+iaas-api internet list-subnet
+iaas-api internet add-subnet
+iaas-api internet update-subnet
+iaas-api internet delete-subnet
+iaas-api internet read-ipv6
+iaas-api internet enable-ipv6
+iaas-api internet disable-ipv6
+iaas-api internet monitor-router
+iaas-api ipaddress list
+iaas-api ipaddress read
+iaas-api ipaddress update-host-name
+iaas-api ipv6addr find
+iaas-api ipv6addr create
+iaas-api ipv6addr read
+iaas-api ipv6addr update
+iaas-api ipv6addr delete
+iaas-api ipv6net find
+iaas-api ipv6net read
+iaas-api packetfilter find
+iaas-api packetfilter read
+iaas-api packetfilter create
+iaas-api packetfilter update
+iaas-api packetfilter delete
+iaas-api product disk find
+iaas-api product disk read
+iaas-api product internet find
+iaas-api product internet read
+iaas-api product license find
+iaas-api product privatehost find
+iaas-api product privatehost read
+iaas-api product server find
+iaas-api product server read
+iaas-api region find
+iaas-api region read
+iaas-api switch find
+iaas-api switch read
+iaas-api switch create
+iaas-api switch update
+iaas-api switch delete
+iaas-api server find
+iaas-api server read
+iaas-api server create
+iaas-api server update
+iaas-api server delete
+iaas-api service-class find
+iaas-api zone find
+iaas-api zone read
+gslb-api find
+gslb-api read
+gslb-api create
+gslb-api update
+gslb-api delete
+local-router-api find
+local-router-api create
+local-router-api read
+local-router-api update
+local-router-api update-settings
+local-router-api delete
+local-router-api health-status
+local-router-api monitor-local-router
+proxylb-api find
+proxylb-api read
+proxylb-api create
+proxylb-api update
+proxylb-api delete
+proxylb-api get-certificates
+proxylb-api set-certificates
+proxylb-api delete-certificates
+proxylb-api renew-lets-encrypt-cert
+proxylb-api health-status
+proxylb-api monitor-connection
+eventbus-api create-common-service-item
+eventbus-api update-common-service-item
+simplemq-api create-queue
+simplemq-api update-queue
+simple-notification-api create-common-service-item
+simple-notification-api update-common-service-item
+simple-notification-api send-notification
+simple-notification-api reorder-notification-routing
+networking-suite-api create-subnet-group
+networking-suite-api update-subnet-group
+networking-suite-api create-subnet
+networking-suite-api update-subnet
+apprun-dedicated-api create-cluster
+apprun-dedicated-api update-cluster
+apprun-dedicated-api create-application-version
+apprun-dedicated-api create-auto-scaling-group
+apprun-dedicated-api create-load-balancer
+apprun-dedicated-api create-certificate
+apprun-dedicated-api update-certificate
+apprun-api create-application
+apprun-api patch-application
+apprun-api patch-application-packet-filter
+apprun-api update-application-traffic
+container-registry-api registry list
+container-registry-api registry create
+container-registry-api registry update
+object-storage-api create-permission
+object-storage-api update-permission
+iam-api update-memberships
+iam-api update-organization-iam-policy
+iam-api update-project-iam-policy
+iam-api update-folder-iam-policy
+iam-api update-organization-password-policy
+iam-api update-organization-auth-conditions
+iam-api create-folder
+iam-api update-organization-id-policy
+iam-api read-organization-service-policy
+iam-api update-organization-service-policy
+iam-api create-project
+iam-api create-api-key
+iam-api update-api-key
+iam-api create-scim-configuration
+iam-api update-scim-configuration
+iam-api create-service-principal
+iam-api update-service-principal
+iam-api create-sso-profile
+iam-api update-sso-profile
+kms-api create-key
+kms-api update-key
+secretmanager-api create-vault
+secretmanager-api update-vault
+service-endpoint-gateway-api seg-create
+service-endpoint-gateway-api seg-update
+security-control-api evaluation-rules-update
+security-control-api automated-actions-create
+security-control-api automated-actions-update

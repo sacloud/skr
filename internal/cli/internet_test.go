@@ -174,6 +174,11 @@ type internetAPITestDouble struct {
 	updateRequest        *internetapi.UpdateRequest
 	deleteRequest        *internetapi.DeleteRequest
 	addSubnetRequest     *internetapi.AddSubnetRequest
+	listSubnetRequests   []*internetapi.ListSubnetRequest
+	updateSubnetRequests []*internetapi.UpdateSubnetRequest
+	readIPv6Requests     []*internetapi.ReadIPv6Request
+	enableIPv6Requests   []*internetapi.EnableIPv6Request
+	disableIPv6Requests  []*internetapi.DisableIPv6Request
 	deleteSubnetRequest  *internetapi.DeleteSubnetRequest
 	monitorRouterRequest *internetapi.MonitorRouterRequest
 	createErr            error
@@ -216,6 +221,31 @@ func (api *internetAPITestDouble) AddSubnetWithContext(_ context.Context, reques
 
 func (api *internetAPITestDouble) DeleteSubnetWithContext(_ context.Context, request *internetapi.DeleteSubnetRequest) error {
 	api.deleteSubnetRequest = request
+	return nil
+}
+
+func (api *internetAPITestDouble) ListSubnetWithContext(_ context.Context, request *internetapi.ListSubnetRequest) ([]*iaas.Subnet, error) {
+	api.listSubnetRequests = append(api.listSubnetRequests, request)
+	return []*iaas.Subnet{}, nil
+}
+
+func (api *internetAPITestDouble) UpdateSubnetWithContext(_ context.Context, request *internetapi.UpdateSubnetRequest) (*iaas.InternetSubnetOperationResult, error) {
+	api.updateSubnetRequests = append(api.updateSubnetRequests, request)
+	return &iaas.InternetSubnetOperationResult{ID: request.SubnetID}, nil
+}
+
+func (api *internetAPITestDouble) ReadIPv6WithContext(_ context.Context, request *internetapi.ReadIPv6Request) (*iaas.IPv6NetInfo, error) {
+	api.readIPv6Requests = append(api.readIPv6Requests, request)
+	return &iaas.IPv6NetInfo{IPv6Prefix: "2001:db8:", IPv6PrefixLen: 64}, nil
+}
+
+func (api *internetAPITestDouble) EnableIPv6WithContext(_ context.Context, request *internetapi.EnableIPv6Request) (*iaas.IPv6NetInfo, error) {
+	api.enableIPv6Requests = append(api.enableIPv6Requests, request)
+	return &iaas.IPv6NetInfo{IPv6Prefix: "2001:db8:", IPv6PrefixLen: 64}, nil
+}
+
+func (api *internetAPITestDouble) DisableIPv6WithContext(_ context.Context, request *internetapi.DisableIPv6Request) error {
+	api.disableIPv6Requests = append(api.disableIPv6Requests, request)
 	return nil
 }
 
@@ -362,6 +392,39 @@ func TestIaaSInternetCommandsBuildSDKRequests(t *testing.T) {
 	request2 := api.deleteSubnetRequest
 	require.EqualValues(t, 123, request2.ID, "DeleteSubnet request = %+v", request2)
 	require.EqualValues(t, 456, request2.SubnetID, "unexpected value")
+
+	_, stderr, code = run("list-subnet", "--request", `{"Zone":"test-zone","ID":123}`)
+	require.Equal(t, 0, code, "list-subnet JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Len(t, api.listSubnetRequests, 1, "ListSubnet request = %+v, want values from JSON", api.listSubnetRequests)
+	require.EqualValues(t, 123, api.listSubnetRequests[0].ID, "unexpected value")
+
+	_, stderr, code = run("update-subnet", "--request", `{"Zone":"test-zone","ID":123,"SubnetID":456,"NextHop":"192.0.2.1"}`)
+	require.Equal(t, 0, code, "update-subnet JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Len(t, api.updateSubnetRequests, 1, "UpdateSubnet request = %+v, want values from JSON", api.updateSubnetRequests)
+	require.EqualValues(t, 123, api.updateSubnetRequests[0].ID, "unexpected value")
+	require.EqualValues(t, 456, api.updateSubnetRequests[0].SubnetID, "unexpected value")
+	require.Equal(t, "192.0.2.1", api.updateSubnetRequests[0].NextHop, "unexpected value")
+
+	output, _, code := run("read-ipv6", "--request", `{"Zone":"test-zone","ID":123}`)
+	require.Equal(t, 0, code, "read-ipv6 JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Len(t, api.readIPv6Requests, 1, "ReadIPv6 request = %+v, want values from JSON", api.readIPv6Requests)
+	require.EqualValues(t, 123, api.readIPv6Requests[0].ID, "unexpected value")
+	require.Contains(t, output, `"IPv6Prefix": "2001:db8:"`, "missing expected text %q: %s", `"IPv6Prefix": "2001:db8:"`, output)
+
+	_, stderr, code = run("enable-ipv6", "--request", `{"Zone":"test-zone","ID":123}`)
+	require.Equal(t, 0, code, "enable-ipv6 JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Len(t, api.enableIPv6Requests, 1, "EnableIPv6 request = %+v, want values from JSON", api.enableIPv6Requests)
+	require.EqualValues(t, 123, api.enableIPv6Requests[0].ID, "unexpected value")
+
+	_, stderr, code = run("disable-ipv6", "--request", `{"Zone":"test-zone","ID":123}`)
+	require.Equal(t, 0, code, "disable-ipv6 JSON: code %d, stderr %q", code, stderr)
+	require.Empty(t, stderr, "should be empty")
+	require.Len(t, api.disableIPv6Requests, 1, "DisableIPv6 request = %+v, want values from JSON", api.disableIPv6Requests)
+	require.EqualValues(t, 123, api.disableIPv6Requests[0].ID, "unexpected value")
 }
 
 func TestIaaSInternetRejectsInvalidRequestsBeforeCallingAPI(t *testing.T) {

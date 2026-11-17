@@ -246,6 +246,18 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqualValues(t, 0, folder.ID, "folder create returned %#v", folder)
 	require.Equal(t, "mock-folder", folder.Name, "unexpected value")
+	// --request 経路でも wire 名のキーで作成できる。parent_id は作成後に移動して確認する
+	var jsonFolder struct {
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand(
+		"iam-api", "create-folder", "--request", `{"name":"json-folder","description":"via request","parent_id":null}`,
+	), &jsonFolder))
+	require.NotEqualValues(t, 0, jsonFolder.ID, "folder create with --request returned %#v", jsonFolder)
+	require.Equal(t, "json-folder", jsonFolder.Name, "unexpected value")
+	require.Equal(t, "via request", jsonFolder.Description, "unexpected value")
 	var childFolder struct {
 		ID int `json:"id"`
 	}
@@ -279,7 +291,7 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 			break
 		}
 	}
-	require.Len(t, projectedFolders, 2, "projected folder list = %#v, want both created folders including %d", projectedFolders, folder.ID)
+	require.Len(t, projectedFolders, 3, "projected folder list = %#v, want all created folders including %d", projectedFolders, folder.ID)
 	require.True(t, foundRootFolder, "unexpected value")
 	var folderList struct {
 		Items []struct {
@@ -307,6 +319,16 @@ func TestIAMAPIFolderProjectAndServicePrincipalWithSakumock(t *testing.T) {
 	), &project))
 	require.NotEqualValues(t, 0, project.ID, "project create returned %#v", project)
 	require.Equal(t, "mock-project", project.Name, "unexpected value")
+	// --request 経路でも wire 名のキーで作成できる
+	var jsonProject struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand(
+		"iam-api", "create-project", "--request", `{"code":"mock-project-code-json","name":"json-project","description":"via request"}`,
+	), &jsonProject))
+	require.NotEqualValues(t, 0, jsonProject.ID, "project create with --request returned %#v", jsonProject)
+	require.Equal(t, "json-project", jsonProject.Name, "unexpected value")
 	runCommand(
 		"iam-api", "move-projects", "--ids", strconv.Itoa(project.ID), "--parent-folder-id", strconv.Itoa(folder.ID),
 	)

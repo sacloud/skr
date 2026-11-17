@@ -190,6 +190,19 @@ func TestKmsAPIWithSakumock(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(runCommand("kms-api", "update-key", keyID, "--name", "mock-kms-renamed", "--description", "renamed"), &updated))
 	require.Equal(t, "mock-kms-renamed", updated.Name, "unexpected value")
+
+	// --request 経路でも同じ SDK リクエストになる。Tags は個別フラグ経路では送信されないため JSON で指定する
+	var jsonUpdated struct {
+		ID   string   `json:"ID"`
+		Name string   `json:"Name"`
+		Tags []string `json:"Tags"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand(
+		"kms-api", "update-key", keyID, "--request", `{"Name":"json-renamed","Description":"json-desc","Tags":["team-a"]}`,
+	), &jsonUpdated))
+	require.Equal(t, keyID, jsonUpdated.ID, "unexpected value")
+	require.Equal(t, "json-renamed", jsonUpdated.Name, "unexpected value")
+	require.Equal(t, []string{"team-a"}, jsonUpdated.Tags, "unexpected value")
 	require.NoError(t, json.Unmarshal(runCommand("kms-api", "rotate-key", keyID), &updated))
 	require.Equal(t, keyID, updated.ID, "unexpected value")
 	var restricted string

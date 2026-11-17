@@ -163,6 +163,16 @@ func TestGSLBCommandOperations(t *testing.T) {
 	require.NotNil(t, api.deleteRequest, "delete request = %+v", api.deleteRequest)
 	require.EqualValues(t, 123, api.deleteRequest.ID, "unexpected value")
 	require.True(t, api.deleteRequest.FailIfNotFound, "unexpected value")
+
+	// --request 経路でも同じ SDK リクエストになる
+	run("gslb-api", "find", "--request", `{"Names":["json-gslb"],"Tags":["web"]}`)
+	require.NotNil(t, api.findRequest, "find request = %+v", api.findRequest)
+	require.Equal(t, []string{"json-gslb"}, api.findRequest.Names, "unexpected value")
+	require.True(t, reflectStrings(api.findRequest.Tags, []string{"web"}), "unexpected value")
+
+	run("gslb-api", "read", "--request", `{"ID":123}`)
+	require.NotNil(t, api.readRequest, "read request = %+v", api.readRequest)
+	require.EqualValues(t, 123, api.readRequest.ID, "unexpected value")
 }
 
 func TestGSLBJSONInputAndMutualExclusion(t *testing.T) {

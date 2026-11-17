@@ -88,6 +88,11 @@ func TestIaaSZoneFindWithLocalMockAndQuery(t *testing.T) {
 	var names []string
 	require.NoError(t, json.Unmarshal([]byte(queryOutput), &names), "decode query output %q", queryOutput)
 	require.Equal(t, []string{"test-zone-a", "test-zone-b"}, names, "configured zone names")
+
+	// --request 経路でも同じ SDK リクエストになる
+	jsonOutput := runCommand("iaas-api", "zone", "find", "--request", `{}`)
+	require.Contains(t, jsonOutput, `"test-zone-a"`, "find --request output %q", jsonOutput)
+	require.Contains(t, jsonOutput, `"test-zone-b"`, "find --request output %q", jsonOutput)
 }
 
 func TestIaaSZoneReadWithLocalMock(t *testing.T) {

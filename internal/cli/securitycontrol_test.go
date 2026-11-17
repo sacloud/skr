@@ -318,6 +318,33 @@ func TestRunSecurityControlAPIAutomatedActionCreateWithFlags(t *testing.T) {
 	}`, string(body))
 }
 
+func TestRunSecurityControlAPIAutomatedActionUpdateWithRequestFile(t *testing.T) {
+	var gotUpdateBody map[string]any
+	setSecurityControlTestEndpoint(t, func(writer http.ResponseWriter, request *http.Request) {
+		require.Equal(t, securityControlAPIRootPath+"/automated_actions/action-1", request.URL.Path)
+		writer.Header().Set("Content-Type", "application/json")
+		if request.Method != http.MethodPut {
+			http.Error(writer, "unexpected method", http.StatusNotFound)
+			return
+		}
+		require.NoError(t, json.NewDecoder(request.Body).Decode(&gotUpdateBody))
+		_, _ = writer.Write([]byte(`{"automatedActionId":"action-1","name":"my-action","action":{"actionType":"simpleNotification","actionParameter":{"servicePrincipalId":"112700012345","notificationGroupId":"112700056789"}},"executionCondition":"condition","isEnabled":true,"createdAt":"2026-01-01T00:00:00Z"}`))
+	})
+
+	requestFile := filepath.Join(t.TempDir(), "request.json")
+	requestJSON := `{"name":"my-action","action":{"actionType":"simpleNotification","actionParameter":{"servicePrincipalId":"112700012345","notificationGroupId":"112700056789"}},"executionCondition":"condition","isEnabled":true}`
+	require.NoError(t, os.WriteFile(requestFile, []byte(requestJSON), 0o600))
+
+	var stdout, stderr bytes.Buffer
+	require.Equal(t, 0, run([]string{"security-control-api", "automated-actions-update", "action-1", "--request", "@" + requestFile}, &stdout, &stderr), "stderr: %s", stderr.String())
+	require.Contains(t, stdout.String(), `"automatedActionId": "action-1"`)
+	require.Contains(t, stdout.String(), `"isEnabled": true`)
+
+	body, err := json.Marshal(gotUpdateBody)
+	require.NoError(t, err)
+	require.JSONEq(t, requestJSON, string(body))
+}
+
 func TestRunSecurityControlAPIAutomatedActionDelete(t *testing.T) {
 	setSecurityControlTestEndpoint(t, func(writer http.ResponseWriter, request *http.Request) {
 		require.Equal(t, securityControlAPIRootPath+"/automated_actions/action-1", request.URL.Path)
