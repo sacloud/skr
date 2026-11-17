@@ -145,7 +145,7 @@ func TestIaaSIPv6AddrCommandsUseSDKRequests(t *testing.T) {
 	require.Equal(t, []string{"www.example.com"}, request.HostNames, "unexpected value")
 	require.Equal(t, []string{"2001:db8::1"}, request.IPv6Addresses, "unexpected value")
 	require.Len(t, request.Sort, 1, "unexpected value")
-	require.Equal(t, "IPv6Addr", string(request.Sort[0].Key), "unexpected value")
+	require.Equal(t, "IPv6Addr", request.Sort[0].Key, "unexpected value")
 	require.Equal(t, 10, request.Count, "unexpected value")
 	require.Equal(t, 20, request.From, "unexpected value")
 	var found []struct {
