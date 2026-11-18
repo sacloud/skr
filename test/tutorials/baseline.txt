@@ -6,7 +6,7 @@
 apprun-api.md deferred 10 sakumock が未整備
 apprun-dedicated.md deferred 23 sakumock が未整備
 container-registry-api.md deferred 9 sakumock が未整備
-eventbus.md deferred 14 sakumock が SimpleMQ の API キー発行に未対応
+eventbus.md implemented 14
 gslb-api.md deferred 18 手動置換プレースホルダーの撤去と sakumockiaas の appliance 拡充が必要
 http-request.md deferred 2 対象サーバーを持たない汎用 HTTP コマンドのためモック方針を未確定
 iaas-api/archive.md deferred 4 sakumockiaas が archive に未対応

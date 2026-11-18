@@ -146,6 +146,9 @@ func runImplementedTutorial(t *testing.T, path string, script *tutorialScript) {
 	workDir := t.TempDir()
 	r, err := newRunner(binDir, filepath.Join(repoRoot, "test", "tutorials", "fixtures"), workDir, fixture)
 	require.NoError(t, err)
+	// モックサーバーはテスト終了時に停止します。HTTP サーバーの停止に
+	// コンテキストは不要なため t.Cleanup を使います。
+	t.Cleanup(r.close)
 
 	// プロファイルを作成するため、テストプロセスの環境変数を設定します。
 	// 実環境の認証情報は使わない。

@@ -78,6 +78,55 @@ func TestLoadFixture(t *testing.T) {
 		_, err := loadFixture(dir, "ws-token.md")
 		require.Error(t, err)
 	})
+
+	t.Run("未知のモックサービス", func(t *testing.T) {
+		path := filepath.Join(dir, "unknown-service.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"mock": {"zones": ["is1a"], "services": ["dummy"]}}`), 0o600))
+		_, err := loadFixture(dir, "unknown-service.md")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `unknown mock service "dummy"`)
+	})
+
+	t.Run("eventbus だけを宣言したモックサービス", func(t *testing.T) {
+		// サービスリンクの宛先が実 API になるため、simplemq との同時宣言を要求する。
+		path := filepath.Join(dir, "eventbus-only.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"mock": {"zones": ["is1a"], "services": ["eventbus"]}}`), 0o600))
+		_, err := loadFixture(dir, "eventbus-only.md")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "requires simplemq")
+	})
+
+	t.Run("eventbus を宣言せずイベントを宣言", func(t *testing.T) {
+		path := filepath.Join(dir, "event-without-service.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"mock": {"zones": ["is1a"], "events": [{"after": "skr x", "source": "s", "type": "t"}]}}`), 0o600))
+		_, err := loadFixture(dir, "event-without-service.md")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "requires the eventbus mock service")
+	})
+
+	t.Run("送信元のないイベント", func(t *testing.T) {
+		path := filepath.Join(dir, "event-without-source.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"mock": {"zones": ["is1a"], "services": ["simplemq", "eventbus"], "events": [{"after": "skr x", "source": "", "type": "t"}]}}`), 0o600))
+		_, err := loadFixture(dir, "event-without-source.md")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "empty source")
+	})
+
+	t.Run("種別のないイベント", func(t *testing.T) {
+		path := filepath.Join(dir, "event-without-type.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"mock": {"zones": ["is1a"], "services": ["simplemq", "eventbus"], "events": [{"after": "skr x", "source": "s", "type": ""}]}}`), 0o600))
+		_, err := loadFixture(dir, "event-without-type.md")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "empty type")
+	})
+
+	t.Run("after が空のイベント", func(t *testing.T) {
+		path := filepath.Join(dir, "event-without-after.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"mock": {"zones": ["is1a"], "services": ["simplemq", "eventbus"], "events": [{"after": "  ", "source": "s", "type": "t"}]}}`), 0o600))
+		_, err := loadFixture(dir, "event-without-after.md")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "blank after")
+	})
 }
 
 func TestFixtureSubstituteValues(t *testing.T) {
@@ -88,11 +137,35 @@ func TestFixtureSubstituteValues(t *testing.T) {
 	}}
 	require.NoError(t, fixture.validate("test.json"))
 
+	substitute := func(command string) string {
+		t.Helper()
+		replaced, err := fixture.substituteValues(command)
+		require.NoError(t, err)
+		return replaced
+	}
+
 	t.Run("境界の一致のみ置換", func(t *testing.T) {
 		// クォートの直後は境界のため、"$QUEUE-NAME" は置換対象になる。
 		require.Equal(t,
 			`skr iaas-api queue create --name "$eventbus-queue-x1y2" --zone is1b`,
-			fixture.substituteValues(`skr iaas-api queue create --name "$QUEUE-NAME" --zone ZONE`),
+			substitute(`skr iaas-api queue create --name "$QUEUE-NAME" --zone ZONE`),
+		)
+	})
+
+	t.Run("ハイフンで連結された名前の一部でも置換する", func(t *testing.T) {
+		// ハイフンは境界として扱うため、プレースホルダーを名前の接尾辞に
+		// 埋め込んだ形式でも置換される。
+		require.Equal(t,
+			`skr iaas-api switch create --name eventbus-switch-is1b`,
+			substitute(`skr iaas-api switch create --name eventbus-switch-ZONE`),
+		)
+	})
+
+	t.Run("アンダースコアで連結された変数の一部は置換しない", func(t *testing.T) {
+		// ZONE_ID は ZONE とは別の変数のため、ZONE としては置換されない。
+		require.Equal(t,
+			`skr x --id "$ZONE_ID" --zone is1b`,
+			substitute(`skr x --id "$ZONE_ID" --zone ZONE`),
 		)
 	})
 
@@ -100,15 +173,34 @@ func TestFixtureSubstituteValues(t *testing.T) {
 		// QUEUE-NAME-2 は QUEUE-NAME として置換されず、長い方のトークンで置換される。
 		require.Equal(t,
 			"skr x --name eventbus-queue-a1b2",
-			fixture.substituteValues("skr x --name QUEUE-NAME-2"),
+			substitute("skr x --name QUEUE-NAME-2"),
+		)
+	})
+
+	t.Run("値を持たない長いプレースホルダーの一部になるトークンはエラー", func(t *testing.T) {
+		// SWITCH-NAME の値だけを定義して TEST-SWITCH-NAME を定義しないと、
+		// 意図しない名前でリソースを作るため fail-closed でエラーにする。
+		f := &Fixture{Values: map[string]string{"SWITCH-NAME": "sakura-switch-x1y2"}}
+		require.NoError(t, f.validate("test.json"))
+		_, err := f.substituteValues("skr iaas-api switch create --name TEST-SWITCH-NAME")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "SWITCH-NAME")
+		require.Contains(t, err.Error(), "TEST-SWITCH-NAME")
+	})
+
+	t.Run("jq のフィールド名など値を持たない語はそのまま残る", func(t *testing.T) {
+		require.Equal(t,
+			`skr x --query '{ID,Name}'`,
+			substitute(`skr x --query '{ID,Name}'`),
 		)
 	})
 
 	t.Run("使用済みトークンの記録と未使用検出", func(t *testing.T) {
 		f := &Fixture{Values: map[string]string{"A": "1", "B": "2"}}
 		require.NoError(t, f.validate("test.json"))
-		f.substituteValues("skr x --a A")
-		err := f.checkUnused()
+		_, err := f.substituteValues("skr x --a A")
+		require.NoError(t, err)
+		err = f.checkUnused()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "values: B")
 	})

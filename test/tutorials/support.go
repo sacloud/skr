@@ -15,12 +15,7 @@
 package tutorials
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
-	"os"
 
 	"github.com/itchyny/gojq"
 	"github.com/sacloud/skr/internal/cli"
@@ -40,24 +35,6 @@ func compileGojq(expression string) error {
 	}
 	if _, err := gojq.Compile(query); err != nil {
 		return fmt.Errorf("compile expression: %w", err)
-	}
-	return nil
-}
-
-// writeHarnessPrivateKey はプロファイル作成に必要なダミーの RSA 秘密鍵を
-// path に書き込みます。実環境の認証情報ではありません。
-func writeHarnessPrivateKey(path string) error {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return fmt.Errorf("generate rsa key: %w", err)
-	}
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		return fmt.Errorf("marshal private key: %w", err)
-	}
-	block := &pem.Block{Type: "PRIVATE KEY", Bytes: der}
-	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil { //nolint:gosec // runner の workDir 配下にダミー鍵を書き込む。
-		return fmt.Errorf("write private key: %w", err)
 	}
 	return nil
 }
