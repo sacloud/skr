@@ -362,7 +362,7 @@ func (s *Server) doZone(method string, uri, id string) ([]byte, error) {
 	case method == "GET" && id == "":
 		zones := make([]map[string]any, 0, len(s.zones))
 		for i, name := range s.zones {
-			zones = append(zones, map[string]any{"ID": i + 1, "Name": name})
+			zones = append(zones, zoneRecord(i+1, name))
 		}
 		return marshalJSON(map[string]any{
 			"Total": len(zones),
@@ -378,10 +378,30 @@ func (s *Server) doZone(method string, uri, id string) ([]byte, error) {
 			return nil, zoneNotFound(method, uri, id)
 		}
 		return marshalJSON(map[string]any{
-			"Zone": map[string]any{"ID": zoneID, "Name": s.zones[zoneID-1]},
+			"Zone": zoneRecord(zoneID, s.zones[zoneID-1]),
 		})
 	default:
 		return nil, fmt.Errorf("unsupported IaaS operation: %s %s", method, uri)
+	}
+}
+
+// zoneRecord は Zone API のレスポンスの 1 ゾーン分を返します。
+// フィールド構成は SDK の naked.Zone に合わせます。
+func zoneRecord(id int, name string) map[string]any {
+	// リージョンはゾーン名の接頭辞から推定します (is1: 石狩、tk1: 福岡)。
+	region := map[string]any{"ID": 210, "Name": "石狩"}
+	if strings.HasPrefix(name, "tk") {
+		region = map[string]any{"ID": 290, "Name": "福岡"}
+	}
+	return map[string]any{
+		"ID":           id,
+		"Name":         name,
+		"Description":  fmt.Sprintf("さくらのクラウド %s ゾーン", name),
+		"DisplayOrder": id,
+		"IsDummy":      false,
+		"VNCProxy":     map[string]any{"HostName": "vnc." + name + ".sakura.ad.jp", "IPAddress": "192.0.2.10"},
+		"FTPServer":    map[string]any{"HostName": fmt.Sprintf("es%d.sakura.ad.jp", id), "IPAddress": "192.0.2.11"},
+		"Region":       region,
 	}
 }
 
