@@ -1,6 +1,6 @@
 # IaaS Zone API: ゾーン一覧とゾーン情報を参照する
 
-`skr iaas-api zone` は IaaS API からゾーン一覧とゾーン情報を取得します。このチュートリアルでは、JSON の一覧を確認し、`--query` でゾーン名だけを取り出し、指定した ID のゾーン情報を参照します。
+`skr iaas-api zone` は IaaS API からゾーン一覧とゾーン情報を取得します。このチュートリアルでは、JSON の一覧を確認し、`--query` でゾーン名だけを取り出し、指定した ID のゾーン情報を参照します。ゾーン ID は `zone find` の結果から `--query` で取り込み、シェルの変数に設定して使います。
 
 ## 前提条件
 
@@ -49,22 +49,23 @@ jq 式は skr に組み込まれた gojq で評価するため、外部の jq �
 
 ### 4. ID でゾーン情報を参照する
 
-`zone read` に `--id` でゾーン ID を指定すると、そのゾーンの情報を取得します。表示されるゾーン ID は環境によって異なるため、`zone find` の結果から選んだ値を使います。
+`zone read` に `--id` でゾーン ID を指定すると、そのゾーンの情報を取得します。ゾーン ID は環境によって異なるため、`zone find` の結果から `--query` で ID を取り込み、変数に設定します。ここでは ID が最小のゾーンを選びます。
 
 ```console
-$ skr iaas-api zone read --id 21001
+$ ZONE_ID=$(skr iaas-api zone find --query 'sort_by(.ID) | .[0].ID')
+$ skr iaas-api zone read --id "$ZONE_ID"
 ```
 
 応答には ID、表示順、名前、説明のほか、VNC プロキシや FTP サーバなどの接続情報が含まれます。必要な項目だけを確認するには、`--query` でオブジェクトを構築します。`read` の応答は配列ではなく単一オブジェクトのため、`map()` ではなく `{ID,Name}` の形式を使います。
 
 ```console
-$ skr iaas-api zone read --id 21001 --query '{ID,Name,Region}'
+$ skr iaas-api zone read --id "$ZONE_ID" --query '{ID,Name,Region}'
 ```
 
-`--id` と `--request` は併用できません。`ReadRequest` JSON を直接指定する場合は次のようにします。
+`--id` と `--request` は併用できません。`ReadRequest` JSON を直接指定する場合は、変数を使って次のようにします。
 
 ```console
-$ skr iaas-api zone read --request '{"ID":21001}'
+$ skr iaas-api zone read --request "{\"ID\":$ZONE_ID}"
 ```
 
 ## クリーンアップ
@@ -74,6 +75,6 @@ $ skr iaas-api zone read --request '{"ID":21001}'
 ## 参考資料
 
 - [さくらのクラウド API v1.1: 設備関連 API の `get_zone`](https://manual.sakura.ad.jp/cloud-api/1.1/facility/index.html#get_zone)
-- [sacloud-sdk-go v0.3.0: IaaS Zone API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.3.0/service/iaas/zone)
+- [sacloud-sdk-go v0.7.0: IaaS Zone API](https://pkg.go.dev/github.com/sacloud/sacloud-sdk-go@v0.7.0/service/iaas/zone)
 - [jq マニュアル](https://jqlang.github.io/jq/manual/)
 - [gojq の jq との差異](https://github.com/itchyny/gojq#differences-from-jq)

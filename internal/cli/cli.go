@@ -192,3 +192,25 @@ func shouldShowCommandHelp(args []string, err error) bool {
 	selected := parseErr.Context.Selected()
 	return selected != nil && len(selected.Children) > 0 && args[len(args)-1] == selected.Name
 }
+
+// ParseOnly はコマンドライン引数を kong でパースし、妥当性だけを検証します。
+// コマンドは実行せず、API への接続も行いません。
+// チュートリアル検証 harness (test/tutorials) が stub 化したコマンドの
+// 構文検証に使うためのものです。
+func ParseOnly(args []string) error {
+	parser, err := kong.New(
+		newCLI(),
+		kong.Name("skr"),
+		kong.Description("CLI for Sakura Cloud."),
+		kong.Writers(io.Discard, io.Discard),
+		kong.Exit(func(int) {}),
+		kong.Vars{"version": version.FullVersion()},
+	)
+	if err != nil {
+		return fmt.Errorf("build kong grammar: %w", err)
+	}
+	if _, err := parser.Parse(args); err != nil {
+		return err
+	}
+	return nil
+}
