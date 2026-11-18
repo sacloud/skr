@@ -1,6 +1,6 @@
 # チュートリアルスクリプト実行 harness の設計
 
-- 状態: Phase 1・2 実装済み (Phase 3 以降は未着手)
+- 状態: Phase 1〜3 実装済み (Phase 4 以降は未着手)
 - 根拠: [ADR 0088](../adr/0088-tutorial-script-execution-harness.md)
 - 関連: [ADR 0065](../adr/0065-e2e-command-coverage-baseline.md) (baseline 形式)、[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md) (E2E の配置)
 
@@ -27,7 +27,8 @@ test/tutorials/
 ├── baseline.txt       # チュートリアルごとの状況とブロック数の下限
 └── fixtures/
     ├── zone.json      # implemented チュートリアルの制御 fixture
-    └── eventbus.json  # Phase 2: SimpleMQ / EventBus モックとイベント注入の fixture
+    ├── eventbus.json  # Phase 2: SimpleMQ / EventBus モックとイベント注入の fixture
+    └── simplemq-api.json  # Phase 3: SimpleMQ モックによるメッセージ送受信の fixture
 ```
 
 IaaS モックの HTTP ブリッジは `internal/sakumock/iaas/http.go` に置く。通常ビルドでは参照されないが、単体テスト (`http_test.go`) でブリッジと `remoteCaller` の往復を検証する。
@@ -164,7 +165,8 @@ TestMain で次を行う。
 | --- | --- | --- | --- |
 | 1 | `iaas-api/zone.md` | harness 本体、IaaS ビルドタグ接続、zone.md の ID 取得書き換え、baseline 初版 | 完了 |
 | 2 | `eventbus.md` | Ogen 系接続 (SimpleMQ / EventBus モック)、`mock.services` と `mock.events`、IaaS モックの HTTP ブリッジによる状態共有、値注入 (`UNIQUE-SUFFIX`、`QUEUE-NAME`、`ZONE`、`STARTS-AT`) | 完了 |
-| 3 以降 | IaaS 系チュートリアル | 手動置換プレースホルダーの撤去 (`server.md`、`internet.md`、`gslb-api.md`、`proxylb-api.md`、`networking-suite-api.md`)、sakumockiaas のデータ拡充 (`archive`、`product disk`、`server`、`appliance` など)、baseline の `deferred` 解除 | 未着手 |
+| 3 | `simplemq-api.md` | SimpleMQ モック単独による実行検証。回転 API キーのファイル保存 (`--query-raw '.APIKey'`)、メッセージの送受信・延長・削除、`QUEUE_ID` / `MESSAGE_ID` のコマンド置換化 | 完了 |
+| 4 以降 | IaaS 系チュートリアル | 手動置換プレースホルダーの撤去 (`server.md`、`internet.md`、`gslb-api.md`、`proxylb-api.md`、`networking-suite-api.md`)、sakumockiaas のデータ拡充 (`archive`、`product disk`、`server`、`appliance` など)、baseline の `deferred` 解除 | 未着手 |
 
 ## fixture の形式
 

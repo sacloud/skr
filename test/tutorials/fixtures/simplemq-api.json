@@ -1,0 +1,10 @@
+{
+  "values": {
+    "UNIQUE-SUFFIX": "p7w3q8",
+    "QUEUE-NAME": "simplemq-tutorial-p7w3q8"
+  },
+  "mock": {
+    "zones": ["is1a"],
+    "services": ["simplemq"]
+  }
+}
