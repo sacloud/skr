@@ -69,7 +69,8 @@ func TestExtractScript(t *testing.T) {
 			check: func(t *testing.T, script *tutorialScript) {
 				steps := script.Blocks[0].Steps
 				require.Len(t, steps, 2)
-				require.Equal(t, "cat > \"$USER_DATA_PATH\" <<EOF\n#cloud-config\nusers:\n  - default", steps[0].Command)
+				// 終端行も含まれる。含めないと bash の source で構文エラーになる。
+				require.Equal(t, "cat > \"$USER_DATA_PATH\" <<EOF\n#cloud-config\nusers:\n  - default\nEOF", steps[0].Command)
 				require.Equal(t, "skr version", steps[1].Command)
 				require.Empty(t, steps[0].Expected)
 			},
@@ -84,7 +85,21 @@ func TestExtractScript(t *testing.T) {
 			check: func(t *testing.T, script *tutorialScript) {
 				steps := script.Blocks[0].Steps
 				require.Len(t, steps, 1)
-				require.Equal(t, "skr http post https://example.com <<'BODY'\n{\"key\": \"value\"}", steps[0].Command)
+				require.Equal(t, "skr http post https://example.com <<'BODY'\n{\"key\": \"value\"}\nBODY", steps[0].Command)
+			},
+		},
+		{
+			name: "タブインデント付きの <<- 終端も含める",
+			content: "```console\n" +
+				"$ cat > f <<-EOF\n" +
+				"text\n" +
+				"\tEOF\n" +
+				"$ skr version\n" +
+				"```\n",
+			check: func(t *testing.T, script *tutorialScript) {
+				steps := script.Blocks[0].Steps
+				require.Len(t, steps, 2)
+				require.Equal(t, "cat > f <<-EOF\ntext\n\tEOF", steps[0].Command)
 			},
 		},
 		{

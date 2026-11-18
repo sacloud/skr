@@ -85,3 +85,57 @@ func TestRunnerMultiLineVariablesCarried(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "line1\nline2", string(out))
 }
+
+func TestRunnerUnsetCarried(t *testing.T) {
+	r := newTestRunner(t)
+
+	// step 内の unset も次の step に引き継がれます。テストプロセスの環境変数が
+	// 復活しないことを確認します。
+	err := r.execStep(&Step{Command: "HARNESS_VAR=1"}, "set variable")
+	require.NoError(t, err)
+	err = r.execStep(&Step{Command: "unset HARNESS_VAR"}, "unset variable")
+	require.NoError(t, err)
+	err = r.execStep(&Step{Command: "echo \"${HARNESS_VAR-missing}\" > unset.txt"}, "check variable")
+	require.NoError(t, err)
+
+	out, err := os.ReadFile(filepath.Join(r.cwd, "unset.txt"))
+	require.NoError(t, err)
+	require.Equal(t, "missing\n", string(out))
+}
+
+func TestCompareInlineExpected(t *testing.T) {
+	r := newTestRunner(t)
+
+	// インライン期待出力が JSON で、実際の出力と構造が一致する場合は成功します。
+	err := r.execStep(&Step{Command: `echo '{"id":1,"name":"x"}'`}, "output JSON")
+	require.NoError(t, err)
+	err = r.compareInlineExpected("test.md", &Step{Line: 1, Expected: []string{"{", "  \"id\": 999,", "  \"name\": \"masked\"", "}"}})
+	require.NoError(t, err)
+
+	// 構造が異なる JSON 期待出力は失敗します。
+	err = r.compareInlineExpected("test.md", &Step{Line: 2, Expected: []string{"{", "  \"id\": 999", "}"}})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "line 2")
+
+	// 期待出力が JSON として解釈できない (プレーンテキストの説明行) 場合は照合しません。
+	err = r.compareInlineExpected("test.md", &Step{Line: 3, Expected: []string{"表示されるゾーンは環境によって異なります。"}})
+	require.NoError(t, err)
+
+	// 期待出力がない step は照合しません。
+	err = r.compareInlineExpected("test.md", &Step{Line: 4})
+	require.NoError(t, err)
+}
+
+func TestRunnerHeredocCommand(t *testing.T) {
+	r := newTestRunner(t)
+
+	// heredoc を含むコマンドは終端行まで含めて実行されます。
+	// 終端行が欠けると bash の source が構文エラーになります。
+	command := "cat > data.txt <<EOF\nline1\nline2\nEOF\nwc -l < data.txt"
+	err := r.execStep(&Step{Line: 1, Command: command}, "heredoc step")
+	require.NoError(t, err)
+
+	out, err := os.ReadFile(filepath.Join(r.stateDir, "last-output"))
+	require.NoError(t, err)
+	require.Equal(t, "2\n", string(out))
+}

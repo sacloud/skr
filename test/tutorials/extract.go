@@ -160,6 +160,9 @@ func parseConsoleBlock(lines []string, open int) (*Block, int, error) {
 				body = strings.TrimLeft(line, "\t")
 			}
 			if body == heredocTerm {
+				// 終端行もコマンドの一部として連結する。含めないと bash の
+				// source 実行時に heredoc が閉じられず構文エラーになる。
+				appendToCurrent(j+1, line)
 				heredocTerm = ""
 				continue
 			}

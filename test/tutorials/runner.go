@@ -51,7 +51,8 @@ type runner struct {
 	cwd string
 	// umask は直前 step 終了時の umask です。
 	umask string
-	// env は直前 step 終了時の環境変数の写像です。
+	// env は直前 step 終了時の環境変数の写像です。nil の場合は
+	// まだ 1 step も実行しておらず、テストプロセスの環境変数を基準にします。
 	env map[string]string
 }
 
@@ -65,7 +66,8 @@ func newRunner(binDir, fixturesDir, workDir string, fixture *Fixture) (*runner, 
 		stateDir:    filepath.Join(workDir, ".harness-state"),
 		cwd:         workDir,
 		umask:       "022",
-		env:         map[string]string{},
+		// env は nil のままにし、最初の step はテストプロセスの環境変数を基準にする。
+		env: nil,
 	}
 	if err := os.MkdirAll(r.stateDir, 0o750); err != nil {
 		return nil, err
@@ -123,6 +125,9 @@ func (r *runner) run(script *tutorialScript) error {
 			if err := r.execStep(&Step{Line: step.Line, Command: command}, description); err != nil {
 				return err
 			}
+			if err := r.compareInlineExpected(script.Path, step); err != nil {
+				return err
+			}
 		}
 		// ブロックの直後に置かれた JSON 例は、ブロック内で最後に実行した
 		// step の出力と照合します。
@@ -138,6 +143,23 @@ func (r *runner) run(script *tutorialScript) error {
 	}
 	// チュートリアルの編集で対応が外れた fixture の項目を検出します。
 	return r.fixture.checkUnused()
+}
+
+// compareInlineExpected は step 直後にチュートリアルに書かれたインライン期待出力を
+// 実行結果と照合します。期待出力が JSON として解釈できない場合 (プレーンテキストの
+// 説明行など) は照合しません。
+func (r *runner) compareInlineExpected(path string, step *Step) error {
+	if len(step.Expected) == 0 {
+		return nil
+	}
+	actual, err := os.ReadFile(filepath.Join(r.stateDir, "last-output")) //nolint:gosec // runner が作成した state ディレクトリ配下のファイルを読み込む。
+	if err != nil {
+		return fmt.Errorf("%s: line %d: read last output: %w", path, step.Line, err)
+	}
+	if err := compareOutput(strings.Join(step.Expected, "\n"), string(actual)); err != nil {
+		return fmt.Errorf("%s: line %d: %w", path, step.Line, err)
+	}
+	return nil
 }
 
 // execStep は 1 step を bash で実行し、状態を回収します。
@@ -178,19 +200,26 @@ func (r *runner) execStep(step *Step, description string) error {
 }
 
 // processEnv は bash プロセスに渡す環境変数を組み立てます。
-// テストプロセスの環境変数に、直前 step までに作成・変更された変数を
-// 上書きして加えます。
+// 最初の step はテストプロセスの環境変数を基にし、2 step 目以降は直前 step
+// 終了時の完全な環境 (unset の反映を含む) を基にします。
 func (r *runner) processEnv() []string {
 	merged := map[string]string{}
-	for _, entry := range os.Environ() {
-		key, value, _ := strings.Cut(entry, "=")
-		merged[key] = value
+	if r.env == nil {
+		for _, entry := range os.Environ() {
+			key, value, _ := strings.Cut(entry, "=")
+			merged[key] = value
+		}
+	} else {
+		for key, value := range r.env {
+			merged[key] = value
+		}
 	}
-	for key, value := range r.env {
-		merged[key] = value
+	// PATH はビルド済みバイナリを優先します。2 step 目以降の PATH には
+	// すでに binDir が含まれるため、重複して先頭に加えない。
+	prefix := r.binDir + string(os.PathListSeparator)
+	if !strings.HasPrefix(merged["PATH"], prefix) {
+		merged["PATH"] = prefix + merged["PATH"]
 	}
-	// PATH はビルド済みバイナリを優先します。
-	merged["PATH"] = r.binDir + string(os.PathListSeparator) + os.Getenv("PATH")
 	// harness 固有の変数は明示的に組み立て直すため、引き継ぎ分を除去します。
 	for _, key := range []string{"SKR_HARNESS_CWD", "SKR_HARNESS_UMASK", "SKR_HARNESS_STATE", "SKR_HARNESS_STEP"} {
 		delete(merged, key)
