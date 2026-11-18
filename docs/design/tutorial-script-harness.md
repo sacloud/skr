@@ -124,7 +124,7 @@ fixture の `mock.services` で起動するモックサービスを宣言する�
 
 - `after` は step コマンドの正規化後テキストと完全一致させる。一致するたびに、runner は EventBus モックの検証用エンドポイント (`POST /_sakumock/events`) へイベントを POST する。
 - `source` と `type` はトリガーの照合に、`attributes` は条件の照合に使われる。属性値にも fixture 値の置換が適用される。
-- 応答の `Deliveries[].Error` が空でない場合、メッセージが SimpleMQ に届いていないことを意味するため、fail-closed でチュートリアルを失敗させる。
+- 応答の `Deliveries[].Error` が空でない場合、および配信が 0 件の場合 (トリガーが 1 つも一致しない場合) は、メッセージが SimpleMQ に届いていないことを意味するため、fail-closed でチュートリアルを失敗させる。
 - `after` で指定した step がチュートリアルに存在しなくなった場合は未使用 fixture として検出される。
 
 

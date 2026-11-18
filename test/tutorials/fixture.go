@@ -159,7 +159,12 @@ func (f *Fixture) validate(path string) error {
 	}
 	hasSimpleMQ := false
 	hasEventBus := false
+	seenServices := map[string]bool{}
 	for _, service := range f.Mock.Services {
+		if seenServices[service] {
+			return fmt.Errorf("fixture %s: mock.services declares %q more than once", path, service)
+		}
+		seenServices[service] = true
 		switch service {
 		case "simplemq":
 			hasSimpleMQ = true

@@ -77,6 +77,40 @@ type runner struct {
 	iaasMock *sakumockiaas.Server
 	// iaasServer は IaaS モックをサブプロセスに公開する HTTP ブリッジです。
 	iaasServer *httptest.Server
+	// envBackup は setEnv で変更した環境変数の変更前の値です。close で
+	// 復元し、後続のチュートリアルに停止済みモックの URL を継承させないためです。
+	envBackup map[string]envValue
+}
+
+// envValue は runner が変更する前の環境変数の値です。
+type envValue struct {
+	value  string
+	exists bool
+}
+
+// setEnv はテストプロセスの環境変数を設定し、変更前の値を記録します。
+// close で元に戻すためです。
+func (r *runner) setEnv(key, value string) error {
+	if r.envBackup == nil {
+		r.envBackup = map[string]envValue{}
+	}
+	if _, seen := r.envBackup[key]; !seen {
+		current, exists := os.LookupEnv(key)
+		r.envBackup[key] = envValue{value: current, exists: exists}
+	}
+	return os.Setenv(key, value)
+}
+
+// restoreEnv は setEnv で変更した環境変数を、変更前の状態に戻します。
+func (r *runner) restoreEnv() {
+	for key, saved := range r.envBackup {
+		if saved.exists {
+			_ = os.Setenv(key, saved.value) // この後テストは失敗済みのため、復元エラーを通知する手段がない。
+		} else {
+			_ = os.Unsetenv(key)
+		}
+	}
+	r.envBackup = nil
 }
 
 // newRunner は runner を初期化し、ラッパースクリプトを書き込みます。
@@ -99,14 +133,14 @@ func newRunner(binDir, fixturesDir, workDir string, fixture *Fixture) (*runner, 
 		return nil, fmt.Errorf("fixture must seed at least one zone for the IaaS mock")
 	}
 	// チュートリアルは順次実行されるため、テストプロセスの環境変数を上書きしてよい。
-	if err := os.Setenv(zonesEnv, strings.Join(fixture.Mock.Zones, ",")); err != nil {
+	if err := r.setEnv(zonesEnv, strings.Join(fixture.Mock.Zones, ",")); err != nil {
 		return nil, err
 	}
 	// IaaS モックは runner 側で 1 つだけ起動し、サブプロセスから HTTP で参照します。
 	// スイッチなどの状態をプロセス間で共有するためです。
 	r.iaasMock = sakumockiaas.NewTestServer(sakumockiaas.Config{Zones: fixture.Mock.Zones})
 	r.iaasServer = sakumockiaas.NewTestHTTPServer(r.iaasMock)
-	if err := os.Setenv(iaasURLEnv, r.iaasServer.URL); err != nil {
+	if err := r.setEnv(iaasURLEnv, r.iaasServer.URL); err != nil {
 		r.close()
 		return nil, err
 	}
@@ -122,31 +156,18 @@ func newRunner(binDir, fixturesDir, workDir string, fixture *Fixture) (*runner, 
 
 // startMockServices は fixture の mock.services で宣言された Ogen 系モック
 // サービスを起動し、エンドポイント env 変数をテストプロセスに設定します。
-// eventbus は simplemq と一緒に宣言することを fixture の検証が保証するため、
-// 宣言順に起動すればサービスリンクの宛先は常にモックになります。
+// 宣言順に依存しないため、サービスリンクの宛先になる SimpleMQ を先に起動します。
 func (r *runner) startMockServices() error {
 	for _, service := range r.fixture.Mock.Services {
-		switch service {
-		case "simplemq":
-			server := simplemqmock.NewTestServer(simplemqmock.Config{})
-			r.mqServer = server
-			// SimpleMQ はキュー (コントロールプレーン) とメッセージ (データプレーン)
-			// で同じ URL のエンドポイント変数を2つ使います。
-			for _, key := range []string{"SAKURA_ENDPOINTS_SIMPLE_MQ_QUEUE", "SAKURA_ENDPOINTS_SIMPLE_MQ_MESSAGE"} {
-				if err := os.Setenv(key, server.TestURL()); err != nil {
-					return err
-				}
+		if service == "simplemq" {
+			if err := r.startSimpleMQMock(); err != nil {
+				return err
 			}
-		case "eventbus":
-			// サービスリンク: モック内のフォワーダーがトリガー発火時に SimpleMQ
-			// モックへメッセージを送信できるよう、エンドポイント変数を渡します。
-			env := []core.EnvVar{
-				{Key: "SAKURA_ENDPOINTS_SIMPLE_MQ_MESSAGE", Value: r.mqServer.TestURL()},
-			}
-			env = append(env, core.DummyCredentialEnv()...)
-			server := eventbusmock.NewTestServerWithServiceLink(eventbusmock.Config{}, env)
-			r.eventbusServer = server
-			if err := os.Setenv("SAKURA_ENDPOINTS_EVENTBUS", server.TestURL()); err != nil {
+		}
+	}
+	for _, service := range r.fixture.Mock.Services {
+		if service == "eventbus" {
+			if err := r.startEventBusMock(); err != nil {
 				return err
 			}
 		}
@@ -154,7 +175,33 @@ func (r *runner) startMockServices() error {
 	return nil
 }
 
-// close は起動したモックサーバーを停止します。
+// startSimpleMQMock は SimpleMQ モックを起動します。キュー (コントロールプレーン) と
+// メッセージ (データプレーン) で同じ URL のエンドポイント変数を2つ使います。
+func (r *runner) startSimpleMQMock() error {
+	server := simplemqmock.NewTestServer(simplemqmock.Config{})
+	r.mqServer = server
+	for _, key := range []string{"SAKURA_ENDPOINTS_SIMPLE_MQ_QUEUE", "SAKURA_ENDPOINTS_SIMPLE_MQ_MESSAGE"} {
+		if err := r.setEnv(key, server.TestURL()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// startEventBusMock は EventBus モックを、SimpleMQ モック宛てのサービスリンクと
+// 一起動します。モック内のフォワーダーがトリガー発火時に SimpleMQ モックへ
+// メッセージを送信できるよう、エンドポイント変数を渡します。
+func (r *runner) startEventBusMock() error {
+	env := []core.EnvVar{
+		{Key: "SAKURA_ENDPOINTS_SIMPLE_MQ_MESSAGE", Value: r.mqServer.TestURL()},
+	}
+	env = append(env, core.DummyCredentialEnv()...)
+	server := eventbusmock.NewTestServerWithServiceLink(eventbusmock.Config{}, env)
+	r.eventbusServer = server
+	return r.setEnv("SAKURA_ENDPOINTS_EVENTBUS", server.TestURL())
+}
+
+// close は起動したモックサーバーを停止し、プロセス環境への変更を元に戻します。
 func (r *runner) close() {
 	if r.mqServer != nil {
 		r.mqServer.Close()
@@ -169,6 +216,7 @@ func (r *runner) close() {
 		r.iaasServer = nil
 	}
 	r.iaasMock = nil
+	r.restoreEnv()
 }
 
 // setup は実行環境を作成します。ダミーのアクセストークン認証による skr プロファイルを
@@ -299,7 +347,8 @@ func (r *runner) injectEvents(command string) error {
 const injectEventTimeout = 30 * time.Second
 
 // injectEvent は 1 件のイベントを EventBus モックの検証用エンドポイント
-// (POST /_sakumock/events) へ POST します。発火した配信にエラーがあれば
+// (POST /_sakumock/events) へ POST します。mock.events は発火を期待する宣言のため、
+// 配信が 0 件 (トリガーが 1 つも一致しない) 場合も、発火した配信にエラーがある場合も
 // fail-closed でエラーにします。メッセージが届かない状態でチュートリアルを
 // 成功扱いにしないためです。
 func (r *runner) injectEvent(event *MockEvent) error {
@@ -336,6 +385,12 @@ func (r *runner) injectEvent(event *MockEvent) error {
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return fmt.Errorf("decode mock event response: %w", err)
+	}
+	// モックはトリガーに 1 つも一致しない場合も 2xx と空の Deliveries を返す。
+	// 発火を期待する注入で配信が 0 件なら、チュートリアルのトリガーか fixture の
+	// 宣言が壊れているため失敗にする。
+	if len(result.Deliveries) == 0 {
+		return fmt.Errorf("mock event (source=%s type=%s) was delivered to no trigger: check the trigger in the tutorial and the mock.events declaration", body.Source, body.Type)
 	}
 	for _, delivery := range result.Deliveries {
 		if delivery.Error != "" {

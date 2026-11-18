@@ -79,6 +79,15 @@ func TestLoadFixture(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("重複したモックサービス", func(t *testing.T) {
+		// 重複宣言は同じモックを複数回起動する恐れがあるため拒否します。
+		path := filepath.Join(dir, "duplicate-service.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"mock": {"zones": ["is1a"], "services": ["simplemq", "simplemq"]}}`), 0o600))
+		_, err := loadFixture(dir, "duplicate-service.md")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `declares "simplemq" more than once`)
+	})
+
 	t.Run("未知のモックサービス", func(t *testing.T) {
 		path := filepath.Join(dir, "unknown-service.json")
 		require.NoError(t, os.WriteFile(path, []byte(`{"mock": {"zones": ["is1a"], "services": ["dummy"]}}`), 0o600))

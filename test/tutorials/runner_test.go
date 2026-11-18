@@ -30,7 +30,53 @@ func newTestRunner(t *testing.T) *runner {
 	require.NoError(t, fixture.validate("test.json"))
 	r, err := newRunner("/does-not-exist", t.TempDir(), t.TempDir(), fixture)
 	require.NoError(t, err)
+	// 起動したモックと環境変数の変更はテスト終了時に後片併きします。
+	t.Cleanup(r.close)
 	return r
+}
+func TestRunnerCloseRestoresEnv(t *testing.T) {
+	keys := []string{zonesEnv, iaasURLEnv, "SAKURA_ENDPOINTS_SIMPLE_MQ_QUEUE", "SAKURA_ENDPOINTS_SIMPLE_MQ_MESSAGE", "SAKURA_ENDPOINTS_EVENTBUS"}
+	before := map[string]envValue{}
+	for _, key := range keys {
+		value, exists := os.LookupEnv(key)
+		before[key] = envValue{value: value, exists: exists}
+	}
+
+	r := newTestRunner(t)
+	require.Equal(t, r.iaasServer.URL, os.Getenv(iaasURLEnv))
+	require.Equal(t, "is1a", os.Getenv(zonesEnv))
+
+	r.close()
+	for _, key := range keys {
+		value, exists := os.LookupEnv(key)
+		require.Equal(t, before[key].exists, exists, "key %s", key)
+		if exists {
+			require.Equal(t, before[key].value, value, "key %s", key)
+		}
+	}
+}
+
+func TestRunnerInjectEventWithoutTrigger(t *testing.T) {
+	// 宣言順に依存しないことを確認するため、eventbus を先に宣言します。
+	fixture := &Fixture{Mock: MockConfig{
+		Zones:    []string{"is1a"},
+		Services: []string{"eventbus", "simplemq"},
+		Events: []*MockEvent{{
+			After:  "skr iaas-api switch create --zone is1a",
+			Source: "//eventbus.sakura.ad.jp/eventlog",
+			Type:   "jp.ad.sakura.eventbus.eventlog.IaaS.request.Switch.normal.created",
+		}},
+	}}
+	require.NoError(t, fixture.validate("test.json"))
+	r, err := newRunner("/does-not-exist", t.TempDir(), t.TempDir(), fixture)
+	require.NoError(t, err)
+	t.Cleanup(r.close)
+
+	// トリガーが 1 つもない状態でのイベント注入は配信 0 件のためエラーになります。
+	// トリガーや fixture の宣言が壊れていてもチュートリアルを成功扱いにしないためです。
+	err = r.injectEvents("skr iaas-api switch create --zone is1a")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no trigger")
 }
 
 func TestRunnerCarriesStateAcrossSteps(t *testing.T) {
