@@ -405,3 +405,24 @@ simplemq-api rotate-api-key live
 simplemq-api send-message live
 simplemq-api update-queue live
 version live
+workflows-api list-workflows implemented
+workflows-api list-suggestions implemented
+workflows-api create-workflow implemented
+workflows-api read-workflow implemented
+workflows-api patch-workflow implemented
+workflows-api delete-workflow implemented
+workflows-api create-revision implemented
+workflows-api list-revisions implemented
+workflows-api read-revision implemented
+workflows-api update-revision-alias implemented
+workflows-api delete-revision-alias implemented
+workflows-api create-execution implemented
+workflows-api list-executions implemented
+workflows-api read-execution implemented
+workflows-api cancel-execution implemented
+workflows-api delete-execution implemented
+workflows-api list-execution-histories implemented
+workflows-api list-plans implemented
+workflows-api read-subscription implemented
+workflows-api create-subscription implemented
+workflows-api delete-subscription implemented

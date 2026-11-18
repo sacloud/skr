@@ -1,0 +1,112 @@
+{
+  "package": "workflowsapi",
+  "resource": "Workflows revisions",
+  "command_prefix": "WorkflowRevision",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/workflows/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "Create",
+      "help": "ワークフローに新しい Runbook (YAML) リビジョンを登録します。--runbook-file で Runbook ファイルを指定します。",
+      "method": "Create",
+      "request_type": "v1.CreateRevisionReq",
+      "request_by_value": true,
+      "response_type": "*v1.CreateRevisionCreatedRevision",
+      "arguments": [
+        {
+          "name": "workflow-id",
+          "field": "WorkflowID",
+          "type": "string",
+          "help": "リビジョンを登録するワークフロー ID。"
+        }
+      ],
+      "handwritten": true,
+      "command_name": "create-revision"
+    },
+    {
+      "name": "List",
+      "help": "ワークフローのリビジョンを一覧表示します。公開状態の絞り込みとページングができます。",
+      "method": "List",
+      "request_type": "v1.ListRevisionsParams",
+      "request_by_value": true,
+      "response_type": "*v1.ListRevisionsOK",
+      "handwritten": true,
+      "command_name": "list-revisions"
+    },
+    {
+      "name": "Read",
+      "help": "リビジョン番号を指定してリビジョンを読み取ります。Runbook の内容を含みます。",
+      "method": "Read",
+      "response_type": "*v1.ReadRevisionOKRevision",
+      "arguments": [
+        {
+          "name": "workflow-id",
+          "field": "WorkflowID",
+          "type": "string",
+          "help": "読み取るリビジョンが属するワークフロー ID。"
+        },
+        {
+          "name": "revision-number",
+          "field": "RevisionNumber",
+          "type": "int",
+          "help": "読み取るリビジョン番号。list-revisions の出力にある RevisionId。"
+        }
+      ],
+      "command_name": "read-revision"
+    },
+    {
+      "name": "UpdateAlias",
+      "help": "リビジョンにエイリアスを設定します。実行時に --revision-alias でこのエイリアスを指定できます。",
+      "method": "UpdateAlias",
+      "request_type": "v1.UpdateRevisionAliasReq",
+      "request_by_value": true,
+      "response_type": "*v1.UpdateRevisionAliasOKRevision",
+      "arguments": [
+        {
+          "name": "workflow-id",
+          "field": "WorkflowID",
+          "type": "string",
+          "help": "エイリアスを設定するリビジョンが属するワークフロー ID。"
+        },
+        {
+          "name": "revision-number",
+          "field": "RevisionNumber",
+          "type": "int",
+          "help": "エイリアスを設定するリビジョン番号。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "revision-alias",
+          "field": "RevisionAlias",
+          "type": "string",
+          "help": "設定するエイリアス名。"
+        }
+      ],
+      "command_name": "update-revision-alias"
+    },
+    {
+      "name": "DeleteAlias",
+      "help": "リビジョンのエイリアスを削除します。リビジョン自体は削除されません。",
+      "method": "DeleteAlias",
+      "arguments": [
+        {
+          "name": "workflow-id",
+          "field": "WorkflowID",
+          "type": "string",
+          "help": "エイリアスを削除するリビジョンが属するワークフロー ID。"
+        },
+        {
+          "name": "revision-number",
+          "field": "RevisionNumber",
+          "type": "int",
+          "help": "エイリアスを削除するリビジョン番号。"
+        }
+      ],
+      "command_name": "delete-revision-alias"
+    }
+  ],
+  "wiring_target": "WorkflowsAPI.Revision",
+  "sdk_factory": "workflowsapi.NewRevisionAPI"
+}

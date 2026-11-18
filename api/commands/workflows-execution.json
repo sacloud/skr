@@ -1,0 +1,112 @@
+{
+  "package": "workflowsapi",
+  "resource": "Workflows executions",
+  "command_prefix": "WorkflowExecution",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/workflows/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "Create",
+      "help": "ワークフローを実行します。対象リビジョンを --revision-id または --revision-alias で指定できます。どちらも未指定のときは最新リビジョンが実行されます。実行にはワークフローの公開設定が必要です。",
+      "method": "Create",
+      "request_type": "v1.OptCreateExecutionReq",
+      "request_by_value": true,
+      "response_type": "*v1.CreateExecutionCreatedExecution",
+      "arguments": [
+        {
+          "name": "workflow-id",
+          "field": "WorkflowID",
+          "type": "string",
+          "help": "実行するワークフロー ID。"
+        }
+      ],
+      "handwritten": true,
+      "command_name": "create-execution"
+    },
+    {
+      "name": "List",
+      "help": "ワークフローの実行を一覧表示します。ページングと並び順を指定できます。",
+      "method": "List",
+      "request_type": "v1.ListExecutionsParams",
+      "request_by_value": true,
+      "response_type": "*v1.ListExecutionsOK",
+      "handwritten": true,
+      "command_name": "list-executions"
+    },
+    {
+      "name": "Read",
+      "help": "ID を指定して実行を読み取ります。実行状態、結果、エラーの内容を含みます。",
+      "method": "Read",
+      "response_type": "*v1.ReadExecutionOKExecution",
+      "arguments": [
+        {
+          "name": "workflow-id",
+          "field": "WorkflowID",
+          "type": "string",
+          "help": "読み取る実行が属するワークフロー ID。"
+        },
+        {
+          "name": "execution-id",
+          "field": "ExecutionID",
+          "type": "string",
+          "help": "読み取る実行 ID。create-execution の出力にある ExecutionId。"
+        }
+      ],
+      "command_name": "read-execution"
+    },
+    {
+      "name": "Cancel",
+      "help": "実行中のワークフロー実行をキャンセル要求します。実行がキャンセルされると Status が Canceled になります。",
+      "method": "Cancel",
+      "response_type": "*v1.CancelExecutionOKExecution",
+      "arguments": [
+        {
+          "name": "workflow-id",
+          "field": "WorkflowID",
+          "type": "string",
+          "help": "キャンセルする実行が属するワークフロー ID。"
+        },
+        {
+          "name": "execution-id",
+          "field": "ExecutionID",
+          "type": "string",
+          "help": "キャンセルする実行 ID。"
+        }
+      ],
+      "command_name": "cancel-execution"
+    },
+    {
+      "name": "Delete",
+      "help": "ID を指定して実行記録を削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "workflow-id",
+          "field": "WorkflowID",
+          "type": "string",
+          "help": "削除する実行が属するワークフロー ID。"
+        },
+        {
+          "name": "execution-id",
+          "field": "ExecutionID",
+          "type": "string",
+          "help": "削除する実行 ID。"
+        }
+      ],
+      "command_name": "delete-execution"
+    },
+    {
+      "name": "ListHistory",
+      "help": "実行のステップ履歴を一覧表示します。各ステップの開始・終了時刻と状態を確認できます。",
+      "method": "ListHistory",
+      "request_type": "v1.ListExecutionHistoriesParams",
+      "request_by_value": true,
+      "response_type": "*v1.ListExecutionHistoriesOK",
+      "handwritten": true,
+      "command_name": "list-execution-histories"
+    }
+  ],
+  "wiring_target": "WorkflowsAPI.Execution",
+  "sdk_factory": "workflowsapi.NewExecutionAPI"
+}

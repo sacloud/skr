@@ -1,0 +1,224 @@
+{
+  "package": "workflowsapi",
+  "resource": "Workflows",
+  "command_prefix": "Workflow",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/workflows/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "ワークフローを一覧表示します。名前による絞り込み、公開状態の絞り込み、ページングができます。",
+      "method": "List",
+      "request_type": "v1.ListWorkflowsParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "request_validator": "ValidateWorkflowListRequest",
+      "response_type": "*v1.ListWorkflowsOK",
+      "flags": [
+        {
+          "name": "page",
+          "field": "Page",
+          "type": "int",
+          "help": "任意: ページ番号。",
+          "conversion": "v1.NewOptInt"
+        },
+        {
+          "name": "page-limit",
+          "field": "PageLimit",
+          "type": "int",
+          "help": "任意: 1 ページあたりの取得件数。",
+          "conversion": "v1.NewOptInt"
+        },
+        {
+          "name": "sort-by",
+          "field": "SortBy",
+          "type": "string",
+          "help": "任意: ソートに使うプロパティ。createdAt、updatedAt、id のいずれか。",
+          "conversion": "NewOptWorkflowSortBy"
+        },
+        {
+          "name": "order",
+          "field": "Order",
+          "type": "string",
+          "help": "任意: ソートの順序。asc または desc。",
+          "conversion": "NewOptWorkflowOrder"
+        },
+        {
+          "name": "published",
+          "field": "Published",
+          "type": "bool",
+          "help": "任意: 公開状態で絞り込みます。",
+          "conversion": "v1.NewOptBool"
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: ワークフロー名で絞り込みます。--name-match-type と組み合わせます。",
+          "conversion": "v1.NewOptString"
+        },
+        {
+          "name": "name-match-type",
+          "field": "NameMatchType",
+          "type": "string",
+          "help": "任意: --name の一致方法。partial (部分一致)、prefix (前方一致) のいずれか。既定値は partial です。",
+          "conversion": "NewOptWorkflowNameMatchType"
+        }
+      ],
+      "command_name": "list-workflows"
+    },
+    {
+      "name": "ListSuggest",
+      "help": "ワークフロー名の候補と使用状況を検索します。--name に指定した文字列に一致する名前の候補と、各名前を持つワークフローの数を返します。",
+      "method": "ListSuggest",
+      "request_type": "v1.ListSuggestionsParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "request_validator": "ValidateSuggestionListRequest",
+      "response_type": "*v1.ListSuggestionsOK",
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "required": true,
+          "help": "必須: 検索するワークフロー名。"
+        },
+        {
+          "name": "page",
+          "field": "Page",
+          "type": "int",
+          "help": "任意: ページ番号。",
+          "conversion": "v1.NewOptInt"
+        },
+        {
+          "name": "page-limit",
+          "field": "PageLimit",
+          "type": "int",
+          "help": "任意: 1 ページあたりの取得件数。",
+          "conversion": "v1.NewOptInt"
+        },
+        {
+          "name": "sort-by",
+          "field": "SortBy",
+          "type": "string",
+          "help": "任意: ソートに使うプロパティ。name、count のいずれか。",
+          "conversion": "NewOptSuggestionSortBy"
+        },
+        {
+          "name": "order",
+          "field": "Order",
+          "type": "string",
+          "help": "任意: ソートの順序。asc または desc。",
+          "conversion": "NewOptSuggestionOrder"
+        }
+      ],
+      "command_name": "list-suggestions"
+    },
+    {
+      "name": "Create",
+      "help": "Runbook (YAML) からワークフローを作成します。--runbook-file で Runbook ファイルを指定します。",
+      "method": "Create",
+      "request_type": "v1.CreateWorkflowReq",
+      "request_by_value": true,
+      "response_type": "*v1.CreateWorkflowCreatedWorkflow",
+      "handwritten": true,
+      "command_name": "create-workflow"
+    },
+    {
+      "name": "Read",
+      "help": "ID を指定してワークフローを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.ReadWorkflowOKWorkflow",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "読み取るワークフロー ID。list-workflows の出力にある ID。"
+        }
+      ],
+      "command_name": "read-workflow"
+    },
+    {
+      "name": "Update",
+      "help": "ワークフローを部分更新します。指定した項目だけをリクエストに含めます。--tags を省略した場合は Tags をリクエストに含めません。既存のタグを維持・変更する場合は --request JSON で現在値を指定してください。",
+      "method": "Update",
+      "request_type": "v1.PatchWorkflowReq",
+      "request_by_value": true,
+      "response_type": "*v1.PatchWorkflowOKWorkflow",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新するワークフロー ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 更新後のワークフロー名。省略するとリクエストに含まれません。",
+          "conversion": "v1.NewOptString"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 更新後の説明。省略するとリクエストに含まれません。",
+          "conversion": "v1.NewOptString"
+        },
+        {
+          "name": "publish",
+          "field": "Publish",
+          "type": "bool",
+          "help": "任意: 公開状態。--publish=false も指定できます。省略するとリクエストに含まれません。",
+          "conversion": "v1.NewOptBool"
+        },
+        {
+          "name": "logging",
+          "field": "Logging",
+          "type": "bool",
+          "help": "任意: 実行ログの記録。--logging=false も指定できます。省略するとリクエストに含まれません。",
+          "conversion": "v1.NewOptBool"
+        },
+        {
+          "name": "concurrency-mode",
+          "field": "ConcurrencyMode",
+          "type": "string",
+          "help": "任意: 同時実行の制御方法。parallel、lock、queue のいずれか。省略するとリクエストに含まれません。",
+          "conversion": "NewOptPatchWorkflowConcurrencyMode"
+        }
+      ],
+      "repeated_flags": [
+        {
+          "name": "tags",
+          "field": "Tags",
+          "help": "任意: 設定するタグ。--tags 名前 の形式で繰り返し指定します。省略するとリクエストに含まれません。"
+        }
+      ],
+      "request_transform": "SetPatchWorkflowTags",
+      "request_validator": "ValidatePatchWorkflowRequest",
+      "command_name": "patch-workflow"
+    },
+    {
+      "name": "Delete",
+      "help": "ID を指定してワークフローを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するワークフロー ID。"
+        }
+      ],
+      "command_name": "delete-workflow"
+    }
+  ],
+  "wiring_target": "WorkflowsAPI.Workflow",
+  "sdk_factory": "workflowsapi.NewWorkflowAPI"
+}

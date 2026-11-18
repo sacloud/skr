@@ -1,0 +1,48 @@
+{
+  "package": "workflowsapi",
+  "resource": "Workflows subscription",
+  "command_prefix": "WorkflowSubscription",
+  "imports": {
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/workflows/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "ListPlans",
+      "help": "利用可能な Workflows のプランを一覧表示します。プラン ID、サービスクラス、基本料金、ステップ数の内訳を確認できます。",
+      "method": "ListPlans",
+      "response_type": "*v1.ListPlansOK",
+      "command_name": "list-plans"
+    },
+    {
+      "name": "Read",
+      "help": "現在の Workflows サブスクリプション (契約) を取得します。契約がない場合は CurrentPlan が null になります。",
+      "method": "Read",
+      "response_type": "*v1.ReadSubscriptionOK",
+      "command_name": "read-subscription"
+    },
+    {
+      "name": "Create",
+      "help": "Workflows のサブスクリプション (契約) を開始します。課金が発生します。利用可能なプランは list-plans で確認してください。",
+      "method": "Create",
+      "request_type": "v1.CreateSubscriptionReq",
+      "request_by_value": true,
+      "flags": [
+        {
+          "name": "plan-id",
+          "field": "PlanId",
+          "type": "int",
+          "help": "契約するプランの ID。list-plans の出力にある ID。"
+        }
+      ],
+      "command_name": "create-subscription"
+    },
+    {
+      "name": "Delete",
+      "help": "Workflows のサブスクリプション (契約) を解約します。課金が停止されます。実行前に現在の契約を read-subscription で確認してください。",
+      "method": "Delete",
+      "command_name": "delete-subscription"
+    }
+  ],
+  "wiring_target": "WorkflowsAPI.Subscription",
+  "sdk_factory": "workflowsapi.NewSubscriptionAPI"
+}
