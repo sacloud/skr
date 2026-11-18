@@ -32,9 +32,18 @@ import (
 // カンマ区切りのゾーン名を受け付けます。
 const harnessZonesEnvVar = "SKR_TUTORIAL_HARNESS_ZONES"
 
+// harnessIaaSURLEnvVar はチュートリアル harness が起動した IaaS モックの
+// HTTP ブリッジの URL を伝える環境変数です。skr はサブプロセスで実行されるため、
+// モックの状態を共有するには runner 側の 1 つのサーバーに接続します。
+const harnessIaaSURLEnvVar = "SKR_TUTORIAL_HARNESS_IAAS_URL"
+
 // New はチュートリアル harness 用の IaaS API クライアントを返します。
-// 実環境へ接続せず、in-process の sakumock サーバーを iaas.APICaller として返します。
+// 環境変数にモックの URL があれば HTTP 経由で接続し、なければ in-process の
+// sakumock サーバーを返します。
 func New(trace bool) (iaas.APICaller, error) {
+	if url := os.Getenv(harnessIaaSURLEnvVar); url != "" {
+		return sakumockiaas.NewRemoteCaller(url)
+	}
 	names := os.Getenv(harnessZonesEnvVar)
 	if names == "" {
 		return nil, fmt.Errorf("%s is not set", harnessZonesEnvVar)

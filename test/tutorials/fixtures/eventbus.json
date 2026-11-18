@@ -1,0 +1,22 @@
+{
+  "values": {
+    "UNIQUE-SUFFIX": "x9k2m4",
+    "QUEUE-NAME": "eventbus-queue-x9k2m4",
+    "ZONE": "is1a",
+    "STARTS-AT": "2027-01-01T00:00:00+09:00"
+  },
+  "mock": {
+    "zones": ["is1a"],
+    "services": ["simplemq", "eventbus"],
+    "events": [
+      {
+        "after": "SWITCH_ID=$(skr iaas-api switch create --zone ZONE --name eventbus-switch-UNIQUE-SUFFIX --description \"Temporary switch for EventBus tutorial\" --query-raw '.ID')",
+        "source": "//eventbus.sakura.ad.jp/eventlog",
+        "type": "jp.ad.sakura.eventbus.eventlog.IaaS.request.Switch.normal.created",
+        "attributes": {
+          "zone": "ZONE"
+        }
+      }
+    ]
+  }
+}

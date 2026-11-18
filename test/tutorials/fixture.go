@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -32,6 +34,37 @@ var harnessSkipPrefixes = []string{"ssh", "exit"}
 type MockConfig struct {
 	// Zones は IaaS モックに登録するゾーン名のリストです。
 	Zones []string `json:"zones,omitempty"`
+	// Services は起動する Ogen 系モックサービスのリストです。
+	// simplemq と eventbus をサポートします。eventbus は simplemq と
+	// 一緒に宣言する必要があります (サービスリンクの宛先を実 API に向けないため)。
+	Services []string `json:"services,omitempty"`
+	// Events はチュートリアル外の副作用として発生するイベントの宣言です。
+	// after に一致する step が成功するたびに EventBus モックへ注入されます。
+	Events []*MockEvent `json:"events,omitempty"`
+}
+
+// MockEvent は harness が EventBus モックへ注入するイベントです。
+// 実世界ではリソース操作の副作用としてイベントログに記録され、EventBus が
+// それを受け取ります。モックにはその経路がないため、fixture で宣言した
+// 位置 (after) で注入してトリガーを発火させます。
+type MockEvent struct {
+	// After はイベントを注入するタイミングを示す、チュートリアルに書かれた
+	// コマンドテキスト (正規化後) です。stub や skip と同じ照合方法を使います。
+	After string `json:"after"`
+	// Source と Type はイベントの送信元と種別です。
+	Source string `json:"source"`
+	Type   string `json:"type"`
+	// Attributes はトリガー条件の照合に使うイベント属性です。値は
+	// fixture の値で置換されます。
+	Attributes map[string]string `json:"attributes,omitempty"`
+}
+
+// mockEventBody は EventBus モックのイベント注入エンドポイント
+// (POST /_sakumock/events) のリクエスト本文です。
+type mockEventBody struct {
+	Source     string            `json:"Source"`
+	Type       string            `json:"Type"`
+	Attributes map[string]string `json:"Attributes"`
 }
 
 // Fixture はチュートリアル 1 ファイル分の実行補助情報です。
@@ -46,11 +79,12 @@ type Fixture struct {
 	// Mock はモックへのシードです。
 	Mock MockConfig `json:"mock,omitempty"`
 
-	// usedStub / usedSkip / usedValues は実行時に照合された項目の記録です。
-	// 未使用の fixture 項目を fail-closed で検出するために使います。
+	// usedStub / usedSkip / usedValues / usedEvents は実行時に照合された項目の
+	// 記録です。未使用の fixture 項目を fail-closed で検出するために使います。
 	usedStub   map[string]bool
 	usedSkip   map[string]bool
 	usedValues map[string]bool
+	usedEvents map[*MockEvent]bool
 }
 
 // loadFixture は fixture ファイルを読み込みます。ファイルがなければエラーにします。
@@ -98,6 +132,7 @@ func (f *Fixture) validate(path string) error {
 	f.usedStub = map[string]bool{}
 	f.usedSkip = map[string]bool{}
 	f.usedValues = map[string]bool{}
+	f.usedEvents = map[*MockEvent]bool{}
 	for token, value := range f.Values {
 		if token == "" {
 			return fmt.Errorf("fixture %s: values must not have empty token", path)
@@ -122,6 +157,43 @@ func (f *Fixture) validate(path string) error {
 			return fmt.Errorf("fixture %s: stub replacement for %q must not be blank", path, key)
 		}
 	}
+	hasSimpleMQ := false
+	hasEventBus := false
+	seenServices := map[string]bool{}
+	for _, service := range f.Mock.Services {
+		if seenServices[service] {
+			return fmt.Errorf("fixture %s: mock.services declares %q more than once", path, service)
+		}
+		seenServices[service] = true
+		switch service {
+		case "simplemq":
+			hasSimpleMQ = true
+		case "eventbus":
+			hasEventBus = true
+		default:
+			return fmt.Errorf("fixture %s: unknown mock service %q", path, service)
+		}
+	}
+	// EventBus モックのサービスリンク (トリガー発火時のメッセージ送信) は
+	// SimpleMQ モックの URL を必要とします。宣言がない場合はリンク先が
+	// 実 API になるため、一緒に宣言することを要求します。
+	if hasEventBus && !hasSimpleMQ {
+		return fmt.Errorf("fixture %s: the eventbus mock service requires simplemq to be declared too", path)
+	}
+	if len(f.Mock.Events) > 0 && !hasEventBus {
+		return fmt.Errorf("fixture %s: mock.events requires the eventbus mock service", path)
+	}
+	for _, event := range f.Mock.Events {
+		if normalizeCommand(event.After) == "" {
+			return fmt.Errorf("fixture %s: mock.events entries must not have blank after", path)
+		}
+		if event.Source == "" {
+			return fmt.Errorf("fixture %s: mock.events entries must not have empty source", path)
+		}
+		if event.Type == "" {
+			return fmt.Errorf("fixture %s: mock.events entries must not have empty type", path)
+		}
+	}
 	return nil
 }
 
@@ -131,10 +203,28 @@ func normalizeCommand(command string) string {
 	return strings.Join(strings.Fields(command), " ")
 }
 
+// capsWordPattern は「大文字・数字・ハイフンのみで構成される語」のパターンです。
+// チュートリアルのプレースホルダー (例: QUEUE-NAME、UNIQUE-SUFFIX) は
+// この形で書かれるという規約に基づきます。
+var capsWordPattern = regexp.MustCompile(`[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*`)
+
 // substituteValues はコマンドテキスト内のトークンを fixture の値に置き換えます。
-// トークンは前後が英数字・ハイフン・アンダースコアでない場合のみ置換します。
-// 置換したトークンは使用済みとして記録します。
-func (f *Fixture) substituteValues(command string) string {
+// トークンは前後が英数字・アンダースコアでない場合のみ置換します。ハイフンは
+// 境界として扱うため、eventbus-switch-UNIQUE-SUFFIX のような名前の一部でも
+// 置換されます。置換したトークンは使用済みとして記録します。
+// 値を定義したトークンが、それ自身の値を持たないより長いプレースホルダー語の
+// 一部としてしか一致しない場合は、置換結果が意図しない名前になるためエラーにします。
+func (f *Fixture) substituteValues(command string) (string, error) {
+	for _, word := range capsWordPattern.FindAllString(command, -1) {
+		if _, ok := f.Values[word]; ok {
+			continue
+		}
+		for token := range f.Values {
+			if tokenEmbeddedIn(word, token) {
+				return "", fmt.Errorf("value token %s only matches part of placeholder %s: define a value for %s or use distinct tokens", token, word, word)
+			}
+		}
+	}
 	tokens := make([]string, 0, len(f.Values))
 	for token := range f.Values {
 		tokens = append(tokens, token)
@@ -149,14 +239,32 @@ func (f *Fixture) substituteValues(command string) string {
 		}
 		command = replaced
 	}
-	return command
+	return command, nil
 }
 
-// replaceToken は text 内の token を、前後がトークン構成文字 (英数字・ハイフン・
-// アンダースコア) でない場合に限り value に置き換えます。
+// tokenEmbeddedIn は token が word のハイフン区切り部分列として含まれるかを
+// 返します。word と token が同じ語の場合は部分ではないため false です。
+func tokenEmbeddedIn(word, token string) bool {
+	if word == token {
+		return false
+	}
+	ws := strings.Split(word, "-")
+	ts := strings.Split(token, "-")
+	for i := 0; i+len(ts) <= len(ws); i++ {
+		if slices.Equal(ws[i:i+len(ts)], ts) {
+			return true
+		}
+	}
+	return false
+}
+
+// replaceToken は text 内の token を、前後がトークン構成文字 (英数字・
+// アンダースコア) でない場合に限り value に置き換えます。ハイフンは境界として
+// 扱いますが、アンダースコアは構成文字のため ZONE は ZONE_ID の一部としては
+// 置換されません。
 func replaceToken(text, token, value string) string {
 	isTokenChar := func(b byte) bool {
-		return b == '_' || b == '-' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+		return b == '_' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 	}
 	var out strings.Builder
 	for i := 0; i < len(text); {
@@ -171,6 +279,26 @@ func replaceToken(text, token, value string) string {
 		i++
 	}
 	return out.String()
+}
+
+// substituteEvent はイベント注入の本文を fixture の値で置換します。
+func (f *Fixture) substituteEvent(ev *MockEvent) (mockEventBody, error) {
+	body := mockEventBody{Attributes: map[string]string{}}
+	var err error
+	if body.Source, err = f.substituteValues(ev.Source); err != nil {
+		return body, err
+	}
+	if body.Type, err = f.substituteValues(ev.Type); err != nil {
+		return body, err
+	}
+	for key, value := range ev.Attributes {
+		v, err := f.substituteValues(value)
+		if err != nil {
+			return body, fmt.Errorf("event attribute %s: %w", key, err)
+		}
+		body.Attributes[key] = v
+	}
+	return body, nil
 }
 
 // shouldSkip はコマンドが skip 対象かどうかを返します。
@@ -223,6 +351,11 @@ func (f *Fixture) checkUnused() error {
 	for key := range f.Stub {
 		if !f.usedStub[key] {
 			unused = append(unused, "stub: "+key)
+		}
+	}
+	for _, event := range f.Mock.Events {
+		if !f.usedEvents[event] {
+			unused = append(unused, "event: "+normalizeCommand(event.After))
 		}
 	}
 	sort.Strings(unused)

@@ -40,8 +40,10 @@
 
 ### mock との接続
 
-- IaaS (`iaas-api`) は `skr_tutorial_harness` ビルドタグ付きバイナリを使う。タグ付きビルドでは `internal/iaas/client` の `New` が `internal/sakumock/iaas` のサーバーを in-process で返し、モックデータは環境変数経由でシードする。通常ビルドには影響しない。
-- Ogen 系 API (`eventbus`、`simplemq-api` など) は sakumock モジュールのテストサーバーをハーネス内で起動し、`SAKURA_ENDPOINTS_<SERVICE>` 環境変数で接続する。既存の sakumock テストと同じ方式である。
+- IaaS (`iaas-api`) は `skr_tutorial_harness` ビルドタグ付きバイナリを使う。runner は `internal/sakumock/iaas` のサーバーを 1 つだけ起動して HTTP ブリッジで公開し、タグ付きビルドの `internal/iaas/client` の `New` はその URL (環境変数で伝える) に接続する `iaas.APICaller` を返す。`skr` は step ごとにプロセスを起動するため、スイッチなどの作成状態を共有するには HTTP 経由にする必要がある。通常ビルドには影響しない。
+- Ogen 系 API (`eventbus`、`simplemq-api` など) は fixture の `mock.services` で宣言された sakumock モックをハーネス内で起動し、`SAKURA_ENDPOINTS_<SERVICE>` 環境変数で接続する。既存の sakumock テストと同じ方式である。EventBus が SimpleMQ 宛てのサービスリンクを持つため、`eventbus` は `simplemq` と同時に宣言することを検証で要求する。
+- リソース操作の副作用として発生するイベントは、fixture の `mock.events` で宣言した通りに EventBus モックへ注入し、サービスリンク経由のメッセージ配信エラーをチュートリアルの失敗として扱う。
+- プロファイルの認証は、実環境の認証エンドポイントに到達しないダミーのアクセストークン認証 (Basic 認証) で作成する。サービスプリンシパル認証は JWT を実環境で検証されるため使わない。
 - sakumock が用意されていないサービスのチュートリアルは、baseline で `deferred` とし実行しない。ライブ API には決して向けない ([AGENTS.md](../../AGENTS.md) の安全性規約)。
 
 ### baseline
