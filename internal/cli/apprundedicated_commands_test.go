@@ -37,7 +37,7 @@ func TestRunAppRunDedicatedHighLevelHelp(t *testing.T) {
 	}{
 		{
 			args: []string{"apprun-dedicated", "--help"},
-			want: []string{"init", "deploy", "diff", "render", "status", "versions", "containers", "rollback", "deactivate", "delete", "create-auto-scaling-group", "delete-auto-scaling-group", "delete-cluster", "--app"},
+			want: []string{"init", "deploy", "diff", "render", "status", "versions", "containers", "rollback", "deactivate", "delete", "create-auto-scaling-group", "delete-auto-scaling-group", "delete-cluster", "create-cluster", "--app"},
 		},
 		{
 			args: []string{"apprun-dedicated", "deploy", "--help"},
@@ -70,6 +70,10 @@ func TestRunAppRunDedicatedHighLevelHelp(t *testing.T) {
 		{
 			args: []string{"apprun-dedicated", "delete-cluster", "--help"},
 			want: []string{"--force", "--[no-]wait", "--wait-timeout"},
+		},
+		{
+			args: []string{"apprun-dedicated", "create-cluster", "--help"},
+			want: []string{"--service-principal-id", "--port='port=80,protocol=http'", "--lets-encrypt-email", "http、https、tcp のいずれか"},
 		},
 	} {
 		t.Run(strings.Join(test.args[1:], "_"), func(t *testing.T) {
@@ -411,10 +415,52 @@ func TestRunAppRunDedicatedInfrastructureCommandsWithSakumock(t *testing.T) {
 		return stdout.Bytes()
 	}
 
-	// 準備として、低レベルコマンドでクラスタを作成します。
-	var createdCluster v1.ClusterIdentifier
-	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "create-cluster", "--request",
-		`{"name":"infra-cluster","servicePrincipalID":"sp-000000000","ports":[{"port":443,"protocol":"https"}]}`), &createdCluster))
+	// 準備として、高レベルコマンドでロードバランサの待受ポート付きクラスタを作成します。
+	var createdCluster struct {
+		Name                string `json:"name"`
+		ClusterID           string `json:"clusterID"`
+		Created             int64  `json:"created"`
+		HasLetsEncryptEmail bool   `json:"hasLetsEncryptEmail"`
+		Ports               []struct {
+			Port     uint16 `json:"port"`
+			Protocol string `json:"protocol"`
+		} `json:"ports"`
+		ServicePrincipalID string `json:"servicePrincipalID"`
+	}
+	data := runCommand("apprun-dedicated", "create-cluster", "infra-cluster",
+		"--service-principal-id", "sp-000000000",
+		"--port", "port=443,protocol=https")
+	require.NoError(t, json.Unmarshal(data, &createdCluster))
+	require.Equal(t, "infra-cluster", createdCluster.Name)
+	require.NotEmpty(t, createdCluster.ClusterID)
+	require.NotZero(t, createdCluster.Created)
+	require.False(t, createdCluster.HasLetsEncryptEmail)
+	require.Len(t, createdCluster.Ports, 1)
+	require.EqualValues(t, 443, createdCluster.Ports[0].Port)
+	require.Equal(t, "https", createdCluster.Ports[0].Protocol)
+	require.Equal(t, "sp-000000000", createdCluster.ServicePrincipalID)
+	clusterID := createdCluster.ClusterID
+
+	// 低レベルコマンドで作成結果を読み戻し、ID と指定内容を照合します。
+	var readBack struct {
+		ClusterID           string `json:"clusterID"`
+		Name                string `json:"name"`
+		ServicePrincipalID  string `json:"servicePrincipalID"`
+		HasLetsEncryptEmail bool   `json:"hasLetsEncryptEmail"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated-api", "read-cluster", clusterID,
+		"--query", "{clusterID, name, servicePrincipalID, hasLetsEncryptEmail}"), &readBack))
+	require.Equal(t, clusterID, readBack.ClusterID)
+	require.Equal(t, "infra-cluster", readBack.Name)
+	require.Equal(t, "sp-000000000", readBack.ServicePrincipalID)
+	require.False(t, readBack.HasLetsEncryptEmail)
+
+	// 同名のクラスタを作成しようとすると、既存エラーになります。
+	var stdoutDupCluster, stderrDupCluster bytes.Buffer
+	require.NotEqual(t, 0, run([]string{"apprun-dedicated", "create-cluster", "infra-cluster",
+		"--service-principal-id", "sp-000000000"}, &stdoutDupCluster, &stderrDupCluster))
+	require.Contains(t, stderrDupCluster.String(), "既に存在します")
+
 	// create-auto-scaling-group でオートスケーリンググループを作成します。
 	var createdGroup struct {
 		Cluster                string `json:"cluster"`
@@ -425,7 +471,7 @@ func TestRunAppRunDedicatedInfrastructureCommandsWithSakumock(t *testing.T) {
 		MinNodes               int32  `json:"minNodes"`
 		MaxNodes               int32  `json:"maxNodes"`
 	}
-	data := runCommand("apprun-dedicated", "create-auto-scaling-group", "infra-cluster", "infra-asg",
+	data = runCommand("apprun-dedicated", "create-auto-scaling-group", "infra-cluster", "infra-asg",
 		"--zone", "is1a", "--worker-service-class-path", "cloud/apprun/dedicated/worker/1vcpu_2gb",
 		"--name-servers", "210.188.224.10",
 		"--min-nodes", "1", "--max-nodes", "1", "--no-wait")
@@ -564,5 +610,26 @@ func TestRunAppRunDedicatedInfrastructureInputErrors(t *testing.T) {
 			"--name-servers", "not-an-ip",
 			"--min-nodes", "1", "--max-nodes", "1")
 		require.Contains(t, message, "IPv4")
+	})
+
+	t.Run("create-cluster の --port は key=value 形式です", func(t *testing.T) {
+		message := runError("apprun-dedicated", "create-cluster", "c1",
+			"--service-principal-id", "sp-000000000",
+			"--port", "443/https")
+		require.Contains(t, message, "key=value")
+	})
+
+	t.Run("create-cluster の --port の protocol は列挙値です", func(t *testing.T) {
+		message := runError("apprun-dedicated", "create-cluster", "c1",
+			"--service-principal-id", "sp-000000000",
+			"--port", "port=443,protocol=grpc")
+		require.Contains(t, message, "http、https、tcp のいずれか")
+	})
+
+	t.Run("create-cluster の --port の port は整数です", func(t *testing.T) {
+		message := runError("apprun-dedicated", "create-cluster", "c1",
+			"--service-principal-id", "sp-000000000",
+			"--port", "port=abc,protocol=tcp")
+		require.Contains(t, message, "1 ～ 65535 の整数")
 	})
 }

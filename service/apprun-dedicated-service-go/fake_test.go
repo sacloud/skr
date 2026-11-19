@@ -60,9 +60,13 @@ func (a *fakeApp) readApplication() v1.ReadApplication {
 
 // fakeCluster はメモリ上のクラスタです。
 type fakeCluster struct {
-	clusterID v1.ClusterID
-	name      string
-	deleted   bool
+	clusterID          v1.ClusterID
+	name               string
+	servicePrincipalID string
+	letsEncryptEmail   *string
+	ports              []v1.ClusterLoadBalancerPort
+	created            int
+	deleted            bool
 }
 
 // fakeAutoScalingGroup はメモリ上のオートスケーリンググループです。
@@ -117,6 +121,8 @@ type fakeSDK struct {
 		name      string
 		clusterID v1.ClusterID
 	}
+	// createClusterCalls はクラスタ作成の呼び出し記録です。
+	createClusterCalls     []cluster.CreateParams
 	updateApplicationCalls []struct {
 		id        v1.ApplicationID
 		toVersion *int32
@@ -125,6 +131,8 @@ type fakeSDK struct {
 	createVersionCalls     []version.CreateParams
 
 	listErr, readErr, createApplicationErr, updateErr, createVersionErr error
+	// createClusterErr はクラスタ作成 API のエラーです。
+	createClusterErr error
 
 	// containersErrCount は Containers がこの回数だけ失敗することを表します (再試行の検証用)。
 	containersErrCount int
@@ -261,6 +269,14 @@ func (f *fakeSDK) newID() [16]byte {
 func notFoundError(msg string) error {
 	return saclient.NewError(http.StatusNotFound, msg, errors.New(msg))
 }
+
+// conflictError は同名リソースの既存を表す 409 エラーを返します。
+func conflictError(msg string) error {
+	return saclient.NewError(http.StatusConflict, msg, errors.New(msg))
+}
+
+// fakeClusterCreatedAt は fakeClusterAPI の Create が返す作成日時 (UNIX 時間の秒) です。
+const fakeClusterCreatedAt = 1700000000
 
 // --- application.ApplicationAPI ---
 
@@ -433,7 +449,27 @@ func (f *fakeClusterAPI) List(ctx context.Context, maxItems int64, cursor *v1.Cl
 }
 
 func (f *fakeClusterAPI) Create(ctx context.Context, params cluster.CreateParams) (*v1.ClusterIdentifier, error) {
-	return nil, errors.New("fakeSDK はクラスタの作成に対応しません")
+	if f.sdk.createClusterErr != nil {
+		return nil, f.sdk.createClusterErr
+	}
+	f.sdk.mu.Lock()
+	defer f.sdk.mu.Unlock()
+	for _, c := range f.sdk.clusters {
+		if c.name == params.Name && !c.deleted {
+			return nil, conflictError("cluster already exists")
+		}
+	}
+	f.sdk.createClusterCalls = append(f.sdk.createClusterCalls, params)
+	c := &fakeCluster{
+		clusterID:          v1.ClusterID(f.sdk.newID()),
+		name:               params.Name,
+		servicePrincipalID: params.ServicePrincipalID,
+		letsEncryptEmail:   params.LetsEncryptEmail,
+		ports:              params.Ports,
+		created:            fakeClusterCreatedAt,
+	}
+	f.sdk.clusters = append(f.sdk.clusters, c)
+	return &v1.ClusterIdentifier{ClusterID: c.clusterID}, nil
 }
 
 func (f *fakeClusterAPI) Read(ctx context.Context, id v1.ClusterID) (*cluster.ClusterDetail, error) {
@@ -441,7 +477,14 @@ func (f *fakeClusterAPI) Read(ctx context.Context, id v1.ClusterID) (*cluster.Cl
 	defer f.sdk.mu.Unlock()
 	for _, c := range f.sdk.clusters {
 		if c.clusterID == id && !c.deleted {
-			return &cluster.ClusterDetail{ClusterID: c.clusterID, Name: c.name}, nil
+			return &cluster.ClusterDetail{
+				ClusterID:           c.clusterID,
+				Name:                c.name,
+				Ports:               c.ports,
+				ServicePrincipalID:  c.servicePrincipalID,
+				HasLetsEncryptEmail: c.letsEncryptEmail != nil,
+				Created:             c.created,
+			}, nil
 		}
 	}
 	return nil, notFoundError("cluster not found")

@@ -15,6 +15,7 @@
 package apprundedicated
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -214,6 +215,67 @@ func TestDeleteCluster(t *testing.T) {
 		_, err := s.DeleteCluster(t.Context(), "c1", nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "クラスタ \"c1\" が見つかりません")
+	})
+}
+
+func TestCreateCluster(t *testing.T) {
+	t.Run("待受ポートと Let's Encrypt なしで作成", func(t *testing.T) {
+		f := newFakeSDK(t)
+		s := newTestService(t, f)
+
+		result, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, "c1", result.Name)
+		require.NotEmpty(t, result.ClusterID)
+		require.Equal(t, int64(fakeClusterCreatedAt), result.Created)
+		require.False(t, result.HasLetsEncryptEmail)
+		require.Empty(t, result.Ports)
+		require.Equal(t, "sp-000000000", result.ServicePrincipalID)
+		// 待受ポートを指定しない場合も、リクエストには空配列の ports を送ります。
+		require.Len(t, f.createClusterCalls, 1)
+		require.NotNil(t, f.createClusterCalls[0].Ports)
+		require.Empty(t, f.createClusterCalls[0].Ports)
+		require.Nil(t, f.createClusterCalls[0].LetsEncryptEmail)
+	})
+
+	t.Run("待受ポートと Let's Encrypt のメールアドレスを指定", func(t *testing.T) {
+		f := newFakeSDK(t)
+		s := newTestService(t, f)
+
+		email := "ops@example.com"
+		ports := []v1.ClusterLoadBalancerPort{
+			{Port: 80, Protocol: v1.ClusterLoadBalancerPortProtocolHTTP},
+			{Port: 443, Protocol: v1.ClusterLoadBalancerPortProtocolHTTPS},
+		}
+		result, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", ports, &email)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.True(t, result.HasLetsEncryptEmail)
+		require.Equal(t, ports, result.Ports)
+		require.Equal(t, ports, f.createClusterCalls[0].Ports)
+		require.Equal(t, &email, f.createClusterCalls[0].LetsEncryptEmail)
+	})
+
+	t.Run("同名のクラスタが既に存在", func(t *testing.T) {
+		f := newFakeSDK(t)
+		f.addCluster(t, "c1")
+		s := newTestService(t, f)
+
+		_, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", nil, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "クラスタ \"c1\" は既に存在します")
+		require.Empty(t, f.createClusterCalls)
+	})
+
+	t.Run("作成 API のエラーを伝播", func(t *testing.T) {
+		f := newFakeSDK(t)
+		f.createClusterErr = errors.New("create cluster failed")
+		s := newTestService(t, f)
+
+		_, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", nil, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "クラスタ \"c1\" の作成に失敗しました")
 	})
 }
 
