@@ -49,7 +49,7 @@ database は create と update (POST/PUT の本体) に未対応で、テスト�
 | `iaas-api/server.md` | server 未対応 | 手動置換プレースホルダーの撤去 |
 | `iaas-api/serviceclass.md` | service class 未対応 | なし |
 
-- `iaas-api/packetfilter.md`、`iaas-api/switch.md`、`iaas-api/icon.md` はモック対応済み (icon は CRUD と Filter 検索に対応) で、baseline の理由は手動置換プレースホルダーの撤去のみである。3 件とも実行確認は未済で、Phase 4 以降に実行して `deferred` 解除を判断する。
+- `iaas-api/packetfilter.md`、`iaas-api/switch.md`、`iaas-api/icon.md` はモック対応済み (icon の CRUD と Filter 検索に対応) で、baseline の理由は手動置換プレースホルダーの撤去のみである。3 件とも実行確認は未済で、Phase 4 以降に実行して `deferred` 解除を判断する。
 - `iaas-api/zone.md` は実行検証済み (`implemented`)。
 - IaaS モックの拡充はチュートリアル harness の Phase 4 以降の作業 ([docs/design/tutorial-script-harness.md](tutorial-script-harness.md)) に含まれる。
 
