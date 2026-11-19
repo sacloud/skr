@@ -11,7 +11,7 @@
 - アプリケーションのライフサイクル (定義からのデプロイ、バージョンの切替、停止、削除)。
 - インフラライフサイクルの一部。クラスタの作成と削除、既存のクラスタに対するオートスケーリンググループの作成と削除です (`create-cluster`、`delete-cluster`、`create-auto-scaling-group`、`delete-auto-scaling-group`)。
 
-対象外はインフラの中でも、クラスタのロードバランサ、証明書、ワーカノードの draining、サービスクラスの一覧と選択です。これらは低レベルの `skr apprun-dedicated-api` が提供します。待受ポートや Let's Encrypt の設定を含むクラスタ構成の詳細は、低レベルコマンドのほか Terraform などの別手段で行うこともできます。
+対象外はインフラの中でも、クラスタのロードバランサ、証明書、ワーカノードの draining、サービスクラスの一覧と選択です。これらは低レベルの `skr apprun-dedicated-api` が提供します。待受ポートと Let's Encrypt の設定は `create-cluster` の作成時に `--port` と `--lets-encrypt-email` で指定できます。作成後のロードバランサや証明書の参照・更新、ワーカノードの draining などの詳細なインフラ操作は、低レベルコマンドのほか Terraform などの別手段で行うこともできます。
 
 ## 概念
 
@@ -241,7 +241,7 @@ skr apprun-dedicated create-cluster <name> \
   [--lets-encrypt-email=EMAIL]
 ```
 
-クラスタを作成します。作成前に同名のクラスタが存在しないことを確認し、存在する場合はエラーになります。作成後は API から読み戻して ID、名前、ロードバランサの待受ポート、Let's Encrypt の設定を照合し、結果を JSON で出力します (`--query` で加工できます)。クラスタの作成は API 側で同期的に完了するため、待機のオプションはありません。
+クラスタを作成します。作成前に同名のクラスタが存在しないことを確認し、存在する場合はエラーになります。作成後は API から読み戻して、指定した内容 (名前、サービスプリンシパル ID、待受ポート、Let's Encrypt の設定) を照合し、結果を JSON で出力します (`--query` で加工できます)。クラスタの作成は API 側で同期的に完了するため、待機のオプションはありません。
 
 `--service-principal-id` にはクラスタで利用するサービスプリンシパルの ID を指定します。サービスプリンシパルの作成方法は [クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html) を参照してください。
 

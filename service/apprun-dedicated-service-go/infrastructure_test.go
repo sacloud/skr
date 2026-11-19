@@ -15,13 +15,31 @@
 package apprundedicated
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
 
+	cluster "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/stretchr/testify/require"
 )
+
+// readMutatingClusterAPI は Read の応答を加工する cluster.ClusterAPI です。
+// 応答の不整合を再現するために使います。
+type readMutatingClusterAPI struct {
+	cluster.ClusterAPI
+	mutate func(*cluster.ClusterDetail)
+}
+
+func (m *readMutatingClusterAPI) Read(ctx context.Context, id v1.ClusterID) (*cluster.ClusterDetail, error) {
+	detail, err := m.ClusterAPI.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	m.mutate(detail)
+	return detail, nil
+}
 
 func TestCreateAutoScalingGroup(t *testing.T) {
 	t.Run("作成後にワーカノードが healthy になるまで待つ", func(t *testing.T) {
@@ -266,6 +284,40 @@ func TestCreateCluster(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "クラスタ \"c1\" は既に存在します")
 		require.Empty(t, f.createClusterCalls)
+	})
+
+	t.Run("同名のクラスタが後続ページに存在", func(t *testing.T) {
+		f := newFakeSDK(t)
+		for i := 0; i < 3; i++ {
+			f.addCluster(t, "c0")
+		}
+		f.addCluster(t, "c1")
+		s := pagingService(t, f, 1)
+
+		// ページサイズ 1 で同名が 4 ページ目にあっても、作成前に検出して中断します。
+		_, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", nil, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "クラスタ \"c1\" は既に存在します")
+		require.Empty(t, f.createClusterCalls)
+	})
+
+	t.Run("読み戻しが指定内容と不一致", func(t *testing.T) {
+		f := newFakeSDK(t)
+		s := newTestService(t, f)
+		s.clusterAPI = &readMutatingClusterAPI{
+			ClusterAPI: f.cluster,
+			mutate: func(d *cluster.ClusterDetail) {
+				d.Ports = []v1.ClusterLoadBalancerPort{
+					{Port: 8080, Protocol: v1.ClusterLoadBalancerPortProtocolTCP},
+				}
+			},
+		}
+		email := "ops@example.com"
+		_, err := s.CreateCluster(t.Context(), "c1", "sp-000000000",
+			[]v1.ClusterLoadBalancerPort{{Port: 443, Protocol: v1.ClusterLoadBalancerPortProtocolHTTPS}}, &email)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "作成したクラスタ \"c1\" の応答が指定内容と一致しません")
+		require.Contains(t, err.Error(), "待受ポート")
 	})
 
 	t.Run("作成 API のエラーを伝播", func(t *testing.T) {

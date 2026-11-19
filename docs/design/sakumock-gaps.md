@@ -45,6 +45,12 @@ IaaS API のモック (sakumockiaas、`internal/sakumock/iaas` のリポジト�
 - ストアはサーバープロセス内のメモリのみで、プラン一覧は静的データ (ID 1 と 2)。状態はプロセスの生存期間で失われるため、テストごとにサーバーを起動する前提で作成したデータに依存しないこと。
 - 実行にはワークフローの公開設定が必要で、非公開のワークフローの実行は 409 (`not executable`) になる。
 
+### AppRun Dedicated
+
+| 操作 | 差分 | 影響と現状の扱い |
+| --- | --- | --- |
+| `create-cluster` | sakumock は `ports` が空配列 (または要素なし) の作成リクエストを 400 (`at least one port is required`) で拒否する (`apprundedicated/validate.go` の `validateClusterPorts`)。実 API は空配列を受け付け、2026-11-13 のライブ実行で待受ポートなしのクラスタ作成を確認済み。詳細は [sacloud/sakumock#267](https://github.com/sacloud/sakumock/issues/267) を参照 | 許容。sakumock での検証では待受ポートを 1 つ以上指定する (`internal/cli` の CLI 操作テストとチュートリアル harness が該当)。高レベル `create-cluster` での待受ポート省略 (空配列送信) は、service 層の fake テストとライブ E2E で検証する |
+
 ### モックサーバーが存在しないドメイン
 
 | ドメイン | 影響と現状の扱い |
@@ -60,9 +66,9 @@ IaaS API のモック (sakumockiaas、`internal/sakumock/iaas` のリポジト�
 | security-control | sakumock v0.13.0 にはサーバーが無かったため、`internal/cli/securitycontrol_test.go` は `httptest` と `SAKURA_ENDPOINTS_SECURITY_CONTROL` による自前モックで実装している | v0.14.0 (2026-11-07) で sakumock に `securitycontrol` モックが追加された。応答形式と操作範囲の整合を確認できたら自前モックから移行する (未確認) |
 | simple-notification | sakumock には `simplenotification` モックが存在するが、`internal/cli/simplenotification_test.go` は `httptest` による自前モックで実装している | 同上。整合を確認できたら移行する (未確認) |
 
-### SimpleMQ、EventBus、AppRun、AppRun Dedicated、IAM、KMS、Object Storage、Secret Manager、Service Endpoint Gateway
+### SimpleMQ、EventBus、AppRun、IAM、KMS、Object Storage、Secret Manager、Service Endpoint Gateway
 
-- いずれも sakumock のモックサーバーがあり、`internal/cli` の CLI 操作テストで使用している。既知の差分は未確認。見つけたらこの文書に節を追加する。
+- いずれも sakumock のモックサーバーがあり、`internal/cli` の CLI 操作テストで使用している。既知の差分は未確認。見つけたらこの文書に節を追加する。AppRun Dedicated の既知の差分は「AppRun Dedicated」の節を参照。
 
 ## チュートリアル harness と sakumock の接続状況
 

@@ -5,7 +5,7 @@
 # <blocks> は抽出された console ブロック数の下限です。実測が下限を下回ると抽出の腐敗として失敗します。
 # deferred のチュートリアルは抽出と baseline 照合のみを行い、実行しません。
 apprun-api.md deferred 10 sakumock にサーバーがあるが harness 未接続
-apprun-dedicated.md deferred 23 sakumock にサーバーがあるが harness 未接続
+apprun-dedicated.md deferred 24 sakumock にサーバーがあるが harness 未接続
 container-registry-api.md deferred 9 sakumock にサーバーがなく fake で代替
 eventbus.md implemented 14
 gslb-api.md deferred 18 手動置換プレースホルダーの撤去と sakumockiaas の appliance 拡充が必要

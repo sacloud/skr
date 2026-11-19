@@ -336,14 +336,14 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 
 ### CLI 全体と SDK 通信のテスト
 
-- `internal/cli` の sakumock テストで、14 個の末端コマンドの正常系を実際の CLI パスと SDK を通して検証します。sakumock の `apprundedicated` サーバー (v0.14.0) を使います。既存の低レベル層のテスト (`internal/cli/apprundedicated_test.go`) と同じサーバーを共有します。
+- `internal/cli` の sakumock テストで、14 個の末端コマンドの正常系を実際の CLI パスと SDK を通して検証します。sakumock の `apprundedicated` サーバー (v0.14.0) を使います。既存の低レベル層のテスト (`internal/cli/apprundedicated_test.go`) と同じサーバーを共有します。sakumock は待受ポートなしの `create-cluster` を 400 で拒否するため ([sacloud/sakumock#267](https://github.com/sacloud/sakumock/issues/267)、[sakumock の既知の差分と未整備](sakumock-gaps.md))、sakumock でのクラスタ作成は待受ポートを 1 つ以上指定します。待受ポート省略 (空配列送信) は service 層の fake テストとライブ E2E で検証します。
 - sakumock で待機条件 (コンテナの `running` 遷移) が再現できない場合は、SDK が読むステータスと応答型を再現する HTTP テストサーバーで補います (`SAKURA_ENDPOINTS_*` によるエンドポイント差し替え)。[EventBus 高レベルコマンドの設計](eventbus.md) のテスト方針と同じ方式です。
 - service 層の通信テストは service/apprun-dedicated-service-go に置き、sakumock へ実際の SDK を接続して wire 形式と操作の流れを検証します。
 - 秘密情報: 定義ファイル・標準入力・fake リクエストのいずれの経路でも、stdout・stderr・ログ・エラーに `registryPassword` が現れないことを確認します。
 
 ### ライブ E2E
 
-クラスタ作成を含むライフサイクルシナリオを `test/e2e/apprun-dedicated/scenario_lifecycle_test.go` に実装済みです ([ADR 0058](../adr/0058-live-e2e-command-coverage.md)、[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)、[ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従う testing.T ベースのシナリオ)。2026-11-12 にクラスタと ASG (ワーカノード 1 台) の作成を含むライブ実行で全操作の正常動作と後片付けを確認済みで、`baseline.txt` の高レベル 14 コマンドは `live` です。シナリオの概要:
+クラスタ作成を含むライフサイクルシナリオを `test/e2e/apprun-dedicated/scenario_lifecycle_test.go` に実装済みです ([ADR 0058](../adr/0058-live-e2e-command-coverage.md)、[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)、[ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従う testing.T ベースのシナリオ)。2026-11-12 にクラスタと ASG (ワーカノード 1 台) の作成を含むライブ実行で全操作の正常動作と後片付けを確認済みです。`baseline.txt` の高レベル 14 コマンドのうち、切り替え済みの 13 コマンドは `live` です。`create-cluster` は高レベルコマンドへの切り替え後のライブ再実行が未実施のため `implemented` です。シナリオの概要:
 
 - 事前の同名確認と、作成直後の SDK による読み戻し (クラスタは ID・名前、ASG は ID・名前・ゾーン・サービスクラス・ノード数・インターフェース) を行います。
 - `deploy` (バージョン 1)、`status`、`versions`、`containers`、`init` での参照、環境変数を追加した 2 回目の `deploy` (バージョン 2)、`rollback`、`deactivate`、`delete` の順に実行し、応答と状態を照合します。

@@ -205,7 +205,8 @@ type CreateClusterResult struct {
 // CreateCluster はクラスタを作成します。
 //
 // クラスタ名で同名のクラスタが既に存在しないことを確認してから作成 API を呼び出し、
-// 作成後の Read で ID と名前を照合します。クラスタの作成は API 側で同期的に完了するため、
+// 作成後の Read で ID、名前、サービスプリンシパル ID、待受ポート、Let's Encrypt の
+// 設定を照合します。クラスタの作成は API 側で同期的に完了するため、
 // 待機のオプションはありません。
 func (s *Service) CreateCluster(ctx context.Context, name, servicePrincipalID string, ports []v1.ClusterLoadBalancerPort, letsEncryptEmail *string) (*CreateClusterResult, error) {
 	if err := s.requireClusterAbsent(ctx, name); err != nil {
@@ -231,8 +232,25 @@ func (s *Service) CreateCluster(ctx context.Context, name, servicePrincipalID st
 	if err != nil {
 		return nil, fmt.Errorf("作成したクラスタ %q の情報取得に失敗しました: %w", name, err)
 	}
-	if detail.ClusterID != ident.ClusterID || detail.Name != name {
-		return nil, fmt.Errorf("作成したクラスタ %q の応答が一致しません (ID: %v、名前: %q)", name, detail.ClusterID, detail.Name)
+	// 作成後に読み戻して、指定した内容と API に登録された内容を照合します。
+	var mismatches []string
+	if detail.ClusterID != ident.ClusterID {
+		mismatches = append(mismatches, fmt.Sprintf("ID (応答: %v)", detail.ClusterID))
+	}
+	if detail.Name != name {
+		mismatches = append(mismatches, fmt.Sprintf("名前 (応答: %q)", detail.Name))
+	}
+	if detail.ServicePrincipalID != servicePrincipalID {
+		mismatches = append(mismatches, fmt.Sprintf("サービスプリンシパル ID (応答: %q)", detail.ServicePrincipalID))
+	}
+	if detail.HasLetsEncryptEmail != (letsEncryptEmail != nil) {
+		mismatches = append(mismatches, fmt.Sprintf("Let's Encrypt の設定 (応答: %v)", detail.HasLetsEncryptEmail))
+	}
+	if !clusterPortsEqual(detail.Ports, ports) {
+		mismatches = append(mismatches, fmt.Sprintf("待受ポート (応答: %s)", formatClusterPorts(detail.Ports)))
+	}
+	if len(mismatches) > 0 {
+		return nil, fmt.Errorf("作成したクラスタ %q の応答が指定内容と一致しません: %s", name, strings.Join(mismatches, "、"))
 	}
 	return &CreateClusterResult{
 		Name:                detail.Name,
@@ -242,6 +260,32 @@ func (s *Service) CreateCluster(ctx context.Context, name, servicePrincipalID st
 		Ports:               detail.Ports,
 		ServicePrincipalID:  detail.ServicePrincipalID,
 	}, nil
+}
+
+// clusterPortsEqual は待受ポートの期待値と応答を比較します。
+// 空の配列と nil は同じとみなし、要素は指定順に等しいことを確認します。
+func clusterPortsEqual(actual, expected []v1.ClusterLoadBalancerPort) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	for i := range expected {
+		if actual[i] != expected[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// formatClusterPorts は待受ポートをエラーメッセージ用に整形します。
+func formatClusterPorts(ports []v1.ClusterLoadBalancerPort) string {
+	if len(ports) == 0 {
+		return "(なし)"
+	}
+	parts := make([]string, 0, len(ports))
+	for _, port := range ports {
+		parts = append(parts, fmt.Sprintf("ポート番号=%d/プロトコル=%q", port.Port, port.Protocol))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // requireClusterAbsent は同名のクラスタが存在しないことを確認します。

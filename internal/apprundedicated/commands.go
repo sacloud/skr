@@ -136,7 +136,7 @@ type Commands struct {
 	CreateAutoScalingGroup CreateAutoScalingGroupCommand `cmd:"" name:"create-auto-scaling-group" help:"クラスタにオートスケーリンググループを作成し、ワーカノードが healthy になるまで待ちます。ネットワークインターフェースは共有セグメントに接続する既定の設定を使います。"`
 	DeleteAutoScalingGroup DeleteAutoScalingGroupCommand `cmd:"" name:"delete-auto-scaling-group" help:"クラスタのオートスケーリンググループを削除します。削除 API の呼び出しと削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、--no-wait を指定しても行われます。実行前に確認を求めます (--force で省略)。"`
 	DeleteCluster          DeleteClusterCommand          `cmd:"" name:"delete-cluster" help:"クラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループなど) が残っていれば列挙して中断します。削除 API の呼び出しと削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、--no-wait を指定しても行われます。実行前に確認を求めます (--force で省略)。"`
-	CreateCluster          CreateClusterCommand          `cmd:"" name:"create-cluster" help:"クラスタを作成します。同名のクラスタが存在しないことを確認してから作成し、作成後に API から読み戻して ID、名前、ロードバランサの待受ポートなどを照合します。ロードバランサの待受ポートと Let's Encrypt の利用設定は省略できます。"`
+	CreateCluster          CreateClusterCommand          `cmd:"" name:"create-cluster" help:"クラスタを作成します。同名のクラスタが存在しないことを確認してから作成し、作成後に API から読み戻して、指定した内容 (名前、サービスプリンシパル ID、待受ポート、Let's Encrypt の設定) を照合します。ロードバランサの待受ポートと Let's Encrypt の利用設定は省略できます。"`
 }
 
 // NewCommands は runtime と factory を各コマンドへ一括注入します。

@@ -68,6 +68,16 @@ $ skr apprun-dedicated-api list-clusters --query '[.items[] | {clusterID, name}]
 
 既存のクラスタが表示された場合は、作成予定の `CLUSTER-NAME` と一致する名前がないことを確認してください。一覧はページ単位のため、結果が 1 ページに収まらない場合は `--cursor` で続きを確認してください。
 
+以降の手順では、次のシェル変数を使います。実行するシェルで値を設定してください。`CLUSTER-NAME` と `ASG-NAME` は前提条件どおりの短い名前に置き換えます。`SERVICE-PRINCIPAL-ID` は前提条件で確認したサービスプリンシパルの ID に置き換えます。`ZONE` はワーカノードを作成するゾーンに置き換えます。`WORKER_SERVICE_CLASS_PATH` は Step 3 で選択する構成のパスで、ここでは予定する値を設定します。
+
+```console
+$ CLUSTER_NAME='CLUSTER-NAME'
+$ SERVICE_PRINCIPAL_ID='SERVICE-PRINCIPAL-ID'
+$ ASG_NAME='ASG-NAME'
+$ ZONE='ZONE'
+$ WORKER_SERVICE_CLASS_PATH='cloud/apprun/dedicated/worker/1vcpu_2gb'
+```
+
 ## Step 2: クラスタを作成する
 
 高レベルコマンド `create-cluster` でクラスタを作成します。`SERVICE-PRINCIPAL-ID` は前提条件で確認した ID に置き換えます。ロードバランサの待受ポート (`--port`) と Let's Encrypt の利用設定 (`--lets-encrypt-email`) は省略でき、このチュートリアルではどちらも使わないため指定しません。待受ポートや Let's Encrypt を利用する場合の設定は、[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)を参照してください。
