@@ -162,12 +162,14 @@ $ skr monitoring-suite-api list-alert-project-log-measure-rules "$PROJECT_ID" --
 $ PUBLISHER_CODE=$(skr monitoring-suite-api list-publishers \
     --query-raw 'map(select(any(.variants[]; .storage == "logs"))) | .[0].code')
 $ echo "$PUBLISHER_CODE"
-$ skr monitoring-suite-api create-log-routing \
+$ LOG_ROUTING_UID=$(skr monitoring-suite-api create-log-routing \
     --publisher-code "$PUBLISHER_CODE" --variant logs --log-storage-id "$LOG_STORAGE_ID" \
-    --query '{uid,variant}'
-$ skr monitoring-suite-api create-metric-routing \
+    --query-raw '.uid')
+$ echo "$LOG_ROUTING_UID"
+$ METRIC_ROUTING_UID=$(skr monitoring-suite-api create-metric-routing \
     --publisher-code "$PUBLISHER_CODE" --variant metrics --metrics-storage-id "$METRICS_STORAGE_ID" \
-    --query '{uid,variant}'
+    --query-raw '.uid')
+$ echo "$METRIC_ROUTING_UID"
 ```
 
 ## Step 7: トレースストレージを作成し、保存期間を変更する
@@ -182,7 +184,7 @@ $ TRACE_STORAGE_ID=$(skr monitoring-suite-api create-trace-storage \
 $ echo "$TRACE_STORAGE_ID"
 ```
 
-ログストレージとトレースストレージの保存期間は `--days` で変更できます。メトリクスストレージの保存期間は変更できません。41 日以上の保存期間を指定した場合は追加料金が発生します ([コントロールパネル操作ガイド](https://manual.sakura.ad.jp/cloud/appliance/monitoring-suite/ui.html))。
+ログストレージとトレースストレージの保存期間は `--days` で変更できます。メトリクスストレージの保存期間は変更できません。保存期間によっては追加料金が発生します ([コントロールパネル操作ガイド](https://manual.sakura.ad.jp/cloud/appliance/monitoring-suite/ui.html))。
 
 ```console
 $ skr monitoring-suite-api set-log-storage-expire "$LOG_STORAGE_ID" --days 90 --query '{expire_day}'
@@ -204,9 +206,10 @@ $ skr monitoring-suite-api list-alert-project-rule-histories "$PROJECT_ID" \
 ダッシュボードプロジェクトを作成すると、モニタリングスイート専用 Web UI (Perses) でメトリクスを可視化できます。作成の際は `--description` が必要です。
 
 ```console
-$ skr monitoring-suite-api create-dashboard-project \
+$ DASHBOARD_ID=$(skr monitoring-suite-api create-dashboard-project \
     --name "skr-tutorial-dashboard-$SUFFIX" \
-    --description "Monitoring suite tutorial" --query '{id,name}'
+    --description "Monitoring suite tutorial" --query-raw '.id')
+$ echo "$DASHBOARD_ID"
 ```
 
 ## Step 9: 後片付けする
@@ -214,10 +217,6 @@ $ skr monitoring-suite-api create-dashboard-project \
 作成したリソースをすべて削除します。まず ID と名前を照合してから削除し、削除後は参照して残っていないことを確認します。
 
 ```console
-$ LOG_ROUTING_UID=$(skr monitoring-suite-api list-log-routings \
-    --query-raw 'map(select(.log_storage.id == '"$LOG_STORAGE_ID"')) | .[0].uid')
-$ METRIC_ROUTING_UID=$(skr monitoring-suite-api list-metric-routings \
-    --query-raw 'map(select(.metrics_storage.id == '"$METRICS_STORAGE_ID"')) | .[0].uid')
 $ skr monitoring-suite-api delete-log-routing "$LOG_ROUTING_UID"
 $ skr monitoring-suite-api delete-metric-routing "$METRIC_ROUTING_UID"
 $ skr monitoring-suite-api delete-alert-project-log-measure-rule "$PROJECT_ID" "$MEASURE_RULE_UID"
@@ -228,12 +227,10 @@ $ skr monitoring-suite-api delete-trace-storage "$TRACE_STORAGE_ID"
 $ skr monitoring-suite-api delete-log-storage "$LOG_STORAGE_ID"
 $ skr monitoring-suite-api delete-metric-storage "$METRICS_STORAGE_ID"
 $ skr monitoring-suite-api delete-alert-project "$PROJECT_ID"
-$ DASHBOARD_ID=$(skr monitoring-suite-api list-dashboard-projects \
-    --query-raw 'map(select(.name | test("skr-tutorial"))) | .[0].id')
 $ skr monitoring-suite-api delete-dashboard-project "$DASHBOARD_ID"
 ```
 
-Step 8 でダッシュボードプロジェクトを作成しなかった場合、`DASHBOARD_ID` の取り込みは失敗します。その場合、`DASHBOARD_ID` の行と削除の行をスキップしてください。
+Step 8 でダッシュボードプロジェクトを作成しなかった場合は、削除の行をスキップしてください。
 
 削除が反映されるまで数秒かかることがあります。参照が 404 を返せば削除済みです。削除に失敗したリソースがあると料金が発生し続けるため、`list-*` コマンドで `skr-tutorial` から始まる名前のリソースが残っていないことを確認してください。
 

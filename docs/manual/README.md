@@ -34,6 +34,7 @@
 - [Networking Suite API: 別サブネット間の通信を確認する](tutorials/networking-suite-api.md)
 - [SecurityControl API: セキュリティコントロールを有効化し、評価ルールと自動アクションを操作する](tutorials/security-control-api.md)
 - [Workflows API: Runbook を定義してワークフローを実行する](tutorials/workflows-api.md)
+- [Monitoring Suite API: ストレージとアラートを CLI で作る](tutorials/monitoring-suite-api.md)
 - [HTTP API: `get_zone` でゾーン一覧を取得する](tutorials/http-request.md)
 
 ## コマンドリファレンス
