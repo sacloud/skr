@@ -195,7 +195,7 @@ $ skr monitoring-suite-api set-trace-storage-expire "$TRACE_STORAGE_ID" --days 6
 
 ## Step 8: アラートの履歴を確認する
 
-アラートプロジェクトの履歴を確認します。アラートが発生していない場合、空の一覧が返ります。履歴は重要度 (`--severity`) や解消状態 (`--open`、`--closed`) で絞り込めます。
+アラートプロジェクトの履歴を確認します。アラートが発生していない場合、空の一覧が返ります。履歴は重要度 (`--severity`) で絞り込み、未解決のアラートだけを `--open` で取り出せます。
 
 ```console
 $ skr monitoring-suite-api list-alert-project-histories "$PROJECT_ID" --query 'map({id,severity,open})'
