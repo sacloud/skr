@@ -36,7 +36,7 @@ type MockConfig struct {
 	Zones []string `json:"zones,omitempty"`
 	// Services は起動する Ogen 系モックサービスのリストです。
 	// simplemq、eventbus、workflows をサポートします。eventbus は simplemq と
-	// 一起動する必要があります (サービスリンクの宛先を実 API に向けないため)。
+	// 一緒に起動する必要があります (サービスリンクの宛先を実 API に向けないため)。
 	Services []string `json:"services,omitempty"`
 	// Events はチュートリアル外の副作用として発生するイベントの宣言です。
 	// after に一致する step が成功するたびに EventBus モックへ注入されます。

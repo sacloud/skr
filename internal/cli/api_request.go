@@ -17,6 +17,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -33,6 +34,15 @@ func decodeRequest(input string, destination any) error {
 }
 
 func requestData(input string) ([]byte, error) {
+	// - (標準入力) はヘルプで案内している入力形式。秘密情報を含むリクエストは
+	// 保護したファイルまたは標準入力から読み込めるようにする。
+	if input == "-" {
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("read request from standard input: %w", err)
+		}
+		return data, nil
+	}
 	if strings.HasPrefix(input, "@") {
 		data, err := os.ReadFile(strings.TrimPrefix(input, "@"))
 		if err != nil {

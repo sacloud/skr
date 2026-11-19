@@ -68,7 +68,7 @@ skr workflows-api delete-subscription
 - `ConcurrencyMode` は `--concurrency-mode` で受け取ります。`parallel`、`lock`、`queue` のいずれかで、CLI が値を検証します。
 - `ServicePrincipalId` は `--request` JSON でのみ指定できます。公式マニュアルは、サービスプリンシパルを利用するワークフローは API トークンまたはサービスプリンシパルを認証主体とした API 経由では作成できないことを案内しています (<https://manual.sakura.ad.jp/cloud/appliance/workflows/index.html>)。値の検証は API に委ねます。
 - `patch-workflow` の個別フラグ経路では、指定した項目だけをリクエストに含めます (patch の意味論)。`--tags` を省略すると `Tags` をリクエストに含めません。既存タグを維持したい場合は `--request` JSON で現在値を再指定してください。
-- `create-execution` の `--revision-id` と `--revision-alias` は相互排他です。どちらも未指定のときは API が最新リビジョンを実行します。`Args` は `--args` (インライン JSON、`@path.json`、`-` による標準入力) で渡し、CLI が JSON として妥当か検証します。実行にはワークフローの公開設定が必要です。
+- `create-execution` の `--revision-id` と `--revision-alias` は相互排他です。どちらも未指定のときは API が最新リビジョンを実行します。`Args` は `--args` (インライン JSON、`@path.json`、`-` による標準入力) で渡し、CLI が JSON として妥当か検証します。秘密情報を含む値は `@path` または標準入力で指定してください ([ADR 0007](../adr/0007-api-request-input.md))。実行にはワークフローの公開設定が必要です。
 - `create-subscription` は `--plan-id` と `--request` を相互排他で受け取ります。利用可能なプランは `list-plans` で確認できます。`delete-subscription` は契約の解約です。
 
 ## 生成と手書きの分担

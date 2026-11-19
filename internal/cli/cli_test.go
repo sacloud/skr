@@ -233,6 +233,21 @@ func TestDecodeRequest(t *testing.T) {
 	err3 := decodeRequest("@"+path, &fromFile)
 	require.NoError(t, err3)
 	require.Equal(t, "file", fromFile.Name, "file Name = %q, want file", fromFile.Name)
+
+	// - (標準入力) からも読み込めることを確認する。os.Stdin を差し替えて元に戻す
+	pr, pw, errPipe := os.Pipe()
+	require.NoError(t, errPipe)
+	_, errWrite := pw.Write([]byte(`{"Name":"stdin"}`))
+	require.NoError(t, errWrite)
+	require.NoError(t, pw.Close())
+	origStdin := os.Stdin
+	os.Stdin = pr
+	var fromStdin request
+	err4 := decodeRequest("-", &fromStdin)
+	os.Stdin = origStdin
+	require.NoError(t, pr.Close())
+	require.NoError(t, err4)
+	require.Equal(t, "stdin", fromStdin.Name, "stdin Name = %q, want stdin", fromStdin.Name)
 }
 
 func TestDecodeRequestInvalidJSON(t *testing.T) {

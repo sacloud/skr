@@ -333,7 +333,7 @@ type WorkflowExecutionCreateCommand struct {
 	Request       *string `help:"個別フラグと併用不可。CreateExecutionReq JSON を直接または @path.json、- (標準入力) で指定します。RevisionId、RevisionAlias、Args、Name を指定できます。"`
 	RevisionID    *int    `name:"revision-id" help:"任意: 実行するリビジョン番号。--revision-alias と同時に指定できません。"`
 	RevisionAlias *string `name:"revision-alias" help:"任意: 実行するリビジョンのエイリアス。--revision-id と同時に指定できません。"`
-	Args          *string `name:"args" help:"任意: 実行時に Runbook へ渡す JSON。JSON 文字列を直接指定するか、@path.json、- (標準入力) で読み込みます。"`
+	Args          *string `name:"args" help:"任意: 実行時に Runbook へ渡す JSON。JSON 文字列を直接指定するか、@path.json、- (標準入力) で読み込みます。秘密情報を含む値は @path または - (標準入力) で指定してください。"`
 	Name          *string `name:"name" help:"任意: 実行の名前。"`
 	factory       WorkflowExecutionAPIFactory
 	runtime       WorkflowExecutionRuntime

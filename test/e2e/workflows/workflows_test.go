@@ -136,7 +136,8 @@ func cheapestWorkflowsPlan(t *testing.T, plans []workflowsPlanItem) workflowsPla
 }
 
 // readWorkflowsSubscription は read-subscription を実行して現在の契約を返します。
-// 契約がなければ nil を返します。
+// 契約がなければ nil を返します。応答が is_ok でない場合は照会失敗としてテストを失敗させ、
+// 未契約と誤認して契約操作を行わないようにします。
 func readWorkflowsSubscription(t *testing.T, h *helper.Helper, description string) *workflowsCurrentPlan {
 	t.Helper()
 	data := h.Call(t, description, "workflows-api", "read-subscription")
@@ -145,41 +146,56 @@ func readWorkflowsSubscription(t *testing.T, h *helper.Helper, description strin
 		CurrentPlan *workflowsCurrentPlan `json:"CurrentPlan"`
 	}
 	require.NoError(t, json.Unmarshal(data, &result), "read-subscription output: %s", data)
+	require.True(t, result.IsOk, "read-subscription should report is_ok: %s", data)
 	return result.CurrentPlan
 }
 
+// workflowsSubscriptionCleanup はテストが作成した契約の識別情報を保持します。
+// ensureWorkflowsSubscription が契約を作成した直後に設定します。呼び出し元は
+// ensureWorkflowsSubscription の呼び出し前に defer releaseWorkflowsSubscription を登録し、
+// 以降の検証が失敗しても解約されるようにしてください。
+type workflowsSubscriptionCleanup struct {
+	planID         int
+	subscriptionID string
+}
+
 // ensureWorkflowsSubscription は Workflows の契約がなければ最安プランで契約します。
-// 戻り値は (契約を作成したか, 契約したプラン ID) です。created が true の場合は呼び出し元が
-// defer で releaseWorkflowsSubscription を実行して契約を解約してください。
+// 契約を作成した場合は cleanup に契約 ID とプラン ID を保持します。
 // 既存の契約は変更・解約しません。
-func ensureWorkflowsSubscription(t *testing.T, h *helper.Helper) (bool, int) {
+func ensureWorkflowsSubscription(t *testing.T, h *helper.Helper, cleanup *workflowsSubscriptionCleanup) {
 	t.Helper()
 	current := readWorkflowsSubscription(t, h, "Workflows の契約状態を確認する")
 	if current != nil {
-		t.Logf("Workflows の契約が既に存在します (planId=%d planName=%s)。契約を作成・解約しません", current.PlanId, current.PlanName)
-		return false, 0
+		t.Logf("Workflows の契約が既に存在します (id=%s planId=%d planName=%s)。契約を作成・解約しません", current.ID, current.PlanId, current.PlanName)
+		return
 	}
 	cheapest := cheapestWorkflowsPlan(t, listWorkflowsPlans(t, h))
 	h.Call(t, "契約がないため最安プランで契約を開始する (planId="+strconv.Itoa(cheapest.ID)+" name="+cheapest.Name+")",
 		"workflows-api", "create-subscription", "--plan-id", strconv.Itoa(cheapest.ID))
 	after := readWorkflowsSubscription(t, h, "契約開始後に契約状態を確認する")
 	require.NotNil(t, after, "subscription should exist after create-subscription")
+	// 作成直後に後片付け用の識別情報を保持する。以降の検証が失敗しても defer の後片付けで解約できる
+	cleanup.subscriptionID = after.ID
+	cleanup.planID = after.PlanId
 	require.Equal(t, cheapest.ID, after.PlanId, "current plan should be the plan created by this run")
-	return true, cheapest.ID
 }
 
-// releaseWorkflowsSubscription は契約を解約します。解約直前に現在値を再取得し、
-// 契約が存在しない場合は変更せずに終了します。現在の契約が expectedPlanID と
-// 一致しない場合は変更 API を呼ばずに失敗します。
-func releaseWorkflowsSubscription(t *testing.T, h *helper.Helper, expectedPlanID int) {
+// releaseWorkflowsSubscription は契約を解約します。cleanup に契約情報がなければ何もしません。
+// 解約直前に現在値を再取得し、契約が存在しない場合は変更せずに終了します。現在の契約が
+// 作成時に保持した契約 ID・プラン ID と一致しない場合は変更 API を呼ばずに失敗します。
+func releaseWorkflowsSubscription(t *testing.T, h *helper.Helper, cleanup *workflowsSubscriptionCleanup) {
 	t.Helper()
+	if cleanup.subscriptionID == "" {
+		return
+	}
 	current := readWorkflowsSubscription(t, h, "後片付け: 契約状態を再確認する")
 	if current == nil {
 		t.Logf("後片付け: 契約は既に存在しません。解約しません")
 		return
 	}
-	require.Equal(t, expectedPlanID, current.PlanId, "subscription plan should be the plan created by this run; refusing to delete a different plan")
-	h.Call(t, "後片付け: テストで開始した契約 (planId="+strconv.Itoa(current.PlanId)+") を解約する", "workflows-api", "delete-subscription")
+	require.Equal(t, cleanup.subscriptionID, current.ID, "subscription ID should be the one created by this run; refusing to delete a different subscription")
+	require.Equal(t, cleanup.planID, current.PlanId, "subscription plan should be the plan created by this run; refusing to delete a different plan")
+	h.Call(t, "後片付け: テストで開始した契約 (id="+current.ID+" planId="+strconv.Itoa(current.PlanId)+") を解約する", "workflows-api", "delete-subscription")
 	after := readWorkflowsSubscription(t, h, "後片付け: 解約後に契約が存在しないことを確認する")
 	require.Nil(t, after, "subscription should not remain after delete-subscription")
 }

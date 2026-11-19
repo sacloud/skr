@@ -79,11 +79,11 @@ func TestScenarioWorkflowsLifecycle(t *testing.T) {
 	executionName := "skr-e2e-exec-" + suffix
 	cancelExecutionName := "skr-e2e-cancel-" + suffix
 
-	// 契約の有無を確認し、なければ最安プランで契約する。契約を作成した場合のみ後片付けで解約する
-	subscriptionCreated, subscriptionPlanID := ensureWorkflowsSubscription(t, h)
-	if subscriptionCreated {
-		defer releaseWorkflowsSubscription(t, h, subscriptionPlanID)
-	}
+	// 契約の有無を確認し、なければ最安プランで契約する。後片付けは ensure の前に defer で
+	// 登録し、契約作成直後から検証が失敗しても解約されるようにする
+	var subscriptionCleanup workflowsSubscriptionCleanup
+	defer releaseWorkflowsSubscription(t, h, &subscriptionCleanup)
+	ensureWorkflowsSubscription(t, h, &subscriptionCleanup)
 
 	// 作成前に同名ワークフローが存在しないことを確認する
 	before := listWorkflows(t, h, "作成前に同名ワークフローが存在しないことを確認する")

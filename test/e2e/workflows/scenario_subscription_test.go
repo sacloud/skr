@@ -43,14 +43,13 @@ func TestScenarioWorkflowsSubscription(t *testing.T) {
 		return
 	}
 
-	// 契約を開始する。最安のプランを選ぶ
+	// 契約を開始する。最安のプランを選ぶ。後片付けは ensure の前に defer で登録し、
+	// 契約作成直後から検証が失敗しても解約されるようにする
 	cheapest := cheapestWorkflowsPlan(t, plans)
-	created, planID := ensureWorkflowsSubscription(t, h)
-	require.True(t, created, "subscription should be created when no contract exists")
-	require.Equal(t, cheapest.ID, planID, "created plan should be the cheapest plan")
-
-	// 後片付け: 契約を解約する。解約前に現在値を再照合する
-	defer releaseWorkflowsSubscription(t, h, planID)
+	var subscriptionCleanup workflowsSubscriptionCleanup
+	defer releaseWorkflowsSubscription(t, h, &subscriptionCleanup)
+	ensureWorkflowsSubscription(t, h, &subscriptionCleanup)
+	require.Equal(t, cheapest.ID, subscriptionCleanup.planID, "created plan should be the cheapest plan")
 
 	// 契約状態を再確認する
 	after := readWorkflowsSubscription(t, h, "契約開始後に契約状態を確認する")
