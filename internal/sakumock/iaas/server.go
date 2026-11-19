@@ -131,7 +131,7 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 	case method == "GET":
 		item, ok := s.switches[key]
 		if !ok {
-			return nil, fmt.Errorf("switch %s in zone %s not found", id, zone)
+			return nil, switchNotFound(method, uri, id, zone)
 		}
 		return marshalJSON(map[string]any{"Switch": item})
 	case method == "POST" && id == "":
@@ -150,7 +150,7 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 	case method == "PUT" && id != "":
 		current, ok := s.switches[key]
 		if !ok {
-			return nil, fmt.Errorf("switch %s in zone %s not found", id, zone)
+			return nil, switchNotFound(method, uri, id, zone)
 		}
 		for key, value := range request {
 			current[key] = value
@@ -159,7 +159,7 @@ func (s *Server) Do(ctx context.Context, method, uri string, body any) ([]byte, 
 		return marshalJSON(map[string]any{"Switch": current})
 	case method == "DELETE" && id != "":
 		if _, ok := s.switches[key]; !ok {
-			return nil, fmt.Errorf("switch %s in zone %s not found", id, zone)
+			return nil, switchNotFound(method, uri, id, zone)
 		}
 		delete(s.switches, key)
 		return nil, nil
@@ -251,6 +251,30 @@ func iconNotFound(method, uri, id string) error {
 	}
 	return iaas.NewAPIError(method, requestURL, http.StatusNotFound, &iaas.APIErrorResponse{
 		ErrorCode: "not_found", ErrorMessage: fmt.Sprintf("icon %s not found", id),
+	})
+}
+
+// switchNotFound は存在しない Switch への GET / PUT / DELETE に対する API 404 エラーを返します。
+// APIError にしないと SDK の iaas.IsNotFoundError が false を返し、skr の delete の FailIfNotFound=false が
+// 対象不在を無視できなくなります。
+func switchNotFound(method, uri, id, zone string) error {
+	requestURL, err := url.Parse(uri)
+	if err != nil {
+		return fmt.Errorf("parse Switch request URL: %w", err)
+	}
+	return iaas.NewAPIError(method, requestURL, http.StatusNotFound, &iaas.APIErrorResponse{
+		ErrorCode: "not_found", ErrorMessage: fmt.Sprintf("switch %s not found in zone %s", id, zone),
+	})
+}
+
+// packetFilterNotFound は存在しない PacketFilter への GET / PUT / DELETE に対する API 404 エラーを返します。
+func packetFilterNotFound(method, uri, id, zone string) error {
+	requestURL, err := url.Parse(uri)
+	if err != nil {
+		return fmt.Errorf("parse PacketFilter request URL: %w", err)
+	}
+	return iaas.NewAPIError(method, requestURL, http.StatusNotFound, &iaas.APIErrorResponse{
+		ErrorCode: "not_found", ErrorMessage: fmt.Sprintf("PacketFilter %s not found in zone %s", id, zone),
 	})
 }
 
@@ -456,7 +480,7 @@ func (s *Server) doPacketFilter(method string, parts []string, uri string, body 
 	case method == "GET":
 		item, ok := s.packetFilters[key]
 		if !ok {
-			return nil, fmt.Errorf("PacketFilter %s in zone %s not found", id, zone)
+			return nil, packetFilterNotFound(method, uri, id, zone)
 		}
 		return marshalJSON(map[string]any{"PacketFilter": item})
 	case method == "POST" && id == "":
@@ -476,7 +500,7 @@ func (s *Server) doPacketFilter(method string, parts []string, uri string, body 
 	case method == "PUT" && id != "":
 		current, ok := s.packetFilters[key]
 		if !ok {
-			return nil, fmt.Errorf("PacketFilter %s in zone %s not found", id, zone)
+			return nil, packetFilterNotFound(method, uri, id, zone)
 		}
 		for field, value := range request {
 			current[field] = value
@@ -485,7 +509,7 @@ func (s *Server) doPacketFilter(method string, parts []string, uri string, body 
 		return marshalJSON(map[string]any{"PacketFilter": current})
 	case method == "DELETE" && id != "":
 		if _, ok := s.packetFilters[key]; !ok {
-			return nil, fmt.Errorf("PacketFilter %s in zone %s not found", id, zone)
+			return nil, packetFilterNotFound(method, uri, id, zone)
 		}
 		delete(s.packetFilters, key)
 		return nil, nil
