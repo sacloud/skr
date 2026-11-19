@@ -127,17 +127,17 @@ func TestScenarioWorkflowsLifecycle(t *testing.T) {
 	require.Equal(t, mainID, listed.Workflows[0].ID)
 
 	// 名前の候補検索に作成したワークフローが含まれることを確認する。
+	// 実 API の Suggests 要素は Name と Count で、作成直後のワークフローも即座に反映される (2026-11-19 ライブ検証済み)。
 	// sakumock は Suggests 要素の必須フィールド Count を返さないため、その応答デコード
-	// エラーだけは環境の制限として許容する。ライブ環境では Count 付きの応答が返るため、
-	// 正常系の検証はそちらで行われる。
+	// エラーだけは環境の制限として許容する。詳細は docs/design/sakumock-gaps.md を参照。
 	if suggested, err := tryListWorkflowsSuggestions(t, h, "名前の候補検索で作成したワークフローを確認する", mainName); err != nil {
 		require.Contains(t, err.Error(), "Count (field required)", "unexpected list-suggestions error: %v", err)
 		t.Logf("list-suggestions は sakumock が Count を返さないため検証をスキップします (ライブ環境で検証します)")
 	} else {
 		found := false
 		for _, item := range suggested {
-			if item.Id == mainID {
-				require.Equal(t, mainName, item.Name, "suggestion %q should be the workflow created by this run", item.Id)
+			if item.Name == mainName {
+				require.Positive(t, item.Count, "suggestion %q should report its workflow count", item.Name)
 				found = true
 			}
 		}

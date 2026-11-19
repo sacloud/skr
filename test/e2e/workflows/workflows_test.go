@@ -86,9 +86,8 @@ type workflowsCurrentPlan struct {
 	PlanName string `json:"planName"`
 }
 
-// workflowsSuggestionItem は list-suggestions の応答項目です。
+// workflowsSuggestionItem は list-suggestions の応答項目です。ライブ API は Name と Count を返し、Id は含みません。
 type workflowsSuggestionItem struct {
-	Id    string `json:"Id"`
 	Name  string `json:"Name"`
 	Count int    `json:"Count"`
 }
