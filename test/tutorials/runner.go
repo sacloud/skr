@@ -31,6 +31,7 @@ import (
 	saclient "github.com/sacloud/sacloud-sdk-go/common/saclient"
 	"github.com/sacloud/sakumock/core"
 	eventbusmock "github.com/sacloud/sakumock/eventbus"
+	monitoringsuitemock "github.com/sacloud/sakumock/monitoringsuite"
 	simplemqmock "github.com/sacloud/sakumock/simplemq"
 	workflowsmock "github.com/sacloud/sakumock/workflows"
 	sakumockiaas "github.com/sacloud/skr/internal/sakumock/iaas"
@@ -77,6 +78,9 @@ type runner struct {
 	// workflowsServer は Workflows モックです。fixture の mock.services に
 	// workflows が指定された場合のみ起動します。
 	workflowsServer *workflowsmock.Server
+	// monitoringSuiteServer は Monitoring Suite モックです。fixture の
+	// mock.services に monitoringsuite が指定された場合のみ起動します。
+	monitoringSuiteServer *monitoringsuitemock.Server
 	// iaasMock は IaaS のインメモリモックです。スイッチなどの状態を保持します。
 	iaasMock *sakumockiaas.Server
 	// iaasServer は IaaS モックをサブプロセスに公開する HTTP ブリッジです。
@@ -180,6 +184,11 @@ func (r *runner) startMockServices() error {
 				return err
 			}
 		}
+		if service == "monitoringsuite" {
+			if err := r.startMonitoringSuiteMock(); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -190,6 +199,13 @@ func (r *runner) startWorkflowsMock() error {
 	server := workflowsmock.NewTestServer(workflowsmock.Config{EnableDataPlane: true})
 	r.workflowsServer = server
 	return r.setEnv("SAKURA_ENDPOINTS_WORKFLOWS", server.TestURL())
+}
+
+// startMonitoringSuiteMock は Monitoring Suite モックを起動します。
+func (r *runner) startMonitoringSuiteMock() error {
+	server := monitoringsuitemock.NewTestServer(monitoringsuitemock.Config{})
+	r.monitoringSuiteServer = server
+	return r.setEnv("SAKURA_ENDPOINTS_MONITORING_SUITE", server.TestURL())
 }
 
 // startSimpleMQMock は SimpleMQ モックを起動します。キュー (コントロールプレーン) と
@@ -231,6 +247,10 @@ func (r *runner) close() {
 	if r.workflowsServer != nil {
 		r.workflowsServer.Close()
 		r.workflowsServer = nil
+	}
+	if r.monitoringSuiteServer != nil {
+		r.monitoringSuiteServer.Close()
+		r.monitoringSuiteServer = nil
 	}
 	if r.iaasServer != nil {
 		r.iaasServer.Close()

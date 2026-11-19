@@ -51,6 +51,15 @@ IaaS API のモック (sakumockiaas、`internal/sakumock/iaas` のリポジト�
 | --- | --- | --- |
 | `create-cluster` | sakumock は `ports` が空配列 (または要素なし) の作成リクエストを 400 (`at least one port is required`) で拒否する (`apprundedicated/validate.go` の `validateClusterPorts`)。実 API は空配列を受け付け、2026-11-13 のライブ実行で待受ポートなしのクラスタ作成を確認済み。詳細は [sacloud/sakumock#267](https://github.com/sacloud/sakumock/issues/267) を参照 | 許容。sakumock での検証では待受ポートを 1 つ以上指定する (`internal/cli` の CLI 操作テストとチュートリアル harness が該当)。高レベル `create-cluster` での待受ポート省略 (空配列送信) は、service 層の fake テストとライブ E2E で検証する |
 
+### Monitoring Suite
+
+実 API の入力検証が sakumock より厳しい差分。CLI 操作テスト (sakumock) では通るが、ライブ実行では制約があるため、ヘルプとチュートリアルで案内する。
+
+| 操作 | 差分 | 影響と現状の扱い |
+| --- | --- | --- |
+| `create-dashboard-project` | 実 API は `description` が必須で、省略したリクエストは 500 を返す (応答本文なし、2026-11-19 ライブ検証)。sakumock は省略を受け付ける | 許容。CLI では `--description` を必須フラグにし、sakumock の CLI 操作テストでも指定する |
+| `create-alert-project-rule` / `patch-alert-project-rule` | 実 API は (1) `query` を PromQL として検証する、(2) `threshold_warning` / `threshold_critical` は比較演算子を先頭に付けた形式 (例: `>=70`) でないと 400、(3) `enabled_warning` と `enabled_critical` の少なくとも一方を true にする必要がある、の 3 点を検証する (2026-11-19 ライブ検証)。sakumock は文字列長のみ検証する | 許容。ヘルプに形式を記載し、ライブ E2E では制約を満たす入力を使う |
+
 ### モックサーバーが存在しないドメイン
 
 | ドメイン | 影響と現状の扱い |

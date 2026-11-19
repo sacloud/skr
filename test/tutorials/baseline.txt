@@ -8,6 +8,7 @@ apprun-api.md deferred 10 sakumock にサーバーがあるが harness 未接続
 apprun-dedicated.md deferred 24 sakumock にサーバーがあるが harness 未接続
 container-registry-api.md deferred 9 sakumock にサーバーがなく fake で代替
 dns-api.md deferred 9 手動置換プレースホルダーの撤去と sakumockiaas の appliance 拡充が必要
+monitoring-suite-api.md implemented 21
 eventbus.md implemented 14
 gslb-api.md deferred 18 手動置換プレースホルダーの撤去と sakumockiaas の appliance 拡充が必要
 http-request.md deferred 2 対象サーバーを持たない汎用 HTTP コマンドのためモック方針を未確定
