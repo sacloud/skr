@@ -120,7 +120,7 @@ Switch コマンドは [`api/commands/iaas-switch.json`](../../api/commands/iaas
 $ make generate-iaas-api API_CONFIG=api/commands/iaas-switch.json API_OUTPUT=internal/iaas/switchapi/switch_api_generated.go
 ```
 
-同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型、モードに合わない `command_prefix` で受け付けず、出力は `go/format` で整形します。設定検証では、導出された Commands / API / Factory / Runtime、操作ごとの型、構築子の名前を 1 つの名前集合へ登録して重複を拒否します。同じ集合でインポートの別名との衝突も検査します。型の重複宣言でコンパイルできない生成コードを出力する前にエラーを返します。生成コードの整形だけでは設定との一致を保証しないため、各設定の再生成結果とコミット済み生成ファイルの一致をドメイン package と `internal/cli` のテストで検証します。IaaS と Ogen 系 API は生成対象の形と型名の導出規則が異なるため、IaaS は専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
+同じ処理は `go run ./cmd/apigen-iaas -config path/to/example.json -out example_api_generated.go` でも実行できます。設定を不正な JSON、未知のフィールド、重複した操作名／メソッド、未対応のフラグ型、モードに合わない `command_prefix` で受け付けず、出力は `go/format` で整形します。設定検証では、導出された Commands / API / Factory / Runtime と操作ごとの型を 1 つの名前集合へ登録して重複を拒否します。構築子 `New<Commands>` がインポートの別名と衝突しないことも、登録した名前集合に対して別途検査します。型の重複宣言でコンパイルできない生成コードを出力する前にエラーを返します。生成コードの整形だけでは設定との一致を保証しないため、各設定の再生成結果とコミット済み生成ファイルの一致をドメイン package と `internal/cli` のテストで検証します。IaaS と Ogen 系 API は生成対象の形と型名の導出規則が異なるため、IaaS は専用入口を保ち、サービス数が増える Ogen 系 API は共通入口 `cmd/apigen-api` を使います。
 
 ## internal/cli 配下の配線コード
 
