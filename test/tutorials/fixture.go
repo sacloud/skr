@@ -35,8 +35,8 @@ type MockConfig struct {
 	// Zones は IaaS モックに登録するゾーン名のリストです。
 	Zones []string `json:"zones,omitempty"`
 	// Services は起動する Ogen 系モックサービスのリストです。
-	// simplemq と eventbus をサポートします。eventbus は simplemq と
-	// 一緒に宣言する必要があります (サービスリンクの宛先を実 API に向けないため)。
+	// simplemq、eventbus、workflows をサポートします。eventbus は simplemq と
+	// 一緒に起動する必要があります (サービスリンクの宛先を実 API に向けないため)。
 	Services []string `json:"services,omitempty"`
 	// Events はチュートリアル外の副作用として発生するイベントの宣言です。
 	// after に一致する step が成功するたびに EventBus モックへ注入されます。
@@ -170,6 +170,7 @@ func (f *Fixture) validate(path string) error {
 			hasSimpleMQ = true
 		case "eventbus":
 			hasEventBus = true
+		case "workflows":
 		default:
 			return fmt.Errorf("fixture %s: unknown mock service %q", path, service)
 		}

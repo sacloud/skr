@@ -131,7 +131,7 @@ fixture の `mock.services` で起動するモックサービスを宣言する�
 
 ### sakumock 未整備サービス
 
-baseline で `deferred` とし、抽出と baseline 照合のみを行い、実行しない。ライブ API には向けない。
+baseline で `deferred` とし、抽出と baseline 照合のみを行い、実行しない。ライブ API には向けない。deferred の原因の分類 (モックサーバーの有無、harness 未接続、モックの応答範囲、手動置換プレースホルダー) と各チュートリアルの詳細は [sakumock の既知の差分と未整備](sakumock-gaps.md) を参照する。
 
 ## bootstrap
 

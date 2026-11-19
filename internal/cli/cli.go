@@ -40,6 +40,7 @@ import (
 	"github.com/sacloud/skr/internal/serviceendpointgatewayapi"
 	"github.com/sacloud/skr/internal/simplemqapi"
 	"github.com/sacloud/skr/internal/simplenotificationapi"
+	"github.com/sacloud/skr/internal/workflowsapi"
 	"github.com/sacloud/skr/version"
 )
 
@@ -69,6 +70,7 @@ type cli struct {
 	SecretManagerAPI          secretmanagerapi.Commands          `cmd:"" name:"secretmanager-api" help:"さくらのクラウド シークレットマネージャーでシークレット保管庫 (Vault) とシークレットを操作します。シークレットは Vault 単位で暗号化され、最新を含む 50 世代まで保管されます。Vault 作成には既存の KMS キー ID が必要です。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。シークレットの値は --value-file で指定したファイルまたは標準入力から読み込み、unveil は値をそのまま標準出力へ出力します。結果は JSON で出力しますが、unveil は値のみを出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/secretsmanager/index.html"`
 	ServiceEndpointGatewayAPI serviceendpointgatewayapi.Commands `cmd:"" name:"service-endpoint-gateway-api" help:"さくらのクラウドのサービスエンドポイントゲートウェイを操作します。サービスエンドポイントゲートウェイはスイッチの拡張機能で、プライベートネットワーク内からオブジェクトストレージやコンテナレジストリなどのマネージドサービスへ閉域接続します。スイッチ単体が対象で、ルータ＋スイッチでは利用できません。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。Create はフラグまたは --request JSON で入力します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/network/switch/seg.html"`
 	SecurityControlAPI        securitycontrolapi.Commands        `cmd:"" name:"security-control-api" help:"さくらのクラウドのセキュリティコントロールを操作します。有効化状態 (activation)、評価ルールの設定 (evaluation-rule)、自動アクション (automated-action) を管理します。評価ルールはプロジェクトのリソース設定を検査し、自動アクションは評価結果をきっかけに通知やワークフローを実行します。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。API エンドポイントは SDK の既定値を使い、SAKURA_ENDPOINTS_SECURITY_CONTROL で変更できます。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/controlpanel/eventlog/security-control.html"`
+	WorkflowsAPI              workflowsapi.Commands              `cmd:"" name:"workflows-api" help:"さくらのクラウド Workflows のワークフロー、Runbook リビジョン、実行、サブスクリプションを操作します。ワークフローは YAML の Runbook で自動化手順を定義します。Runbook の内容は --runbook-file で指定したファイルまたは標準入力から読み込みます。サービスプリンシパルを利用するワークフローは API 経由では作成できないことが公式マニュアルで案内されています。ServicePrincipalId は --request JSON でのみ指定できます。SDK プロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。API エンドポイントは SDK の既定値を使い、SAKURA_ENDPOINTS_WORKFLOWS で変更できます。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/workflows/about.html"`
 	HTTP                      httpCommand                        `cmd:"" name:"http" help:"SDK の認証情報を使って HTTPS URL に直接リクエストを送ります。指定したホストへアカウントの認証情報が送信されるため、信頼できる API エンドポイントだけを指定してください。レスポンス本文は形式を変えずに出力し、--query と --query-raw による加工は行いません。実行中に SIGINT (Ctrl+C) または SIGTERM を受けるとリクエストを中断します。リクエストの期限は SAKURA_API_REQUEST_TIMEOUT (未設定の項目は SAKURACLOUD_API_REQUEST_TIMEOUT)、プロファイルの api_request_timeout、SDK の既定値の順で決まります。例: skr http 'https://api.example.test/path' --method GET"`
 }
 
@@ -133,6 +135,7 @@ func newCLI() *cli {
 	result.initKmsAPI()
 	result.initSecretManagerAPI()
 	result.initSecurityControlAPI()
+	result.initWorkflowsAPI()
 	result.initServiceEndpointGatewayAPI()
 	result.initSimpleMQMessage()
 	result.initHTTP()

@@ -1,11 +1,12 @@
 # status は implemented(実行検証済み) / deferred(モック未整備などで延期) のいずれか。
 # 延期の場合は status の後に理由を書きます。詳細は docs/design/tutorial-script-harness.md を参照。
+# モックの既知の差分と未整備の詳細は docs/design/sakumock-gaps.md を参照。
 # チュートリアルファイルごとの状況。1行1ファイルで、<path> <status> <blocks>[<理由>]の順に書きます。
 # <blocks> は抽出された console ブロック数の下限です。実測が下限を下回ると抽出の腐敗として失敗します。
 # deferred のチュートリアルは抽出と baseline 照合のみを行い、実行しません。
-apprun-api.md deferred 10 sakumock が未整備
-apprun-dedicated.md deferred 23 sakumock が未整備
-container-registry-api.md deferred 9 sakumock が未整備
+apprun-api.md deferred 10 sakumock にサーバーがあるが harness 未接続
+apprun-dedicated.md deferred 23 sakumock にサーバーがあるが harness 未接続
+container-registry-api.md deferred 9 sakumock にサーバーがなく fake で代替
 eventbus.md implemented 14
 gslb-api.md deferred 18 手動置換プレースホルダーの撤去と sakumockiaas の appliance 拡充が必要
 http-request.md deferred 2 対象サーバーを持たない汎用 HTTP コマンドのためモック方針を未確定
@@ -13,7 +14,7 @@ iaas-api/archive.md deferred 4 sakumockiaas が archive に未対応
 iaas-api/database.md deferred 23 sakumockiaas が database 一部操作に未対応
 iaas-api/disk-plan.md deferred 4 sakumockiaas が disk plan に未対応
 iaas-api/disk.md deferred 9 手動置換プレースホルダーの撤去と sakumockiaas の disk 拡充が必要
-iaas-api/icon.md deferred 7 sakumockiaas が icon の一部操作に未対応
+iaas-api/icon.md deferred 7 手動置換プレースホルダーの撤去が必要
 iaas-api/internet-plan.md deferred 4 sakumockiaas が internet plan に未対応
 iaas-api/internet.md deferred 16 手動置換プレースホルダーの撤去と sakumockiaas の拡充が必要
 iaas-api/ipaddress.md deferred 5 sakumockiaas が ipaddress に未対応
@@ -28,14 +29,15 @@ iaas-api/server.md deferred 14 手動置換プレースホルダーの撤去と 
 iaas-api/serviceclass.md deferred 3 sakumockiaas が service class に未対応
 iaas-api/switch.md deferred 7 手動置換プレースホルダーの撤去が必要
 iaas-api/zone.md implemented 6
-iam-api.md deferred 23 sakumock が未整備
-kms-api.md deferred 11 sakumock が未整備
-local-router-api.md deferred 14 sakumock が未整備
+iam-api.md deferred 23 sakumock にサーバーがあるが harness 未接続
+kms-api.md deferred 11 sakumock にサーバーがあるが harness 未接続
+local-router-api.md deferred 14 sakumock にサーバーがなく fake で代替
 networking-suite-api.md deferred 26 手動置換プレースホルダーの撤去が必要
-object-storage-api.md deferred 14 sakumock が未整備
+object-storage-api.md deferred 14 sakumock にサーバーがあるが harness 未接続
 proxylb-api.md deferred 18 手動置換プレースホルダーの撤去と sakumockiaas の拡充が必要
-secretmanager-api.md deferred 13 sakumock が未整備
-security-control-api.md deferred 18 sakumock が未整備
-service-endpoint-gateway-api.md deferred 17 sakumock が未整備
-simple-notification-api.md deferred 7 sakumock が未整備
+secretmanager-api.md deferred 13 sakumock にサーバーがあるが harness 未接続
+security-control-api.md deferred 18 sakumock v0.14.0 の securitycontrol は harness 未接続
+service-endpoint-gateway-api.md deferred 17 sakumock にサーバーがあるが harness 未接続
+simple-notification-api.md deferred 7 sakumock にサーバーがあるが harness 未接続
 simplemq-api.md implemented 8
+workflows-api.md implemented 22

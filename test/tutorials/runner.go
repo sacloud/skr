@@ -32,6 +32,7 @@ import (
 	"github.com/sacloud/sakumock/core"
 	eventbusmock "github.com/sacloud/sakumock/eventbus"
 	simplemqmock "github.com/sacloud/sakumock/simplemq"
+	workflowsmock "github.com/sacloud/sakumock/workflows"
 	sakumockiaas "github.com/sacloud/skr/internal/sakumock/iaas"
 )
 
@@ -73,6 +74,9 @@ type runner struct {
 	// eventbusServer は EventBus モックです。サービスリンクで SimpleMQ モックに
 	// 接続し、トリガー発火時のメッセージ送信を再現します。
 	eventbusServer *eventbusmock.Server
+	// workflowsServer は Workflows モックです。fixture の mock.services に
+	// workflows が指定された場合のみ起動します。
+	workflowsServer *workflowsmock.Server
 	// iaasMock は IaaS のインメモリモックです。スイッチなどの状態を保持します。
 	iaasMock *sakumockiaas.Server
 	// iaasServer は IaaS モックをサブプロセスに公開する HTTP ブリッジです。
@@ -171,8 +175,21 @@ func (r *runner) startMockServices() error {
 				return err
 			}
 		}
+		if service == "workflows" {
+			if err := r.startWorkflowsMock(); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// startWorkflowsMock は Workflows モックを起動します。Runbook の実行を
+// 再現するデータプレーンを有効にします。
+func (r *runner) startWorkflowsMock() error {
+	server := workflowsmock.NewTestServer(workflowsmock.Config{EnableDataPlane: true})
+	r.workflowsServer = server
+	return r.setEnv("SAKURA_ENDPOINTS_WORKFLOWS", server.TestURL())
 }
 
 // startSimpleMQMock は SimpleMQ モックを起動します。キュー (コントロールプレーン) と
@@ -210,6 +227,10 @@ func (r *runner) close() {
 	if r.eventbusServer != nil {
 		r.eventbusServer.Close()
 		r.eventbusServer = nil
+	}
+	if r.workflowsServer != nil {
+		r.workflowsServer.Close()
+		r.workflowsServer = nil
 	}
 	if r.iaasServer != nil {
 		r.iaasServer.Close()

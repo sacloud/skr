@@ -155,3 +155,9 @@ service-endpoint-gateway-api seg-update
 security-control-api evaluation-rules-update
 security-control-api automated-actions-create
 security-control-api automated-actions-update
+workflows-api create-workflow
+workflows-api patch-workflow
+workflows-api create-revision
+workflows-api update-revision-alias
+workflows-api create-execution
+workflows-api create-subscription
