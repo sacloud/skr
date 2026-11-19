@@ -1,0 +1,10 @@
+{
+  "values": {
+    "UNIQUE-SUFFIX": "x9k2m4",
+    "REVISION-ALIAS": "tutorial-stable"
+  },
+  "mock": {
+    "zones": ["is1a"],
+    "services": ["workflows"]
+  }
+}

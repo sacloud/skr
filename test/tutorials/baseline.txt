@@ -39,3 +39,4 @@ security-control-api.md deferred 18 sakumock が未整備
 service-endpoint-gateway-api.md deferred 17 sakumock が未整備
 simple-notification-api.md deferred 7 sakumock が未整備
 simplemq-api.md implemented 8
+workflows-api.md implemented 22
