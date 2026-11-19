@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.3.0](https://github.com/sacloud/skr/compare/v0.2.2...v0.3.0) - 2026-11-19
+
+### 🚀 Changes
+- グローバル --query-raw フラグを追加し、チュートリアルの jq 依存を解消する by @tokuhirom in https://github.com/sacloud/skr/pull/278
+- チュートリアルスクリプトの実行検証 harness を追加する (ADR 0088) by @tokuhirom in https://github.com/sacloud/skr/pull/280
+- チュートリアル harness で eventbus.md を sakumock に対して実行する by @tokuhirom in https://github.com/sacloud/skr/pull/281
+- apprun-dedicated のインフラライフサイクル 3 コマンドを live に更新する by @tokuhirom in https://github.com/sacloud/skr/pull/282
+- チュートリアル harness で simplemq-api.md を sakumock に対して実行する by @tokuhirom in https://github.com/sacloud/skr/pull/283
+- Workflows API コマンド群を追加する by @tokuhirom in https://github.com/sacloud/skr/pull/284
+- sakumock と sakumockiaas の差分管理を別ファイルに分離する by @tokuhirom in https://github.com/sacloud/skr/pull/285
+- IaaS のローカル mock の not-found を SDK の APIError に合わせる by @tokuhirom in https://github.com/sacloud/skr/pull/286
+- API 生成器の生成型名の衝突検査を名前集合の登録として明示する by @tokuhirom in https://github.com/sacloud/skr/pull/287
+- skr apprun-dedicated に create-cluster を追加する (#266) by @tokuhirom in https://github.com/sacloud/skr/pull/288
+
 ## [v0.2.2](https://github.com/sacloud/skr/compare/v0.2.1...v0.2.2) - 2026-11-17
 
 ### 🚀 Changes
