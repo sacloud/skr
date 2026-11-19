@@ -131,7 +131,7 @@ fixture の `mock.services` で起動するモックサービスを宣言する�
 
 ### sakumock 未整備サービス
 
-baseline で `deferred` とし、抽出と baseline 照合のみを行い、実行しない。ライブ API には向けない。deferred の原因の分類 (モックサーバーの有無、harness 未接続、モックの応答範囲、手動置換プレースホルダー) と各チュートリアルの詳細は [sakumock の既知の差分と未整備](sakumock-gaps.md) を参照する。
+baseline で `deferred` とし、抽出と baseline 照合のみを行い、実行しない。ライブ API には向けない。deferred の原因の分類 (モックサーバーの有無、harness 未接続、モックの応答範囲、手動置換プレースホルダー) と各チュートリアルの詳細は、Ogen 系モックの [sakumock の既知の差分と未整備](sakumock-gaps.md)、IaaS モックの [sakumockiaas の対応範囲と未対応](sakumockiaas-gaps.md) を参照する。
 
 ## bootstrap
 
@@ -166,7 +166,7 @@ TestMain で次を行う。
 | 1 | `iaas-api/zone.md` | harness 本体、IaaS ビルドタグ接続、zone.md の ID 取得書き換え、baseline 初版 | 完了 |
 | 2 | `eventbus.md` | Ogen 系接続 (SimpleMQ / EventBus モック)、`mock.services` と `mock.events`、IaaS モックの HTTP ブリッジによる状態共有、値注入 (`UNIQUE-SUFFIX`、`QUEUE-NAME`、`ZONE`、`STARTS-AT`) | 完了 |
 | 3 | `simplemq-api.md` | SimpleMQ モック単独による実行検証。回転 API キーのファイル保存 (`--query-raw '.APIKey'`)、メッセージの送受信・延長・削除、`QUEUE_ID` / `MESSAGE_ID` のコマンド置換化 | 完了 |
-| 4 以降 | IaaS 系チュートリアル | 手動置換プレースホルダーの撤去 (`server.md`、`internet.md`、`gslb-api.md`、`proxylb-api.md`、`networking-suite-api.md`)、sakumockiaas のデータ拡充 (`archive`、`product disk`、`server`、`appliance` など)、baseline の `deferred` 解除 | 未着手 |
+| 4 以降 | IaaS 系チュートリアル | 手動置換プレースホルダーの撤去 (`server.md`、`internet.md`、`gslb-api.md`、`proxylb-api.md`、`networking-suite-api.md`)、sakumockiaas のデータ拡充 ([対応範囲と未対応](sakumockiaas-gaps.md) 参照、`archive`、`product disk`、`server`、`appliance` など)、baseline の `deferred` 解除 | 未着手 |
 
 ## fixture の形式
 
