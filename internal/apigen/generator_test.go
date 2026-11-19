@@ -733,6 +733,77 @@ func TestValidateRejectsUnsupportedFlagsAndDuplicateNames(t *testing.T) {
 	require.Contains(t, err.Error(), "duplicate operation")
 }
 
+func TestRegisterGeneratedTypeNameRejectsDuplicates(t *testing.T) {
+	// トップレベル型と操作型を一つの名前集合へ順に登録して、重複を生成前に拒否する。
+	names := make(map[string]bool)
+	require.NoError(t, registerGeneratedTypeName(names, "Commands"))
+	require.NoError(t, registerGeneratedTypeName(names, "API"))
+	require.NoError(t, registerGeneratedTypeName(names, "APIFactory"))
+	require.NoError(t, registerGeneratedTypeName(names, "Runtime"))
+	require.NoError(t, registerGeneratedTypeName(names, "ListCommand"))
+
+	err := registerGeneratedTypeName(names, "Commands")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `duplicate generated type name "Commands"`)
+
+	err = registerGeneratedTypeName(names, "ListCommand")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `duplicate generated type name "ListCommand"`)
+}
+
+func TestResolveProducesDistinctGeneratedTypeNames(t *testing.T) {
+	// 手書き操作を含む設定でも、導出された生成型名全体 (構築子を含む) が互いに重複しないこと。
+	operations := []Operation{
+		{
+			Name:        "List",
+			Help:        "一覧を表示します。",
+			Method:      "List",
+			RequestType: "ListParams",
+		},
+		{
+			Name:        "UpdateSecret",
+			Help:        "秘密情報を更新します。",
+			Method:      "UpdateSecret",
+			RequestType: "UpdateSecretRequest",
+			Handwritten: true,
+		},
+	}
+	for _, test := range []struct {
+		name   string
+		config Config
+		mode   Mode
+	}{
+		{
+			name:   "IaaS",
+			config: Config{Package: "exampleapi", Resource: "Example", Operations: operations},
+			mode:   ModeIaaS,
+		},
+		{
+			name:   "Ogen",
+			config: Config{Package: "exampleapi", Resource: "Example", CommandPrefix: "Example", Operations: operations},
+			mode:   ModeOgen,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			require.NoError(t, test.config.Validate(test.mode))
+			resolved := test.config.resolve(test.mode)
+			seen := map[string]bool{}
+			for _, name := range []string{
+				resolved.CommandsType,
+				resolved.APIType,
+				resolved.FactoryType,
+				resolved.RuntimeType,
+				"New" + resolved.CommandsType,
+				resolved.Operations[0].CommandType,
+				resolved.Operations[1].CommandType,
+			} {
+				require.False(t, seen[name], "generated type name %q is duplicated", name)
+				seen[name] = true
+			}
+		})
+	}
+}
+
 func TestValidateModeSpecificPrefixRules(t *testing.T) {
 	operations := []Operation{{
 		Name: "List", Help: "一覧を表示します。", Method: "List", RequestType: "ListParams",

@@ -556,10 +556,9 @@ func (c Config) Validate(mode Mode) error {
 	commandsType, apiType, factoryType, runtimeType := c.typeNames(mode)
 	commandTypes := make(map[string]bool)
 	for _, name := range []string{commandsType, apiType, factoryType, runtimeType} {
-		if commandTypes[name] {
-			return fmt.Errorf("duplicate generated type name %q", name)
+		if err := registerGeneratedTypeName(commandTypes, name); err != nil {
+			return err
 		}
-		commandTypes[name] = true
 	}
 	runtimeFields := map[string]bool{"DecodeRequest": true, "ValidateOutput": true, "WriteOutput": true}
 	requestValidatorReservedNames := map[string]bool{
@@ -584,8 +583,8 @@ func (c Config) Validate(mode Mode) error {
 		if operations[operation.Name] {
 			return fmt.Errorf("duplicate operation name %q", operation.Name)
 		}
-		if commandTypes[operationType] {
-			return fmt.Errorf("duplicate generated type name %q", operationType)
+		if err := registerGeneratedTypeName(commandTypes, operationType); err != nil {
+			return err
 		}
 		if !token.IsIdentifier(operation.Method) || token.Lookup(operation.Method).IsKeyword() {
 			return fmt.Errorf("operation %q method must be a valid Go identifier", operation.Name)
@@ -787,7 +786,6 @@ func (c Config) Validate(mode Mode) error {
 		}
 		operations[operation.Name] = true
 		methods[operation.Method] = true
-		commandTypes[operationType] = true
 	}
 	if commandNamesSet != 0 && commandNamesSet != len(c.Operations) {
 		return fmt.Errorf("command_name must be specified for every operation or none")
@@ -816,6 +814,17 @@ func (c Config) Validate(mode Mode) error {
 	if aliases[constructorName] {
 		return fmt.Errorf("generated constructor %q conflicts with an import alias", constructorName)
 	}
+	return nil
+}
+
+// registerGeneratedTypeName は生成型名を一つの名前集合へ順に登録し、重複を拒否します。
+// Commands / API / Factory / Runtime のトップレベル型と操作ごとの型を同じ集合で検査して、
+// 型の重複宣言でコンパイルできない生成コードを出力する前にエラーにします。
+func registerGeneratedTypeName(names map[string]bool, name string) error {
+	if names[name] {
+		return fmt.Errorf("duplicate generated type name %q", name)
+	}
+	names[name] = true
 	return nil
 }
 
