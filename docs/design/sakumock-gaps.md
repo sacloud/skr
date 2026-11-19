@@ -33,7 +33,7 @@ sakumock を使うテスト (CLI 操作テスト、チュートリアル harness
 
 | 操作 | 差分 | 影響と現状の扱い |
 | --- | --- | --- |
-| `list-suggestions` | sakumock は `Suggests` 要素を `{Id, Name}` で返すが、API 応答スキーマ上は要素に `Count` (1 以上の整数) が必須である。SDK (`ListSuggestionsOKSuggestsItem`) も `Name` と `Count` を必須としてデコードするため、応答のデコードが `Count (field required)` で失敗する。sakumock 自身の応答スキーマ検証 (`validate_gen.go`) も `Count` を必須としており、モック内部の不整合。実 API の要素は `{Name, Count}` で、`Id` は含まない (2026-11-19 ライブ検証) | 許容。ライフサイクル E2E (`test/e2e/workflows/scenario_lifecycle_test.go` の `tryListWorkflowsSuggestions`) は、デコードエラーのメッセージが一致する場合だけ制約として通し、それ以外のエラーは失敗扱いにする。正常系はライブ E2E で検証済み (2026-11-19、作成直後のワークフローが候補に即時反映されることも確認)。チュートリアル (`docs/manual/tutorials/workflows-api.md`) は候補検索を対象外にしている |
+| `list-suggestions` | sakumock は `Suggests` 要素を `{Id, Name}` で返すが、API 応答スキーマ上は要素に `Count` (1 以上の整数) が必須である。SDK (`ListSuggestionsOKSuggestsItem`) も `Name` と `Count` を必須としてデコードするため、応答のデコードが `Count (field required)` で失敗する。sakumock 自身の応答スキーマ検証 (`validate_gen.go`) も `Count` を必須としており、モック内部の不整合。実 API の要素は `{Name, Count}` で、`Id` は含まない (2026-11-19 ライブ検証)。詳細は [sacloud/sakumock#265](https://github.com/sacloud/sakumock/issues/265) を参照 | 許容。ライフサイクル E2E (`test/e2e/workflows/scenario_lifecycle_test.go` の `tryListWorkflowsSuggestions`) は、デコードエラーのメッセージが一致する場合だけ制約として通し、それ以外のエラーは失敗扱いにする。正常系はライブ E2E で検証済み (2026-11-19、作成直後のワークフローが候補に即時反映されることも確認)。チュートリアル (`docs/manual/tutorials/workflows-api.md`) は候補検索を対象外にしている |
 
 ### Workflows の動作メモ (差分ではないがテスト設計に関わる事項)
 
