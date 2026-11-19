@@ -88,6 +88,11 @@ local-router-api update-settings
 local-router-api delete
 local-router-api health-status
 local-router-api monitor-local-router
+dns-api find
+dns-api read
+dns-api create
+dns-api update
+dns-api delete
 proxylb-api find
 proxylb-api read
 proxylb-api create
