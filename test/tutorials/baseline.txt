@@ -1,6 +1,6 @@
 # status は implemented(実行検証済み) / deferred(モック未整備などで延期) のいずれか。
 # 延期の場合は status の後に理由を書きます。詳細は docs/design/tutorial-script-harness.md を参照。
-# モックの既知の差分と未整備の詳細は docs/design/sakumock-gaps.md を参照。
+# モックの既知の差分と未整備の詳細は docs/design/sakumock-gaps.md (Ogen 系 sakumock) と docs/design/sakumockiaas-gaps.md (IaaS sakumockiaas) を参照。
 # チュートリアルファイルごとの状況。1行1ファイルで、<path> <status> <blocks>[<理由>]の順に書きます。
 # <blocks> は抽出された console ブロック数の下限です。実測が下限を下回ると抽出の腐敗として失敗します。
 # deferred のチュートリアルは抽出と baseline 照合のみを行い、実行しません。

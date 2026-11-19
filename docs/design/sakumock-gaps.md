@@ -2,21 +2,25 @@
 
 ## この文書について
 
-sakumock を使うテスト (CLI 操作テスト、チュートリアル harness、ライブ E2E のドライラン) で判明した「実 API との差分」「モックに無い操作」「モックサーバー自体が無いドメイン」を、この 1 ファイルに集約して追跡する ([ADR 0090](../adr/0090-sakumock-gap-tracking.md))。
+外部ライブラリの sakumock (`github.com/sacloud/sakumock`、Ogen 系 API のモック) の差分を追跡する。
+対象は、CLI 操作テスト、チュートリアル harness、ライブ E2E のドライランで判明した「実 API との差分」「モックに無い操作」「モックサーバー自体が無いドメイン」である。差分管理の位置づけは [ADR 0091](../adr/0091-split-sakumock-and-sakumockiaas-gap-tracking.md) を参照。
 
 - 新たな差分や未整備を確認したら、対応する節に「現象」と「影響と現状の扱い」を追記する。
+- upstream (sacloud/sakumock) に issue を起票した項目は、issue へのリンクを残して解消を追跡する。
 - sakumock の更新や実装追加で解消したら、確認した日付と内容を残して該当箇所を更新する。
 - サービスごとの設計文書は「sakumock による検証の状況」だけを書き、差分の詳細はこの文書を参照する。
 - チュートリアルの実行可否の現状は `test/tutorials/baseline.txt` の status と理由、対応表はこの文書の「チュートリアル harness と sakumock の接続状況」に置く。
 
+IaaS API のモック (sakumockiaas、`internal/sakumock/iaas` のリポジトリ内実装) は別物で、対応範囲と未対応は [sakumockiaas の対応範囲と未対応](sakumockiaas-gaps.md) で管理する。
+
 ## sakumock の構成
 
-テストでは 2 種類のモックを併用する。
+テストでは 2 種類のモックを併用する。差分の管理はモックごとに分かれている。
 
-| 名称 | 場所 | 対象 API | 接続方法 |
-| --- | --- | --- | --- |
-| sakumock | `github.com/sacloud/sakumock` (外部ライブラリ) | Ogen 系 API (SimpleMQ、EventBus、Workflows など) | `NewTestServer` で起動し `SAKURA_ENDPOINTS_<SERVICE>` 環境変数で接続 |
-| sakumockiaas | `internal/sakumock/iaas` (リポジトリ内) | IaaS API | `iaas.APICaller` として in-process 接続。チュートリアル harness は `internal/sakumock/iaas/http.go` の HTTP ブリッジ経由 |
+| 名称 | 場所 | 対象 API | 接続方法 | 差分の管理 |
+| --- | --- | --- | --- | --- |
+| sakumock | `github.com/sacloud/sakumock` (外部ライブラリ) | Ogen 系 API (SimpleMQ、EventBus、Workflows など) | `NewTestServer` で起動し `SAKURA_ENDPOINTS_<SERVICE>` 環境変数で接続 | この文書。upstream issue で解消を追跡 |
+| sakumockiaas | `internal/sakumock/iaas` (リポジトリ内) | IaaS API | `iaas.APICaller` として in-process 接続。チュートリアル harness は `internal/sakumock/iaas/http.go` の HTTP ブリッジ経由 | [sakumockiaas の対応範囲と未対応](sakumockiaas-gaps.md)。リポジトリの作業として追跡 |
 
 ## 差分の扱いの分類
 
@@ -60,51 +64,20 @@ sakumock を使うテスト (CLI 操作テスト、チュートリアル harness
 
 - いずれも sakumock のモックサーバーがあり、`internal/cli` の CLI 操作テストで使用している。既知の差分は未確認。見つけたらこの文書に節を追加する。
 
-## IaaS API (sakumockiaas)
-
-`internal/sakumock/iaas` は zone、icon、packetfilter、switch、database (appliance の一部操作: 参照・削除・電源・リセット・モニター、パラメータ一覧) のみ実装している。それ以外のリソースの URL は `unsupported IaaS request URL` エラーになる。
-
-icon の検索は、SDK が `Names`/`Tags`/`Scope` を Filter (`Name`、`Tags.Name`、`Scope`) に変換した形式を受け付ける。検索条件は `Count`/`From`/`Sort`/`Filter` の一部キーのみを解釈し、FindCondition の `Include`/`Exclude` などそれ以外は無視する。ソートキーはリソースごとに限定的である (icon は ID/Name/Scope)。
-
-database は create と update (POST/PUT の本体) に未対応で、テストは `AddDatabase` による事前シードで代替する。
-
-チュートリアル baseline で `deferred` になっている IaaS 系チュートリアルと、sakumockiaas に起因する理由は次のとおり (`test/tutorials/baseline.txt` の理由と対応する)。
-
-| チュートリアル | sakumockiaas に起因する理由 | その他の理由 |
-| --- | --- | --- |
-| `iaas-api/archive.md` | archive 未対応 | なし |
-| `iaas-api/database.md` | create / update 未対応 | なし |
-| `iaas-api/disk.md` | disk 未対応 | 手動置換プレースホルダーの撤去 |
-| `iaas-api/disk-plan.md` | product disk 未対応 | なし |
-| `iaas-api/icon.md` | 要確認 (モック自体は icon の CRUD と Filter 検索に対応済み。deferred の実原因は Phase 4 以降の実行確認で特定する) | 手動置換プレースホルダーの撤去 |
-| `iaas-api/internet.md` | internet 未対応 | 手動置換プレースホルダーの撤去 |
-| `iaas-api/internet-plan.md` | product internet 未対応 | なし |
-| `iaas-api/ipaddress.md` | ipaddress 未対応 | なし |
-| `iaas-api/ipv6addr.md` | ipv6addr 未対応 | なし |
-| `iaas-api/ipv6net.md` | ipv6net 未対応 | なし |
-| `iaas-api/license-info.md` | product license 未対応 | なし |
-| `iaas-api/private-host-plan.md` | product privatehost 未対応 | なし |
-| `iaas-api/region.md` | region 未対応 | なし |
-| `iaas-api/server.md` | server 未対応 | 手動置換プレースホルダーの撤去 |
-| `iaas-api/serviceclass.md` | service class 未対応 | なし |
-
-- `iaas-api/packetfilter.md` と `iaas-api/switch.md` はモック対応済みで、理由は手動置換プレースホルダーの撤去のみ。
-- `iaas-api/zone.md` は実行検証済み (`implemented`)。
-- IaaS モックの拡充はチュートリアル harness の Phase 4 以降の作業 ([docs/design/tutorial-script-harness.md](tutorial-script-harness.md)) に含まれる。
-
 ## チュートリアル harness と sakumock の接続状況
 
 | 状況 | チュートリアル |
 | --- | --- |
-| 接続済み (実行検証済み) | `eventbus.md` (SimpleMQ + EventBus)、`simplemq-api.md`、`iaas-api/zone.md`、`workflows-api.md` |
+| 接続済み (実行検証済み) | `eventbus.md` (SimpleMQ + EventBus)、`simplemq-api.md`、`workflows-api.md` |
 | sakumock にサーバーがあるが harness 未接続 | `apprun-api.md`、`apprun-dedicated.md`、`iam-api.md`、`kms-api.md`、`object-storage-api.md`、`secretmanager-api.md`、`security-control-api.md` (v0.14.0 追加分)、`service-endpoint-gateway-api.md`、`simple-notification-api.md` |
-| sakumock にサーバーが無い | `container-registry-api.md`、`local-router-api.md`、`networking-suite-api.md`、IaaS 系は上の表を参照 |
+| sakumock にサーバーが無い | `container-registry-api.md`、`local-router-api.md`、`networking-suite-api.md` |
 
 - harness 未接続のチュートリアルは `internal/cli` では sakumock を使って検証済みである。「接続済み」にするには、fixture の作成とチュートリアル本文がモックの応答範囲で完結することの確認が必要である。
+- IaaS 系チュートリアル (`iaas-api/*.md`) の状況は [sakumockiaas の対応範囲と未対応](sakumockiaas-gaps.md) の対応表を参照する。
 
 ## 更新ルール
 
-1. 差分・未整備を確認したら、対応する節に「現象」と「影響と現状の扱い」を書いて追記する。どのテストで許容・除外したか (ファイル名と関数名) まで書く。
-2. sakumock のバージョン更新で解消したら、該当箇所に解消日と確認内容を残して更新する。節ごと削除する場合は、設計文書側の参照が残らないか確認する。
+1. 差分・未整備を確認したら、対応する節に「現象」と「影響と現状の扱い」を書いて追記する。どのテストで許容・除外したか (ファイル名と関数名) まで書く。upstream issue を起票するか判断し、起票したらリンクを残す。
+2. sakumock のバージョン更新で解消したら、該当箇所に解消日と確認内容を残して更新する。upstream issue で追跡している項目は issue の状態も確認する。節ごと削除する場合は、設計文書側の参照が残らないか確認する。
 3. ライブ E2E で正常系を確認したら、「許容」「除外」の記載に実施日を添えて更新する。
-4. `test/tutorials/baseline.txt` の status や理由を変えたら、この文書の対応表も更新する。
+4. `test/tutorials/baseline.txt` の status や理由を変えたら、この文書の対応表も更新する。IaaS 系チュートリアルは [sakumockiaas の対応範囲と未対応](sakumockiaas-gaps.md) を更新する。

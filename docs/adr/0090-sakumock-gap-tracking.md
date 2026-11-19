@@ -1,6 +1,6 @@
 # ADR 0090: sakumock の既知の差分を 1 ファイルに集約する
 
-- Status: Accepted
+- Status: Superseded by [ADR 0091](0091-split-sakumock-and-sakumockiaas-gap-tracking.md)
 - Date: 2026-11-19
 
 ## Context
