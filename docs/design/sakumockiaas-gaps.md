@@ -26,15 +26,17 @@ database は create と update (POST/PUT の本体) に未対応で、テスト�
 
 ## チュートリアル baseline との対応
 
-チュートリアル baseline で `deferred` になっている IaaS 系チュートリアルと、sakumockiaas に起因する理由は次のとおり (`test/tutorials/baseline.txt` の理由と対応する)。
+チュートリアル baseline で `deferred` になっているチュートリアルのうち、sakumockiaas に起因する理由を含むものと、その理由は次のとおり (`test/tutorials/baseline.txt` の理由と対応する)。
 
 | チュートリアル | sakumockiaas に起因する理由 | その他の理由 |
 | --- | --- | --- |
+| `gslb-api.md` | appliance 拡充が必要 | sakumock に GSLB モックサーバーが無い (Ogen 系)、手動置換プレースホルダーの撤去 |
+| `proxylb-api.md` | 拡充が必要 | sakumock に ProxyLB モックサーバーが無い (Ogen 系)、手動置換プレースホルダーの撤去 |
 | `iaas-api/archive.md` | archive 未対応 | なし |
 | `iaas-api/database.md` | create / update 未対応 | なし |
 | `iaas-api/disk.md` | disk 未対応 | 手動置換プレースホルダーの撤去 |
 | `iaas-api/disk-plan.md` | product disk 未対応 | なし |
-| `iaas-api/icon.md` | 要確認 (モック自体は icon の CRUD と Filter 検索に対応済み。deferred の実原因は Phase 4 以降の実行確認で特定する) | 手動置換プレースホルダーの撤去 |
+| `iaas-api/icon.md` | なし | 手動置換プレースホルダーの撤去 |
 | `iaas-api/internet.md` | internet 未対応 | 手動置換プレースホルダーの撤去 |
 | `iaas-api/internet-plan.md` | product internet 未対応 | なし |
 | `iaas-api/ipaddress.md` | ipaddress 未対応 | なし |
@@ -43,10 +45,11 @@ database は create と update (POST/PUT の本体) に未対応で、テスト�
 | `iaas-api/license-info.md` | product license 未対応 | なし |
 | `iaas-api/private-host-plan.md` | product privatehost 未対応 | なし |
 | `iaas-api/region.md` | region 未対応 | なし |
+| `iaas-api/server-plan.md` | server plan 未対応 | なし |
 | `iaas-api/server.md` | server 未対応 | 手動置換プレースホルダーの撤去 |
 | `iaas-api/serviceclass.md` | service class 未対応 | なし |
 
-- `iaas-api/packetfilter.md` と `iaas-api/switch.md` はモック対応済みで、理由は手動置換プレースホルダーの撤去のみ。
+- `iaas-api/packetfilter.md`、`iaas-api/switch.md`、`iaas-api/icon.md` はモック対応済み (icon は CRUD と Filter 検索に対応) で、baseline の理由は手動置換プレースホルダーの撤去のみである。3 件とも実行確認は未済で、Phase 4 以降に実行して `deferred` 解除を判断する。
 - `iaas-api/zone.md` は実行検証済み (`implemented`)。
 - IaaS モックの拡充はチュートリアル harness の Phase 4 以降の作業 ([docs/design/tutorial-script-harness.md](tutorial-script-harness.md)) に含まれる。
 
