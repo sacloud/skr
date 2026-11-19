@@ -14,13 +14,14 @@
 
 ## Decision
 
-- `dns-api` に SDK が公開する Find / Read / Create / Update / Delete を追加し、`internal/dnsapi/` で入力と SDK 呼び出しを扱います。CLI 登録と SDK factory の接続は `internal/cli/` に置きます。- 名前 (ゾーン名 FQDN)、説明、タグ、アイコン ID は個別フラグにします。Find の `--name` は [ADR 0049](0049-internet-workflow-options.md) と同じく SDK の `Names` への 1 要素変換 (部分一致 AND) とし、`--tags` も 1 要素の `Tags` にします。
+- `dns-api` に SDK が公開する Find / Read / Create / Update / Delete を追加し、`internal/dnsapi/` で入力と SDK 呼び出しを扱います。CLI 登録と SDK factory の接続は `internal/cli/` に置きます。
+- 名前 (ゾーン名 FQDN)、説明、タグ、アイコン ID は個別フラグにします。Find の `--name` は [ADR 0049](0049-internet-workflow-options.md) と同じく SDK の `Names` への 1 要素変換 (部分一致 AND) とし、`--tags` はカンマ区切りを複数要素の `Tags` に変換します。
 - レコードは `--record 'name=www,type=A,rdata=192.0.2.1,ttl=3600'` を反復して指定します。4 キーすべて必須で、`type` は SDK が公開する 12 種類のいずれか、`ttl` は 0 以上の整数を受け付けます。解析は `internal/textjson` の共通パーサーを使い、未知キー、重複キー、空値、不正な種別と TTL は拒否します。Create で指定しない場合は空のレコード一覧 (`[]`) を送ります。
 - Update の `--record` を指定するとレコード一覧全体を指定内容に置き換えます。説明・タグ・アイコン ID・監視ログ設定は未指定を現状維持とします。`MonitoringSuiteLog` の有効・無効は `--monitoring-suite-log-enabled` フラグで指定できます。
 - レコードの値にカンマを含む場合など、key=value 構文で表現できない入力は `--request` JSON 経路を使います。JSON 経路と個別フラグは相互排他とし、暗黙にマージしません。`--request` には直接指定と `@path.json` を使えます。
 - この key=value 構文は DNS の `--record` に限って再採用し、他の配列へ自動的に適用しません。
 - ライブ E2E は委譲されていない無料のダミーゾーンを作成し、A・TXT・MX・CNAME のレコード付きで作成、参照、検索、レコード一覧の置換更新、削除を確認します。補助確認として、参照応答の権威 DNS サーバーに `dig` で直接問い合わせ、A レコードの応答値を作成時と更新後で照合します。`dig` が無い環境では API 応答の照合だけで判定します。後片付けは保持した ID と識別情報を再照合してから削除し、不在を確認します。課金リソースは作成しません。
-- DNS ゾーン名は API が検証します。Public Suffix List に掲載されたドメイン (`example.com` など)、存在しない TLD、予約名は登録できず、実在 TLD 配下の掲載外の名前だけを受け付けます。ダミーゾーンは実在 gTLD 配下のランダムな名前を使います。
+- DNS ゾーン名は API が検証します。文書用に予約されたドメイン (`example.com` など)、Public Suffix List にマッチする名前、存在しない TLD、予約名 (`*.sakura.ad.jp` など) は登録できず、実在 TLD 配下で public suffix と一致しない名前だけを受け付けます。ダミーゾーンは実在 gTLD 配下のランダムな名前を使います。
 - ライブ検証で確認した API の入力規則として、全レコードの TTL は同一である必要があり、MX・CNAME の値は末尾が `.` の完全修飾ドメイン名で保存されます。MX の宛先ホストにはゾーン内に A または AAAA レコードが必要です。これらの規則の詳細は設計文書に記録します。
 
 ## Consequences

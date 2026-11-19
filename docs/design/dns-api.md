@@ -10,7 +10,7 @@
 
 ## 入力
 
-Find の `--name` は SDK の `Names` に1要素を設定する部分一致検索 ([ADR 0049](../adr/0049-internet-workflow-options.md))、`--tags` も1要素の `Tags` に変換します。複数名検索など生成フラグにない入力は `--request` JSON に残します。Read / Update / Delete の ID と Create / Update の単純値は個別フラグで指定できます。Create / Update は `--request` とフラグを併用できません。
+Find の `--name` は SDK の `Names` に1要素を設定する部分一致検索 ([ADR 0049](../adr/0049-internet-workflow-options.md))、`--tags` はカンマ区切りを複数要素の `Tags` に変換します。複数名検索など生成フラグにない入力は `--request` JSON に残します。Read / Update / Delete の ID と Create / Update の単純値は個別フラグで指定できます。Create / Update は `--request` とフラグを併用できません。
 
 レコードは反復可能な `--record` で指定します。構文は次のとおりです。
 
@@ -19,7 +19,7 @@ $ skr dns-api create --name www.example.com \
     --record 'name=www,type=A,rdata=192.0.2.10,ttl=3600'
 ```
 
-`name`、`type`、`rdata`、`ttl` はすべて必須です。`type` は `a`、`aaaa`、`alias`、`cname`、`ns`、`mx`、`txt`、`srv`、`caa`、`https`、`svcb`、`ptr` のいずれか、`ttl` は 0 以上の整数です。未知・重複キー、空値、不正な種別と TTL は CLI が拒否します。解析は `internal/textjson` の共通パーサー ([ADR 0078](../adr/0078-shared-text-to-json-notation.md)) を使うため、値は字義どおり保持されます。空白はトリムせず、引用符とエスケープを解釈しないため、カンマを含むレコード値 (長い TXT など) はこの構文で表現できません。その場合は `--request` JSON を使います。
+`name`、`type`、`rdata`、`ttl` はすべて必須です。`type` は `A`、`AAAA`、`ALIAS`、`CNAME`、`NS`、`MX`、`TXT`、`SRV`、`CAA`、`HTTPS`、`SVCB`、`PTR` のいずれか、`ttl` は 0 以上の整数です。未知・重複キー、空値、不正な種別と TTL は CLI が拒否します。解析は `internal/textjson` の共通パーサー ([ADR 0078](../adr/0078-shared-text-to-json-notation.md)) を使うため、値は字義どおり保持されます。空白はトリムせず、引用符とエスケープを解釈しないため、カンマを含むレコード値 (長い TXT など) はこの構文で表現できません。その場合は `--request` JSON を使います。
 
 Create で `--record` を指定しない場合は空のレコード一覧 (`[]`) を送ります。Update で `--record` を指定するとレコード一覧全体を指定内容に置き換えます。レコードを1つだけ変更したい場合も、変更後の一覧全体を指定するか、JSON リクエストを使います。Update の説明・タグ・アイコン ID・`--monitoring-suite-log-enabled` は未指定を現状維持とし、明示した `false` も入力として区別します。Update は SDK が現在値とマージするため、未指定のレコード以外の設定は維持されます。
 
@@ -27,7 +27,7 @@ Create で `--record` を指定しない場合は空のレコード一覧 (`[]`)
 
 ## ライブ検証で確認した API の挙動
 
-- DNS ゾーン名は API が検証します。Public Suffix List に掲載されたドメイン (`example.com`、`example.jp` など)、存在しない TLD、予約名 (`*.sakura.ad.jp` など) は登録できず、実在 TLD 配下の掲載外の名前だけを受け付けます。エラーメッセージは拒否理由ごとに「ゾーン名の形式が不正」「Public Suffix Listにマッチするか存在しないTLD」「予約名」と変わります。
+- DNS ゾーン名は API が検証します。文書用に予約されたドメイン (`example.com`、`example.net` など、[RFC 2606](https://www.rfc-editor.org/rfc/rfc2606.html)) は「ゾーン名の形式が不正」として拒否されます。Public Suffix List にマッチする名前と存在しない TLD (`test`、`invalid` など) は「Public Suffix Listにマッチするか存在しないTLD」として拒否されます。`*.sakura.ad.jp` などの予約名は「予約名」として拒否されます。実在 TLD 配下で public suffix と一致しない名前を受け付けます。エラーメッセージは拒否理由ごとに変わります。
 - 全レコードの TTL は同一である必要があります。TTL が異なるレコードを送ると 400 になります。
 - MX の値は `優先度 宛先ホスト` の形式で、宛先ホストは末尾が `.` の完全修飾ドメイン名である必要があります。末尾の `.` がない場合は API がエラーを返します。
 - MX の宛先ホストにはゾーン内の A または AAAA レコードが必要です。

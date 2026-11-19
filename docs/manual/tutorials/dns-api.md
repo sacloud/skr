@@ -4,7 +4,7 @@ DNS は、ドメイン名 (ゾーン) とそのレコードを管理するサー
 
 ゾーンを作成しただけでは、そのゾーンはインターネットに公開されません。一般の resolver から応答を得るには、ドメイン登録事業者でネームサーバー (NS) の委譲設定が必要です。この手順では委譲しないため、権威サーバーへの直接問い合わせだけで確認します。
 
-DNS ゾーン名には、実在するトップレベルドメイン (TLD) 配下で、Public Suffix List に掲載されていない名前を指定します。`example.com` や `example.jp` などの文書用に予約されたドメインは Public Suffix List に掲載されているため登録できません（[Public Suffix List](https://publicsuffix.org/)）。この手順では `.cloud` 配下のランダムな名前をダミーゾーンとして使います。既に取得済みのドメインをお持ちの場合は、その名前を使っても構いません。
+DNS ゾーン名には、実在するトップレベルドメイン (TLD) 配下で、Public Suffix List にマッチしない名前を指定します。`example.com` や `example.net` などの文書用に予約されたドメインは登録できません（[文書用に予約されたドメイン名 (RFC 2606)](https://www.rfc-editor.org/rfc/rfc2606.html)）。存在しない TLD も登録できません。この手順では `.cloud` 配下のランダムな名前をダミーゾーンとして使います。既に取得済みのドメインをお持ちの場合は、その名前を使っても構いません。
 
 > [!WARNING]
 > 選択中のプロジェクトに DNS ゾーンを作成・削除します。実際に権威を持つドメイン名や、業務で利用中のドメイン名は指定しないでください。既存のゾーンは変更しません。
@@ -46,10 +46,11 @@ $ skr dns-api create --name "$ZONE_NAME" \
     --record "name=$ZONE_NAME,type=MX,rdata=10 www.$ZONE_NAME.,ttl=3600" \
     --record "name=docs,type=CNAME,rdata=www.$ZONE_NAME.,ttl=3600" \
     --query '{ID,Name,Description,Records}'
-$ ZONE_ID=ZONE_ID
+$ ZONE_ID=$(skr dns-api find --name "$ZONE_NAME" --query-raw 'map(select(.Name == "'"$ZONE_NAME"'")) | .[0].ID')
+$ echo "$ZONE_ID"
 ```
 
-`ZONE_ID` は Create の出力の ID に置き換えます。レコードの種別には A、AAAA、ALIAS、CNAME、NS、MX、TXT、SRV、CAA、HTTPS、SVCB、PTR を指定できます。カンマを含むレコード値 (長い TXT など) は `--record` の形式では表現できないため、`--request` JSON で指定します。
+`ZONE_ID` は検索結果から取り込むため、手動での置き換えは不要です。同名のゾーンは 1 件だけ作成されます。レコードの種別には A、AAAA、ALIAS、CNAME、NS、MX、TXT、SRV、CAA、HTTPS、SVCB、PTR を指定できます。カンマを含むレコード値 (長い TXT など) は `--record` の形式では表現できないため、`--request` JSON で指定します。
 
 ## Step 3: ゾーンを確認する
 

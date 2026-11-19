@@ -29,12 +29,13 @@ import (
 )
 
 // dnsZoneNamePrefix はテスト用 DNS ゾーンの名前の接頭辞です。ランダムな接尾辞とともに使い、
-// 過去の実行のリソースと衝突しないようにします。DNS ゾーン名は Public Suffix List に掲載された
-// ドメイン (example.com など) や存在しない TLD は登録できないため、実在 gTLD 配下のランダムな名前を使います。
+// 過去の実行のリソースと衝突しないようにします。DNS ゾーン名には、public suffix そのもの (TLD や
+// Public Suffix List 掲載のサフィックス) と一致しない、実在 TLD 配下の名前を指定します。
+// 文書用に予約されたドメイン (example.com など) や存在しない TLD は登録できません。
 // 委譲しないため外部からは応答せず、DNS ゾーン自体は無料です。
 const dnsZoneNamePrefix = "skr-e2e-"
 
-// dnsZoneTLD はテスト用 DNS ゾーンに使う実在 gTLD です。Public Suffix List に掲載されていません。
+// dnsZoneTLD はテスト用 DNS ゾーンに使う実在 gTLD です。配下のランダムな名前は public suffix と一致しないため登録できます。
 const dnsZoneTLD = ".cloud"
 
 // TestScenarioDNS は DNS E2E です。委譲されていないダミーゾーンを無料で作成し、
