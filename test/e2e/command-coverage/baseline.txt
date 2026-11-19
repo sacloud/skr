@@ -109,6 +109,11 @@ gslb-api delete live
 gslb-api find live
 gslb-api read live
 gslb-api update live
+dns-api create live
+dns-api delete live
+dns-api find live
+dns-api read live
+dns-api update live
 http live
 iaas-api archive find live
 iaas-api archive read live

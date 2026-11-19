@@ -22,6 +22,7 @@
 - [IaaS Switch API: Sandbox でスイッチの管理手順を確認する](tutorials/iaas-api/switch.md)
 - [IaaS Zone API: ゾーン一覧を jq で加工する](tutorials/iaas-api/zone.md)
 - [GSLB API: 実サーバーを監視して DNS 応答先を制御する](tutorials/gslb-api.md)
+- [DNS API: ゾーンとレコードを作って権威サーバーの応答を確認する](tutorials/dns-api.md)
 - [SimpleMQ API: キューを作成してメッセージを送受信する](tutorials/simplemq-api.md)
 - [Simple Notification API: グループに通知を送り、履歴を確認する](tutorials/simple-notification-api.md)
 - [Container Registry API: レジストリと認証ユーザーを管理する](tutorials/container-registry-api.md)
