@@ -72,10 +72,11 @@ func TestHTTPBridgeRoundTrip(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	require.Equal(t, http.StatusNotFound, apiErr.ResponseCode(), "error response code")
 
-	// APIError 以外のエラーはメッセージとして伝わります。
+	// APIError 以外のエラーはエラーメッセージとして伝わります。
 	_, err = caller.Do(ctx, "GET", "/api/cloud/1.1/is1a/unsupported", nil)
 	require.Error(t, err)
 	require.False(t, sdk.IsNotFoundError(err), "error = %v, want non-404 error", err)
+	require.Contains(t, err.Error(), "unsupported IaaS request URL", "error = %v", err)
 
 	// 削除は本文を持たない 200 で応答します。
 	data, err = caller.Do(ctx, "DELETE", "/api/cloud/1.1/is1a/switch/"+created.Switch.ID.String(), nil)
