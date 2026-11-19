@@ -242,10 +242,6 @@ func TestScenarioWorkflowsLifecycle(t *testing.T) {
 	require.Equal(t, "Canceled", cancelExecution.Status)
 }
 
-// workflowsWorkflowResponse は参照系コマンドの出力です。参照系の出力は
-// エンベロープ (is_ok、Workflow) を除いたワークフロー本体です。
-type workflowsWorkflowResponse = workflowsWorkflowItem
-
 // createWorkflowsWorkflow は create-workflow を実行して作成結果を返します。
 // 作成系の出力は作成したリソースの本体です。
 func createWorkflowsWorkflow(t *testing.T, h *helper.Helper, name, description, runbookFile string) workflowsWorkflowItem {
@@ -267,14 +263,6 @@ func readWorkflowsWorkflow(t *testing.T, h *helper.Helper, description, workflow
 	var result workflowsWorkflowItem
 	require.NoError(t, json.Unmarshal(data, &result), "read-workflow output: %s", data)
 	return result
-}
-
-// listWorkflowsSuggestions は list-suggestions を実行して候補を返します。
-func listWorkflowsSuggestions(t *testing.T, h *helper.Helper, description, name string) []workflowsSuggestionItem {
-	t.Helper()
-	suggested, err := tryListWorkflowsSuggestions(t, h, description, name)
-	require.NoError(t, err, "list-suggestions should succeed")
-	return suggested
 }
 
 // tryListWorkflowsSuggestions は list-suggestions を実行します。失敗した場合は
