@@ -90,6 +90,55 @@ func TestIconMissingResourceReturnsNotFound(t *testing.T) {
 	}
 }
 
+// TestSwitchMissingResourceReturnsNotFound は存在しない Switch への SDK 経由の操作が 404 と分類されることを確認します。
+// 分類は skr の delete の FailIfNotFound の挙動 (iaas.IsNotFoundError) に依存します。
+func TestSwitchMissingResourceReturnsNotFound(t *testing.T) {
+	server := NewTestServer(Config{})
+	t.Cleanup(server.Close)
+	ctx := context.Background()
+	op := sdk.NewSwitchOp(server)
+	for _, test := range []struct {
+		name string
+		do   func() error
+	}{
+		{"GET", func() error { _, err := op.Read(ctx, "is1b", 9999); return err }},
+		{"PUT", func() error { _, err := op.Update(ctx, "is1b", 9999, &sdk.SwitchUpdateRequest{}); return err }},
+		{"DELETE", func() error { return op.Delete(ctx, "is1b", 9999) }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.do()
+			var apiErr sdk.APIError
+			require.ErrorAs(t, err, &apiErr, "error = %v, want API error", err)
+			require.Equal(t, http.StatusNotFound, apiErr.ResponseCode(), "error response code")
+			require.True(t, sdk.IsNotFoundError(err), "error = %v, want not found", err)
+		})
+	}
+}
+
+// TestPacketFilterMissingResourceReturnsNotFound は存在しない PacketFilter への SDK 経由の操作が 404 と分類されることを確認します。
+func TestPacketFilterMissingResourceReturnsNotFound(t *testing.T) {
+	server := NewTestServer(Config{})
+	t.Cleanup(server.Close)
+	ctx := context.Background()
+	op := sdk.NewPacketFilterOp(server)
+	for _, test := range []struct {
+		name string
+		do   func() error
+	}{
+		{"GET", func() error { _, err := op.Read(ctx, "is1b", 9999); return err }},
+		{"PUT", func() error { _, err := op.Update(ctx, "is1b", 9999, &sdk.PacketFilterUpdateRequest{}, ""); return err }},
+		{"DELETE", func() error { return op.Delete(ctx, "is1b", 9999) }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.do()
+			var apiErr sdk.APIError
+			require.ErrorAs(t, err, &apiErr, "error = %v, want API error", err)
+			require.Equal(t, http.StatusNotFound, apiErr.ResponseCode(), "error response code")
+			require.True(t, sdk.IsNotFoundError(err), "error = %v, want not found", err)
+		})
+	}
+}
+
 func TestZoneFindReturnsConfiguredZonesWithIDs(t *testing.T) {
 	server := NewTestServer(Config{Zones: []string{"test-zone-a", "test-zone-b"}})
 	t.Cleanup(server.Close)

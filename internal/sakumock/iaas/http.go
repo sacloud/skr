@@ -18,11 +18,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+
+	sdk "github.com/sacloud/sacloud-sdk-go/api/iaas"
 )
 
 // httpBridge はインメモリの Server を HTTP で公開するブリッジです。
@@ -39,7 +43,8 @@ func NewTestHTTPServer(inner *Server) *httptest.Server {
 }
 
 // ServeHTTP は HTTP リクエストを inner.Do の呼び出しに変換します。
-// リクエスト本文は JSON として渡し、エラーは 400 とエラーメッセージ本文で返します。
+// リクエスト本文は JSON として渡し、APIError はレスポンスコードと APIErrorResponse の本文で返して
+// リモート側でも SDK と同じ分類をできるようにします。それ以外のエラーは 400 とエラーメッセージ本文で返します。
 func (b *httpBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -53,6 +58,14 @@ func (b *httpBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := b.inner.Do(r.Context(), r.Method, r.URL.RequestURI(), body)
 	if err != nil {
+		var apiErr sdk.APIError
+		if errors.As(err, &apiErr) && apiErr.OrigErr() != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(apiErr.ResponseCode())
+			// 書き込みエラーはクライアント側で切断として検出できるため無視する。
+			_ = json.NewEncoder(w).Encode(apiErr.OrigErr())
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -112,7 +125,26 @@ func (c *remoteCaller) Do(ctx context.Context, method, uri string, body any) ([]
 		return nil, fmt.Errorf("read IaaS mock response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if apiErr := decodeAPIErrorResponse(data); apiErr != nil {
+			requestURL, err := url.Parse(c.baseURL + uri)
+			if err == nil {
+				return nil, sdk.NewAPIError(method, requestURL, resp.StatusCode, apiErr)
+			}
+		}
 		return nil, fmt.Errorf("%s", strings.TrimSpace(string(data)))
 	}
 	return data, nil
+}
+
+// decodeAPIErrorResponse はブリッジが返した APIErrorResponse を復元します。
+// error_code を持つ JSON オブジェクトだけを API エラーと判断し、それ以外は通常のメッセージとして扱います。
+func decodeAPIErrorResponse(data []byte) *sdk.APIErrorResponse {
+	var body sdk.APIErrorResponse
+	if err := json.Unmarshal(data, &body); err != nil {
+		return nil
+	}
+	if body.ErrorCode == "" {
+		return nil
+	}
+	return &body
 }

@@ -17,9 +17,12 @@ package iaas
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/sacloud/sacloud-sdk-go/api/iaas"
 )
 
 func TestHTTPBridgeRoundTrip(t *testing.T) {
@@ -62,10 +65,18 @@ func TestHTTPBridgeRoundTrip(t *testing.T) {
 	require.Equal(t, created.Switch.ID.String(), read.Switch.ID.String())
 	require.Equal(t, "bridge test", read.Switch.Description)
 
-	// 存在しないリソースはエラーとして伝わります。
+	// 存在しないリソースは APIError (HTTP 404) として伝わり、SDK の分類で not-found と判定されます。
 	_, err = caller.Do(ctx, "GET", "/api/cloud/1.1/is1a/switch/999999", nil)
+	require.True(t, sdk.IsNotFoundError(err), "error = %v, want not found", err)
+	var apiErr sdk.APIError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, http.StatusNotFound, apiErr.ResponseCode(), "error response code")
+
+	// APIError 以外のエラーはエラーメッセージとして伝わります。
+	_, err = caller.Do(ctx, "GET", "/api/cloud/1.1/is1a/unsupported", nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "not found")
+	require.False(t, sdk.IsNotFoundError(err), "error = %v, want non-404 error", err)
+	require.Contains(t, err.Error(), "unsupported IaaS request URL", "error = %v", err)
 
 	// 削除は本文を持たない 200 で応答します。
 	data, err = caller.Do(ctx, "DELETE", "/api/cloud/1.1/is1a/switch/"+created.Switch.ID.String(), nil)
@@ -73,7 +84,7 @@ func TestHTTPBridgeRoundTrip(t *testing.T) {
 	require.Empty(t, data)
 
 	_, err = caller.Do(ctx, "GET", "/api/cloud/1.1/is1a/switch/"+created.Switch.ID.String(), nil)
-	require.Error(t, err)
+	require.True(t, sdk.IsNotFoundError(err), "error = %v, want not found", err)
 }
 
 func TestRemoteCallerValidation(t *testing.T) {

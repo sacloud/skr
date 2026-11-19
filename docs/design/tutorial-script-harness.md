@@ -108,7 +108,7 @@ stub で置き換えられた元のコマンドは実行されないため、置
 - `internal/iaas/client/harness_client.go` (`//go:build skr_tutorial_harness`) が、同じシグネチャの `New(trace bool)` を提供する。環境変数 `SKR_TUTORIAL_HARNESS_IAAS_URL` があれば `internal/sakumock/iaas` の HTTP ブリッジに接続する `remoteCaller` を返し、なければ in-process の `sakumockiaas.Server` を返す。どちらも `iaas.APICaller` と適合する。
 - モックは runner 側で 1 つだけ起動し、`NewTestHTTPServer` で HTTP に公開する。`skr` は step ごとにプロセスを起動するため、スイッチなどの状態をプロセス間で共有するには HTTP 経由にする必要がある。`SKR_TUTORIAL_HARNESS_IAAS_URL` にブリッジの URL を設定してサブプロセスに伝える。
 - モックのシード (ゾーン一覧など) は環境変数 `SKR_TUTORIAL_HARNESS_ZONES` で渡す。fixture の `mock.zones` から runner が設定する。
-- HTTP ブリッジはリクエストをそのまま `Do(ctx, method, uri, body)` に変換し、エラーは 400 とメッセージ本文で返す。`remoteCaller` は 2xx 以外を `Do` のエラーに変換するため、in-process の場合と同じエラー文言が CLI に伝わる。
+- HTTP ブリッジはリクエストをそのまま `Do(ctx, method, uri, body)` に変換する。`Do` が返す `iaas.APIError` は HTTP のレスポンスコードと `APIErrorResponse` の本文で返し、それ以外のエラーは 400 とメッセージ本文で返す。`remoteCaller` は 2xx 以外で `error_code` を持つ本文を `iaas.NewAPIError` に復元するため、in-process の場合と同じ分類とエラー文言が CLI に伝わる。
 - `internal/cli` の配線は `iaasclient.New` の結果を `<res>api.NewAPI(client)` に渡すだけで、戻り値の具象型に依存しないため、タグ付きビルドでも無変更でコンパイルできる。
 
 ### Ogen 系 API
