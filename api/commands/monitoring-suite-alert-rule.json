@@ -65,7 +65,7 @@
           "field": "Query",
           "type": "string",
           "required": true,
-          "help": "必須: 監視条件の PromQL クエリ (API のフィールド query)。"
+          "help": "必須: 監視条件の PromQL クエリ (API のフィールド query)。--query は jq 式の共通オプションなので、このフラグ名は --alert-query です。"
         },
         {
           "name": "name",
@@ -187,7 +187,7 @@
           "name": "alert-query",
           "field": "Query",
           "type": "string",
-          "help": "必須: 監視条件の PromQL クエリ (API のフィールド query)。",
+          "help": "任意: 監視条件の PromQL クエリ (API のフィールド query)。省略するとリクエストに含まれません。--query は jq 式の共通オプションなので、このフラグ名は --alert-query です。",
           "pointer": true
         },
         {

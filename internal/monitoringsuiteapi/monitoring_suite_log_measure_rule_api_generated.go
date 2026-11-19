@@ -18,7 +18,7 @@ type LogMeasureRuleCommands struct {
 	List          LogMeasureRuleListCommand          "cmd:\"\" name:\"list-alert-project-log-measure-rules\" help:\"アラートプロジェクトのログ計測ルールを一覧表示します。対象ストレージで絞り込めます。\""
 	Create        LogMeasureRuleCreateCommand        "cmd:\"\" name:\"create-alert-project-log-measure-rule\" help:\"ログ計測ルールを作成します。ログの構造化ルールは Matcher の組み合わせで表現するため、--request JSON で指定します。Rule の詳細はモニタリングスイートの API リファレンスを参照してください。\""
 	Read          LogMeasureRuleReadCommand          "cmd:\"\" name:\"read-alert-project-log-measure-rule\" help:\"ログ計測ルールを 1 件読み取ります。\""
-	Update        LogMeasureRuleUpdateCommand        "cmd:\"\" name:\"patch-alert-project-log-measure-rule\" help:\"ログ計測ルールを部分更新します。--request JSON の Rule で構造化ルールを指定します。Rule を指定しない場合、既存の Rule は維持されます。\""
+	Update        LogMeasureRuleUpdateCommand        "cmd:\"\" name:\"patch-alert-project-log-measure-rule\" help:\"ログ計測ルールを部分更新します。--request JSON で指定します。Rule は構造化ルールのため --request JSON でのみ指定でき、既存の Rule は維持されます。Name や Description も --request JSON で指定できます。\""
 	Delete        LogMeasureRuleDeleteCommand        "cmd:\"\" name:\"delete-alert-project-log-measure-rule\" help:\"ログ計測ルールを削除します。削除前に対象 ID を確認してください。\""
 	ListHistories LogMeasureRuleListHistoriesCommand "cmd:\"\" name:\"list-alert-project-log-measure-rule-histories\" help:\"ログ計測ルールのアラート履歴を一覧表示します。状態や重要度、発生日時で絞り込めます。\""
 	ReadHistory   LogMeasureRuleReadHistoryCommand   "cmd:\"\" name:\"read-alert-project-log-measure-rule-history\" help:\"ログ計測ルールの履歴を 1 件読み取ります。\""
@@ -186,23 +186,15 @@ func (c *LogMeasureRuleReadCommand) Run(ctx *kong.Context) error {
 }
 
 type LogMeasureRuleUpdateCommand struct {
-	ProjectID        string    "arg:\"\" name:\"project-id\" help:\"アラートプロジェクトのリソース ID。\""
-	RuleID           uuid.UUID "arg:\"\" name:\"rule-id\" help:\"更新するログ計測ルールの UID。\""
-	Request          *string   "help:\"API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。\""
-	LogStorageID     *string   "name:\"log-storage-id\" help:\"任意: 対象のログストレージのリソース ID。省略するとリクエストに含まれません。\""
-	MetricsStorageID *string   "name:\"metrics-storage-id\" help:\"任意: 対象のメトリクスストレージのリソース ID。省略するとリクエストに含まれません。\""
-	Name             *string   "name:\"name\" help:\"任意: ログ計測ルール名。省略するとリクエストに含まれません。\""
-	Description      *string   "name:\"description\" help:\"任意: 説明。省略するとリクエストに含まれません。\""
-	factory          LogMeasureRuleAPIFactory
-	runtime          LogMeasureRuleRuntime
+	ProjectID string    "arg:\"\" name:\"project-id\" help:\"アラートプロジェクトのリソース ID。\""
+	RuleID    uuid.UUID "arg:\"\" name:\"rule-id\" help:\"更新するログ計測ルールの UID。\""
+	Request   *string   "help:\"API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。\""
+	factory   LogMeasureRuleAPIFactory
+	runtime   LogMeasureRuleRuntime
 }
 
 func (c *LogMeasureRuleUpdateCommand) Run(ctx *kong.Context) error {
 	flagsSet := false
-	flagsSet = flagsSet || c.LogStorageID != nil
-	flagsSet = flagsSet || c.MetricsStorageID != nil
-	flagsSet = flagsSet || c.Name != nil
-	flagsSet = flagsSet || c.Description != nil
 	if c.Request != nil && flagsSet {
 		return fmt.Errorf("--request と個別フラグは併用できません")
 	}
@@ -215,21 +207,7 @@ func (c *LogMeasureRuleUpdateCommand) Run(ctx *kong.Context) error {
 			return err
 		}
 	} else {
-		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
-		}
-		if c.LogStorageID != nil {
-			request.LogStorageID = c.LogStorageID
-		}
-		if c.MetricsStorageID != nil {
-			request.MetricsStorageID = c.MetricsStorageID
-		}
-		if c.Name != nil {
-			request.Name = c.Name
-		}
-		if c.Description != nil {
-			request.Description = c.Description
-		}
+		return fmt.Errorf("--request が必要です")
 	}
 	if c.runtime.ValidateOutput == nil {
 		return fmt.Errorf("API 出力処理が設定されていません")

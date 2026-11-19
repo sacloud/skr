@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -673,6 +674,18 @@ func TestRunMonitoringSuiteAPINotificationRoutingAndReorder(t *testing.T) {
 	require.Len(t, listed, 1)
 	require.Equal(t, 2, listed[0].Order, "listed = %+v", listed)
 
+	// patch-alert-project-notification-routing: --request JSON 経路で再送間隔を変更する
+	var patched struct {
+		UID                   string `json:"uid"`
+		ResendIntervalMinutes int    `json:"resend_interval_minutes"`
+	}
+	require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t,
+		"monitoring-suite-api", "patch-alert-project-notification-routing", projectID, created.UID,
+		"--request", `{"NotificationTargetUID":"`+target.UID+`","ResendIntervalMinutes":30}`,
+	), &patched), "patch-alert-project-notification-routing output")
+	require.Equal(t, created.UID, patched.UID)
+	require.Equal(t, 30, patched.ResendIntervalMinutes)
+
 	require.Equal(t, 0, run([]string{"monitoring-suite-api", "delete-alert-project-notification-routing", projectID, created.UID}, &stdoutHolder{}, &stderr))
 }
 
@@ -759,12 +772,83 @@ func TestRunMonitoringSuiteAPIHistories(t *testing.T) {
 	), &listed), "list-alert-project-histories output")
 	require.Empty(t, listed, "listed = %+v", listed)
 
+	// list-alert-project-log-measure-rule-histories: sakumock は空の履歴を返す
+	var measureRuleHistories []struct {
+		UID string `json:"uid"`
+	}
+	require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t,
+		"monitoring-suite-api", "list-alert-project-log-measure-rule-histories", projectID,
+	), &measureRuleHistories), "list-alert-project-log-measure-rule-histories output")
+	require.Empty(t, measureRuleHistories, "measureRuleHistories = %+v", measureRuleHistories)
+
 	// 存在しない履歴の読み取りはエラーになる
-	var stdout, stderr bytes.Buffer
-	require.NotEqual(t, 0, run([]string{
-		"monitoring-suite-api", "read-alert-project-history", projectID, "00000000-0000-0000-0000-000000000000",
-	}, &stdout, &stderr))
-	require.Contains(t, stderr.String(), "404")
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"read-alert-project-history", []string{"read-alert-project-history", projectID, "00000000-0000-0000-0000-000000000000"}},
+		{"read-alert-project-rule-history", []string{"read-alert-project-rule-history", projectID, "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000"}},
+		{"read-alert-project-log-measure-rule-history", []string{"read-alert-project-log-measure-rule-history", projectID, "00000000-0000-0000-0000-000000000000"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			require.NotEqual(t, 0, run(append([]string{"monitoring-suite-api"}, tc.args...), &stdout, &stderr))
+			require.Contains(t, stderr.String(), "404")
+		})
+	}
+}
+
+func TestRunMonitoringSuiteAPIStorageStats(t *testing.T) {
+	setupMonitoringSuiteMock(t)
+
+	// 各ストレージを作成して日次・月次利用量を取得する。データがなくても正常応答する。
+	for _, tc := range []struct {
+		kind       string
+		createArgs []string
+		dailyCmd   string
+		monthlyCmd string
+	}{
+		{
+			kind:       "log",
+			createArgs: []string{"create-log-storage", "--name", "stats-logs"},
+			dailyCmd:   "read-log-storage-stats-daily",
+			monthlyCmd: "read-log-storage-stats-monthly",
+		},
+		{
+			kind:       "metric",
+			createArgs: []string{"create-metric-storage", "--name", "stats-metrics"},
+			dailyCmd:   "read-metric-storage-stats-daily",
+			monthlyCmd: "read-metric-storage-stats-monthly",
+		},
+		{
+			kind:       "trace",
+			createArgs: []string{"create-trace-storage", "--name", "stats-traces", "--classification", "shared"},
+			dailyCmd:   "read-trace-storage-stats-daily",
+			monthlyCmd: "read-trace-storage-stats-monthly",
+		},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			var created struct {
+				ID int64 `json:"id"`
+			}
+			require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t,
+				append([]string{"monitoring-suite-api"}, tc.createArgs...)...,
+			), &created), "create output")
+			storageID := int64String(created.ID)
+
+			year := strconv.Itoa(time.Now().Year())
+			for _, cmd := range []string{tc.dailyCmd, tc.monthlyCmd} {
+				args := []string{"monitoring-suite-api", cmd, storageID}
+				if strings.HasSuffix(cmd, "monthly") {
+					// 月次利用量は年が必須 (実 API と同じ)
+					args = append(args, "--year", year)
+				}
+				var usages []map[string]any
+				require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t, args...), &usages), cmd+" output")
+				require.Empty(t, usages, cmd+" should return an empty usage list")
+			}
+		})
+	}
 }
 
 func TestRunMonitoringSuiteAPITracesStorageLifecycle(t *testing.T) {
@@ -800,8 +884,71 @@ func TestRunMonitoringSuiteAPITracesStorageLifecycle(t *testing.T) {
 	require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t, "monitoring-suite-api", "list-trace-storages"), &listed), "list-trace-storages output")
 	require.Len(t, listed, 1)
 
+	// create-trace-storage-key: 応答にはキーの値が含まれるため、そのまま検証する
+	var createdKey struct {
+		UID         string `json:"uid"`
+		Secret      string `json:"secret"`
+		Token       string `json:"token"`
+		Description string `json:"description"`
+	}
+	require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t,
+		"monitoring-suite-api", "create-trace-storage-key", storageID,
+		"--description", "mock-key",
+	), &createdKey), "create-trace-storage-key output")
+	require.NotEmpty(t, createdKey.UID, "createdKey = %+v", createdKey)
+	require.NotEmpty(t, createdKey.Secret, "createdKey = %+v", createdKey)
+	require.Equal(t, "mock-key", createdKey.Description)
+
+	// patch-trace-storage-key
+	var patchedKey struct {
+		UID         string `json:"uid"`
+		Description string `json:"description"`
+	}
+	require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t,
+		"monitoring-suite-api", "patch-trace-storage-key", storageID, createdKey.UID,
+		"--description", "mock-key patched",
+	), &patchedKey), "patch-trace-storage-key output")
+	require.Equal(t, createdKey.UID, patchedKey.UID)
+	require.Equal(t, "mock-key patched", patchedKey.Description)
+
+	// read-trace-storage-key
+	var readKey struct {
+		UID string `json:"uid"`
+	}
+	require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t,
+		"monitoring-suite-api", "read-trace-storage-key", storageID, createdKey.UID,
+	), &readKey), "read-trace-storage-key output")
+	require.Equal(t, createdKey.UID, readKey.UID)
+
+	// list-trace-storage-keys
+	var listedKeys []struct {
+		UID string `json:"uid"`
+	}
+	require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t,
+		"monitoring-suite-api", "list-trace-storage-keys", storageID,
+	), &listedKeys), "list-trace-storage-keys output")
+	require.Contains(t, listedKeysUIDs(listedKeys), createdKey.UID)
+
+	// delete-trace-storage-key / read で不在確認
+	runMonitoringSuiteCommand(t, "monitoring-suite-api", "delete-trace-storage-key", storageID, createdKey.UID)
+	var stderrAfterDelete bytes.Buffer
+	require.NotEqual(t, 0, run([]string{"monitoring-suite-api", "read-trace-storage-key", storageID, createdKey.UID}, &stdoutHolder{}, &stderrAfterDelete))
+	require.Contains(t, stderrAfterDelete.String(), "API Error 404")
+
+	// delete-trace-storage
 	var stderr bytes.Buffer
 	require.Equal(t, 0, run([]string{"monitoring-suite-api", "delete-trace-storage", storageID}, &stdoutHolder{}, &stderr))
+}
+
+// listedKeysUIDs はアクセスキー一覧から UID 集合を作ります。
+func listedKeysUIDs(items []struct {
+	UID string `json:"uid"`
+}) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.UID)
+	}
+	return out
 }
 
 func TestRunMonitoringSuiteAPIMetricStorageLifecycle(t *testing.T) {

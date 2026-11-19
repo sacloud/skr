@@ -460,7 +460,7 @@ monitoring-suite-api delete-metric-storage live
 monitoring-suite-api delete-metric-storage-key live
 monitoring-suite-api delete-trace-storage live
 monitoring-suite-api delete-trace-storage-key live
-monitoring-suite-api initialize-provisioning live
+monitoring-suite-api initialize-provisioning implemented
 monitoring-suite-api list-alert-project-histories live
 monitoring-suite-api list-alert-project-log-measure-rule-histories live
 monitoring-suite-api list-alert-project-log-measure-rules live
@@ -494,13 +494,13 @@ monitoring-suite-api patch-metric-storage-key live
 monitoring-suite-api patch-trace-storage live
 monitoring-suite-api patch-trace-storage-key live
 monitoring-suite-api read-alert-project live
-monitoring-suite-api read-alert-project-history live
+monitoring-suite-api read-alert-project-history implemented
 monitoring-suite-api read-alert-project-log-measure-rule live
-monitoring-suite-api read-alert-project-log-measure-rule-history live
+monitoring-suite-api read-alert-project-log-measure-rule-history implemented
 monitoring-suite-api read-alert-project-notification-routing live
 monitoring-suite-api read-alert-project-notification-target live
 monitoring-suite-api read-alert-project-rule live
-monitoring-suite-api read-alert-project-rule-history live
+monitoring-suite-api read-alert-project-rule-history implemented
 monitoring-suite-api read-dashboard-project live
 monitoring-suite-api read-log-routing live
 monitoring-suite-api read-log-storage live

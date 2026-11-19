@@ -96,7 +96,7 @@
     },
     {
       "name": "Update",
-      "help": "ログ計測ルールを部分更新します。--request JSON の Rule で構造化ルールを指定します。Rule を指定しない場合、既存の Rule は維持されます。",
+      "help": "ログ計測ルールを部分更新します。--request JSON で指定します。Rule は構造化ルールのため --request JSON でのみ指定でき、既存の Rule は維持されます。Name や Description も --request JSON で指定できます。",
       "method": "Update",
       "request_type": "monitoringsuite.LogMeasureRuleUpdateParams",
       "request_by_value": true,
@@ -113,36 +113,6 @@
           "field": "RuleID",
           "type": "uuid.UUID",
           "help": "更新するログ計測ルールの UID。"
-        }
-      ],
-      "flags": [
-        {
-          "name": "log-storage-id",
-          "field": "LogStorageID",
-          "type": "string",
-          "help": "任意: 対象のログストレージのリソース ID。省略するとリクエストに含まれません。",
-          "pointer": true
-        },
-        {
-          "name": "metrics-storage-id",
-          "field": "MetricsStorageID",
-          "type": "string",
-          "help": "任意: 対象のメトリクスストレージのリソース ID。省略するとリクエストに含まれません。",
-          "pointer": true
-        },
-        {
-          "name": "name",
-          "field": "Name",
-          "type": "string",
-          "help": "任意: ログ計測ルール名。省略するとリクエストに含まれません。",
-          "pointer": true
-        },
-        {
-          "name": "description",
-          "field": "Description",
-          "type": "string",
-          "help": "任意: 説明。省略するとリクエストに含まれません。",
-          "pointer": true
         }
       ],
       "command_name": "patch-alert-project-log-measure-rule"

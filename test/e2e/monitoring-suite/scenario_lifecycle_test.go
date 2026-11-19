@@ -17,6 +17,7 @@ package main
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,27 @@ func callMonitoringSuite(t *testing.T, h *helper.Helper, description string, arg
 	data := h.Call(t, description, args...)
 	var out monitoringSuiteJSON
 	require.NoError(t, json.Unmarshal(data, &out), "output of %v is not a JSON object: %s", args, data)
+	return out
+}
+
+// callMonitoringSuiteSecret は stdout にキーの値などの秘密情報が含まれる
+// monitoring-suite-api コマンドを実行して JSON 応答を返します。
+// 応答本文は実行記録に残らず、テスト内での解析だけに使われます。
+func callMonitoringSuiteSecret(t *testing.T, h *helper.Helper, description string, args ...string) monitoringSuiteJSON {
+	t.Helper()
+	data := h.CallHidingStdout(t, description, args...)
+	var out monitoringSuiteJSON
+	require.NoError(t, json.Unmarshal(data, &out), "output of %v is not a JSON object: %s", args, data)
+	return out
+}
+
+// callMonitoringSuiteSecretList は stdout に秘密情報が含まれ得る一覧コマンドを実行して
+// 配列応答を返します。応答本文は実行記録に残りません。
+func callMonitoringSuiteSecretList(t *testing.T, h *helper.Helper, description string, args ...string) []map[string]any {
+	t.Helper()
+	data := h.CallHidingStdout(t, description, args...)
+	var out []map[string]any
+	require.NoError(t, json.Unmarshal(data, &out), "output of %v is not a JSON array: %s", args, data)
 	return out
 }
 
@@ -71,21 +93,33 @@ func pollMonitoringSuiteRead(t *testing.T, h *helper.Helper, description string,
 	}
 }
 
+// monitoringSuiteNotFound はコマンドの失敗が対象不在の API 404 かどうかを判定します。
+func monitoringSuiteNotFound(stderr string) bool {
+	return strings.Contains(stderr, "API Error 404")
+}
+
 // monitoringSuiteWaitGone はリソースの削除後の不在を期限付きで確認します。
+// API の 404 以外の失敗 (認証失敗・通信障害など) は不在とみなさず、
+// 期限までに 404 が確認できなければテストを失敗させます。
 func monitoringSuiteWaitGone(t *testing.T, h *helper.Helper, description string, timeout time.Duration, args ...string) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
-		_, _, err := h.CallAllowingFailure(t, description, args...)
-		if err == nil {
+		_, stderr, err := h.CallAllowingFailure(t, description, args...)
+		if err != nil {
+			if monitoringSuiteNotFound(stderr) {
+				return
+			}
 			if time.Now().After(deadline) {
-				require.Failf(t, "timed out waiting for resource deletion", "read %v still succeeded", args)
+				require.Failf(t, "timed out waiting for resource deletion", "read %v did not report a 404: %s", args, stderr)
 			}
 			time.Sleep(3 * time.Second)
 			continue
 		}
-		// 読み取りが失敗すれば不在とみなす (失敗内容は実行記録に残る)
-		return
+		if time.Now().After(deadline) {
+			require.Failf(t, "timed out waiting for resource deletion", "read %v still succeeded", args)
+		}
+		time.Sleep(3 * time.Second)
 	}
 }
 
@@ -128,6 +162,13 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	dashboardID := monitoringSuiteIDText(t, dashboard, "id")
 	require.Equal(t, dashboardName, dashboard["name"], "create-dashboard-project output: %v", dashboard)
 
+	// テスト専用リソースのため、作成直後に削除と不在確認を defer で登録する
+	defer func() {
+		h.Call(t, "後片付け: ダッシュボードプロジェクト "+dashboardID+" を削除する", "monitoring-suite-api", "delete-dashboard-project", dashboardID)
+		monitoringSuiteWaitGone(t, h, "後片付け: ダッシュボードプロジェクト "+dashboardID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-dashboard-project", dashboardID)
+	}()
+
 	dashboardRead := callMonitoringSuite(t, h, "ダッシュボードプロジェクト "+dashboardID+" を参照する",
 		"monitoring-suite-api", "read-dashboard-project", dashboardID)
 	require.Equal(t, dashboardID, monitoringSuiteIDText(t, dashboardRead, "id"))
@@ -144,10 +185,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	require.NoError(t, json.Unmarshal(dashboardList, &dashboards), "list-dashboard-projects output: %s", dashboardList)
 	require.Contains(t, dashboardNames(dashboards), dashboardName, "list-dashboard-projects should contain the created dashboard")
 	require.Contains(t, dashboardIDs(t, dashboards), dashboardID, "list-dashboard-projects should contain the created dashboard ID")
-
-	h.Call(t, "後片付け: ダッシュボードプロジェクト "+dashboardID+" を削除する", "monitoring-suite-api", "delete-dashboard-project", dashboardID)
-	monitoringSuiteWaitGone(t, h, "ダッシュボードプロジェクト "+dashboardID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-dashboard-project", dashboardID)
 
 	// --- アラートプロジェクト ---
 	project := callMonitoringSuite(t, h, "アラートプロジェクト "+projectName+" を作成する",
@@ -199,25 +236,42 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"monitoring-suite-api", "patch-metric-storage", metricStorageID, "--request", `{"Description":"skr e2e patched"}`)
 	require.Equal(t, "skr e2e patched", metricStoragePatched["description"], "patch-metric-storage output: %v", metricStoragePatched)
 
+	// --- メトリクスストレージの一覧と利用量 ---
+	metricStorageList := h.Call(t, "メトリクスストレージをリソース ID で絞り込んで取得する",
+		"monitoring-suite-api", "list-metric-storages", "--resource-id", metricStorageID)
+	var metricStorages []struct {
+		ID float64 `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(metricStorageList, &metricStorages), "list-metric-storages output: %s", metricStorageList)
+	require.Len(t, metricStorages, 1, "list-metric-storages filtered by resource ID should match exactly the created storage")
+	require.Equal(t, metricStorageID, monitoringSuiteIDFloatText(t, metricStorages[0].ID), "list-metric-storages should return the created storage ID")
+
+	// 利用量はデータがなくても日次・月次とも正常応答することを確認する。
+	// 月次は年を必須で指定する。
+	metricDailyStats := h.Call(t, "メトリクスストレージ "+metricStorageID+" の日次利用量を取得する",
+		"monitoring-suite-api", "read-metric-storage-stats-daily", metricStorageID)
+	t.Logf("メトリクスストレージの日次利用量: %s", strings.TrimSpace(string(metricDailyStats)))
+	metricMonthlyStats := h.Call(t, "メトリクスストレージ "+metricStorageID+" の月次利用量を取得する",
+		"monitoring-suite-api", "read-metric-storage-stats-monthly", metricStorageID, "--year", strconv.Itoa(time.Now().Year()))
+	t.Logf("メトリクスストレージの月次利用量: %s", strings.TrimSpace(string(metricMonthlyStats)))
+
 	// --- メトリクスストレージのアクセスキー ---
-	metricKey := callMonitoringSuite(t, h, "メトリクスストレージ "+metricStorageID+" のアクセスキーを作成する",
+	// 作成応答にはキーの値が含まれるため、応答本文は実行記録に残さない
+	metricKey := callMonitoringSuiteSecret(t, h, "メトリクスストレージ "+metricStorageID+" のアクセスキーを作成する",
 		"monitoring-suite-api", "create-metric-storage-key", metricStorageID, "--description", "skr e2e key")
 	metricKeyUID := monitoringSuiteIDText(t, metricKey, "uid")
 
-	metricKeyPatched := callMonitoringSuite(t, h, "アクセスキー "+metricKeyUID+" の説明を更新する",
+	metricKeyPatched := callMonitoringSuiteSecret(t, h, "アクセスキー "+metricKeyUID+" の説明を更新する",
 		"monitoring-suite-api", "patch-metric-storage-key", metricStorageID, metricKeyUID, "--description", "skr e2e key patched")
 	require.Equal(t, "skr e2e key patched", metricKeyPatched["description"], "patch-metric-storage-key output: %v", metricKeyPatched)
 
-	metricKeyRead := callMonitoringSuite(t, h, "アクセスキー "+metricKeyUID+" を参照する",
+	metricKeyRead := callMonitoringSuiteSecret(t, h, "アクセスキー "+metricKeyUID+" を参照する",
 		"monitoring-suite-api", "read-metric-storage-key", metricStorageID, metricKeyUID)
 	require.Equal(t, metricKeyUID, monitoringSuiteIDText(t, metricKeyRead, "uid"))
 
-	metricKeys := h.Call(t, "メトリクスストレージのアクセスキー一覧を取得する", "monitoring-suite-api", "list-metric-storage-keys", metricStorageID)
-	var metricKeyList []struct {
-		UID string `json:"uid"`
-	}
-	require.NoError(t, json.Unmarshal(metricKeys, &metricKeyList), "list-metric-storage-keys output: %s", metricKeys)
-	require.Contains(t, uids(metricKeyList), metricKeyUID, "list-metric-storage-keys should contain the created key")
+	metricKeyList := callMonitoringSuiteSecretList(t, h, "メトリクスストレージのアクセスキー一覧を取得する",
+		"monitoring-suite-api", "list-metric-storage-keys", metricStorageID)
+	require.Contains(t, jsonUIDs(metricKeyList), metricKeyUID, "list-metric-storage-keys should contain the created key")
 
 	h.Call(t, "アクセスキー "+metricKeyUID+" を削除する", "monitoring-suite-api", "delete-metric-storage-key", metricStorageID, metricKeyUID)
 	monitoringSuiteWaitGone(t, h, "アクセスキー "+metricKeyUID+" の削除後の不在を確認する", 2*time.Minute,
@@ -257,11 +311,19 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 
 	ruleHistories := h.Call(t, "アラートルール "+ruleUID+" の履歴を一覧表示する",
 		"monitoring-suite-api", "list-alert-project-rule-histories", projectID, ruleUID)
-	var ruleHistoryList []struct {
-		UID string `json:"uid"`
-	}
+	var ruleHistoryList []map[string]any
 	require.NoError(t, json.Unmarshal(ruleHistories, &ruleHistoryList), "list-alert-project-rule-histories output: %s", ruleHistories)
 	t.Logf("アラートルールの履歴: %d 件", len(ruleHistoryList))
+	// 履歴はアラート発生後に作られるため、存在する場合にのみ参照を確認する。
+	// 履歴がない場合の参照は未ライブ検証 (command-coverage baseline を参照)
+	for _, history := range ruleHistoryList {
+		historyUID, ok := history["uid"].(string)
+		require.True(t, ok, "history uid should be a string: %v", history)
+		ruleHistoryRead := callMonitoringSuite(t, h, "アラートルールの履歴 "+historyUID+" を参照する",
+			"monitoring-suite-api", "read-alert-project-rule-history", projectID, ruleUID, historyUID)
+		require.Equal(t, historyUID, monitoringSuiteIDText(t, ruleHistoryRead, "uid"))
+		break
+	}
 
 	h.Call(t, "アラートルール "+ruleUID+" を削除する", "monitoring-suite-api", "delete-alert-project-rule", projectID, ruleUID)
 	monitoringSuiteWaitGone(t, h, "アラートルール "+ruleUID+" の削除後の不在を確認する", 2*time.Minute,
@@ -323,25 +385,31 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	require.Len(t, logStorageList, 1, "list-log-storages filtered by name should match exactly the created storage")
 	require.Equal(t, logStorageID, monitoringSuiteIDFloatText(t, logStorageList[0].ID), "list-log-storages should return the created storage ID")
 
+	// 利用量はデータがなくても日次・月次とも正常応答することを確認する。月次は年を必須で指定する。
+	logDailyStats := h.Call(t, "ログストレージ "+logStorageID+" の日次利用量を取得する",
+		"monitoring-suite-api", "read-log-storage-stats-daily", logStorageID)
+	t.Logf("ログストレージの日次利用量: %s", strings.TrimSpace(string(logDailyStats)))
+	logMonthlyStats := h.Call(t, "ログストレージ "+logStorageID+" の月次利用量を取得する",
+		"monitoring-suite-api", "read-log-storage-stats-monthly", logStorageID, "--year", strconv.Itoa(time.Now().Year()))
+	t.Logf("ログストレージの月次利用量: %s", strings.TrimSpace(string(logMonthlyStats)))
+
 	// --- ログストレージのアクセスキー ---
-	logKey := callMonitoringSuite(t, h, "ログストレージ "+logStorageID+" のアクセスキーを作成する",
+	// 作成応答にはキーの値が含まれるため、応答本文は実行記録に残さない
+	logKey := callMonitoringSuiteSecret(t, h, "ログストレージ "+logStorageID+" のアクセスキーを作成する",
 		"monitoring-suite-api", "create-log-storage-key", logStorageID, "--description", "skr e2e key")
 	logKeyUID := monitoringSuiteIDText(t, logKey, "uid")
 
-	logKeyPatched := callMonitoringSuite(t, h, "アクセスキー "+logKeyUID+" の説明を更新する",
+	logKeyPatched := callMonitoringSuiteSecret(t, h, "アクセスキー "+logKeyUID+" の説明を更新する",
 		"monitoring-suite-api", "patch-log-storage-key", logStorageID, logKeyUID, "--description", "skr e2e key patched")
 	require.Equal(t, "skr e2e key patched", logKeyPatched["description"], "patch-log-storage-key output: %v", logKeyPatched)
 
-	logKeyRead := callMonitoringSuite(t, h, "アクセスキー "+logKeyUID+" を参照する",
+	logKeyRead := callMonitoringSuiteSecret(t, h, "アクセスキー "+logKeyUID+" を参照する",
 		"monitoring-suite-api", "read-log-storage-key", logStorageID, logKeyUID)
 	require.Equal(t, logKeyUID, monitoringSuiteIDText(t, logKeyRead, "uid"))
 
-	logKeys := h.Call(t, "ログストレージのアクセスキー一覧を取得する", "monitoring-suite-api", "list-log-storage-keys", logStorageID)
-	var logKeyList []struct {
-		UID string `json:"uid"`
-	}
-	require.NoError(t, json.Unmarshal(logKeys, &logKeyList), "list-log-storage-keys output: %s", logKeys)
-	require.Contains(t, uids(logKeyList), logKeyUID, "list-log-storage-keys should contain the created key")
+	logKeyList := callMonitoringSuiteSecretList(t, h, "ログストレージのアクセスキー一覧を取得する",
+		"monitoring-suite-api", "list-log-storage-keys", logStorageID)
+	require.Contains(t, jsonUIDs(logKeyList), logKeyUID, "list-log-storage-keys should contain the created key")
 
 	h.Call(t, "アクセスキー "+logKeyUID+" を削除する", "monitoring-suite-api", "delete-log-storage-key", logStorageID, logKeyUID)
 	monitoringSuiteWaitGone(t, h, "アクセスキー "+logKeyUID+" の削除後の不在を確認する", 2*time.Minute,
@@ -383,6 +451,12 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	require.Len(t, routings, 1, "list-alert-project-notification-routings should return the created routing")
 	require.Equal(t, float64(3), routings[0].Order, "reorder should apply the new order: %v", routings)
 
+	// 通知先 UID を同値で部分更新し、部分更新 API が正常応答することを確認する
+	routingPatched := callMonitoringSuite(t, h, "通知ルーティング "+routingUID+" の通知先を同値で更新する",
+		"monitoring-suite-api", "patch-alert-project-notification-routing", projectID, routingUID,
+		"--request", `{"NotificationTargetUID":"`+target2UID+`","ResendIntervalMinutes":30}`)
+	require.Equal(t, routingUID, monitoringSuiteIDText(t, routingPatched, "uid"), "patch-alert-project-notification-routing output: %v", routingPatched)
+
 	h.Call(t, "通知ルーティング "+routingUID+" を削除する",
 		"monitoring-suite-api", "delete-alert-project-notification-routing", projectID, routingUID)
 	monitoringSuiteWaitGone(t, h, "通知ルーティング "+routingUID+" の削除後の不在を確認する", 2*time.Minute,
@@ -412,6 +486,22 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	require.NoError(t, json.Unmarshal(measureRules, &measureRuleList), "list-alert-project-log-measure-rules output: %s", measureRules)
 	require.Contains(t, uids(measureRuleList), measureRuleUID, "list-alert-project-log-measure-rules should contain the created rule")
 
+	// ログ計測ルールの履歴はアラート発生後に作られるため、一覧が空でも正常応答を確認する
+	measureRuleHistories := h.Call(t, "ログ計測ルールの履歴を一覧表示する",
+		"monitoring-suite-api", "list-alert-project-log-measure-rule-histories", projectID)
+	var measureRuleHistoryList []map[string]any
+	require.NoError(t, json.Unmarshal(measureRuleHistories, &measureRuleHistoryList), "list-alert-project-log-measure-rule-histories output: %s", measureRuleHistories)
+	t.Logf("ログ計測ルールの履歴: %d 件", len(measureRuleHistoryList))
+	// 履歴が存在する場合のみ参照を確認する。履歴がない場合の参照は未ライブ検証 (command-coverage baseline を参照)
+	for _, history := range measureRuleHistoryList {
+		historyUID, ok := history["uid"].(string)
+		require.True(t, ok, "history uid should be a string: %v", history)
+		measureRuleHistoryRead := callMonitoringSuite(t, h, "ログ計測ルールの履歴 "+historyUID+" を参照する",
+			"monitoring-suite-api", "read-alert-project-log-measure-rule-history", projectID, historyUID)
+		require.Equal(t, historyUID, monitoringSuiteIDText(t, measureRuleHistoryRead, "uid"))
+		break
+	}
+
 	h.Call(t, "ログ計測ルール "+measureRuleUID+" を削除する",
 		"monitoring-suite-api", "delete-alert-project-log-measure-rule", projectID, measureRuleUID)
 	monitoringSuiteWaitGone(t, h, "ログ計測ルール "+measureRuleUID+" の削除後の不在を確認する", 2*time.Minute,
@@ -430,6 +520,18 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"monitoring-suite-api", "read-log-routing", logRoutingUID)
 	require.Equal(t, logRoutingUID, monitoringSuiteIDText(t, logRoutingRead, "uid"))
 
+	logRoutingList := h.Call(t, "ログルーティングの一覧を取得する", "monitoring-suite-api", "list-log-routings")
+	var logRoutings []struct {
+		UID string `json:"uid"`
+	}
+	require.NoError(t, json.Unmarshal(logRoutingList, &logRoutings), "list-log-routings output: %s", logRoutingList)
+	require.Contains(t, uids(logRoutings), logRoutingUID, "list-log-routings should contain the created routing")
+
+	logRoutingPatched := callMonitoringSuite(t, h, "ログルーティング "+logRoutingUID+" の転送先を同値で更新する",
+		"monitoring-suite-api", "patch-log-routing", logRoutingUID,
+		"--log-storage-id", logStorageID)
+	require.Equal(t, logRoutingUID, monitoringSuiteIDText(t, logRoutingPatched, "uid"), "patch-log-routing output: %v", logRoutingPatched)
+
 	h.Call(t, "後片付け: ログルーティング "+logRoutingUID+" を削除する", "monitoring-suite-api", "delete-log-routing", logRoutingUID)
 	monitoringSuiteWaitGone(t, h, "後片付け: ログルーティング "+logRoutingUID+" の削除後の不在を確認する", 2*time.Minute,
 		"monitoring-suite-api", "read-log-routing", logRoutingUID)
@@ -445,6 +547,18 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	metricRoutingRead := callMonitoringSuite(t, h, "メトリクスルーティング "+metricRoutingUID+" を参照する",
 		"monitoring-suite-api", "read-metric-routing", metricRoutingUID)
 	require.Equal(t, metricRoutingUID, monitoringSuiteIDText(t, metricRoutingRead, "uid"))
+
+	metricRoutingList := h.Call(t, "メトリクスルーティングの一覧を取得する", "monitoring-suite-api", "list-metric-routings")
+	var metricRoutings []struct {
+		UID string `json:"uid"`
+	}
+	require.NoError(t, json.Unmarshal(metricRoutingList, &metricRoutings), "list-metric-routings output: %s", metricRoutingList)
+	require.Contains(t, uids(metricRoutings), metricRoutingUID, "list-metric-routings should contain the created routing")
+
+	metricRoutingPatched := callMonitoringSuite(t, h, "メトリクスルーティング "+metricRoutingUID+" の転送先を同値で更新する",
+		"monitoring-suite-api", "patch-metric-routing", metricRoutingUID,
+		"--metrics-storage-id", metricStorageID)
+	require.Equal(t, metricRoutingUID, monitoringSuiteIDText(t, metricRoutingPatched, "uid"), "patch-metric-routing output: %v", metricRoutingPatched)
 
 	h.Call(t, "後片付け: メトリクスルーティング "+metricRoutingUID+" を削除する", "monitoring-suite-api", "delete-metric-routing", metricRoutingUID)
 	monitoringSuiteWaitGone(t, h, "後片付け: メトリクスルーティング "+metricRoutingUID+" の削除後の不在を確認する", 2*time.Minute,
@@ -472,6 +586,18 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	require.True(t, ok, "set-trace-storage-expire should return retention_period_days: %v", traceStorageExpired)
 	require.Equal(t, float64(60), retention, "set-trace-storage-expire should apply the new retention period")
 
+	traceStoragePatched := callMonitoringSuite(t, h, "トレースストレージ "+traceStorageID+" の説明を更新する",
+		"monitoring-suite-api", "patch-trace-storage", traceStorageID, "--request", `{"Description":"skr e2e patched"}`)
+	require.Equal(t, "skr e2e patched", traceStoragePatched["description"], "patch-trace-storage output: %v", traceStoragePatched)
+
+	// 利用量はデータがなくても日次・月次とも正常応答することを確認する
+	traceDailyStats := h.Call(t, "トレースストレージ "+traceStorageID+" の日次利用量を取得する",
+		"monitoring-suite-api", "read-trace-storage-stats-daily", traceStorageID)
+	t.Logf("トレースストレージの日次利用量: %s", strings.TrimSpace(string(traceDailyStats)))
+	traceMonthlyStats := h.Call(t, "トレースストレージ "+traceStorageID+" の月次利用量を取得する",
+		"monitoring-suite-api", "read-trace-storage-stats-monthly", traceStorageID, "--year", strconv.Itoa(time.Now().Year()))
+	t.Logf("トレースストレージの月次利用量: %s", strings.TrimSpace(string(traceMonthlyStats)))
+
 	traceStorages := h.Call(t, "トレースストレージの一覧を名前で絞り込んで取得する",
 		"monitoring-suite-api", "list-trace-storages",
 		"--query-raw", `[.[] | select(.name == "`+traceStorageName+`")]`)
@@ -483,14 +609,54 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	require.Len(t, traceStorageList, 1, "list-trace-storages filtered by name should match exactly the created storage")
 	require.Equal(t, traceStorageID, monitoringSuiteIDFloatText(t, traceStorageList[0].ID), "list-trace-storages should return the created storage ID")
 
+	// --- トレースストレージのアクセスキー ---
+	// 作成応答にはキーの値が含まれるため、応答本文は実行記録に残さない
+	traceKey := callMonitoringSuiteSecret(t, h, "トレースストレージ "+traceStorageID+" のアクセスキーを作成する",
+		"monitoring-suite-api", "create-trace-storage-key", traceStorageID, "--description", "skr e2e key")
+	traceKeyUID := monitoringSuiteIDText(t, traceKey, "uid")
+
+	traceKeyPatched := callMonitoringSuiteSecret(t, h, "トレースストレージのアクセスキー "+traceKeyUID+" の説明を更新する",
+		"monitoring-suite-api", "patch-trace-storage-key", traceStorageID, traceKeyUID, "--description", "skr e2e key patched")
+	require.Equal(t, "skr e2e key patched", traceKeyPatched["description"], "patch-trace-storage-key output: %v", traceKeyPatched)
+
+	traceKeyRead := callMonitoringSuiteSecret(t, h, "トレースストレージのアクセスキー "+traceKeyUID+" を参照する",
+		"monitoring-suite-api", "read-trace-storage-key", traceStorageID, traceKeyUID)
+	require.Equal(t, traceKeyUID, monitoringSuiteIDText(t, traceKeyRead, "uid"))
+
+	traceKeyList := callMonitoringSuiteSecretList(t, h, "トレースストレージのアクセキー一覧を取得する",
+		"monitoring-suite-api", "list-trace-storage-keys", traceStorageID)
+	require.Contains(t, jsonUIDs(traceKeyList), traceKeyUID, "list-trace-storage-keys should contain the created key")
+
+	h.Call(t, "トレースストレージのアクセキー "+traceKeyUID+" を削除する",
+		"monitoring-suite-api", "delete-trace-storage-key", traceStorageID, traceKeyUID)
+	monitoringSuiteWaitGone(t, h, "トレースストレージのアクセキー "+traceKeyUID+" の削除後の不在を確認する", 2*time.Minute,
+		"monitoring-suite-api", "read-trace-storage-key", traceStorageID, traceKeyUID)
+
+	// --- 通知先一覧 ---
+	targetList := h.Call(t, "アラートプロジェクトの通知先一覧を取得する",
+		"monitoring-suite-api", "list-alert-project-notification-targets", projectID)
+	var targets []struct {
+		UID string `json:"uid"`
+	}
+	require.NoError(t, json.Unmarshal(targetList, &targets), "list-alert-project-notification-targets output: %s", targetList)
+	require.Contains(t, uids(targets), target2UID, "list-alert-project-notification-targets should contain the routing target")
+
 	// --- アラートプロジェクトの履歴 ---
 	projectHistories := h.Call(t, "アラートプロジェクトの履歴を一覧表示する",
 		"monitoring-suite-api", "list-alert-project-histories", projectID, "--severity", "critical", "--open")
-	var historyList []struct {
-		UID string `json:"uid"`
-	}
+	var historyList []map[string]any
 	require.NoError(t, json.Unmarshal(projectHistories, &historyList), "list-alert-project-histories output: %s", projectHistories)
 	t.Logf("アラートプロジェクトの履歴: %d 件", len(historyList))
+	// 履歴はアラート発生後に作られるため、存在する場合にのみ参照を確認する。
+	// 履歴がない場合の参照は未ライブ検証 (command-coverage baseline を参照)
+	for _, history := range historyList {
+		historyUID, ok := history["uid"].(string)
+		require.True(t, ok, "history uid should be a string: %v", history)
+		historyRead := callMonitoringSuite(t, h, "アラート履歴 "+historyUID+" を参照する",
+			"monitoring-suite-api", "read-alert-project-history", projectID, historyUID)
+		require.Equal(t, historyUID, monitoringSuiteIDText(t, historyRead, "uid"))
+		break
+	}
 }
 
 // dashboardNames はダッシュボード一覧から名前の集合を作ります。
@@ -530,6 +696,17 @@ func uids(items []struct {
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		out = append(out, item.UID)
+	}
+	return out
+}
+
+// jsonUIDs は map 形式の一覧応答から UID 集合を作ります。
+func jsonUIDs(items []map[string]any) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if uid, ok := item["uid"].(string); ok {
+			out = append(out, uid)
+		}
 	}
 	return out
 }
