@@ -1,0 +1,374 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteTracesStorage",
+  "command_prefix": "TracesStorage",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1",
+    "uuid": "github.com/google/uuid"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "トレースストレージを一覧表示します。プランなどで絞り込めます。",
+      "method": "List",
+      "request_type": "monitoringsuite.TracesStorageListParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "response_type": "[]v1.TraceStorage",
+      "flags": [
+        {
+          "name": "account-id",
+          "field": "AccountID",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: アカウント ID で絞り込みます。"
+        },
+        {
+          "name": "bucket-classification",
+          "field": "BucketClassification",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: ストレージプランで絞り込みます。shared (共用)、dedicated (専有) のいずれか。",
+          "conversion": "v1.ListTraceStoragesLogStorageBucketClassification"
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        },
+        {
+          "name": "resource-id",
+          "field": "ResourceID",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: リソース ID で絞り込みます。"
+        }
+      ],
+      "command_name": "list-trace-storages"
+    },
+    {
+      "name": "Create",
+      "help": "トレースストレージを作成します。KMS キーやサービスプリンシパルの指定など、フラグにない項目は --request JSON で指定できます。",
+      "method": "Create",
+      "request_type": "monitoringsuite.TracesStorageCreateParams",
+      "request_by_value": true,
+      "response_type": "*v1.TraceStorage",
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "required": true,
+          "help": "必須: トレースストレージ名。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 説明。",
+          "pointer": true
+        },
+        {
+          "name": "classification",
+          "field": "Classification",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: ストレージプラン。shared (共用)、dedicated (専有) のいずれか。既定値は shared です。",
+          "conversion": "v1.TraceStorageCreateRequestClassification"
+        },
+        {
+          "name": "kms-key-id",
+          "field": "KmsKeyID",
+          "type": "int64",
+          "help": "任意: データ暗号化に使う KMS キーの ID。null で解除します。",
+          "conversion": "v1.NewOptNilInt64"
+        },
+        {
+          "name": "service-principal-id",
+          "field": "ServicePrincipalID",
+          "type": "int64",
+          "help": "任意: サービスプリンシパルの ID。null で解除します。",
+          "conversion": "v1.NewOptNilInt64"
+        }
+      ],
+      "command_name": "create-trace-storage"
+    },
+    {
+      "name": "Read",
+      "help": "ID を指定してトレースストレージを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.TraceStorage",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "読み取るトレースストレージのリソース ID。list-trace-storages の出力にある ID。"
+        }
+      ],
+      "command_name": "read-trace-storage"
+    },
+    {
+      "name": "Update",
+      "help": "トレースストレージを部分更新します。指定した項目だけをリクエストに含めます。",
+      "method": "Update",
+      "request_type": "monitoringsuite.TracesStorageUpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.TraceStorage",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新するトレースストレージのリソース ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 更新後のトレースストレージ名。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 更新後の説明。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "service-principal-id",
+          "field": "ServicePrincipalID",
+          "type": "int64",
+          "help": "任意: サービスプリンシパルの ID。null で解除します。省略するとリクエストに含まれません。",
+          "conversion": "v1.NewOptNilInt64"
+        }
+      ],
+      "command_name": "patch-trace-storage"
+    },
+    {
+      "name": "Delete",
+      "help": "ID を指定してトレースストレージを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するトレースストレージのリソース ID。"
+        }
+      ],
+      "command_name": "delete-trace-storage"
+    },
+    {
+      "name": "SetExpire",
+      "help": "トレースストレージの保存期間を設定します。設定した保存期間を超えるデータは自動的に削除されます。",
+      "method": "SetExpire",
+      "response_type": "*v1.TraceStorage",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "保存期間を設定するトレースストレージのリソース ID。"
+        },
+        {
+          "name": "days",
+          "field": "Days",
+          "type": "int",
+          "flag": true,
+          "required": true,
+          "help": "必須: 保存期間 (日数)。"
+        }
+      ],
+      "flags": [],
+      "command_name": "set-trace-storage-expire"
+    },
+    {
+      "name": "ReadDailyStats",
+      "help": "トレースストレージの日次利用量を取得します。",
+      "method": "ReadDailyStats",
+      "response_type": "[]v1.LogStorageDailyUsage",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "利用量を取得するトレースストレージのリソース ID。"
+        },
+        {
+          "name": "start-date",
+          "field": "StartDate",
+          "type": "*time.Time",
+          "flag": true,
+          "help": "任意: 取得範囲の開始日。RFC3339 形式で指定します。"
+        },
+        {
+          "name": "end-date",
+          "field": "EndDate",
+          "type": "*time.Time",
+          "flag": true,
+          "help": "任意: 取得範囲の終了日。RFC3339 形式で指定します。"
+        }
+      ],
+      "command_name": "read-trace-storage-stats-daily"
+    },
+    {
+      "name": "ReadMonthlyStats",
+      "help": "トレースストレージの月次利用量を取得します。",
+      "method": "ReadMonthlyStats",
+      "response_type": "[]v1.LogStorageMonthlyUsage",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "利用量を取得するトレースストレージのリソース ID。"
+        },
+        {
+          "name": "year",
+          "field": "Year",
+          "type": "int",
+          "flag": true,
+          "help": "必須: 取得する年。"
+        }
+      ],
+      "command_name": "read-trace-storage-stats-monthly"
+    },
+    {
+      "name": "ListKeys",
+      "help": "トレースストレージのアクセスキーを一覧表示します。ページングができます。",
+      "method": "ListKeys",
+      "response_type": "[]v1.TraceStorageAccessKey",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "アクセスキーを一覧表示するトレースストレージのリソース ID。"
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        }
+      ],
+      "command_name": "list-trace-storage-keys"
+    },
+    {
+      "name": "CreateKey",
+      "help": "トレースストレージのアクセスキーを発行します。発行したキーの値は後から取得できないため、出力を保存してください。",
+      "method": "CreateKey",
+      "response_type": "*v1.TraceStorageAccessKey",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "アクセスキーを発行するトレースストレージのリソース ID。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "*string",
+          "flag": true,
+          "help": "任意: アクセスキーの説明。"
+        }
+      ],
+      "command_name": "create-trace-storage-key"
+    },
+    {
+      "name": "ReadKey",
+      "help": "トレースストレージのアクセスキーを 1 件読み取ります。",
+      "method": "ReadKey",
+      "response_type": "*v1.TraceStorageAccessKey",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "トレースストレージのリソース ID。"
+        },
+        {
+          "name": "key-id",
+          "field": "KeyID",
+          "type": "uuid.UUID",
+          "help": "読み取るアクセスキーの UID。list-trace-storage-keys の出力にある UID。"
+        }
+      ],
+      "command_name": "read-trace-storage-key"
+    },
+    {
+      "name": "UpdateKey",
+      "help": "トレースストレージのアクセスキーを部分更新します。指定した項目だけをリクエストに含めます。",
+      "method": "UpdateKey",
+      "response_type": "*v1.TraceStorageAccessKey",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "トレースストレージのリソース ID。"
+        },
+        {
+          "name": "key-id",
+          "field": "KeyID",
+          "type": "uuid.UUID",
+          "help": "更新するアクセスキーの UID。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "*string",
+          "flag": true,
+          "help": "任意: アクセスキーの説明。省略するとリクエストに含まれません。"
+        }
+      ],
+      "flags": [],
+      "command_name": "patch-trace-storage-key"
+    },
+    {
+      "name": "DeleteKey",
+      "help": "トレースストレージのアクセスキーを削除します。削除したキーではエージェントが転送できなくなります。",
+      "method": "DeleteKey",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "トレースストレージのリソース ID。"
+        },
+        {
+          "name": "key-id",
+          "field": "KeyID",
+          "type": "uuid.UUID",
+          "help": "削除するアクセスキーの UID。"
+        }
+      ],
+      "command_name": "delete-trace-storage-key"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.TracesStorage",
+  "sdk_factory": "monitoringsuiteapi.NewTracesStorageAPI"
+}

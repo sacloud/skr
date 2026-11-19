@@ -1,0 +1,176 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteMetricsRouting",
+  "command_prefix": "MetricsRouting",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1",
+    "uuid": "github.com/google/uuid"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "メトリクスルーティングを一覧表示します。Publisher や種別、リソースで絞り込めます。",
+      "method": "List",
+      "request_type": "monitoringsuite.MetricsRoutingsListParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "response_type": "[]v1.MetricsRouting",
+      "flags": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        },
+        {
+          "name": "publisher-code",
+          "field": "PublisherCode",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: Publisher コードで絞り込みます。list-publishers で確認できます。"
+        },
+        {
+          "name": "resource-id",
+          "field": "ResourceID",
+          "type": "int64",
+          "pointer": true,
+          "help": "任意: 対象リソース ID で絞り込みます。"
+        },
+        {
+          "name": "variant",
+          "field": "Variant",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: ルーティングの種別で絞り込みます。"
+        }
+      ],
+      "command_name": "list-metric-routings"
+    },
+    {
+      "name": "Create",
+      "help": "メトリクスルーティングを作成します。Publisher からメトリクスストレージへメトリクスを転送します。",
+      "method": "Create",
+      "request_type": "monitoringsuite.MetricsRoutingCreateParams",
+      "request_by_value": true,
+      "response_type": "*v1.MetricsRouting",
+      "flags": [
+        {
+          "name": "publisher-code",
+          "field": "PublisherCode",
+          "type": "string",
+          "required": true,
+          "help": "必須: Publisher コード。list-publishers で確認できます。"
+        },
+        {
+          "name": "resource-id",
+          "field": "ResourceID",
+          "type": "string",
+          "help": "任意: 対象リソースの ID。指定しない場合はアカウント全体が対象です。",
+          "pointer": true
+        },
+        {
+          "name": "variant",
+          "field": "Variant",
+          "type": "string",
+          "required": true,
+          "help": "必須: ルーティングの種別。Publisher の対応する種別を指定します。"
+        },
+        {
+          "name": "metrics-storage-id",
+          "field": "MetricsStorageID",
+          "type": "string",
+          "required": true,
+          "help": "必須: 転送先のメトリクスストレージのリソース ID。"
+        }
+      ],
+      "command_name": "create-metric-routing"
+    },
+    {
+      "name": "Read",
+      "help": "メトリクスルーティングを 1 件読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.MetricsRouting",
+      "arguments": [
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "読み取るメトリクスルーティングの UID。list-metric-routings の出力にある UID。"
+        }
+      ],
+      "command_name": "read-metric-routing"
+    },
+    {
+      "name": "Update",
+      "help": "メトリクスルーティングを部分更新します。指定した項目だけをリクエストに含めます。",
+      "method": "Update",
+      "request_type": "monitoringsuite.MetricsRoutingUpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.MetricsRouting",
+      "arguments": [
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "更新するメトリクスルーティングの UID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "publisher-code",
+          "field": "PublisherCode",
+          "type": "string",
+          "help": "任意: Publisher コード。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "resource-id",
+          "field": "ResourceID",
+          "type": "string",
+          "help": "任意: 対象リソースの ID。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "variant",
+          "field": "Variant",
+          "type": "string",
+          "help": "任意: ルーティングの種別。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "metrics-storage-id",
+          "field": "MetricsStorageID",
+          "type": "string",
+          "help": "任意: 転送先のメトリクスストレージのリソース ID。省略するとリクエストに含まれません。",
+          "pointer": true
+        }
+      ],
+      "command_name": "patch-metric-routing"
+    },
+    {
+      "name": "Delete",
+      "help": "メトリクスルーティングを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "削除するメトリクスルーティングの UID。"
+        }
+      ],
+      "command_name": "delete-metric-routing"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.MetricsRouting",
+  "sdk_factory": "monitoringsuiteapi.NewMetricsRoutingAPI"
+}

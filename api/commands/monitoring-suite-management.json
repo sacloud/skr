@@ -1,0 +1,36 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteManagement",
+  "command_prefix": "Management",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "ReadResourceLimits",
+      "help": "モニタリングスイートの各リソースの上限値を読み取ります。上限の最新情報はサービスサイトも確認してください。",
+      "method": "ResourceLimits",
+      "response_type": "*v1.ResourcesLimits",
+      "command_name": "read-resource-limits"
+    },
+    {
+      "name": "ReadProvisioning",
+      "help": "モニタリングスイートのプロビジョニング状態を読み取ります。",
+      "method": "ReadProvisioning",
+      "response_type": "*v1.Provisioning",
+      "command_name": "read-provisioning-state"
+    },
+    {
+      "name": "CreateProvisioning",
+      "help": "モニタリングスイートを初期化します。--request JSON で Logs と Metrics の領域の有無を system_exist と user_exist に指定します。例: --request '{\"Logs\":{\"system_exist\":true,\"user_exist\":true},\"Metrics\":{\"system_exist\":true,\"user_exist\":true}}'",
+      "method": "CreateProvisioning",
+      "request_type": "monitoringsuite.ProvisioningCreateParam",
+      "request_by_value": true,
+      "response_type": "*v1.Provisioning",
+      "command_name": "initialize-provisioning"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.Management",
+  "sdk_factory": "monitoringsuiteapi.NewManagementAPI"
+}

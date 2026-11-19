@@ -1,0 +1,152 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteNotificationRouting",
+  "command_prefix": "NotificationRouting",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1",
+    "uuid": "github.com/google/uuid"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "アラートプロジェクトの通知ルーティングを一覧表示します。通知先で絞り込めます。",
+      "method": "List",
+      "request_type": "monitoringsuite.NotificationRoutingsListParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "response_type": "[]v1.NotificationRouting",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        },
+        {
+          "name": "target",
+          "field": "Target",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 通知先のリソース ID で絞り込みます。"
+        }
+      ],
+      "command_name": "list-alert-project-notification-routings"
+    },
+    {
+      "name": "Create",
+      "help": "通知ルーティングを作成します。通知先 UID とアラートのラベル条件 (MatchLabels) は構造を持つため、--request JSON で指定します。",
+      "method": "Create",
+      "request_type": "monitoringsuite.NotificationRoutingCreateParams",
+      "request_by_value": true,
+      "response_type": "*v1.NotificationRouting",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        }
+      ],
+      "command_name": "create-alert-project-notification-routing"
+    },
+    {
+      "name": "Read",
+      "help": "通知ルーティングを 1 件読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.NotificationRouting",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "読み取る通知ルーティングの UID。list-alert-project-notification-routings の出力にある UID。"
+        }
+      ],
+      "command_name": "read-alert-project-notification-routing"
+    },
+    {
+      "name": "Update",
+      "help": "通知ルーティングを部分更新します。通知先 UID と MatchLabels は構造を持つため、--request JSON で指定します。",
+      "method": "Update",
+      "request_type": "monitoringsuite.NotificationRoutingUpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.NotificationRouting",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "更新する通知ルーティングの UID。"
+        }
+      ],
+      "command_name": "patch-alert-project-notification-routing"
+    },
+    {
+      "name": "Delete",
+      "help": "通知ルーティングを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "削除する通知ルーティングの UID。"
+        }
+      ],
+      "command_name": "delete-alert-project-notification-routing"
+    },
+    {
+      "name": "Reorder",
+      "help": "通知ルーティングの評価順序を並べ替えます。--request JSON で NotificationRoutingUID と Order の配列を指定します。",
+      "method": "Reorder",
+      "request_type": "[]v1.NotificationRoutingOrderRequest",
+      "request_by_value": true,
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        }
+      ],
+      "command_name": "reorder-alert-project-notification-routings"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.NotificationRouting",
+  "sdk_factory": "monitoringsuiteapi.NewNotificationRoutingAPI"
+}

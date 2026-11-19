@@ -1,0 +1,176 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteLogRouting",
+  "command_prefix": "LogRouting",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1",
+    "uuid": "github.com/google/uuid"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "ログルーティングを一覧表示します。Publisher や種別、リソースで絞り込めます。",
+      "method": "List",
+      "request_type": "monitoringsuite.LogsRoutingsListParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "response_type": "[]v1.LogRouting",
+      "flags": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        },
+        {
+          "name": "publisher-code",
+          "field": "PublisherCode",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: Publisher コードで絞り込みます。list-publishers で確認できます。"
+        },
+        {
+          "name": "resource-id",
+          "field": "ResourceID",
+          "type": "int64",
+          "pointer": true,
+          "help": "任意: 対象リソース ID で絞り込みます。"
+        },
+        {
+          "name": "variant",
+          "field": "Variant",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: ルーティングの種別で絞り込みます。"
+        }
+      ],
+      "command_name": "list-log-routings"
+    },
+    {
+      "name": "Create",
+      "help": "ログルーティングを作成します。Publisher からログストレージへログを転送します。",
+      "method": "Create",
+      "request_type": "monitoringsuite.LogsRoutingCreateParams",
+      "request_by_value": true,
+      "response_type": "*v1.LogRouting",
+      "flags": [
+        {
+          "name": "publisher-code",
+          "field": "PublisherCode",
+          "type": "string",
+          "required": true,
+          "help": "必須: Publisher コード。list-publishers で確認できます。"
+        },
+        {
+          "name": "resource-id",
+          "field": "ResourceID",
+          "type": "string",
+          "help": "任意: 対象リソースの ID。指定しない場合はアカウント全体が対象です。",
+          "pointer": true
+        },
+        {
+          "name": "variant",
+          "field": "Variant",
+          "type": "string",
+          "required": true,
+          "help": "必須: ルーティングの種別。Publisher の対応する種別を指定します。"
+        },
+        {
+          "name": "log-storage-id",
+          "field": "LogStorageID",
+          "type": "string",
+          "required": true,
+          "help": "必須: 転送先のログストレージのリソース ID。"
+        }
+      ],
+      "command_name": "create-log-routing"
+    },
+    {
+      "name": "Read",
+      "help": "ログルーティングを 1 件読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.LogRouting",
+      "arguments": [
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "読み取るログルーティングの UID。list-log-routings の出力にある UID。"
+        }
+      ],
+      "command_name": "read-log-routing"
+    },
+    {
+      "name": "Update",
+      "help": "ログルーティングを部分更新します。指定した項目だけをリクエストに含めます。",
+      "method": "Update",
+      "request_type": "monitoringsuite.LogsRoutingUpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.LogRouting",
+      "arguments": [
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "更新するログルーティングの UID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "publisher-code",
+          "field": "PublisherCode",
+          "type": "string",
+          "help": "任意: Publisher コード。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "resource-id",
+          "field": "ResourceID",
+          "type": "string",
+          "help": "任意: 対象リソースの ID。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "variant",
+          "field": "Variant",
+          "type": "string",
+          "help": "任意: ルーティングの種別。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "log-storage-id",
+          "field": "LogStorageID",
+          "type": "string",
+          "help": "任意: 転送先のログストレージのリソース ID。省略するとリクエストに含まれません。",
+          "pointer": true
+        }
+      ],
+      "command_name": "patch-log-routing"
+    },
+    {
+      "name": "Delete",
+      "help": "ログルーティングを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "削除するログルーティングの UID。"
+        }
+      ],
+      "command_name": "delete-log-routing"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.LogRouting",
+  "sdk_factory": "monitoringsuiteapi.NewLogRoutingAPI"
+}

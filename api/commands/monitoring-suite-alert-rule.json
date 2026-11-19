@@ -1,0 +1,371 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteAlertRule",
+  "command_prefix": "AlertRule",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1",
+    "uuid": "github.com/google/uuid"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "アラートプロジェクトのアラートルールを一覧表示します。ページングができます。",
+      "method": "List",
+      "response_type": "[]v1.AlertRule",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        }
+      ],
+      "command_name": "list-alert-project-rules"
+    },
+    {
+      "name": "Create",
+      "help": "アラートルールを作成します。メトリクスストレージの Query に対する条件と、warning / critical のしきい値を設定します。",
+      "method": "Create",
+      "request_type": "monitoringsuite.AlertRuleCreateParams",
+      "request_by_value": true,
+      "response_type": "*v1.AlertRule",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "metrics-storage-id",
+          "field": "MetricsStorageID",
+          "type": "string",
+          "required": true,
+          "help": "必須: 対象のメトリクスストレージのリソース ID。--query と組み合わせます。"
+        },
+        {
+          "name": "alert-query",
+          "field": "Query",
+          "type": "string",
+          "required": true,
+          "help": "必須: 監視条件の PromQL クエリ (API のフィールド query)。"
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: アラートルール名。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "format",
+          "field": "Format",
+          "type": "string",
+          "help": "任意: 通知本文の書式。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "template",
+          "field": "Template",
+          "type": "string",
+          "help": "任意: 通知本文のテンプレート。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "enabled-warning",
+          "field": "EnabledWarning",
+          "type": "bool",
+          "help": "任意: warning しきい値の有効化。省略するとリクエストに含まれません。enabled_warning と enabled_critical は少なくとも一方を true にする必要があります。",
+          "pointer": true
+        },
+        {
+          "name": "enabled-critical",
+          "field": "EnabledCritical",
+          "type": "bool",
+          "help": "任意: critical しきい値の有効化。省略するとリクエストに含まれません。enabled_warning と enabled_critical は少なくとも一方を true にする必要があります。",
+          "pointer": true
+        },
+        {
+          "name": "threshold-warning",
+          "field": "ThresholdWarning",
+          "type": "string",
+          "help": "任意: warning しきい値。省略するとリクエストに含まれません。比較演算子を先頭に付けた形式で指定します。例: >=70。",
+          "pointer": true
+        },
+        {
+          "name": "threshold-critical",
+          "field": "ThresholdCritical",
+          "type": "string",
+          "help": "任意: critical しきい値。省略するとリクエストに含まれません。比較演算子を先頭に付けた形式で指定します。例: >=70。",
+          "pointer": true
+        },
+        {
+          "name": "threshold-duration-warning",
+          "field": "ThresholdDurationWarning",
+          "type": "int64",
+          "help": "任意: warning しきい値を超過した状態の継続秒数。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "threshold-duration-critical",
+          "field": "ThresholdDurationCritical",
+          "type": "int64",
+          "help": "任意: critical しきい値を超過した状態の継続秒数。省略するとリクエストに含まれません。",
+          "pointer": true
+        }
+      ],
+      "command_name": "create-alert-project-rule"
+    },
+    {
+      "name": "Read",
+      "help": "アラートルールを 1 件読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.AlertRule",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "rule-id",
+          "field": "RuleID",
+          "type": "uuid.UUID",
+          "help": "読み取るアラートルールの UID。list-alert-project-rules の出力にある UID。"
+        }
+      ],
+      "command_name": "read-alert-project-rule"
+    },
+    {
+      "name": "Update",
+      "help": "アラートルールを部分更新します。指定した項目だけをリクエストに含めます。",
+      "method": "Update",
+      "request_type": "monitoringsuite.AlertRuleUpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.AlertRule",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "rule-id",
+          "field": "RuleID",
+          "type": "uuid.UUID",
+          "help": "更新するアラートルールの UID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "metrics-storage-id",
+          "field": "MetricsStorageID",
+          "type": "string",
+          "help": "任意: 対象のメトリクスストレージのリソース ID。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "alert-query",
+          "field": "Query",
+          "type": "string",
+          "help": "必須: 監視条件の PromQL クエリ (API のフィールド query)。",
+          "pointer": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: アラートルール名。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "format",
+          "field": "Format",
+          "type": "string",
+          "help": "任意: 通知本文の書式。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "template",
+          "field": "Template",
+          "type": "string",
+          "help": "任意: 通知本文のテンプレート。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "enabled-warning",
+          "field": "EnabledWarning",
+          "type": "bool",
+          "help": "任意: warning しきい値の有効化。省略するとリクエストに含まれません。enabled_warning と enabled_critical は少なくとも一方を true にする必要があります。",
+          "pointer": true
+        },
+        {
+          "name": "enabled-critical",
+          "field": "EnabledCritical",
+          "type": "bool",
+          "help": "任意: critical しきい値の有効化。省略するとリクエストに含まれません。enabled_warning と enabled_critical は少なくとも一方を true にする必要があります。",
+          "pointer": true
+        },
+        {
+          "name": "threshold-warning",
+          "field": "ThresholdWarning",
+          "type": "string",
+          "help": "任意: warning しきい値。省略するとリクエストに含まれません。比較演算子を先頭に付けた形式で指定します。例: >=70。",
+          "pointer": true
+        },
+        {
+          "name": "threshold-critical",
+          "field": "ThresholdCritical",
+          "type": "string",
+          "help": "任意: critical しきい値。省略するとリクエストに含まれません。比較演算子を先頭に付けた形式で指定します。例: >=70。",
+          "pointer": true
+        },
+        {
+          "name": "threshold-duration-warning",
+          "field": "ThresholdDurationWarning",
+          "type": "int64",
+          "help": "任意: warning しきい値を超過した状態の継続秒数。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "threshold-duration-critical",
+          "field": "ThresholdDurationCritical",
+          "type": "int64",
+          "help": "任意: critical しきい値を超過した状態の継続秒数。省略するとリクエストに含まれません。",
+          "pointer": true
+        }
+      ],
+      "command_name": "patch-alert-project-rule"
+    },
+    {
+      "name": "Delete",
+      "help": "アラートルールを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "rule-id",
+          "field": "RuleID",
+          "type": "uuid.UUID",
+          "help": "削除するアラートルールの UID。"
+        }
+      ],
+      "command_name": "delete-alert-project-rule"
+    },
+    {
+      "name": "ListHistories",
+      "help": "アラートルールのアラート履歴を一覧表示します。状態や重要度、発生日時で絞り込めます。",
+      "method": "ListHistories",
+      "request_type": "monitoringsuite.AlertRuleListHistoriesParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "response_type": "[]v1.History",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "rule-id",
+          "field": "RuleID",
+          "type": "uuid.UUID",
+          "help": "アラートルールの UID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 1 回の取得件数。",
+          "pointer": true
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置 (0 開始)。",
+          "pointer": true
+        },
+        {
+          "name": "open",
+          "field": "Open",
+          "type": "bool",
+          "help": "任意: 未解決アラートのみを取得します。",
+          "pointer": true
+        },
+        {
+          "name": "severity",
+          "field": "Severity",
+          "type": "string",
+          "help": "任意: 重要度で絞り込みます。critical、warning のいずれか。",
+          "pointer": true,
+          "conversion": "v1.ListAlertProjectRuleHistoriesSeverity"
+        },
+        {
+          "name": "starts-at",
+          "field": "StartsAt",
+          "type": "time.Time",
+          "help": "任意: 発生日時で絞り込みます。RFC3339 形式で指定します。",
+          "pointer": true
+        }
+      ],
+      "command_name": "list-alert-project-rule-histories"
+    },
+    {
+      "name": "ReadHistory",
+      "help": "アラートルールの履歴を 1 件読み取ります。",
+      "method": "ReadHistory",
+      "response_type": "*v1.History",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "rule-id",
+          "field": "RuleID",
+          "type": "uuid.UUID",
+          "help": "アラートルールの UID。"
+        },
+        {
+          "name": "history-id",
+          "field": "HistoryID",
+          "type": "uuid.UUID",
+          "help": "読み取る履歴の UID。"
+        }
+      ],
+      "command_name": "read-alert-project-rule-history"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.AlertRule",
+  "sdk_factory": "monitoringsuiteapi.NewAlertRuleAPI"
+}

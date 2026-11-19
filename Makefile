@@ -78,6 +78,8 @@ generate-wiring:
 		$(patsubst %,api/commands/%,$(filter security-control-%,$(notdir $(wildcard api/commands/*.json))))
 	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/workflows_wiring_generated.go \
 		$(patsubst %,api/commands/%,$(filter workflows-%,$(notdir $(wildcard api/commands/*.json))))
+	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/monitoring_suite_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter monitoring-suite-%,$(notdir $(wildcard api/commands/*.json))))
 
 .PHONY: docs-site
 docs-site:
