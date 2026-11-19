@@ -14,7 +14,7 @@
 
 // Package apprundedicated は AppRun 専有型の高レベルコマンド層です。
 // 定義ファイル (--app) を入力として、デプロイ、ロールバック、状態の確認など
-// 13 個の操作を提供します。
+// 14 個の操作を提供します。
 //
 // service 層は service/apprun-dedicated-service-go モジュールに切り出してあり
 // (ADR 0077、ADR 0079)、このパッケージは定義の読み込み、確認プロンプト、
@@ -31,6 +31,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	"github.com/google/uuid"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 
+	"github.com/sacloud/skr/internal/textjson"
 	apprundedicatedservice "github.com/sacloud/skr/service/apprun-dedicated-service-go"
 )
 
@@ -134,6 +136,7 @@ type Commands struct {
 	CreateAutoScalingGroup CreateAutoScalingGroupCommand `cmd:"" name:"create-auto-scaling-group" help:"クラスタにオートスケーリンググループを作成し、ワーカノードが healthy になるまで待ちます。ネットワークインターフェースは共有セグメントに接続する既定の設定を使います。"`
 	DeleteAutoScalingGroup DeleteAutoScalingGroupCommand `cmd:"" name:"delete-auto-scaling-group" help:"クラスタのオートスケーリンググループを削除します。削除 API の呼び出しと削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、--no-wait を指定しても行われます。実行前に確認を求めます (--force で省略)。"`
 	DeleteCluster          DeleteClusterCommand          `cmd:"" name:"delete-cluster" help:"クラスタを削除します。関連リソース (アプリケーション、オートスケーリンググループなど) が残っていれば列挙して中断します。削除 API の呼び出しと削除後の不在確認 (対象が見つからなくなるまでのポーリング) を行います。削除は API 側で非同期に完了するため、不在確認が削除完了の確認を兼ね、--no-wait を指定しても行われます。実行前に確認を求めます (--force で省略)。"`
+	CreateCluster          CreateClusterCommand          `cmd:"" name:"create-cluster" help:"クラスタを作成します。同名のクラスタが存在しないことを確認してから作成し、作成後に API から読み戻して、指定した内容 (名前、サービスプリンシパル ID、待受ポート、Let's Encrypt の設定) を照合します。ロードバランサの待受ポートと Let's Encrypt の利用設定は省略できます。"`
 }
 
 // NewCommands は runtime と factory を各コマンドへ一括注入します。
@@ -152,6 +155,7 @@ func NewCommands(runtime Runtime, factory ServiceFactory) Commands {
 		CreateAutoScalingGroup: CreateAutoScalingGroupCommand{factory: factory, runtime: runtime},
 		DeleteAutoScalingGroup: DeleteAutoScalingGroupCommand{factory: factory, runtime: runtime},
 		DeleteCluster:          DeleteClusterCommand{factory: factory, runtime: runtime},
+		CreateCluster:          CreateClusterCommand{factory: factory, runtime: runtime},
 	}
 }
 
@@ -606,6 +610,84 @@ func (c *DeleteClusterCommand) Run(kongCtx *kong.Context) error {
 		Timeout: c.WaitTimeout,
 	})
 	return err
+}
+
+// CreateClusterCommand はクラスタを作成します。
+type CreateClusterCommand struct {
+	Name               string   `arg:"" name:"name" help:"クラスタの名前。プロジェクト内で一意な英数字、アンダースコア、ハイフンで指定します。"`
+	ServicePrincipalID string   `name:"service-principal-id" required:"" help:"クラスタで利用するサービスプリンシパルの ID。サービスプリンシパルの作成方法は AppRun 専有型のクイックスタートを参照してください。"`
+	Port               []string `name:"port" sep:"none" placeholder:"'port=80,protocol=http'" help:"クラスタロードバランサの待受ポート。'port=80,protocol=http' 形式の 1 指定が 1 ポートに対応し、繰り返し指定できます。port はポート番号、protocol は http、https、tcp のいずれかです。省略した場合は待受ポートなしで作成します。"`
+	LetsEncryptEmail   *string  `name:"lets-encrypt-email" help:"Let's Encrypt の証明書発行に使うメールアドレス。証明書発行は HTTP-01 チャレンジになるため、80 番ポートを HTTP プロトコルで外向きに解放する必要があります。"`
+	factory            ServiceFactory
+	runtime            Runtime
+}
+
+func (c *CreateClusterCommand) Run(kongCtx *kong.Context) error {
+	if err := c.runtime.validateOutput(kongCtx); err != nil {
+		return err
+	}
+	ports, err := parseClusterPorts(c.Port)
+	if err != nil {
+		return err
+	}
+	svc, err := newService(c.factory)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := commandContext()
+	defer cancel()
+	result, err := svc.CreateCluster(ctx, c.Name, c.ServicePrincipalID, ports, c.LetsEncryptEmail)
+	if err != nil {
+		return err
+	}
+	return c.runtime.writeOutput(kongCtx, result)
+}
+
+// parseClusterPorts は反復可能な --port の各指定をロードバランサの待受ポートへ変換します。
+// 構文は skr 全体で統一された text → JSON 簡易表記 (ADR 0078) の共通パーサーで解析し、
+// 値の検証 (ポート番号とプロトコル) と API リクエストの構造への変換はこの関数が行います。
+// 指定がなければ nil を返し、service 層が空配列に変換します。
+func parseClusterPorts(inputs []string) ([]v1.ClusterLoadBalancerPort, error) {
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+	ports := make([]v1.ClusterLoadBalancerPort, 0, len(inputs))
+	for _, input := range inputs {
+		fields, err := textjson.Parse(input, []textjson.Field{
+			{Name: "port", Required: true},
+			{Name: "protocol", Required: true},
+		})
+		if err != nil {
+			return nil, err
+		}
+		port, err := clusterPortNumber(fields, "port")
+		if err != nil {
+			return nil, err
+		}
+		protocol := v1.ClusterLoadBalancerPortProtocol(fields.Get("protocol"))
+		switch protocol {
+		case v1.ClusterLoadBalancerPortProtocolHTTP, v1.ClusterLoadBalancerPortProtocolHTTPS, v1.ClusterLoadBalancerPortProtocolTCP:
+		default:
+			return nil, fmt.Errorf("protocol は http、https、tcp のいずれかで指定してください")
+		}
+		ports = append(ports, v1.ClusterLoadBalancerPort{Port: port, Protocol: protocol})
+	}
+	return ports, nil
+}
+
+// clusterPortNumber は指定されたキーの値をポート番号 (1 ～ 65535 の整数) として検証して返します。
+func clusterPortNumber(fields textjson.Fields, key string) (uint16, error) {
+	value := fields.Get(key)
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return 0, fmt.Errorf("%s は 1 ～ 65535 の整数で指定してください", key)
+		}
+	}
+	number, err := strconv.ParseUint(value, 10, 16)
+	if err != nil || number == 0 {
+		return 0, fmt.Errorf("%s は 1 ～ 65535 の整数で指定してください", key)
+	}
+	return uint16(number), nil
 }
 
 // parseNameServers は --name-servers の値を検証して v1.Ipv4 のスライスに変換します。

@@ -20,11 +20,12 @@ skr は 2 つの階層のコマンドを提供します。
 | `skr apprun-dedicated containers` | `list-application-containers` |
 | `skr apprun-dedicated init` | アプリケーションとバージョンの参照から定義を復元 |
 | `skr apprun-dedicated diff` / `render` | 対応する単独の API 操作はありません |
+| `skr apprun-dedicated create-cluster` | `list-clusters`、`create-cluster`、作成後の `read-cluster` |
 | `skr apprun-dedicated create-auto-scaling-group` | `create-auto-scaling-group` (+ 作成後の healthy 待ち) |
 | `skr apprun-dedicated delete-auto-scaling-group` | `delete-auto-scaling-group` (+ 削除後の不在確認) |
 | `skr apprun-dedicated delete-cluster` | 依存リソースの確認 + `delete-cluster` (+ 削除後の不在確認) |
 
-このチュートリアルでは、低レベルコマンドでクラスタとオートスケーリンググループを作成し、高レベルコマンドでアプリケーションをデプロイ・更新・ロールバック・削除します。
+このチュートリアルでは、クラスタ、オートスケーリンググループ、アプリケーションを高レベルコマンドで作成し、デプロイ・更新・ロールバック・削除まで行います。確認用の読み取り操作は低レベルコマンドを使います。
 
 > [!WARNING]
 > この手順ではクラスタ、オートスケーリンググループ (ワーカノード 1 台)、アプリケーションを作成します。AppRun 専有型の料金はワーカノードのスペックと台数、稼働時間に応じて発生します（[料金体系](https://manual.sakura.ad.jp/cloud/apprun-dedicated/about.html)）。実行前に `skr config current` で対象プロファイルとプロジェクトを確認し、テスト専用の名前を使ってください。作成したリソースはクリーンアップの手順で削除します。
@@ -54,8 +55,8 @@ skr は 2 つの階層のコマンドを提供します。
 $ skr config current
 $ skr apprun-dedicated --help
 $ skr apprun-dedicated deploy --help
-$ skr apprun-dedicated-api create-cluster --help
-$ skr apprun-dedicated-api create-auto-scaling-group --help
+$ skr apprun-dedicated create-cluster --help
+$ skr apprun-dedicated create-auto-scaling-group --help
 ```
 
 意図したプロファイルとプロジェクトを確認してください。作成前に、使う名前と同じ名前のリソースがないことを確認します。
@@ -67,24 +68,26 @@ $ skr apprun-dedicated-api list-clusters --query '[.items[] | {clusterID, name}]
 
 既存のクラスタが表示された場合は、作成予定の `CLUSTER-NAME` と一致する名前がないことを確認してください。一覧はページ単位のため、結果が 1 ページに収まらない場合は `--cursor` で続きを確認してください。
 
-## Step 2: クラスタを作成する
-
-クラスタの作成リクエストを次の内容で `cluster.json` という名前で保存します。`SERVICE-PRINCIPAL-ID` は前提条件で確認した ID に置き換えます。`ports` はクラスタロードバランサの待受ポート、`letsEncryptEmail` は Let's Encrypt の利用設定です。このチュートリアルではどちらも使わないため、`ports` を空配列にします（[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)）。待受ポートや Let's Encrypt を利用する場合の設定は、該当ページを参照してください。
-
-```json
-{
-  "name": "CLUSTER-NAME",
-  "servicePrincipalID": "SERVICE-PRINCIPAL-ID",
-  "ports": []
-}
-```
+以降の手順では、次のシェル変数を使います。実行するシェルで値を設定してください。`CLUSTER-NAME` と `ASG-NAME` は前提条件どおりの短い名前に置き換えます。`SERVICE-PRINCIPAL-ID` は前提条件で確認したサービスプリンシパルの ID に置き換えます。`ZONE` はワーカノードを作成するゾーンに置き換えます。`WORKER_SERVICE_CLASS_PATH` は Step 3 で選択する構成のパスで、ここでは予定する値を設定します。
 
 ```console
-$ CLUSTER_ID=$(skr apprun-dedicated-api create-cluster --request @cluster.json --query-raw '.clusterID')
+$ CLUSTER_NAME='CLUSTER-NAME'
+$ SERVICE_PRINCIPAL_ID='SERVICE-PRINCIPAL-ID'
+$ ASG_NAME='ASG-NAME'
+$ ZONE='ZONE'
+$ WORKER_SERVICE_CLASS_PATH='cloud/apprun/dedicated/worker/1vcpu_2gb'
+```
+
+## Step 2: クラスタを作成する
+
+高レベルコマンド `create-cluster` でクラスタを作成します。`SERVICE-PRINCIPAL-ID` は前提条件で確認した ID に置き換えます。ロードバランサの待受ポート (`--port`) と Let's Encrypt の利用設定 (`--lets-encrypt-email`) は省略でき、このチュートリアルではどちらも使わないため指定しません。待受ポートや Let's Encrypt を利用する場合の設定は、[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)を参照してください。
+
+```console
+$ CLUSTER_ID=$(skr apprun-dedicated create-cluster "$CLUSTER_NAME" --service-principal-id "$SERVICE_PRINCIPAL_ID" --query-raw '.clusterID')
 $ skr apprun-dedicated-api read-cluster "$CLUSTER_ID" --query '{clusterID, name, servicePrincipalID, hasLetsEncryptEmail}'
 ```
 
-参照結果に指定した名前とサービスプリンシパル ID が表示されることを確認します。`hasLetsEncryptEmail` は `false` です。以降の手順で使う `CLUSTER_ID` はコマンド出力から取り込んだ値です (文字列の抽出には `--query-raw` を使うと引用符なしで取り込めます。以降も同じ手順です)。
+参照結果に指定した名前とサービスプリンシパル ID が表示されることを確認します。`hasLetsEncryptEmail` は `false` です。以降の手順で使う `CLUSTER_ID` はコマンド出力から取り込んだ値です (文字列の抽出には `--query-raw` を使うと引用符なしで取り込めます。以降も同じ手順です)。サービスプリンシパル ID を省略した場合や、同名のクラスタが既にある場合は、コマンドがエラーになります。
 
 ## Step 3: オートスケーリンググループを作成し、ワーカノードの起動を待つ
 
@@ -417,9 +420,9 @@ apprun-dedicated: Cluster.Read: API Error 404: code 404: {Status:404 Title:...}
 
 ## まとめ
 
-低レベルコマンドでクラスタとオートスケーリンググループを構築し、高レベルコマンドで定義ファイル 1 つからアプリケーションをデプロイ、更新、ロールバック、削除しました。定義の変更は `diff` で確認し、`render` で正規化した内容を確認できます。`registryPassword` などの秘密情報はコマンド引数に含めず、定義ファイルまたは標準入力から渡します。
+低レベルコマンドでの確認と高レベルコマンドでの作成・運用を組み合わせて、定義ファイル 1 つからアプリケーションをデプロイ、更新、ロールバック、削除しました。定義の変更は `diff` で確認し、`render` で正規化した内容を確認できます。`registryPassword` などの秘密情報はコマンド引数に含めず、定義ファイルまたは標準入力から渡します。
 
-ロードバランサの待受ポート、Let's Encrypt、証明書、ワーカノードの draining、CPU 使用率によるオートスケーリング (`scalingMode: "cpu"`) はこのチュートリアルでは扱っていません。低レベルコマンドの `--help` と[技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)を参照してください。アプリケーションの作成・更新・削除を低レベルコマンドだけで行うこともできます。その場合は、高レベルコマンドが自動で行うバージョンの有効化とコンテナの起動・停止の待機を自分で行う必要があるため、各操作の `--help` と待機条件を確認してください。
+待受ポート (`--port`) や Let's Encrypt (`--lets-encrypt-email`) を使うクラスタ構成は、`skr apprun-dedicated create-cluster` の `--help` と[クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html)を参照してください。ロードバランサや証明書の後続の操作、ワーカノードの draining、CPU 使用率によるオートスケーリング (`scalingMode: "cpu"`) は低レベルコマンドの `--help` と[技術概要](https://manual.sakura.ad.jp/cloud/apprun-dedicated/glossary.html)を参照してください。アプリケーションの作成・更新・削除を低レベルコマンドだけで行うこともできます。その場合は、高レベルコマンドが自動で行うバージョンの有効化とコンテナの起動・停止の待機を自分で行う必要があるため、各操作の `--help` と待機条件を確認してください。
 
 ## 参考資料
 

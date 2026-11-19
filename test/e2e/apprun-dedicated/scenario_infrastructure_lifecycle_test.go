@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // このファイルは apprun-dedicated 高レベルコマンドのインフラライフサイクル
-// (create-auto-scaling-group、delete-auto-scaling-group、delete-cluster) の
+// (create-cluster、create-auto-scaling-group、delete-auto-scaling-group、delete-cluster) の
 // ライブ E2E シナリオです。クラスタとオートスケーリンググループの作成を伴うため、
 // 実行にはワーカノード (最小構成 1vCPU/2GB x 1 台) の時間割料金が発生します。
 // 承認は [#59](https://github.com/sacloud/skr/issues/59) で管理します。
@@ -21,6 +21,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -31,12 +32,22 @@ import (
 )
 
 // TestScenarioAppRunDedicatedInfrastructureLifecycle は apprun-dedicated 高レベルコマンドの
-// インフラライフサイクル (create-auto-scaling-group、delete-auto-scaling-group、delete-cluster) の
-// ライブ E2E です。クラスタは低レベルコマンドで作成し、オートスケーリンググループの作成と削除、
-// クラスタの削除は高レベルコマンドで行います。作成直後・削除後の確認は SDK で静かに実行します。
+// インフラライフサイクル (create-cluster、create-auto-scaling-group、delete-auto-scaling-group、
+// delete-cluster) のライブ E2E です。クラスタの作成・削除とオートスケーリンググループの
+// 作成・削除を高レベルコマンドで行います。作成直後・削除後の確認は SDK で静かに実行します。
+// parseClusterIDOutput は --query-raw .clusterID の出力からクラスタ ID を取り込みます。
+func parseClusterIDOutput(t *testing.T, data []byte) v1.ClusterID {
+	t.Helper()
+	id := strings.TrimSpace(string(data))
+	require.NotEmpty(t, id, "create-cluster output should contain a cluster ID")
+	parsed, err := uuid.Parse(id)
+	require.NoError(t, err, "create-cluster output should be a UUID: %s", id)
+	return v1.ClusterID(parsed)
+}
+
 func TestScenarioAppRunDedicatedInfrastructureLifecycle(t *testing.T) {
 	h := helper.New(t, "apprun-dedicated-infrastructure",
-		"AppRun 専有型の高レベルコマンドによるインフラライフサイクル (create-auto-scaling-group、delete-auto-scaling-group、delete-cluster) を確認する。クラスタとワーカノード 1 台のオートスケーリンググループを作成するため、ワーカノードの時間割料金が発生する")
+		"AppRun 専有型の高レベルコマンドによるインフラライフサイクル (create-cluster、create-auto-scaling-group、delete-auto-scaling-group、delete-cluster) を確認する。クラスタとワーカノード 1 台のオートスケーリンググループを作成するため、ワーカノードの時間割料金が発生する")
 
 	servicePrincipalID := os.Getenv(envServicePrincipalID)
 	if servicePrincipalID == "" {
@@ -52,15 +63,12 @@ func TestScenarioAppRunDedicatedInfrastructureLifecycle(t *testing.T) {
 
 	requireNoClusterNamed(t, clusters, clusterName)
 
-	// クラスタを低レベルコマンドで作成する。
-	clusterRequest := h.WriteRequestJSONFile(t, "create-cluster", map[string]any{
-		"name":               clusterName,
-		"ports":              []any{},
-		"servicePrincipalID": servicePrincipalID,
-	})
-	data := h.CallWithTimeout(t, createCommandLimit, "クラスタを作成する",
-		"apprun-dedicated-api", "create-cluster", "--request", "@"+clusterRequest)
-	clusterID := parseCreateClusterOutput(t, data)
+	// クラスタを高レベルコマンドで作成する。待受ポートと Let's Encrypt は使わない。
+	// ID は --query-raw で取り込みます。
+	data := h.CallWithTimeout(t, createCommandLimit, "クラスタを作成する (高レベルコマンド)",
+		"apprun-dedicated", "create-cluster", clusterName, "--service-principal-id", servicePrincipalID,
+		"--query-raw", ".clusterID")
+	clusterID := parseClusterIDOutput(t, data)
 	require.NotEqual(t, uuid.Nil, uuid.UUID(clusterID), "created cluster should have an ID")
 
 	verifyCreatedCluster(t, clusters, clusterID, clusterName)

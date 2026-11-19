@@ -22,6 +22,7 @@ import (
 	"time"
 
 	autoscalinggroup "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/autoscalinggroup"
+	cluster "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/sacloud/sacloud-sdk-go/common/saclient"
 )
@@ -183,6 +184,129 @@ type DeleteClusterOptions struct {
 	NoWait bool
 	// Timeout は削除後の不在確認のタイムアウトです。零値の場合は DefaultWaitTimeout を使います。
 	Timeout time.Duration
+}
+
+// CreateClusterResult は CreateCluster の結果です。
+type CreateClusterResult struct {
+	// Name は作成したクラスタの名前です。
+	Name string `json:"name"`
+	// ClusterID は作成したクラスタの ID です。
+	ClusterID v1.ClusterID `json:"clusterID"`
+	// Created はクラスタの作成日時です (UNIX 時間の秒)。
+	Created int64 `json:"created"`
+	// HasLetsEncryptEmail は Let's Encrypt 用のメールアドレスが設定済みかどうかです。
+	HasLetsEncryptEmail bool `json:"hasLetsEncryptEmail"`
+	// Ports はクラスタロードバランサの待受ポートです。
+	Ports []v1.ClusterLoadBalancerPort `json:"ports"`
+	// ServicePrincipalID はクラスタに設定したサービスプリンシパル ID です。
+	ServicePrincipalID string `json:"servicePrincipalID"`
+}
+
+// CreateCluster はクラスタを作成します。
+//
+// クラスタ名で同名のクラスタが既に存在しないことを確認してから作成 API を呼び出し、
+// 作成後の Read で ID、名前、サービスプリンシパル ID、待受ポート、Let's Encrypt の
+// 設定を照合します。クラスタの作成は API 側で同期的に完了するため、
+// 待機のオプションはありません。
+func (s *Service) CreateCluster(ctx context.Context, name, servicePrincipalID string, ports []v1.ClusterLoadBalancerPort, letsEncryptEmail *string) (*CreateClusterResult, error) {
+	if err := s.requireClusterAbsent(ctx, name); err != nil {
+		return nil, err
+	}
+	if err := ensureActive(ctx); err != nil {
+		return nil, err
+	}
+	// 待受ポートを指定しない場合も、API のリクエストには空配列の ports を送ります。
+	if ports == nil {
+		ports = []v1.ClusterLoadBalancerPort{}
+	}
+	ident, err := s.clusterAPI.Create(ctx, cluster.CreateParams{
+		Name:               name,
+		LetsEncryptEmail:   letsEncryptEmail,
+		Ports:              ports,
+		ServicePrincipalID: servicePrincipalID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("クラスタ %q の作成に失敗しました: %w", name, err)
+	}
+	detail, err := s.clusterAPI.Read(ctx, ident.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("作成したクラスタ %q の情報取得に失敗しました: %w", name, err)
+	}
+	// 作成後に読み戻して、指定した内容と API に登録された内容を照合します。
+	var mismatches []string
+	if detail.ClusterID != ident.ClusterID {
+		mismatches = append(mismatches, fmt.Sprintf("ID (応答: %v)", detail.ClusterID))
+	}
+	if detail.Name != name {
+		mismatches = append(mismatches, fmt.Sprintf("名前 (応答: %q)", detail.Name))
+	}
+	if detail.ServicePrincipalID != servicePrincipalID {
+		mismatches = append(mismatches, fmt.Sprintf("サービスプリンシパル ID (応答: %q)", detail.ServicePrincipalID))
+	}
+	if detail.HasLetsEncryptEmail != (letsEncryptEmail != nil) {
+		mismatches = append(mismatches, fmt.Sprintf("Let's Encrypt の設定 (応答: %v)", detail.HasLetsEncryptEmail))
+	}
+	if !clusterPortsEqual(detail.Ports, ports) {
+		mismatches = append(mismatches, fmt.Sprintf("待受ポート (応答: %s)", formatClusterPorts(detail.Ports)))
+	}
+	if len(mismatches) > 0 {
+		return nil, fmt.Errorf("作成したクラスタ %q の応答が指定内容と一致しません: %s", name, strings.Join(mismatches, "、"))
+	}
+	return &CreateClusterResult{
+		Name:                detail.Name,
+		ClusterID:           detail.ClusterID,
+		Created:             int64(detail.Created),
+		HasLetsEncryptEmail: detail.HasLetsEncryptEmail,
+		Ports:               detail.Ports,
+		ServicePrincipalID:  detail.ServicePrincipalID,
+	}, nil
+}
+
+// clusterPortsEqual は待受ポートの期待値と応答を比較します。
+// 空の配列と nil は同じとみなし、要素は指定順に等しいことを確認します。
+func clusterPortsEqual(actual, expected []v1.ClusterLoadBalancerPort) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	for i := range expected {
+		if actual[i] != expected[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// formatClusterPorts は待受ポートをエラーメッセージ用に整形します。
+func formatClusterPorts(ports []v1.ClusterLoadBalancerPort) string {
+	if len(ports) == 0 {
+		return "(なし)"
+	}
+	parts := make([]string, 0, len(ports))
+	for _, port := range ports {
+		parts = append(parts, fmt.Sprintf("ポート番号=%d/プロトコル=%q", port.Port, port.Protocol))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// requireClusterAbsent は同名のクラスタが存在しないことを確認します。
+// 一覧はページングを含めて走査し、同名が見つかった場合はエラーを返します。
+func (s *Service) requireClusterAbsent(ctx context.Context, name string) error {
+	var cursor *v1.ClusterID
+	for {
+		list, next, err := s.clusterAPI.List(ctx, listPageSize, cursor)
+		if err != nil {
+			return fmt.Errorf("クラスタの一覧取得に失敗しました: %w", err)
+		}
+		for i := range list {
+			if list[i].Name == name {
+				return fmt.Errorf("クラスタ %q は既に存在します", name)
+			}
+		}
+		if next == nil {
+			return nil
+		}
+		cursor = next
+	}
 }
 
 // DeleteClusterResult は DeleteCluster の結果です。

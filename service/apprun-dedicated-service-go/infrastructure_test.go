@@ -15,12 +15,31 @@
 package apprundedicated
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
+	cluster "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/cluster"
 	v1 "github.com/sacloud/sacloud-sdk-go/api/apprun-dedicated/apis/v1"
 	"github.com/stretchr/testify/require"
 )
+
+// readMutatingClusterAPI は Read の応答を加工する cluster.ClusterAPI です。
+// 応答の不整合を再現するために使います。
+type readMutatingClusterAPI struct {
+	cluster.ClusterAPI
+	mutate func(*cluster.ClusterDetail)
+}
+
+func (m *readMutatingClusterAPI) Read(ctx context.Context, id v1.ClusterID) (*cluster.ClusterDetail, error) {
+	detail, err := m.ClusterAPI.Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	m.mutate(detail)
+	return detail, nil
+}
 
 func TestCreateAutoScalingGroup(t *testing.T) {
 	t.Run("作成後にワーカノードが healthy になるまで待つ", func(t *testing.T) {
@@ -214,6 +233,101 @@ func TestDeleteCluster(t *testing.T) {
 		_, err := s.DeleteCluster(t.Context(), "c1", nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "クラスタ \"c1\" が見つかりません")
+	})
+}
+
+func TestCreateCluster(t *testing.T) {
+	t.Run("待受ポートと Let's Encrypt なしで作成", func(t *testing.T) {
+		f := newFakeSDK(t)
+		s := newTestService(t, f)
+
+		result, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, "c1", result.Name)
+		require.NotEmpty(t, result.ClusterID)
+		require.Equal(t, int64(fakeClusterCreatedAt), result.Created)
+		require.False(t, result.HasLetsEncryptEmail)
+		require.Empty(t, result.Ports)
+		require.Equal(t, "sp-000000000", result.ServicePrincipalID)
+		// 待受ポートを指定しない場合も、リクエストには空配列の ports を送ります。
+		require.Len(t, f.createClusterCalls, 1)
+		require.NotNil(t, f.createClusterCalls[0].Ports)
+		require.Empty(t, f.createClusterCalls[0].Ports)
+		require.Nil(t, f.createClusterCalls[0].LetsEncryptEmail)
+	})
+
+	t.Run("待受ポートと Let's Encrypt のメールアドレスを指定", func(t *testing.T) {
+		f := newFakeSDK(t)
+		s := newTestService(t, f)
+
+		email := "ops@example.com"
+		ports := []v1.ClusterLoadBalancerPort{
+			{Port: 80, Protocol: v1.ClusterLoadBalancerPortProtocolHTTP},
+			{Port: 443, Protocol: v1.ClusterLoadBalancerPortProtocolHTTPS},
+		}
+		result, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", ports, &email)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.True(t, result.HasLetsEncryptEmail)
+		require.Equal(t, ports, result.Ports)
+		require.Equal(t, ports, f.createClusterCalls[0].Ports)
+		require.Equal(t, &email, f.createClusterCalls[0].LetsEncryptEmail)
+	})
+
+	t.Run("同名のクラスタが既に存在", func(t *testing.T) {
+		f := newFakeSDK(t)
+		f.addCluster(t, "c1")
+		s := newTestService(t, f)
+
+		_, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", nil, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "クラスタ \"c1\" は既に存在します")
+		require.Empty(t, f.createClusterCalls)
+	})
+
+	t.Run("同名のクラスタが後続ページに存在", func(t *testing.T) {
+		f := newFakeSDK(t)
+		for i := 0; i < 3; i++ {
+			f.addCluster(t, "c0")
+		}
+		f.addCluster(t, "c1")
+		s := pagingService(t, f, 1)
+
+		// ページサイズ 1 で同名が 4 ページ目にあっても、作成前に検出して中断します。
+		_, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", nil, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "クラスタ \"c1\" は既に存在します")
+		require.Empty(t, f.createClusterCalls)
+	})
+
+	t.Run("読み戻しが指定内容と不一致", func(t *testing.T) {
+		f := newFakeSDK(t)
+		s := newTestService(t, f)
+		s.clusterAPI = &readMutatingClusterAPI{
+			ClusterAPI: f.cluster,
+			mutate: func(d *cluster.ClusterDetail) {
+				d.Ports = []v1.ClusterLoadBalancerPort{
+					{Port: 8080, Protocol: v1.ClusterLoadBalancerPortProtocolTCP},
+				}
+			},
+		}
+		email := "ops@example.com"
+		_, err := s.CreateCluster(t.Context(), "c1", "sp-000000000",
+			[]v1.ClusterLoadBalancerPort{{Port: 443, Protocol: v1.ClusterLoadBalancerPortProtocolHTTPS}}, &email)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "作成したクラスタ \"c1\" の応答が指定内容と一致しません")
+		require.Contains(t, err.Error(), "待受ポート")
+	})
+
+	t.Run("作成 API のエラーを伝播", func(t *testing.T) {
+		f := newFakeSDK(t)
+		f.createClusterErr = errors.New("create cluster failed")
+		s := newTestService(t, f)
+
+		_, err := s.CreateCluster(t.Context(), "c1", "sp-000000000", nil, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "クラスタ \"c1\" の作成に失敗しました")
 	})
 }
 

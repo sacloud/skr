@@ -19,7 +19,7 @@ AppRun 専有型のアプリケーションを、JSON の定義ファイル1つ�
 
 対象外は次のとおりです。
 
-- クラスタ、オートスケーリンググループ、ワーカノード、ロードバランサ、証明書、サービスクラスの参照・管理。低レベル `apprun-dedicated-api` が同じ入出力で提供しており、高レベル層では繰り返しません。インフラの構築と管理 (クラスタ作成を含む) は Terraform などの別手段とし、高レベル層はアプリケーションだけを変更します。
+- クラスタ、オートスケーリンググループ、ワーカノード、ロードバランサ、証明書、サービスクラスの参照・管理。低レベル `apprun-dedicated-api` が同じ入出力で提供しており、高レベル層では繰り返しません。ただし、インフラライフサイクルの骨格 (`create-cluster`、`create-auto-scaling-group`、`delete-auto-scaling-group`、`delete-cluster`) は高レベル層が担います ([ADR 0083](../adr/0083-apprun-dedicated-infrastructure-lifecycle-commands.md)、[ADR 0092](../adr/0092-apprun-dedicated-create-cluster.md))。ロードバランサ、証明書、ワーカノードの draining などの詳細なインフラ構築は Terraform などの別手段も選べます。
 - 低レベル `apprun-dedicated-api` の変更。現行のコマンドと JSON 経路を維持します。
 - Jsonnet、環境変数参照 (`env`、`must_env`)、tfstate-lookup、Secret Manager 参照の評価機構。定義は JSON のみです。
 - 低レベル `apprun-dedicated-api` コマンドのライブ E2E。クラスタ作成を伴うため [#59](https://github.com/sacloud/skr/issues/59) で管理します。高レベルコマンドのライフサイクルシナリオは「ライブ E2E」のとおり実装済みです。
@@ -254,9 +254,14 @@ skr apprun-dedicated containers --app FILE|-
 skr apprun-dedicated rollback --app FILE|- [--target VERSION] [--force] [--wait | --no-wait] [--wait-timeout DURATION]
 skr apprun-dedicated deactivate --app FILE|- [--force] [--wait | --no-wait] [--wait-timeout DURATION]
 skr apprun-dedicated delete --app FILE|- [--force] [--wait | --no-wait] [--wait-timeout DURATION]
+
+skr apprun-dedicated create-cluster <name> --service-principal-id=ID [--port 'port=PORT,protocol=PROTOCOL' ...] [--lets-encrypt-email=EMAIL]
+skr apprun-dedicated create-auto-scaling-group <cluster> <name> [flags]
+skr apprun-dedicated delete-auto-scaling-group <cluster> <name> [--force] [--wait | --no-wait] [--wait-timeout DURATION]
+skr apprun-dedicated delete-cluster <name> [--force] [--wait | --no-wait] [--wait-timeout DURATION]
 ```
 
-末端コマンドは 10 個です。位置引数は `init` のクラスタ名とアプリケーション名のみです ([ADR 0075](../adr/0075-high-level-command-tier.md) に従い、対象を表す値は位置引数にします)。認証は低レベル層と同じ SDK のプロファイル機構を使い、グローバルフラグと共通の出力処理を接続します。
+末端コマンドは 14 個です。位置引数は対象を表す値に使い ([ADR 0075](../adr/0075-high-level-command-tier.md))、認証は低レベル層と同じ SDK のプロファイル機構を使い、グローバルフラグと共通の出力処理を接続します。`create-cluster` の設計は [ADR 0092](../adr/0092-apprun-dedicated-create-cluster.md)、インフラライフサイクルの他のコマンドは [ADR 0083](../adr/0083-apprun-dedicated-infrastructure-lifecycle-commands.md) を参照してください。
 
 ### フラグ一覧
 
@@ -331,14 +336,14 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 
 ### CLI 全体と SDK 通信のテスト
 
-- `internal/cli` の sakumock テストで、10 個の末端コマンドの正常系を実際の CLI パスと SDK を通して検証します。sakumock の `apprundedicated` サーバー (v0.14.0) を使います。既存の低レベル層のテスト (`internal/cli/apprundedicated_test.go`) と同じサーバーを共有します。
+- `internal/cli` の sakumock テストで、14 個の末端コマンドの正常系を実際の CLI パスと SDK を通して検証します。sakumock の `apprundedicated` サーバー (v0.14.0) を使います。既存の低レベル層のテスト (`internal/cli/apprundedicated_test.go`) と同じサーバーを共有します。sakumock は待受ポートなしの `create-cluster` を 400 で拒否するため ([sacloud/sakumock#267](https://github.com/sacloud/sakumock/issues/267)、[sakumock の既知の差分と未整備](sakumock-gaps.md))、sakumock でのクラスタ作成は待受ポートを 1 つ以上指定します。待受ポート省略 (空配列送信) は service 層の fake テストとライブ E2E で検証します。
 - sakumock で待機条件 (コンテナの `running` 遷移) が再現できない場合は、SDK が読むステータスと応答型を再現する HTTP テストサーバーで補います (`SAKURA_ENDPOINTS_*` によるエンドポイント差し替え)。[EventBus 高レベルコマンドの設計](eventbus.md) のテスト方針と同じ方式です。
 - service 層の通信テストは service/apprun-dedicated-service-go に置き、sakumock へ実際の SDK を接続して wire 形式と操作の流れを検証します。
 - 秘密情報: 定義ファイル・標準入力・fake リクエストのいずれの経路でも、stdout・stderr・ログ・エラーに `registryPassword` が現れないことを確認します。
 
 ### ライブ E2E
 
-クラスタ作成を含むライフサイクルシナリオを `test/e2e/apprun-dedicated/scenario_lifecycle_test.go` に実装済みです ([ADR 0058](../adr/0058-live-e2e-command-coverage.md)、[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)、[ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従う testing.T ベースのシナリオ)。2026-11-12 にクラスタと ASG (ワーカノード 1 台) の作成を含むライブ実行で全操作の正常動作と後片付けを確認済みで、`baseline.txt` の高レベル 10 コマンドは `live` です。シナリオの概要:
+クラスタ作成を含むライフサイクルシナリオを `test/e2e/apprun-dedicated/scenario_lifecycle_test.go` に実装済みです ([ADR 0058](../adr/0058-live-e2e-command-coverage.md)、[ADR 0062](../adr/0062-e2e-testing-t-based-scenario.md)、[ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md) に従う testing.T ベースのシナリオ)。2026-11-12 にクラスタと ASG (ワーカノード 1 台) の作成を含むライブ実行で全操作の正常動作と後片付けを確認済みです。`baseline.txt` の高レベル 14 コマンドのうち、切り替え済みの 13 コマンドは `live` です。`create-cluster` は高レベルコマンドへの切り替え後のライブ再実行が未実施のため `implemented` です。シナリオの概要:
 
 - 事前の同名確認と、作成直後の SDK による読み戻し (クラスタは ID・名前、ASG は ID・名前・ゾーン・サービスクラス・ノード数・インターフェース) を行います。
 - `deploy` (バージョン 1)、`status`、`versions`、`containers`、`init` での参照、環境変数を追加した 2 回目の `deploy` (バージョン 2)、`rollback`、`deactivate`、`delete` の順に実行し、応答と状態を照合します。
@@ -347,7 +352,7 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 
 deploy の反映待ち失敗時の後片付けを `test/e2e/apprun-dedicated/scenario_deploy_failure_test.go` に実装済みです。オートスケーリンググループを作らないためワーカノードの料金は発生しません。再検索の判定 (作成済み、未作成、別クラスタの同名、同名の複数、照会失敗) はスタブによる単体テスト (`TestFindCreatedApplication`) で確認します。
 
-低レベル `apprun-dedicated-api` コマンドのライブ E2E はクラスタ作成を前提とするため [#59](https://github.com/sacloud/skr/issues/59) で管理します (ライフサイクルシナリオのセットアップと後片付けは低レベルの create/delete を利用しますが、各操作の専用検証は別途整備します)。
+低レベル `apprun-dedicated-api` コマンドのライブ E2E はクラスタ作成を前提とするため [#59](https://github.com/sacloud/skr/issues/59) で管理します (ライフサイクルシナリオのセットアップと後片付けは低レベルの create/delete を利用しますが、各操作の専用検証は別途整備します)。低レベル `create-cluster` の JSON 経路は sakumock テスト (`TestRunAppRunDedicatedCommandsWithSakumock`) が検証します。
 
 ## ドキュメントと PLAN
 

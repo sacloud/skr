@@ -1,6 +1,6 @@
 # AppRun 専有型の高レベルコマンド (`skr apprun-dedicated`)
 
-`skr apprun-dedicated` は、AppRun 専有型のアプリケーションを JSON の定義ファイル 1 つからデプロイ・運用し、オートスケーリンググループとクラスタの削除など、インフラライフサイクルの一部を操作する高レベルコマンドです。デプロイやロールバックの反映待ち、作成後の healthy 待ち、状態の確認、定義の差分確認を 1 つのコマンド群で行います。
+`skr apprun-dedicated` は、AppRun 専有型のアプリケーションを JSON の定義ファイル 1 つからデプロイ・運用し、オートスケーリンググループの作成・削除やクラスタの作成・削除など、インフラライフサイクルの一部を操作する高レベルコマンドです。デプロイやロールバックの反映待ち、作成後の healthy 待ち、状態の確認、定義の差分確認を 1 つのコマンド群で行います。
 
 このページはコマンドの対象、構造、各サブコマンドの挙動と制約を説明するリファレンスです。最初から順に試す手順は [AppRun 専有型: 定義ファイルからアプリケーションをデプロイする](tutorials/apprun-dedicated.md) を参照してください。フラグと使用例の一覧は `--help` で確認できます。
 
@@ -9,9 +9,9 @@
 対象は次の 2 つです。
 
 - アプリケーションのライフサイクル (定義からのデプロイ、バージョンの切替、停止、削除)。
-- インフラライフサイクルの一部。既存のクラスタに対するオートスケーリンググループの作成、オートスケーリンググループの削除、クラスタの削除です (`create-auto-scaling-group`、`delete-auto-scaling-group`、`delete-cluster`)。
+- インフラライフサイクルの一部。クラスタの作成と削除、既存のクラスタに対するオートスケーリンググループの作成と削除です (`create-cluster`、`delete-cluster`、`create-auto-scaling-group`、`delete-auto-scaling-group`)。
 
-対象外はインフラの中でも、クラスタの作成、ロードバランサ、証明書、ワーカノードの draining、サービスクラスの一覧と選択です。これらは低レベルの `skr apprun-dedicated-api` が提供します。クラスタの作成を含むインフラ構築は、低レベルコマンドのほか Terraform などの別手段で行うこともできます。
+対象外はインフラの中でも、クラスタのロードバランサ、証明書、ワーカノードの draining、サービスクラスの一覧と選択です。これらは低レベルの `skr apprun-dedicated-api` が提供します。待受ポートと Let's Encrypt の設定は `create-cluster` の作成時に `--port` と `--lets-encrypt-email` で指定できます。作成後のロードバランサや証明書の参照・更新、ワーカノードの draining などの詳細なインフラ操作は、低レベルコマンドのほか Terraform などの別手段で行うこともできます。
 
 ## 概念
 
@@ -42,6 +42,7 @@ AppRun 専有型のリソースは次の階層で構成されます。用語の�
 | `rollback` | 既存のバージョンを有効化して切り替える | `update-application`、反映待ちの `read-application` と `list-application-containers` |
 | `deactivate` | アクティブバージョンを解除してアプリケーションを停止する | `update-application --deactivate`、停止待ちの `read-application` |
 | `delete` | アプリケーションとすべてのバージョンを削除する | `update-application --deactivate`、`delete-application`、削除後の不在確認 (`read-application`) |
+| `create-cluster` | クラスタを作成する | `list-clusters`、`create-cluster`、作成後の `read-cluster` |
 | `create-auto-scaling-group` | クラスタにオートスケーリンググループを作成する | `list-clusters`、`list-auto-scaling-groups`、`create-auto-scaling-group`、作成後の healthy 待ち |
 | `delete-auto-scaling-group` | クラスタのオートスケーリンググループを削除する | `list-clusters`、`list-auto-scaling-groups`、`delete-auto-scaling-group`、削除後の不在確認 |
 | `delete-cluster` | クラスタを削除する | `list-clusters`、`list-applications`、`list-auto-scaling-groups`、`delete-cluster`、削除後の不在確認 |
@@ -231,6 +232,25 @@ skr apprun-dedicated delete --app=FILE|-
 
 アプリケーションとすべてのバージョンを削除します。アクティブバージョンがあれば先に解除し、停止を待ってから削除します。削除後は API の応答でアプリケーションが不在になったことを確認します。`--no-wait` を指定しても、削除自体と削除後の不在確認は行われます。
 
+### create-cluster
+
+```
+skr apprun-dedicated create-cluster <name> \
+  --service-principal-id=ID \
+  [--port 'port=PORT,protocol=PROTOCOL' ...] \
+  [--lets-encrypt-email=EMAIL]
+```
+
+クラスタを作成します。作成前に同名のクラスタが存在しないことを確認し、存在する場合はエラーになります。作成後は API から読み戻して、指定した内容 (名前、サービスプリンシパル ID、待受ポート、Let's Encrypt の設定) を照合し、結果を JSON で出力します (`--query` で加工できます)。クラスタの作成は API 側で同期的に完了するため、待機のオプションはありません。
+
+`--service-principal-id` にはクラスタで利用するサービスプリンシパルの ID を指定します。サービスプリンシパルの作成方法は [クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html) を参照してください。
+
+`--port` はクラスタロードバランサの待受ポートで、`'port=80,protocol=http'` 形式の 1 指定が 1 ポートに対応し、繰り返し指定できます。`port` はポート番号、`protocol` は `http`、`https`、`tcp` のいずれかです。省略した場合は待受ポートなしで作成します。予約されたポート番号などの入力値の制約は API が検証します。
+
+`--lets-encrypt-email` は Let's Encrypt の証明書発行に使うメールアドレスです。証明書発行は HTTP-01 チャレンジになるため、80 番ポートを HTTP プロトコルで外向きに解放する必要があります。
+
+待受ポートや Let's Encrypt を使わない場合は、このコマンドだけでクラスタを作成できます。ロードバランサや証明書の後続の操作は低レベルの `skr apprun-dedicated-api` で行います。
+
 ### create-auto-scaling-group
 
 ```
@@ -295,7 +315,7 @@ skr apprun-dedicated init <cluster> <application>
 
 ## 出力
 
-`deploy`、`render`、`status`、`versions`、`containers`、`rollback`、`deactivate`、`create-auto-scaling-group` は結果を JSON で出力し、グローバルフラグ `--query` で加工できます。進行状況のログは標準エラー出力に書き、標準出力は結果の JSON だけを含みます。
+`deploy`、`render`、`status`、`versions`、`containers`、`rollback`、`deactivate`、`create-cluster`、`create-auto-scaling-group` は結果を JSON で出力し、グローバルフラグ `--query` で加工できます。進行状況のログは標準エラー出力に書き、標準出力は結果の JSON だけを含みます。
 
 `init` は定義ファイルを書き出し、`diff` は unified diff、`delete`、`delete-auto-scaling-group`、`delete-cluster` は何も出力しないため、この 5 つは `--query` に対応しません。指定した場合はエラーになります。
 
@@ -312,6 +332,8 @@ skr apprun-dedicated init <cluster> <application>
 | --- | --- | --- |
 | 定義の検証エラー (未知のフィールド、必須項目の欠落、`host` と `loadBalancerPort` の整合) | API を呼び出す前にエラーになる | エラーメッセージに定義のフィールド名が示される。定義を修正する |
 | クラスタまたはアプリケーションが見つからない | `deploy` は新規作成に進む。それ以外のコマンドはエラーになる | クラスタ名とアプリケーション名、定義の `cluster` と `name` を確認する |
+| `create-cluster` で同名のクラスタが既にある | 作成 API を呼び出さずにエラーになる | 既存のクラスタを使うか、別の名前を指定する。既存クラスタの ID は `skr apprun-dedicated-api list-clusters` で確認できる |
+| `create-cluster` の `--port` や `--lets-encrypt-email` が API の制約に一致しない | API がエラーを返す | エラーメッセージの制約を確認する。予約されたポート番号などの入力値の制約は [クイックスタート](https://manual.sakura.ad.jp/cloud/apprun-dedicated/getting_started.html) を参照する |
 | 対象の再照合で不一致 | 変更 API を呼び出さずにエラーになる | 定義の識別子と実環境の対応を確認する |
 | 待機のタイムアウト | エラーになる。変更自体は完了していることがある | `status`、`containers` で状態を確認する。ワーカノード数とコンテナ数を確認する (「待機と反映の確認」参照) |
 | トレースが有効な状態での `deploy` | リクエスト本文 (秘密情報を含む) がトレース出力へ記録される | 値が含まれたログを共有・保存しない。`--trace` を外し、`SAKURA_TRACE_MODE` などの SDK 設定を確認する |
