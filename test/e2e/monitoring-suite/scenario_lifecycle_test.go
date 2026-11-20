@@ -222,15 +222,16 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	metricStorageID := monitoringSuiteIDText(t, metricStorage, "id")
 	require.Equal(t, metricStorageName, metricStorage["name"], "create-metric-storage output: %v", metricStorage)
 
-	metricStorageRead := pollMonitoringSuiteRead(t, h, "メトリクスストレージ "+metricStorageID+" の反映を確認する", 3*time.Minute,
-		"monitoring-suite-api", "read-metric-storage", metricStorageID)
-	require.Equal(t, metricStorageID, monitoringSuiteIDText(t, metricStorageRead, "id"))
-
+	// 課金リソースのため、ID 取得直後に削除と不在確認を defer で登録する
 	defer func() {
 		h.Call(t, "後片付け: メトリクスストレージ "+metricStorageID+" を削除する", "monitoring-suite-api", "delete-metric-storage", metricStorageID)
 		monitoringSuiteWaitGone(t, h, "後片付け: メトリクスストレージ "+metricStorageID+" の削除後の不在を確認する", 3*time.Minute,
 			"monitoring-suite-api", "read-metric-storage", metricStorageID)
 	}()
+
+	metricStorageRead := pollMonitoringSuiteRead(t, h, "メトリクスストレージ "+metricStorageID+" の反映を確認する", 3*time.Minute,
+		"monitoring-suite-api", "read-metric-storage", metricStorageID)
+	require.Equal(t, metricStorageID, monitoringSuiteIDText(t, metricStorageRead, "id"))
 
 	metricStoragePatched := callMonitoringSuite(t, h, "メトリクスストレージ "+metricStorageID+" の説明を更新する",
 		"monitoring-suite-api", "patch-metric-storage", metricStorageID, "--request", `{"Description":"skr e2e patched"}`)
@@ -339,6 +340,11 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	targetUID := monitoringSuiteIDText(t, target, "uid")
 	require.Equal(t, "SAKURA_SIMPLE_NOTICE", target["service_type"], "create-alert-project-notification-target output: %v", target)
 
+	targetRead := callMonitoringSuite(t, h, "通知先 "+targetUID+" を参照する",
+		"monitoring-suite-api", "read-alert-project-notification-target", projectID, targetUID)
+	require.Equal(t, targetUID, monitoringSuiteIDText(t, targetRead, "uid"))
+	require.Equal(t, "SAKURA_SIMPLE_NOTICE", targetRead["service_type"], "read-alert-project-notification-target output: %v", targetRead)
+
 	targetPatched := callMonitoringSuite(t, h, "通知先 "+targetUID+" の URL を更新する",
 		"monitoring-suite-api", "patch-alert-project-notification-target", projectID, targetUID,
 		"--request", `{"URL":"https://example.test/hook2"}`)
@@ -354,15 +360,16 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	logStorageID := monitoringSuiteIDText(t, logStorage, "id")
 	require.Equal(t, logStorageName, logStorage["name"], "create-log-storage output: %v", logStorage)
 
-	logStorageRead := pollMonitoringSuiteRead(t, h, "ログストレージ "+logStorageID+" の反映を確認する", 3*time.Minute,
-		"monitoring-suite-api", "read-log-storage", logStorageID)
-	require.Equal(t, logStorageID, monitoringSuiteIDText(t, logStorageRead, "id"))
-
+	// 課金リソースのため、ID 取得直後に削除と不在確認を defer で登録する
 	defer func() {
 		h.Call(t, "後片付け: ログストレージ "+logStorageID+" を削除する", "monitoring-suite-api", "delete-log-storage", logStorageID)
 		monitoringSuiteWaitGone(t, h, "後片付け: ログストレージ "+logStorageID+" の削除後の不在を確認する", 3*time.Minute,
 			"monitoring-suite-api", "read-log-storage", logStorageID)
 	}()
+
+	logStorageRead := pollMonitoringSuiteRead(t, h, "ログストレージ "+logStorageID+" の反映を確認する", 3*time.Minute,
+		"monitoring-suite-api", "read-log-storage", logStorageID)
+	require.Equal(t, logStorageID, monitoringSuiteIDText(t, logStorageRead, "id"))
 
 	logStoragePatched := callMonitoringSuite(t, h, "ログストレージ "+logStorageID+" の説明を更新する",
 		"monitoring-suite-api", "patch-log-storage", logStorageID, "--request", `{"Description":"skr e2e patched"}`)
@@ -570,15 +577,16 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	traceStorageID := monitoringSuiteIDText(t, traceStorage, "id")
 	require.Equal(t, traceStorageName, traceStorage["name"], "create-trace-storage output: %v", traceStorage)
 
-	traceStorageRead := pollMonitoringSuiteRead(t, h, "トレースストレージ "+traceStorageID+" の反映を確認する", 3*time.Minute,
-		"monitoring-suite-api", "read-trace-storage", traceStorageID)
-	require.Equal(t, traceStorageID, monitoringSuiteIDText(t, traceStorageRead, "id"))
-
+	// 課金リソースのため、ID 取得直後に削除と不在確認を defer で登録する
 	defer func() {
 		h.Call(t, "後片付け: トレースストレージ "+traceStorageID+" を削除する", "monitoring-suite-api", "delete-trace-storage", traceStorageID)
 		monitoringSuiteWaitGone(t, h, "後片付け: トレースストレージ "+traceStorageID+" の削除後の不在を確認する", 3*time.Minute,
 			"monitoring-suite-api", "read-trace-storage", traceStorageID)
 	}()
+
+	traceStorageRead := pollMonitoringSuiteRead(t, h, "トレースストレージ "+traceStorageID+" の反映を確認する", 3*time.Minute,
+		"monitoring-suite-api", "read-trace-storage", traceStorageID)
+	require.Equal(t, traceStorageID, monitoringSuiteIDText(t, traceStorageRead, "id"))
 
 	traceStorageExpired := callMonitoringSuite(t, h, "トレースストレージ "+traceStorageID+" の保存期間を 60 日に変更する",
 		"monitoring-suite-api", "set-trace-storage-expire", traceStorageID, "--days", "60")

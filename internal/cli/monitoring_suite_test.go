@@ -463,6 +463,16 @@ func TestRunMonitoringSuiteAPILogStorageLifecycle(t *testing.T) {
 	), &patched), "patch-log-storage output")
 	require.Equal(t, "updated", patched.Description)
 
+	// patch-log-storage: --request 経路で service_principal_id を null にできる (フラグでは数値のみ)
+	var patchedNull struct {
+		ServicePrincipalID *int64 `json:"service_principal_id"`
+	}
+	require.NoError(t, json.Unmarshal(runMonitoringSuiteCommand(t,
+		"monitoring-suite-api", "patch-log-storage", storageID,
+		"--request", `{"ServicePrincipalID":null}`,
+	), &patchedNull), "patch-log-storage with null ServicePrincipalID output")
+	require.Nil(t, patchedNull.ServicePrincipalID, "service_principal_id should be null")
+
 	// delete-log-storage
 	require.Equal(t, 0, run([]string{"monitoring-suite-api", "delete-log-storage", storageID}, &stdoutHolder{}, &stderr))
 }

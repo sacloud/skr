@@ -142,7 +142,7 @@ type TracesStorageCreateCommand struct {
 	Description        *string "name:\"description\" help:\"任意: 説明。\""
 	Classification     *string "name:\"classification\" help:\"任意: ストレージプラン。shared (共用)、dedicated (専有) のいずれか。既定値は shared です。\""
 	KmsKeyID           *int64  "name:\"kms-key-id\" help:\"任意: データ暗号化に使う KMS キーの ID。null で解除します。\""
-	ServicePrincipalID *int64  "name:\"service-principal-id\" help:\"任意: サービスプリンシパルの ID。null で解除します。\""
+	ServicePrincipalID *int64  "name:\"service-principal-id\" help:\"任意: サービスプリンシパルの ID。省略すると設定しません。\""
 	factory            TracesStorageAPIFactory
 	runtime            TracesStorageRuntime
 }
@@ -249,7 +249,7 @@ type TracesStorageUpdateCommand struct {
 	Request            *string "help:\"API リクエスト JSON を直接または @path.json で指定します。個別フラグと併用できません。\""
 	Name               *string "name:\"name\" help:\"任意: 更新後のトレースストレージ名。省略するとリクエストに含まれません。\""
 	Description        *string "name:\"description\" help:\"任意: 更新後の説明。省略するとリクエストに含まれません。\""
-	ServicePrincipalID *int64  "name:\"service-principal-id\" help:\"任意: サービスプリンシパルの ID。null で解除します。省略するとリクエストに含まれません。\""
+	ServicePrincipalID *int64  "name:\"service-principal-id\" help:\"任意: サービスプリンシパルの ID。省略するとリクエストに含まれません。null での解除は --request JSON で {\\\"ServicePrincipalID\\\":null} を指定します。\""
 	factory            TracesStorageAPIFactory
 	runtime            TracesStorageRuntime
 }

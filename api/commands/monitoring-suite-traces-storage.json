@@ -97,7 +97,7 @@
           "name": "service-principal-id",
           "field": "ServicePrincipalID",
           "type": "int64",
-          "help": "任意: サービスプリンシパルの ID。null で解除します。",
+          "help": "任意: サービスプリンシパルの ID。省略すると設定しません。",
           "conversion": "v1.NewOptNilInt64"
         }
       ],
@@ -152,7 +152,7 @@
           "name": "service-principal-id",
           "field": "ServicePrincipalID",
           "type": "int64",
-          "help": "任意: サービスプリンシパルの ID。null で解除します。省略するとリクエストに含まれません。",
+          "help": "任意: サービスプリンシパルの ID。省略するとリクエストに含まれません。null での解除は --request JSON で {\"ServicePrincipalID\":null} を指定します。",
           "conversion": "v1.NewOptNilInt64"
         }
       ],
