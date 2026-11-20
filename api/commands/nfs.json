@@ -1,0 +1,468 @@
+{
+  "package": "nfsapi",
+  "resource": "IaaS NFS",
+  "imports": {
+    "iaas": "github.com/sacloud/sacloud-sdk-go/api/iaas",
+    "types": "github.com/sacloud/sacloud-sdk-go/api/iaas/types"
+  },
+  "wiring_target": "NFSAPI",
+  "sdk_factory": "nfsapi.NewAPI",
+  "client_factory": "iaasclient.New",
+  "operations": [
+    {
+      "name": "Find",
+      "help": "NFS アプライアンスを指定したゾーンで検索して出力します。例: skr nfs-api find --zone tk1v --name example",
+      "method": "FindWithContext",
+      "request_type": "FindRequest",
+      "response_type": "[]*iaas.NFS",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (単一のゾーン名)。任意: 単一名の部分一致検索は --name、複数名の Names と Sort (ソートキーの配列) は JSON で指定します。Tags は --tags のカンマ区切りまたは JSON 配列、Count と From は個別フラグでも指定できます。例: --request='{\"Zone\":\"tk1v\",\"Names\":[\"example\"]}'。値は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。例: --zone tk1v",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Names",
+          "type": "string",
+          "help": "任意: 部分一致で検索する単一の名前。カンマを含めて1つの名前として扱います。API の名前検索条件に対応し、JSON では Names 配列で指定します。",
+          "singleton": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
+          "conversion": "types.Tags",
+          "separator": ","
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "help": "任意: 取得件数 (整数)。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "help": "任意: 取得開始位置 (整数)。"
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "help": "指定した ID の NFS アプライアンスを読み取って出力します。例: skr nfs-api read --zone ZONE --id 123456789012",
+      "method": "ReadWithContext",
+      "request_type": "ReadRequest",
+      "response_type": "*iaas.NFS",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (作成結果にある数値)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 作成結果の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "Create",
+      "help": "NFS アプライアンスを指定したゾーンのスイッチ配下に作成します。接続先スイッチ、プラン ID、IPv4 アドレス、ネットマスク長は作成後の変更ができません。作成後、起動の完了を待たずに応答を返します。例: skr nfs-api create --zone ZONE --name example --plan-id PLAN-ID --switch-id SWITCH-ID --ip-address 192.168.0.11 --network-mask-len 24",
+      "method": "CreateWithContext",
+      "request_type": "CreateRequest",
+      "response_type": "*iaas.NFS",
+      "validate_zone": true,
+      "request_transform": "TransformCreateRequest",
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、Name、PlanID (プラン ID)、SwitchID、IPAddresses (IPv4 アドレスの配列)、NetworkMaskLen。任意: DefaultRoute、Description、Tags、IconID。例: --request='{\"Zone\":\"tk1v\",\"Name\":\"example\",\"PlanID\":100001,\"SwitchID\":112900500001,\"IPAddresses\":[\"192.168.0.11\"],\"NetworkMaskLen\":24}'。値は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。例: --zone tk1v",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "必須: 名前。",
+          "required": true
+        },
+        {
+          "name": "plan-id",
+          "field": "PlanID",
+          "type": "int64",
+          "help": "必須: 作成する NFS のプラン ID (数値)。プラン ID は Note (sys-nfs) のプラン一覧にある、プラン種別 (標準/HDD、SSD) とサイズに対応する ID です。例: --plan-id 100001",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "switch-id",
+          "field": "SwitchID",
+          "type": "int64",
+          "help": "必須: 接続先スイッチの ID (数値)。作成後の変更はできません。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "network-mask-len",
+          "field": "NetworkMaskLen",
+          "type": "int",
+          "help": "必須: ネットマスク長 (整数。24 など)。",
+          "required": true
+        },
+        {
+          "name": "default-route",
+          "field": "DefaultRoute",
+          "type": "string",
+          "help": "任意: デフォルトゲートウェイの IP アドレス。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 説明。"
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: タグの配列。カンマ区切りで指定します。API の Tags フィールドに対応します。",
+          "conversion": "types.Tags",
+          "separator": ","
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコンの ID (数値)。",
+          "conversion": "types.ID"
+        }
+      ],
+      "repeated_flags": [
+        {
+          "name": "ip-address",
+          "field": "IPAddresses",
+          "help": "必須: NFS のネットワークインタフェースに付与する IPv4 アドレス。1 回の指定で 1 個のアドレスを指定し、最大 2 個まで繰り返し指定できます。作成後の変更はできません。例: --ip-address 192.168.0.11 --ip-address 192.168.0.12"
+        }
+      ]
+    },
+    {
+      "name": "Update",
+      "help": "NFS アプライアンスの指定項目を更新します。プランとサイズは変更できません。未指定の項目は空の値として API リクエストへ送信するため、既存の設定を維持する項目は JSON で再指定してください。例: skr nfs-api update --zone ZONE --id 123456789012 --name updated-nfs",
+      "method": "UpdateWithContext",
+      "request_type": "UpdateRequest",
+      "response_type": "*iaas.NFS",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone、ID。Name、Description、Tags、IconID は個別フラグまたは JSON で指定します。未指定の項目は API リクエストどおりに扱われます。PlanID と SwitchID は更新リクエストに含まれないため指定できません。例: --request='{\"Zone\":\"ZONE\",\"ID\":123456789012,\"Name\":\"UPDATED-NFS\"}'。値は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 更新対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 新しい名前。未指定時は空の値を API リクエストへ送信します。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 新しい説明。未指定時は空の値を API リクエストへ送信します。",
+          "pointer": true
+        },
+        {
+          "name": "tags",
+          "field": "Tags",
+          "type": "[]string",
+          "help": "任意: 更新後のタグ配列。カンマ区切りで指定します。未指定時は空配列を API リクエストへ送信します。",
+          "conversion": "types.Tags",
+          "separator": ",",
+          "pointer": true
+        },
+        {
+          "name": "icon-id",
+          "field": "IconID",
+          "type": "int64",
+          "help": "任意: アイコンの ID (数値)。未指定時は 0 を API リクエストへ送信します。",
+          "conversion": "types.ID",
+          "pointer": true
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "help": "NFS アプライアンスを削除します。成功時は出力しません。例: skr nfs-api delete --zone ZONE --id 123456789012",
+      "method": "DeleteWithContext",
+      "request_type": "DeleteRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: FailIfNotFound (真偽値)、Force (真偽値。電源 OFF (強制終了) してから削除します)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012,\"FailIfNotFound\":true}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 削除対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "fail-if-not-found",
+          "field": "FailIfNotFound",
+          "type": "bool",
+          "help": "任意: 対象が見つからない場合にエラーにします (真偽値)。"
+        },
+        {
+          "name": "force",
+          "field": "Force",
+          "type": "bool",
+          "help": "任意: 電源 OFF (強制終了) してから削除します (真偽値)。"
+        }
+      ]
+    },
+    {
+      "name": "Boot",
+      "help": "NFS アプライアンスを起動します。成功時は出力しません。例: skr nfs-api boot --zone ZONE --id 123456789012",
+      "method": "BootWithContext",
+      "request_type": "BootRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: NoWait (真偽値。true で起動の完了を待ちません)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 起動対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "no-wait",
+          "field": "NoWait",
+          "type": "bool",
+          "help": "任意: 起動の完了を待たずに返ります (真偽値)。"
+        }
+      ]
+    },
+    {
+      "name": "Shutdown",
+      "help": "NFS アプライアンスをシャットダウンします。成功時は出力しません。例: skr nfs-api shutdown --zone ZONE --id 123456789012",
+      "method": "ShutdownWithContext",
+      "request_type": "ShutdownRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: NoWait (真偽値。true でシャットダウンの完了を待ちません)、ForceShutdown (真偽値。true で強制終了します)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: シャットダウン対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "no-wait",
+          "field": "NoWait",
+          "type": "bool",
+          "help": "任意: シャットダウンの完了を待たずに返ります (真偽値)。"
+        },
+        {
+          "name": "force",
+          "field": "ForceShutdown",
+          "type": "bool",
+          "help": "任意: 強制終了します (真偽値)。"
+        }
+      ]
+    },
+    {
+      "name": "Reset",
+      "help": "NFS アプライアンスを再起動します。成功時は出力しません。例: skr nfs-api reset --zone ZONE --id 123456789012",
+      "method": "ResetWithContext",
+      "request_type": "ResetRequest",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 再起動対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        }
+      ]
+    },
+    {
+      "name": "MonitorCPU",
+      "help": "CPU 使用率のモニタリング値を指定した期間で取得して出力します。例: skr nfs-api monitor-cpu --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00",
+      "method": "MonitorCPUWithContext",
+      "request_type": "MonitorCPURequest",
+      "response_type": "[]*iaas.MonitorCPUTimeValue",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Start と End (RFC3339 形式の取得期間)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "start",
+          "field": "Start",
+          "type": "time.Time",
+          "help": "任意: 取得期間の開始 (RFC3339 形式)。例: --start 2025-01-01T00:00:00+09:00"
+        },
+        {
+          "name": "end",
+          "field": "End",
+          "type": "time.Time",
+          "help": "任意: 取得期間の終了 (RFC3339 形式)。"
+        }
+      ]
+    },
+    {
+      "name": "MonitorFreeDiskSize",
+      "help": "空きディスク容量のモニタリング値を指定した期間で取得して出力します。モニタリングデータは日単位で記録されるため、--start / --end は 00:00:00 の正時で指定してください。両方を省略すると、UTC の前日 0 時から当日 0 時までの期間で取得します。例: skr nfs-api monitor-free-disk-size --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00",
+      "method": "MonitorFreeDiskSizeWithContext",
+      "request_type": "MonitorFreeDiskSizeRequest",
+      "response_type": "[]*iaas.MonitorFreeDiskSizeValue",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Start と End (RFC3339 形式の取得期間)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "start",
+          "field": "Start",
+          "type": "time.Time",
+          "help": "任意: 取得期間の開始 (RFC3339 形式)。データは日単位のため 00:00:00 の正時で指定します。例: --start 2025-01-01T00:00:00+09:00"
+        },
+        {
+          "name": "end",
+          "field": "End",
+          "type": "time.Time",
+          "help": "任意: 取得期間の終了 (RFC3339 形式)。データは日単位のため 00:00:00 の正時で指定します。"
+        }
+      ]
+    },
+    {
+      "name": "MonitorInterface",
+      "help": "ネットワークインタフェースのモニタリング値を指定した期間で取得して出力します。例: skr nfs-api monitor-interface --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00",
+      "method": "MonitorInterfaceWithContext",
+      "request_type": "MonitorInterfaceRequest",
+      "response_type": "[]*iaas.MonitorInterfaceValue",
+      "validate_zone": true,
+      "request_help": "個別フラグと併用不可。JSON オブジェクトを直接または @path.json で指定します。必須: Zone (ゾーン名)、ID (数値)。任意: Start と End (RFC3339 形式の取得期間)。例: --request='{\"Zone\":\"tk1v\",\"ID\":123456789012}'。ID は実際の値に置き換えます。",
+      "flags": [
+        {
+          "name": "zone",
+          "field": "Zone",
+          "type": "string",
+          "help": "必須: 対象ゾーン名。",
+          "required": true
+        },
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "int64",
+          "help": "必須: 対象の ID (数値)。",
+          "required": true,
+          "conversion": "types.ID"
+        },
+        {
+          "name": "start",
+          "field": "Start",
+          "type": "time.Time",
+          "help": "任意: 取得期間の開始 (RFC3339 形式)。例: --start 2025-01-01T00:00:00+09:00"
+        },
+        {
+          "name": "end",
+          "field": "End",
+          "type": "time.Time",
+          "help": "任意: 取得期間の終了 (RFC3339 形式)。"
+        }
+      ]
+    }
+  ]
+}

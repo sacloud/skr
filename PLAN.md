@@ -25,7 +25,6 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
 - [ ] `license`
 - [ ] `loadbalancer`
 - [ ] `mobilegateway`
-- [ ] `nfs`
 - [ ] `note`
 - [ ] `privatehost`
 - [ ] `subnet`
@@ -47,6 +46,13 @@ SDK のサービスパッケージごとに対応状況を管理します。実�
     - すべての操作で SDK の service 層 (builder) を経由せず api 層の操作を直接呼び出します。Delete / Boot / Shutdown の電源操作と完了待ちは api 層の補助機能で実装しています。Update はゾーン・ID を個別フラグで指定し、更新内容は JSON 専用 (`@path.json` または `-`) です。送信した内容で設定が置き換わるため、既存の設定を維持する項目は JSON に再指定します。Monitor は RFC3339 の `--start` / `--end` を個別フラグで指定できます。設計は[設計文書](docs/design/database-api.md)を参照してください。
     - ライブ E2E は create → read → list-parameter → find → Monitor 4種 → update → shutdown → boot → reset → delete まで確認済みです。sacloud-sdk-go の service 層の不具合 ([#319](https://github.com/sacloud/sacloud-sdk-go/issues/319)、[#320](https://github.com/sacloud/sacloud-sdk-go/issues/320)) は update も api 層の操作に移行して回避し、実機で検証しました。
     - [チュートリアル](docs/manual/tutorials/iaas-api/database.md)を作成済みです。
+- [x] `nfs`
+    - `nfs-api` の Find / Read / Create / Update / Delete、Boot / Shutdown / Reset、Monitor (CPU / FreeDiskSize / Interface) を実装済みです ([ADR 0095](docs/adr/0095-nfs-api-commands.md)、[設計文書](docs/design/nfs-api.md))。
+    - Find は `--name` による単一名の部分一致検索と `--tags` (カンマ区切り) に対応します。Create は個別フラグと `--request` JSON の両経路 (相互排他) を持ち、IP アドレスは反復可能な `--ip-address` (1〜2 個の IPv4) です。Create は起動の完了を待たずに応答を返します。Delete は電源状態を考慮したワークフロー (電源 ON なら `--force` で強制停止してから削除) で、`--force` と `--fail-if-not-found` に対応します。Boot / Shutdown は `--no-wait` に対応します (低レベルコマンドのため [ADR 0082](docs/adr/0082-high-level-command-wait-options.md) の `--wait` 系フラグは設けません)。Update は未指定の項目を空の値として送信します (SDK のセマンティクス準拠)。
+    - すべての操作で SDK の service 層 (builder) を経由せず api 層の操作を直接呼び出します。削除ワークフローと電源操作の完了待ちは api 層の補助機能で実装しています。
+    - 高レベルコマンド `skr nfs` の `plans` (ゾーンの NFS プラン一覧) を実装済みです ([ADR 0096](docs/adr/0096-nfs-high-level-plans.md))。service 層と CLI コマンドを `internal/nfs/` に手書きで置き、Note (sys-nfs) からプラン一覧を取得します。ライブ検証済みで、[ユーザーズマニュアル](docs/manual/nfs.md)があります。
+    - ライブ E2E は [testing.T ベースのシナリオ](test/e2e/nfs/scenario_nfs_test.go) ([ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md)) で、2026-11-20 に tk1a で全ステップをライブ検証済みです (プランは Note から解決した SSD 20GB)。スイッチ作成 → create → 起動待ち → read → find (name / tags) → monitor 3種 → update → shutdown → boot → reset → 削除と不在確認、スイッチ削除まで確認済みです。ライブ検証で確認した API の挙動 (空きディスク容量モニタリングの日単位仕様、タグの並べ替え) は設計文書に記載しています。`skr nfs plans` もシナリオ内でライブ検証済みです。
+    - [チュートリアル](docs/manual/tutorials/nfs-api.md)を作成済みです。プラン ID の確認は `skr nfs plans` を使います。sakumockiaas は NFS 未対応のため、チュートリアルの CLI 操作ハーネステストは sakumock の対応まで deferred です。
 - [x] `disk` — `iaas-api disk` の Find / Read / Create / Update / Delete を実装済みです。Create は必須・任意の単純値とタグ、Update はゾーン・ID・変更する単純値とタグを個別フラグで指定でき、複雑な入力には JSON を使います。Find は `--name` による単一名の部分一致検索に対応します。SDK の Apply / ConnectToServer / DisconnectFromServer / Edit / MonitorDisk / ResizePartition / WaitReady は未対応です。is1b で作成・検索・参照・更新・削除と削除後を確認する [ライブ E2E runner](test/e2e/disk/) と[チュートリアル](docs/manual/tutorials/iaas-api/disk.md)があります。
 - [x] `internet` — `iaas-api internet` の Find / Read / Create / Update / Delete、サブネット操作、IPv6 操作、MonitorRouter を実装済みです。Find は `--name` による単一名の部分一致検索、Delete は `--force` と `--fail-if-not-found` に対応します。ルータ＋スイッチ、Server、起動 Disk を作成し、サブネットから選んだ IPv4 アドレスを NIC の OS 設定へ適用して SSH 接続する [ライブ E2E](test/e2e/internet/) と[チュートリアル](docs/manual/tutorials/iaas-api/internet.md)があります。個別オプションだけの操作で is1b の作成・NIC 接続・名前検索・サブネット参照・SSH ログイン・削除後の不在に加え、Update(更新と復元)、MonitorRouter、追加サブネットの追加・NextHop 更新・削除、IPv6 の有効化・参照・無効化のライブ検証を確認済みです。E2E は 2026-10-29 に [ADR 0062](docs/adr/0062-e2e-testing-t-based-scenario.md) に従う testing.T ベースのシナリオテストへ移行済みです。ADR 0071 に従う API 層への移行が完了し、service 層への依存を除去しました。2026-11-04 に移行後の Internet live E2E を再実行し、サブネット情報の参照、SSH 接続、更新と復元、追加サブネット・IPv6 操作、作成リソースの削除と不在を確認済みです。
 - [x] `ipaddress` — `iaas-api ipaddress` の List / Read / UpdateHostName を実装済みです。List と Read はゾーンを必須とし、UpdateHostName は逆引きホスト名を `--host-name` で指定し、省略時は空に設定します。[ライブ E2E](test/e2e/ipaddress/) と[チュートリアル](docs/manual/tutorials/iaas-api/ipaddress.md)があります。is1b で一覧・参照、存在しないアドレスの参照、共有セグメントのサーバに割り当てられたアドレスへの逆引き設定と解除を確認済みです。設計は[設計文書](docs/design/iaas-ipv6-api.md)を参照してください。
