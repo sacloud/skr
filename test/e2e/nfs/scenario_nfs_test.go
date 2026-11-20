@@ -313,6 +313,15 @@ func TestScenarioNFS(t *testing.T) {
 	require.NoError(t, json.Unmarshal(monitorData, &freeDiskValues), "decode monitor-free-disk-size result")
 	require.NotNil(t, freeDiskValues, "monitor-free-disk-size should return a JSON array")
 
+	// 期間を省略しても既定値が UTC 正時のため、API エラーにならず正常な応答が返る。
+	// 省略時の既定値は前日正時から当日正時で、作成直後はデータが確定していない可能性がある
+	monitorData = h.Call(t, "期間を省略して monitor-free-disk-size のモニタリングデータを取得する (既定値は UTC 正時)",
+		"nfs-api", "monitor-free-disk-size",
+		"--zone", nfsZone, "--id", created.ID.String())
+	freeDiskValues = nil
+	require.NoError(t, json.Unmarshal(monitorData, &freeDiskValues), "decode monitor-free-disk-size result without period")
+	require.NotNil(t, freeDiskValues, "monitor-free-disk-size without period should return a JSON array")
+
 	// 名前と説明とタグを更新する。update は未指定の項目を空の値として送信するため、
 	// 既存の値を維持する項目もあわせて指定する
 	h.Call(t, "NFS の名前・説明・タグを更新する",
