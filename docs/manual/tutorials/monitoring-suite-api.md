@@ -72,11 +72,12 @@ $ skr monitoring-suite-api read-metric-storage "$METRICS_STORAGE_ID" --query '{i
 $ skr monitoring-suite-api read-log-storage "$LOG_STORAGE_ID" --query '{id,name,classification,expire_day}'
 ```
 
-ストレージにデータを書き込むためのアクセスキーを作成できます。アクセスキーの一覧はストレージごとに管理されます。
+ストレージにデータを書き込むためのアクセスキーを作成できます。アクセスキーの一覧はストレージごとに管理されます。後片付けで削除するため、UID を変数に保存します。
 
 ```console
-$ skr monitoring-suite-api create-log-storage-key "$LOG_STORAGE_ID" \
-    --description "Tutorial key" --query '{uid,description}'
+$ LOG_STORAGE_KEY_UID=$(skr monitoring-suite-api create-log-storage-key "$LOG_STORAGE_ID" \
+    --description "Tutorial key" --query-raw '.uid')
+$ echo "$LOG_STORAGE_KEY_UID"
 ```
 
 アクセスキーのシークレットは作成時のみ表示されます。書き込み設定の詳細は[各エージェントの設定例](https://manual.sakura.ad.jp/cloud/appliance/monitoring-suite/agent/index.html)を参照してください。
@@ -156,11 +157,11 @@ $ skr monitoring-suite-api list-alert-project-log-measure-rules "$PROJECT_ID" --
 
 ## Step 6: ログルーティングとメトリクスルーティングを作成する
 
-さくらのクラウドの各種サービスからのログやメトリクスをストレージへ送信するルーティングを作成します。`--publisher-code` は送信元サービスを表すパブリッシャー、`--variant` は種別 (`logs`、`metrics`) を指定します。利用可能なパブリッシャーと種別は `list-publishers` の出力で確認し、ここではログの種別を持つ最初のパブリッシャーを取り込みます。
+さくらのクラウドの各種サービスからのログやメトリクスをストレージへ送信するルーティングを作成します。`--publisher-code` は送信元サービスを表すパブリッシャー、`--variant` は種別 (`logs`、`metrics`) を指定します。利用可能なパブリッシャーと種別は `list-publishers` の出力で確認し、ここではログとメトリクスの両方の種別を持つ最初のパブリッシャーを取り込みます。
 
 ```console
 $ PUBLISHER_CODE=$(skr monitoring-suite-api list-publishers \
-    --query-raw 'map(select(any(.variants[]; .storage == "logs"))) | .[0].code')
+    --query-raw 'map(select(any(.variants[]; .storage == "logs") and any(.variants[]; .storage == "metrics"))) | .[0].code')
 $ echo "$PUBLISHER_CODE"
 $ LOG_ROUTING_UID=$(skr monitoring-suite-api create-log-routing \
     --publisher-code "$PUBLISHER_CODE" --variant logs --log-storage-id "$LOG_STORAGE_ID" \
@@ -214,9 +215,19 @@ $ echo "$DASHBOARD_ID"
 
 ## Step 9: 後片付けする
 
-作成したリソースをすべて削除します。まず ID と名前を照合してから削除し、削除後は参照して残っていないことを確認します。
+作成したリソースをすべて削除します。まず課金対象のストレージとアラートプロジェクトを参照して名前を照合し、取り違えがないか確認してから削除します。照合が失敗した場合は ID を見直してください。
 
 ```console
+$ [ "$(skr monitoring-suite-api read-alert-project "$PROJECT_ID" --query-raw '.name')" = "skr-tutorial-ms-alert-$SUFFIX" ]
+$ [ "$(skr monitoring-suite-api read-metric-storage "$METRICS_STORAGE_ID" --query-raw '.name')" = "skr-tutorial-ms-metrics-$SUFFIX" ]
+$ [ "$(skr monitoring-suite-api read-log-storage "$LOG_STORAGE_ID" --query-raw '.name')" = "skr-tutorial-ms-logs-$SUFFIX" ]
+$ [ "$(skr monitoring-suite-api read-trace-storage "$TRACE_STORAGE_ID" --query-raw '.name')" = "skr-tutorial-ms-traces-$SUFFIX" ]
+```
+
+続いて、作成時に保存した ID と UID で削除します。アクセスキーはストレージより先に削除します。
+
+```console
+$ skr monitoring-suite-api delete-log-storage-key "$LOG_STORAGE_ID" "$LOG_STORAGE_KEY_UID"
 $ skr monitoring-suite-api delete-log-routing "$LOG_ROUTING_UID"
 $ skr monitoring-suite-api delete-metric-routing "$METRIC_ROUTING_UID"
 $ skr monitoring-suite-api delete-alert-project-log-measure-rule "$PROJECT_ID" "$MEASURE_RULE_UID"
@@ -232,10 +243,18 @@ $ skr monitoring-suite-api delete-dashboard-project "$DASHBOARD_ID"
 
 Step 8 でダッシュボードプロジェクトを作成しなかった場合は、削除の行をスキップしてください。
 
-削除が反映されるまで数秒かかることがあります。参照が 404 を返せば削除済みです。削除に失敗したリソースがあると料金が発生し続けるため、`list-*` コマンドで `skr-tutorial` から始まる名前のリソースが残っていないことを確認してください。
+削除が反映されるまで数秒かかることがあります。参照が 404 を返せば削除済みです。削除に失敗したリソースがあると料金が発生し続けるため、名前で絞り込めるリソースは一覧コマンドで `skr-tutorial` から始まる名前が残っていないことを確認してください。アクセスキーやルーティングなど名前のないリソースは、削除コマンドの正常終了で確認します。
 
 ```console
 $ skr monitoring-suite-api list-alert-projects --query-raw 'map(select(.name | test("skr-tutorial")))'
+[]
+$ skr monitoring-suite-api list-dashboard-projects --query-raw 'map(select(.name | test("skr-tutorial")))'
+[]
+$ skr monitoring-suite-api list-metric-storages --query-raw 'map(select(.name | test("skr-tutorial")))'
+[]
+$ skr monitoring-suite-api list-log-storages --query-raw 'map(select(.name | test("skr-tutorial")))'
+[]
+$ skr monitoring-suite-api list-trace-storages --query-raw 'map(select(.name | test("skr-tutorial")))'
 []
 ```
 
