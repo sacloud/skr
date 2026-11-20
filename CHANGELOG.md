@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.3.1](https://github.com/sacloud/skr/compare/v0.3.0...v0.3.1) - 2026-11-20
+
+### 🚀 Changes
+- skr dns-api で DNS ゾーンとレコードを操作できるようにする by @tokuhirom in https://github.com/sacloud/skr/pull/289
+- monitoring-suite-api のコマンド群を追加する by @tokuhirom in https://github.com/sacloud/skr/pull/291
+
 ## [v0.3.0](https://github.com/sacloud/skr/compare/v0.2.2...v0.3.0) - 2026-11-19
 
 ### 🚀 Changes
