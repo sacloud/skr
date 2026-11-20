@@ -171,6 +171,7 @@ func (f *Fixture) validate(path string) error {
 		case "eventbus":
 			hasEventBus = true
 		case "workflows":
+		case "monitoringsuite":
 		default:
 			return fmt.Errorf("fixture %s: unknown mock service %q", path, service)
 		}

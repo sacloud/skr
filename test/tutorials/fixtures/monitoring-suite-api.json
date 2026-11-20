@@ -1,0 +1,6 @@
+{
+  "mock": {
+    "zones": ["is1a"],
+    "services": ["monitoringsuite"]
+  }
+}

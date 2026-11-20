@@ -1,0 +1,196 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteAlertProject",
+  "command_prefix": "AlertProject",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1",
+    "uuid": "github.com/google/uuid"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "アラートプロジェクトを一覧表示します。ページングができます。",
+      "method": "List",
+      "response_type": "[]v1.AlertProject",
+      "arguments": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        }
+      ],
+      "command_name": "list-alert-projects"
+    },
+    {
+      "name": "Create",
+      "help": "アラートプロジェクトを作成します。",
+      "method": "Create",
+      "request_type": "monitoringsuite.AlertProjectCreateParams",
+      "response_type": "*v1.AlertProject",
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "required": true,
+          "help": "必須: アラートプロジェクト名。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 説明。",
+          "pointer": true
+        }
+      ],
+      "command_name": "create-alert-project",
+      "request_by_value": true
+    },
+    {
+      "name": "Read",
+      "help": "ID を指定してアラートプロジェクトを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.AlertProject",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "読み取るアラートプロジェクトのリソース ID。list-alert-projects の出力にある ID。"
+        }
+      ],
+      "command_name": "read-alert-project"
+    },
+    {
+      "name": "Update",
+      "help": "アラートプロジェクトを部分更新します。指定した項目だけをリクエストに含めます。",
+      "method": "Update",
+      "request_type": "monitoringsuite.AlertProjectUpdateParams",
+      "response_type": "*v1.AlertProject",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新するアラートプロジェクトのリソース ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 更新後のアラートプロジェクト名。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 更新後の説明。省略するとリクエストに含まれません。",
+          "pointer": true
+        }
+      ],
+      "command_name": "patch-alert-project",
+      "request_by_value": true
+    },
+    {
+      "name": "Delete",
+      "help": "ID を指定してアラートプロジェクトを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するアラートプロジェクトのリソース ID。"
+        }
+      ],
+      "command_name": "delete-alert-project"
+    },
+    {
+      "name": "ListHistories",
+      "help": "アラートプロジェクトのアラート履歴を一覧表示します。状態や重要度、発生日時で絞り込めます。",
+      "method": "ListHistories",
+      "handwritten": true,
+      "command_name": "list-alert-project-histories",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        },
+        {
+          "name": "open",
+          "field": "Open",
+          "type": "*bool",
+          "flag": true,
+          "help": "任意: 未解決アラートのみを取得します。"
+        },
+        {
+          "name": "severity",
+          "field": "Severity",
+          "type": "*string",
+          "flag": true,
+          "help": "任意: 重要度で絞り込みます。critical、warning のいずれか。"
+        },
+        {
+          "name": "starts-at",
+          "field": "StartsAt",
+          "type": "*time.Time",
+          "flag": true,
+          "help": "任意: 発生日時で絞り込みます。RFC3339 形式で指定します。"
+        }
+      ],
+      "response_type": "[]v1.History"
+    },
+    {
+      "name": "ReadHistory",
+      "help": "アラート履歴を 1 件読み取ります。",
+      "method": "ReadHistory",
+      "response_type": "*v1.History",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "history-id",
+          "field": "HistoryID",
+          "type": "uuid.UUID",
+          "help": "読み取る履歴の UID。list-alert-project-histories の出力にある UID。"
+        }
+      ],
+      "command_name": "read-alert-project-history"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.AlertProject",
+  "sdk_factory": "monitoringsuiteapi.NewAlertProjectAPI"
+}

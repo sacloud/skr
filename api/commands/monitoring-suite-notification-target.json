@@ -1,0 +1,183 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteNotificationTarget",
+  "command_prefix": "NotificationTarget",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1",
+    "uuid": "github.com/google/uuid"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "アラートプロジェクトの通知先を一覧表示します。サービス種別で絞り込めます。",
+      "method": "List",
+      "request_type": "monitoringsuite.NotificationTargetsListParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "response_type": "[]v1.NotificationTarget",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        },
+        {
+          "name": "service-type",
+          "field": "ServiceType",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: サービス種別で絞り込みます。SAKURA_EVENT_BUS、SAKURA_SIMPLE_NOTICE のいずれか。",
+          "conversion": "v1.ListAlertProjectNotificationTargetsServiceType"
+        }
+      ],
+      "command_name": "list-alert-project-notification-targets"
+    },
+    {
+      "name": "Create",
+      "help": "アラートの通知先を作成します。",
+      "method": "Create",
+      "response_type": "*v1.NotificationTarget",
+      "handwritten": true,
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "service-type",
+          "field": "ServiceType",
+          "type": "string",
+          "flag": true,
+          "required": true,
+          "help": "必須: サービス種別。SAKURA_SIMPLE_NOTICE。"
+        },
+        {
+          "name": "url",
+          "field": "URL",
+          "type": "string",
+          "flag": true,
+          "required": true,
+          "help": "必須: 通知先 URL。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "*string",
+          "flag": true,
+          "help": "任意: 説明。"
+        }
+      ],
+      "command_name": "create-alert-project-notification-target"
+    },
+    {
+      "name": "Read",
+      "help": "通知先を 1 件読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.NotificationTarget",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "読み取る通知先の UID。list-alert-project-notification-targets の出力にある UID。"
+        }
+      ],
+      "command_name": "read-alert-project-notification-target"
+    },
+    {
+      "name": "Update",
+      "help": "通知先を部分更新します。指定した項目だけをリクエストに含めます。",
+      "method": "Update",
+      "request_type": "monitoringsuite.NotificationTargetUpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.NotificationTarget",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "更新する通知先の UID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "service-type",
+          "field": "ServiceType",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: サービス種別。SAKURA_SIMPLE_NOTICE。省略するとリクエストに含まれません。",
+          "conversion": "v1.PatchedNotificationTargetRequestServiceType"
+        },
+        {
+          "name": "url",
+          "field": "URL",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: 通知先 URL。省略するとリクエストに含まれません。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: 説明。省略するとリクエストに含まれません。"
+        }
+      ],
+      "command_name": "patch-alert-project-notification-target"
+    },
+    {
+      "name": "Delete",
+      "help": "通知先を削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "uid",
+          "field": "UID",
+          "type": "uuid.UUID",
+          "help": "削除する通知先の UID。"
+        }
+      ],
+      "command_name": "delete-alert-project-notification-target"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.NotificationTarget",
+  "sdk_factory": "monitoringsuiteapi.NewNotificationTargetAPI"
+}

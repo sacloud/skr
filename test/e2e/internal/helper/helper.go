@@ -204,6 +204,16 @@ func (h *Helper) CallAllowingFailure(t *testing.T, description string, args ...s
 	return stdout.Bytes(), stderr.String(), err
 }
 
+// CallAllowingFailureHidingStdout は stdout に秘密情報が含まれ得るコマンドを
+// 失敗を許容して実行し、stdout・stderr・エラーを返す。stdout は成功・失敗とも
+// 実行記録に残さず、実行自体と stderr だけが記録される。
+func (h *Helper) CallAllowingFailureHidingStdout(t *testing.T, description string, args ...string) ([]byte, string, error) {
+	t.Helper()
+
+	stdout, stderr, err := h.run(t, h.defaultTimeout, true, description, args...)
+	return stdout.Bytes(), stderr.String(), err
+}
+
 // run は指定されたコマンドを実行し、stdout・stderr・エラーを返す。実行結果は実行記録へ保存する。
 // hideStdout を設定すると、秘密情報を含む stdout を実行記録に残さない。
 func (h *Helper) run(t *testing.T, timeout time.Duration, hideStdout bool, description string, args ...string) (bytes.Buffer, bytes.Buffer, error) {

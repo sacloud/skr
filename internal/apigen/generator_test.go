@@ -597,6 +597,28 @@ func TestGenerateTimeFlag(t *testing.T) {
 		require.NoError(t, err)
 		require.NotContains(t, string(source), "\t\"time\"")
 	})
+
+	// ListHistories の starts-at / ends-at のように、位置引数が *time.Time の
+	// 操作でも time import と Kong のデコードタグが出力されることを検証します。
+	t.Run("generates time import for pointer time argument", func(t *testing.T) {
+		config := baseConfig
+		config.Operations = []Operation{{
+			Name:        "ListHistories",
+			Help:        "履歴を一覧表示します。",
+			Method:      "ListHistories",
+			RequestType: "ListHistoriesRequest",
+			Arguments: []Argument{
+				{Name: "starts-at", Field: "StartsAt", Type: "*time.Time", Help: "開始日時。"},
+			},
+		}}
+		source, err := Generate(config, ModeIaaS)
+		require.NoError(t, err)
+		generated := string(source)
+		require.Contains(t, generated, "\t\"time\"")
+		require.Regexp(t, `StartsAt\s+\*time\.Time`, generated)
+		require.Contains(t, generated, `arg:\"\" name:\"starts-at\" help:\"開始日時。\"`)
+		require.Contains(t, generated, "op.ListHistories(context.Background(), c.StartsAt, request)")
+	})
 }
 
 func TestGenerateFactoryArgumentsAndNamedMethodArguments(t *testing.T) {

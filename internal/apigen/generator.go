@@ -872,11 +872,17 @@ func Generate(config Config, mode Mode) ([]byte, error) {
 			hasGeneratedOperations = true
 		}
 	}
-	// time.Time フラグは Kong が RFC3339 でデコードするため、生成コードに標準ライブラリの time を含める
+	// time.Time フラグ・引数は Kong が RFC3339 でデコードするため、生成コードに標準ライブラリの time を含める
 	hasTimeFlag := false
 	for _, operation := range config.Operations {
 		for _, flag := range operation.Flags {
 			if flag.Type == "time.Time" {
+				hasTimeFlag = true
+				break
+			}
+		}
+		for _, argument := range operation.Arguments {
+			if argument.Type == "time.Time" || argument.Type == "*time.Time" {
 				hasTimeFlag = true
 				break
 			}

@@ -1,0 +1,124 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteDashboardProject",
+  "command_prefix": "DashboardProject",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "ダッシュボードプロジェクトを一覧表示します。ページングができます。",
+      "method": "List",
+      "response_type": "[]v1.DashboardProject",
+      "arguments": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "*int",
+          "flag": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        }
+      ],
+      "command_name": "list-dashboard-projects"
+    },
+    {
+      "name": "Create",
+      "help": "ダッシュボードプロジェクトを作成します。説明は必須です。",
+      "method": "Create",
+      "request_type": "monitoringsuite.DashboardProjectCreateParams",
+      "request_by_value": true,
+      "response_type": "*v1.DashboardProject",
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "required": true,
+          "help": "必須: ダッシュボードプロジェクト名。"
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "required": true,
+          "help": "必須: 説明。",
+          "pointer": true
+        }
+      ],
+      "command_name": "create-dashboard-project"
+    },
+    {
+      "name": "Read",
+      "help": "ID を指定してダッシュボードプロジェクトを読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.DashboardProject",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "読み取るダッシュボードプロジェクトのリソース ID。list-dashboard-projects の出力にある ID。"
+        }
+      ],
+      "command_name": "read-dashboard-project"
+    },
+    {
+      "name": "Update",
+      "help": "ダッシュボードプロジェクトを部分更新します。指定した項目だけをリクエストに含めます。",
+      "method": "Update",
+      "request_type": "monitoringsuite.DashboardProjectUpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.DashboardProject",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "更新するダッシュボードプロジェクトのリソース ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "name",
+          "field": "Name",
+          "type": "string",
+          "help": "任意: 更新後のダッシュボードプロジェクト名。省略するとリクエストに含まれません。",
+          "pointer": true
+        },
+        {
+          "name": "description",
+          "field": "Description",
+          "type": "string",
+          "help": "任意: 更新後の説明。省略するとリクエストに含まれません。",
+          "pointer": true
+        }
+      ],
+      "command_name": "patch-dashboard-project"
+    },
+    {
+      "name": "Delete",
+      "help": "ID を指定してダッシュボードプロジェクトを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "id",
+          "field": "ID",
+          "type": "string",
+          "help": "削除するダッシュボードプロジェクトのリソース ID。"
+        }
+      ],
+      "command_name": "delete-dashboard-project"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.DashboardProject",
+  "sdk_factory": "monitoringsuiteapi.NewDashboardProjectAPI"
+}

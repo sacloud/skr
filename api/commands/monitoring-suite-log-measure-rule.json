@@ -1,0 +1,220 @@
+{
+  "package": "monitoringsuiteapi",
+  "resource": "MonitoringSuiteLogMeasureRule",
+  "command_prefix": "LogMeasureRule",
+  "imports": {
+    "monitoringsuite": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite",
+    "v1": "github.com/sacloud/sacloud-sdk-go/api/monitoring-suite/apis/v1",
+    "uuid": "github.com/google/uuid"
+  },
+  "operations": [
+    {
+      "name": "List",
+      "help": "アラートプロジェクトのログ計測ルールを一覧表示します。対象ストレージで絞り込めます。",
+      "method": "List",
+      "request_type": "monitoringsuite.LogMeasureRulesListParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "response_type": "[]v1.LogMeasureRule",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        },
+        {
+          "name": "log-storage-id",
+          "field": "LogStorageID",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: 対象のログストレージのリソース ID で絞り込みます。"
+        },
+        {
+          "name": "metrics-storage-id",
+          "field": "MetricsStorageID",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: 対象のメトリクスストレージのリソース ID で絞り込みます。"
+        }
+      ],
+      "command_name": "list-alert-project-log-measure-rules"
+    },
+    {
+      "name": "Create",
+      "help": "ログ計測ルールを作成します。ログの構造化ルールは Matcher の組み合わせで表現するため、--request JSON で指定します。Rule の詳細はモニタリングスイートの API リファレンスを参照してください。",
+      "method": "Create",
+      "request_type": "monitoringsuite.LogMeasureRuleCreateParams",
+      "request_by_value": true,
+      "response_type": "*v1.LogMeasureRule",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        }
+      ],
+      "command_name": "create-alert-project-log-measure-rule"
+    },
+    {
+      "name": "Read",
+      "help": "ログ計測ルールを 1 件読み取ります。",
+      "method": "Read",
+      "response_type": "*v1.LogMeasureRule",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "rule-id",
+          "field": "RuleID",
+          "type": "uuid.UUID",
+          "help": "読み取るログ計測ルールの UID。list-alert-project-log-measure-rules の出力にある UID。"
+        }
+      ],
+      "command_name": "read-alert-project-log-measure-rule"
+    },
+    {
+      "name": "Update",
+      "help": "ログ計測ルールを部分更新します。--request JSON で指定します。Rule は構造化ルールのため --request JSON でのみ指定でき、既存の Rule は維持されます。Name や Description も --request JSON で指定できます。",
+      "method": "Update",
+      "request_type": "monitoringsuite.LogMeasureRuleUpdateParams",
+      "request_by_value": true,
+      "response_type": "*v1.LogMeasureRule",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "rule-id",
+          "field": "RuleID",
+          "type": "uuid.UUID",
+          "help": "更新するログ計測ルールの UID。"
+        }
+      ],
+      "command_name": "patch-alert-project-log-measure-rule"
+    },
+    {
+      "name": "Delete",
+      "help": "ログ計測ルールを削除します。削除前に対象 ID を確認してください。",
+      "method": "Delete",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "rule-id",
+          "field": "RuleID",
+          "type": "uuid.UUID",
+          "help": "削除するログ計測ルールの UID。"
+        }
+      ],
+      "command_name": "delete-alert-project-log-measure-rule"
+    },
+    {
+      "name": "ListHistories",
+      "help": "ログ計測ルールのアラート履歴を一覧表示します。状態や重要度、発生日時で絞り込めます。",
+      "method": "ListHistories",
+      "request_type": "monitoringsuite.LogMeasureRuleListHistoriesParams",
+      "request_by_value": true,
+      "no_request_flag": true,
+      "response_type": "[]v1.History",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        }
+      ],
+      "flags": [
+        {
+          "name": "count",
+          "field": "Count",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 1 回の取得件数。"
+        },
+        {
+          "name": "from",
+          "field": "From",
+          "type": "int",
+          "pointer": true,
+          "help": "任意: 取得開始位置 (0 開始)。"
+        },
+        {
+          "name": "open",
+          "field": "Open",
+          "type": "bool",
+          "pointer": true,
+          "help": "任意: 未解決アラートのみを取得します。"
+        },
+        {
+          "name": "severity",
+          "field": "Severity",
+          "type": "string",
+          "pointer": true,
+          "help": "任意: 重要度で絞り込みます。critical、warning のいずれか。",
+          "conversion": "v1.ListAlertProjectHistoriesSeverity"
+        },
+        {
+          "name": "starts-at",
+          "field": "StartsAt",
+          "type": "time.Time",
+          "pointer": true,
+          "help": "任意: 発生日時で絞り込みます。RFC3339 形式で指定します。"
+        }
+      ],
+      "command_name": "list-alert-project-log-measure-rule-histories"
+    },
+    {
+      "name": "ReadHistory",
+      "help": "ログ計測ルールの履歴を 1 件読み取ります。",
+      "method": "ReadHistory",
+      "response_type": "*v1.History",
+      "arguments": [
+        {
+          "name": "project-id",
+          "field": "ProjectID",
+          "type": "string",
+          "help": "アラートプロジェクトのリソース ID。"
+        },
+        {
+          "name": "history-id",
+          "field": "HistoryID",
+          "type": "uuid.UUID",
+          "help": "読み取る履歴の UID。"
+        }
+      ],
+      "command_name": "read-alert-project-log-measure-rule-history"
+    }
+  ],
+  "wiring_target": "MonitoringSuiteAPI.LogMeasureRule",
+  "sdk_factory": "monitoringsuiteapi.NewLogMeasureRuleAPI"
+}
