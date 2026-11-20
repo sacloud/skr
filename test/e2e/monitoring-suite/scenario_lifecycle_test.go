@@ -478,22 +478,10 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"monitoring-suite-api", "list-log-storage-keys", logStorageID)
 	require.Contains(t, jsonUIDs(logKeyList), logKeyUID, "list-log-storage-keys should contain the created key")
 
-	// --- 通知ルーティング (通知先を再作成して使う) ---
-	target2 := callMonitoringSuite(t, h, "通知ルーティングの検証用に通知先を作成する",
-		"monitoring-suite-api", "create-alert-project-notification-target", projectID,
-		"--service-type", "SAKURA_SIMPLE_NOTICE",
-		"--url", "https://example.test/routing-hook",
-	)
-	target2UID := monitoringSuiteIDText(t, target2, "uid")
-	defer func() {
-		h.Call(t, "後片付け: 通知先 "+target2UID+" を削除する", "monitoring-suite-api", "delete-alert-project-notification-target", projectID, target2UID)
-		monitoringSuiteWaitGone(t, h, "後片付け: 通知先 "+target2UID+" の削除後の不在を確認する", 2*time.Minute,
-			"monitoring-suite-api", "read-alert-project-notification-target", projectID, target2UID)
-	}()
-
+	// --- 通知ルーティング (通知先は SAKURA_SIMPLE_NOTICE でプロジェクトに 1 つのため、作成済みの通知先を使う) ---
 	routing := callMonitoringSuite(t, h, "アラートプロジェクト "+projectID+" に通知ルーティングを作成する",
 		"monitoring-suite-api", "create-alert-project-notification-routing", projectID,
-		"--request", `{"NotificationTargetUID":"`+target2UID+`","MatchLabels":[{"name":"severity","value":"critical"}]}`,
+		"--request", `{"NotificationTargetUID":"`+targetUID+`","MatchLabels":[{"name":"severity","value":"critical"}]}`,
 	)
 	routingUID := monitoringSuiteIDText(t, routing, "uid")
 
@@ -525,7 +513,7 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	// 通知先 UID を同値で部分更新し、部分更新 API が正常応答することを確認する
 	routingPatched := callMonitoringSuite(t, h, "通知ルーティング "+routingUID+" の通知先を同値で更新する",
 		"monitoring-suite-api", "patch-alert-project-notification-routing", projectID, routingUID,
-		"--request", `{"NotificationTargetUID":"`+target2UID+`","ResendIntervalMinutes":30}`)
+		"--request", `{"NotificationTargetUID":"`+targetUID+`","ResendIntervalMinutes":30}`)
 	require.Equal(t, routingUID, monitoringSuiteIDText(t, routingPatched, "uid"), "patch-alert-project-notification-routing output: %v", routingPatched)
 
 	// --- ログ計測ルール ---
@@ -719,7 +707,7 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		UID string `json:"uid"`
 	}
 	require.NoError(t, json.Unmarshal(targetList, &targets), "list-alert-project-notification-targets output: %s", targetList)
-	require.Contains(t, uids(targets), target2UID, "list-alert-project-notification-targets should contain the routing target")
+	require.Contains(t, uids(targets), targetUID, "list-alert-project-notification-targets should contain the routing target")
 
 	// --- アラートプロジェクトの履歴 ---
 	projectHistories := h.Call(t, "アラートプロジェクトの履歴を一覧表示する",
