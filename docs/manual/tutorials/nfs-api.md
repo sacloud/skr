@@ -9,23 +9,14 @@ NFS は、スイッチ配下のローカルネットワークに設置する NFS
 
 ## 前提条件
 
-- `skr`、`curl`、`jq` を利用できる環境が必要です。
+- `skr` を利用できる環境が必要です。
 - NFS とスイッチの操作が許可された認証プロファイルを用意してください。
-- プラン ID の確認だけ、さくらのクラウド API の API キーを環境変数で使います (`skr` と同じキーで構いません)。
-
-```console
-$ export SAKURA_ACCESS_TOKEN=<API トークン>
-$ export SAKURA_ACCESS_TOKEN_SECRET=<API シークレット>
-```
-
-API キーの発行方法は [API キーの発行](https://manual.sakura.ad.jp/cloud/management/api/api-key.html) を参照してください。
-
 - 以下のコマンドは同じシェルで実行します。作成したリソースの ID はコマンド出力から設定してください。
 
 ## 作成するリソースと順序
 
 1. テスト用のスイッチ (無料) を作成します。
-2. 共通仕様ノート `sys-nfs` からプラン ID を確認します。
+2. `skr nfs plans` でプラン ID を確認します。
 3. NFS を作成し、起動の完了を待ちます。
 4. 参照と検索で内容を照合します。
 5. 説明とタグを更新します。
@@ -39,12 +30,13 @@ $ skr config current
 $ skr nfs-api --help
 $ skr nfs-api create --help
 $ skr nfs-api delete --help
+$ skr nfs plans --help
 ```
 
-この手順ではゾーンに `is1a` を使います。別のゾーンを使う場合は、以降の `ZONE` を置き換えてください。
+この手順ではゾーンに `tk1a` を使います。別のゾーンを使う場合は、以降の `ZONE` を置き換えてください。
 
 ```console
-$ ZONE=is1a
+$ ZONE=tk1a
 ```
 
 ## Step 2: 接続先スイッチを作成する
@@ -69,28 +61,31 @@ $ echo "$SWITCH_ID"
 
 ## Step 3: プラン ID を確認する
 
-NFS のプラン ID は、共通仕様ノート `sys-nfs` にプラン一覧として記録されています。さくらのクラウド API でノートを取得し、利用可能な SSD プランのサイズとプラン ID を確認します。
+NFS のプランは、ストレージ種別とディスク容量の組み合わせです。`skr nfs plans` で、ゾーンで利用できるプランの一覧を出力します。デフォルトでは利用可能 (available) なプランのみが表示されます。
 
 ```console
-$ curl -sS --user "$SAKURA_ACCESS_TOKEN:$SAKURA_ACCESS_TOKEN_SECRET" \
-    "https://secure.sakura.ad.jp/cloud/zone/$ZONE/api/cloud/1.1/commonserviceitem.json?Filter.Name=sys-nfs&Filter.Class=json&Count=100" \
-    | jq -r --arg z "$ZONE" '
-        .CommonServiceItems[]
-        | select(any(.Tags[]; . == "@zone=" + $z))
-        | .Content | fromjson | .plans.SSD[]
-        | select(.availability == "available")
-        | "\(.size)GB  \(.planId)"'
-20GB  100001
-40GB  100002
+$ skr nfs plans --zone "$ZONE" --query 'map(select(.Storage == "SSD")) | map({Size,PlanID})'
+[
+  {
+    "Size": 20,
+    "PlanID": 20
+  },
+  {
+    "Size": 100,
+    "PlanID": 1001014001
+  }
+]
 ```
 
-出力例はプラン ID を置き換えています。表示された一覧から、作成したいサイズのプラン ID を選んで設定します。この手順では費用を抑えるため、一覧の最小サイズのプラン ID を使います。
+出力例はプラン ID を置き換えています。表示された一覧から、作成したいサイズのプラン ID を選んで設定します。この手順では費用を抑えるため、一覧の最小サイズのプラン ID をコマンド置換で取り込みます。
 
 ```console
-$ PLAN_ID=<選んだプラン ID>
+$ PLAN_ID=$(skr nfs plans --zone "$ZONE" --query-raw 'map(select(.Storage == "SSD")) | sort_by(.Size) | .[0].PlanID')
+$ echo "$PLAN_ID"
+20
 ```
 
-標準 (HDD) プランのサイズを確認する場合は、`jq` の `.plans.SSD[]` を `.plans.HDD[]` に置き換えてください。
+標準 (HDD) プランを確認する場合は、`select(.Storage == "SSD")` を `select(.Storage == "HDD")` に置き換えてください。利用不可 (disabled) のプランを含めて確認する場合は `--all` を付けます。
 
 ## Step 4: NFS を作成する
 

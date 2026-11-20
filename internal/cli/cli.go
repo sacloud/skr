@@ -36,6 +36,7 @@ import (
 	"github.com/sacloud/skr/internal/localrouterapi"
 	"github.com/sacloud/skr/internal/monitoringsuiteapi"
 	"github.com/sacloud/skr/internal/networkingsuiteapi"
+	"github.com/sacloud/skr/internal/nfs"
 	"github.com/sacloud/skr/internal/objectstorageapi"
 	"github.com/sacloud/skr/internal/proxylbapi"
 	"github.com/sacloud/skr/internal/secretmanagerapi"
@@ -56,6 +57,7 @@ type cli struct {
 	Config                    configCommand                      `cmd:"" help:"Manage configuration profiles."`
 	IaaSAPI                   iaasAPICommand                     `cmd:"" name:"iaas-api" help:"さくらのクラウド IaaS API を操作します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。"`
 	NFSAPI                    nfsapi.Commands                    `cmd:"" name:"nfs-api" help:"さくらのクラウド NFS を操作します。スイッチ配下のローカルネットワークに設置する NFS ファイルサーバアプライアンスを管理します。接続先スイッチ、プラン ID、IPv4 アドレス、ネットマスク長は作成後の変更ができません。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/nfs/index.html"`
+	NFS                       nfs.Commands                       `cmd:"" name:"nfs" help:"NFS の高レベル操作です。ゾーンで利用できる NFS プランの一覧を表示し、skr nfs-api create の --plan-id に指定するプラン ID を確認できます。完全な JSON 入力が必要なときは nfs-api を使ってください。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/appliance/nfs/index.html"`
 	GSLBAPI                   gslbapi.Commands                   `cmd:"" name:"gslb-api" help:"さくらのクラウド GSLB を操作します。実サーバーへのヘルスチェックを行い、DNS 応答先を制御します。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。詳細: https://manual.sakura.ad.jp/cloud/appliance/gslb/index.html"`
 	LocalRouterAPI            localrouterapi.Commands            `cmd:"" name:"local-router-api" help:"さくらのクラウドのローカルルータを操作します。拠点間やゾーン間をまたぐ閉域網 (L3) ネットワークを構成し、スイッチ接続、インターフェース、スタティックルート、ピア接続を設定できます。ローカルルータはグローバルリソースで、ゾーンの指定は不要です。ピア設定の SecretKey など秘密情報を含むリクエストは保護したファイルまたは標準入力から読み込みます。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/network/localrouter.html"`
 	DNSAPI                    dnsapi.Commands                    `cmd:"" name:"dns-api" help:"さくらのクラウド DNS を操作します。DNS ゾーンとレコード (A、AAAA、ALIAS、CNAME、NS、MX、TXT、SRV、CAA、HTTPS、SVCB、PTR) を管理します。DNS ゾーンはグローバルリソースで、ゾーンの指定は不要です。SDK のプロファイル、または SAKURA_ACCESS_TOKEN / SAKURA_ACCESS_TOKEN_SECRET 環境変数で認証します。結果は JSON で出力します。--query で必要な項目を抽出できます。詳細: https://manual.sakura.ad.jp/cloud/dns/"`
@@ -125,6 +127,7 @@ func newCLI() *cli {
 	result := &cli{}
 	result.initIaaSAPI()
 	result.initNFSAPI()
+	result.initNFS()
 	result.initGSLBAPI()
 	result.initLocalRouterAPI()
 	result.initDNSAPI()

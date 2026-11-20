@@ -16,6 +16,7 @@ package main
 
 import (
 	"encoding/json"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -99,6 +100,53 @@ func TestScenarioNFS(t *testing.T) {
 	// 最小サイズを解決します。リソースを変更しない安全確認のため SDK 直呼びとします
 	planID, planSize := resolveNFSPlan(t, client, nfsZone)
 	t.Logf("resolved NFS SSD plan: id=%d size=%dGB", planID, planSize)
+
+	// プラン解決の結果を高レベルコマンド skr nfs plans の出力と照合します。
+	// デフォルトは利用可能 (available) なプランのみで、解決したプラン ID が含まれます
+	plansData := h.Call(t, "高レベルコマンドでゾーンの NFS プラン一覧を確認する",
+		"nfs", "plans", "--zone", nfsZone)
+	var plans []struct {
+		Storage      string
+		Size         int
+		PlanID       types.ID
+		Availability string
+		Cloneable    bool
+	}
+	require.NoError(t, json.Unmarshal(plansData, &plans), "decode nfs plans output")
+	require.NotEmpty(t, plans, "nfs plans output should not be empty")
+	for _, plan := range plans {
+		require.Equal(t, "available", plan.Availability,
+			"default nfs plans output should contain available plans only")
+	}
+	require.True(t, slices.ContainsFunc(plans, func(plan struct {
+		Storage      string
+		Size         int
+		PlanID       types.ID
+		Availability string
+		Cloneable    bool
+	}) bool {
+		return plan.PlanID == planID
+	}),
+		"resolved plan %d should be listed by skr nfs plans", planID)
+
+	// --all は利用不可 (disabled) のプランも含め、デフォルト出力のプランを
+	// すべて含みます
+	allPlansData := h.Call(t, "--all で利用不可のプランも含めた NFS プラン一覧を確認する",
+		"nfs", "plans", "--zone", nfsZone, "--all")
+	var allPlans []struct {
+		PlanID       types.ID
+		Availability string
+	}
+	require.NoError(t, json.Unmarshal(allPlansData, &allPlans), "decode nfs plans --all output")
+	for _, available := range plans {
+		require.True(t, slices.ContainsFunc(allPlans, func(plan struct {
+			PlanID       types.ID
+			Availability string
+		}) bool {
+			return plan.PlanID == available.PlanID
+		}),
+			"plan %d listed by default output should also be listed with --all", available.PlanID)
+	}
 
 	// テスト用のスイッチを作成する。NFS はスイッチへの接続が必須のため
 	switchName := "skr-e2e-nfs-switch-" + suffix

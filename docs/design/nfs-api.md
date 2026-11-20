@@ -27,7 +27,7 @@
 
 `delete` は生成コマンドですが、`TransformDeleteRequest` で手書きのワークフロー (電源状態を考慮した停止と削除) を呼び出します。
 
-生成コードを直接編集せず、設定を変更して再生成します。手書き処理と SDK 呼び出しは `internal/iaas/nfsapi/commands_test.go` と `sdk_api_test.go` で、CLI 登録とヘルプは `internal/cli/nfs_test.go` で確認します。
+生成コードを直接編集せず、設定を変更して再生成します。手書き処理と SDK 呼び出しは `internal/iaas/nfsapi/commands_test.go` と `sdk_api_test.go` で確認します。CLI 登録とヘルプは `internal/cli/nfs_test.go` で確認します (高レベル `skr nfs` の service 層の検証は `internal/nfs/` のテストで行います)。
 
 ## 入力
 
@@ -79,10 +79,20 @@
 
 - `--zone` と `--id` が必須です。`--start` と `--end` は取得期間で、`--end` を省略すると現在時刻、`--start` を省略すると `--end` の 1 時間前になります。
 
+## 高レベルコマンド (`skr nfs plans`)
+
+プラン ID の解決は高レベルコマンド `skr nfs plans` ([ADR 0096](../adr/0096-nfs-high-level-plans.md)) が担います。service 層と CLI コマンドを `internal/nfs/` に手書きで置き、service 層は Note (`sys-nfs`) の検索と Content の解析を担います ([アーキテクチャ](cli-command-architecture.md) の高レベル層)。
+
+- 検索条件は Name `sys-nfs`、Class `json`、件数 100 です。結果からタグ `@zone=<ゾーン>` が一致する Note を取り出します。0 件、複数件、Note が利用可能な状態でない場合はエラーにします。
+- Content の `plans` オブジェクトから既知のストレージ種別 (SSD、HDD) の配列を読み、各要素の `size`、`availability`、`planId`、`cloneable` を出力へ変換します。出力は SSD、HDD の順、同じ種別内はサイズ昇順です。プラン ID は数値として復元します (10 桁のプラン ID が float の丸めで壊れないよう、構造体にデコードします)。
+- 出力フィールドは `Storage`、`Size`、`PlanID` (types.ID)、`Availability`、`Cloneable` です。省略時は `Availability` が `available` のプランのみを出力し、`--all` で `disabled` も含めます。利用不可のプランが Note の配列に含まれるため、デフォルトの絞り込みが最小サイズ選択の手順を短くします。
+- service 層の Note 操作は `iaas.NoteAPI` を interface で受け、単体テスト (`internal/nfs/plans_test.go`) で検索条件、ゾーン照合、Content 解析、並べ替え、フィルタ、異常系を固定します。
+- チュートリアルのプラン解決手順は `curl` と `jq` による生 API から `skr nfs plans` へ置き換わりました ([ADR 0095](../adr/0095-nfs-api-commands.md) 時点の課題の解消)。
+
 ## E2E
 
 実行には `SKR_E2E` の設定と `skr-e2e` プロファイルが必要です。シナリオは接続先スイッチの作成から、NFS (Note から解決した SSD プランの最小サイズ) の作成、起動待ち合わせ、参照、名前・タグ検索、モニタリング、更新を検証します。電源操作 (shutdown / boot / reset) と削除後の不在確認までを (`test/e2e/nfs/scenario_nfs_test.go`) で検証します。
-作成リクエストは起動の完了を待たないため、シナリオは作成後に SDK で起動状態を待ち合わせます。作成するのはスイッチ 1 件と NFS 1 件のみです。テスト関数内の `defer` で ID と識別情報を再照合してから削除し、不在確認まで行います。NFS は作成から削除まで課金されます。
+作成リクエストは起動の完了を待たないため、シナリオは作成後に SDK で起動状態を待ち合わせます。プラン解決は安全確認として SDK 直呼びで行い ([ADR 0064](../adr/0064-e2e-safety-checks-via-sdk.md))、解決したプラン ID が `skr nfs plans` の出力に含まれることを照合します。`--all` の出力はデフォルト出力のプランをすべて含むことも確認します。作成するのはスイッチ 1 件と NFS 1 件のみです。テスト関数内の `defer` で ID と識別情報を再照合してから削除し、不在確認まで行います。NFS は作成から削除まで課金されます。
 
 2026-11-20 に tk1a で全ステップをライブ検証しました (プランは Note から解決した SSD 20GB)。ライブ検証で確認した API の挙動は次のとおりです。
 
