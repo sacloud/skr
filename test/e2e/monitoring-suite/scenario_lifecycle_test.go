@@ -103,9 +103,30 @@ func monitoringSuiteNotFound(stderr string) bool {
 // 期限までに 404 が確認できなければテストを失敗させます。
 func monitoringSuiteWaitGone(t *testing.T, h *helper.Helper, description string, timeout time.Duration, args ...string) {
 	t.Helper()
+	monitoringSuiteWaitGoneImpl(t, h, description, timeout, false, args...)
+}
+
+// monitoringSuiteWaitGoneHidingStdout は stdout にキーの値などの秘密情報が含まれ得る
+// リソースの削除後の不在を期限付きで確認します。読み取り応答の本文は
+// 成功・失敗とも実行記録に残しません。
+func monitoringSuiteWaitGoneHidingStdout(t *testing.T, h *helper.Helper, description string, timeout time.Duration, args ...string) {
+	t.Helper()
+	monitoringSuiteWaitGoneImpl(t, h, description, timeout, true, args...)
+}
+
+// monitoringSuiteWaitGoneImpl は不在確認の共通実装です。
+// API の 404 以外の失敗は不在とみなさず、期限までに 404 が確認できなければテストを失敗させます。
+func monitoringSuiteWaitGoneImpl(t *testing.T, h *helper.Helper, description string, timeout time.Duration, hideStdout bool, args ...string) {
+	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
-		_, stderr, err := h.CallAllowingFailure(t, description, args...)
+		var stderr string
+		var err error
+		if hideStdout {
+			_, stderr, err = h.CallAllowingFailureHidingStdout(t, description, args...)
+		} else {
+			_, stderr, err = h.CallAllowingFailure(t, description, args...)
+		}
 		if err != nil {
 			if monitoringSuiteNotFound(stderr) {
 				return
@@ -141,11 +162,32 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	// --- 読み取り系コマンド ---
 	publishers := h.Call(t, "パブリッシャーの一覧を取得する", "monitoring-suite-api", "list-publishers")
 	var publisherList []struct {
-		Code string `json:"code"`
+		Code     string `json:"code"`
+		Variants []struct {
+			Storage string `json:"storage"`
+		} `json:"variants"`
 	}
 	require.NoError(t, json.Unmarshal(publishers, &publisherList), "list-publishers output: %s", publishers)
 	require.NotEmpty(t, publisherList, "list-publishers should return at least one publisher")
-	publisherCode := publisherList[0].Code
+	// ルーティング作成でログとメトリクスの両方の種別を使うため、
+	// 両方の種別を持つパブリッシャーを選ぶ
+	publisherCode := ""
+	for _, p := range publisherList {
+		hasLogs, hasMetrics := false, false
+		for _, v := range p.Variants {
+			switch v.Storage {
+			case "logs":
+				hasLogs = true
+			case "metrics":
+				hasMetrics = true
+			}
+		}
+		if hasLogs && hasMetrics {
+			publisherCode = p.Code
+			break
+		}
+	}
+	require.NotEmpty(t, publisherCode, "list-publishers should include a publisher with both logs and metrics variants")
 
 	publisher := callMonitoringSuite(t, h, "パブリッシャー "+publisherCode+" を参照する", "monitoring-suite-api", "read-publisher", publisherCode)
 	require.Equal(t, publisherCode, publisher["code"], "read-publisher output: %v", publisher)
@@ -262,6 +304,14 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"monitoring-suite-api", "create-metric-storage-key", metricStorageID, "--description", "skr e2e key")
 	metricKeyUID := monitoringSuiteIDText(t, metricKey, "uid")
 
+	// キーを取得した直後に削除と不在確認を defer で登録する。
+	// 読み取り応答にキーの値が含まれるため、不在確認も応答本文を記録に残さない
+	defer func() {
+		h.Call(t, "後片付け: アクセスキー "+metricKeyUID+" を削除する", "monitoring-suite-api", "delete-metric-storage-key", metricStorageID, metricKeyUID)
+		monitoringSuiteWaitGoneHidingStdout(t, h, "後片付け: アクセスキー "+metricKeyUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-metric-storage-key", metricStorageID, metricKeyUID)
+	}()
+
 	metricKeyPatched := callMonitoringSuiteSecret(t, h, "アクセスキー "+metricKeyUID+" の説明を更新する",
 		"monitoring-suite-api", "patch-metric-storage-key", metricStorageID, metricKeyUID, "--description", "skr e2e key patched")
 	require.Equal(t, "skr e2e key patched", metricKeyPatched["description"], "patch-metric-storage-key output: %v", metricKeyPatched)
@@ -273,10 +323,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	metricKeyList := callMonitoringSuiteSecretList(t, h, "メトリクスストレージのアクセスキー一覧を取得する",
 		"monitoring-suite-api", "list-metric-storage-keys", metricStorageID)
 	require.Contains(t, jsonUIDs(metricKeyList), metricKeyUID, "list-metric-storage-keys should contain the created key")
-
-	h.Call(t, "アクセスキー "+metricKeyUID+" を削除する", "monitoring-suite-api", "delete-metric-storage-key", metricStorageID, metricKeyUID)
-	monitoringSuiteWaitGone(t, h, "アクセスキー "+metricKeyUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-metric-storage-key", metricStorageID, metricKeyUID)
 
 	// --- アラートルール ---
 	// Query は PromQL 形式、しきい値は「演算子+値」の文字列形式
@@ -294,6 +340,13 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	)
 	ruleUID := monitoringSuiteIDText(t, rule, "uid")
 	require.Equal(t, "skr-e2e-rule-"+suffix, rule["name"], "create-alert-project-rule output: %v", rule)
+
+	// ルールを取得した直後に削除と不在確認を defer で登録する
+	defer func() {
+		h.Call(t, "後片付け: アラートルール "+ruleUID+" を削除する", "monitoring-suite-api", "delete-alert-project-rule", projectID, ruleUID)
+		monitoringSuiteWaitGone(t, h, "後片付け: アラートルール "+ruleUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-alert-project-rule", projectID, ruleUID)
+	}()
 
 	ruleRead := callMonitoringSuite(t, h, "アラートルール "+ruleUID+" を参照する",
 		"monitoring-suite-api", "read-alert-project-rule", projectID, ruleUID)
@@ -326,10 +379,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		break
 	}
 
-	h.Call(t, "アラートルール "+ruleUID+" を削除する", "monitoring-suite-api", "delete-alert-project-rule", projectID, ruleUID)
-	monitoringSuiteWaitGone(t, h, "アラートルール "+ruleUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-alert-project-rule", projectID, ruleUID)
-
 	// --- 通知先 ---
 	target := callMonitoringSuite(t, h, "アラートプロジェクト "+projectID+" に通知先を作成する",
 		"monitoring-suite-api", "create-alert-project-notification-target", projectID,
@@ -340,6 +389,13 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	targetUID := monitoringSuiteIDText(t, target, "uid")
 	require.Equal(t, "SAKURA_SIMPLE_NOTICE", target["service_type"], "create-alert-project-notification-target output: %v", target)
 
+	// 通知先を取得した直後に削除と不在確認を defer で登録する
+	defer func() {
+		h.Call(t, "後片付け: 通知先 "+targetUID+" を削除する", "monitoring-suite-api", "delete-alert-project-notification-target", projectID, targetUID)
+		monitoringSuiteWaitGone(t, h, "後片付け: 通知先 "+targetUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-alert-project-notification-target", projectID, targetUID)
+	}()
+
 	targetRead := callMonitoringSuite(t, h, "通知先 "+targetUID+" を参照する",
 		"monitoring-suite-api", "read-alert-project-notification-target", projectID, targetUID)
 	require.Equal(t, targetUID, monitoringSuiteIDText(t, targetRead, "uid"))
@@ -349,10 +405,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"monitoring-suite-api", "patch-alert-project-notification-target", projectID, targetUID,
 		"--request", `{"URL":"https://example.test/hook2"}`)
 	require.Equal(t, "https://example.test/hook2", targetPatched["url"], "patch-alert-project-notification-target output: %v", targetPatched)
-
-	h.Call(t, "通知先 "+targetUID+" を削除する", "monitoring-suite-api", "delete-alert-project-notification-target", projectID, targetUID)
-	monitoringSuiteWaitGone(t, h, "通知先 "+targetUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-alert-project-notification-target", projectID, targetUID)
 
 	// --- ログストレージ ---
 	logStorage := callMonitoringSuite(t, h, "ログストレージ "+logStorageName+" を作成する",
@@ -406,6 +458,14 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"monitoring-suite-api", "create-log-storage-key", logStorageID, "--description", "skr e2e key")
 	logKeyUID := monitoringSuiteIDText(t, logKey, "uid")
 
+	// キーを取得した直後に削除と不在確認を defer で登録する。
+	// 読み取り応答にキーの値が含まれるため、不在確認も応答本文を記録に残さない
+	defer func() {
+		h.Call(t, "後片付け: アクセスキー "+logKeyUID+" を削除する", "monitoring-suite-api", "delete-log-storage-key", logStorageID, logKeyUID)
+		monitoringSuiteWaitGoneHidingStdout(t, h, "後片付け: アクセスキー "+logKeyUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-log-storage-key", logStorageID, logKeyUID)
+	}()
+
 	logKeyPatched := callMonitoringSuiteSecret(t, h, "アクセスキー "+logKeyUID+" の説明を更新する",
 		"monitoring-suite-api", "patch-log-storage-key", logStorageID, logKeyUID, "--description", "skr e2e key patched")
 	require.Equal(t, "skr e2e key patched", logKeyPatched["description"], "patch-log-storage-key output: %v", logKeyPatched)
@@ -417,10 +477,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	logKeyList := callMonitoringSuiteSecretList(t, h, "ログストレージのアクセスキー一覧を取得する",
 		"monitoring-suite-api", "list-log-storage-keys", logStorageID)
 	require.Contains(t, jsonUIDs(logKeyList), logKeyUID, "list-log-storage-keys should contain the created key")
-
-	h.Call(t, "アクセスキー "+logKeyUID+" を削除する", "monitoring-suite-api", "delete-log-storage-key", logStorageID, logKeyUID)
-	monitoringSuiteWaitGone(t, h, "アクセスキー "+logKeyUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-log-storage-key", logStorageID, logKeyUID)
 
 	// --- 通知ルーティング (通知先を再作成して使う) ---
 	target2 := callMonitoringSuite(t, h, "通知ルーティングの検証用に通知先を作成する",
@@ -440,6 +496,14 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"--request", `{"NotificationTargetUID":"`+target2UID+`","MatchLabels":[{"name":"severity","value":"critical"}]}`,
 	)
 	routingUID := monitoringSuiteIDText(t, routing, "uid")
+
+	// ルーティングを取得した直後に削除と不在確認を defer で登録する
+	defer func() {
+		h.Call(t, "後片付け: 通知ルーティング "+routingUID+" を削除する",
+			"monitoring-suite-api", "delete-alert-project-notification-routing", projectID, routingUID)
+		monitoringSuiteWaitGone(t, h, "後片付け: 通知ルーティング "+routingUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-alert-project-notification-routing", projectID, routingUID)
+	}()
 
 	routingRead := callMonitoringSuite(t, h, "通知ルーティング "+routingUID+" を参照する",
 		"monitoring-suite-api", "read-alert-project-notification-routing", projectID, routingUID)
@@ -464,11 +528,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"--request", `{"NotificationTargetUID":"`+target2UID+`","ResendIntervalMinutes":30}`)
 	require.Equal(t, routingUID, monitoringSuiteIDText(t, routingPatched, "uid"), "patch-alert-project-notification-routing output: %v", routingPatched)
 
-	h.Call(t, "通知ルーティング "+routingUID+" を削除する",
-		"monitoring-suite-api", "delete-alert-project-notification-routing", projectID, routingUID)
-	monitoringSuiteWaitGone(t, h, "通知ルーティング "+routingUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-alert-project-notification-routing", projectID, routingUID)
-
 	// --- ログ計測ルール ---
 	measureRule := callMonitoringSuite(t, h, "アラートプロジェクト "+projectID+" にログ計測ルールを作成する",
 		"monitoring-suite-api", "create-alert-project-log-measure-rule", projectID,
@@ -476,6 +535,14 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 			`"Rule":{"version":"v1","query":{"matchers":[{"type":"string","operator":"eq","field":"log_name","value":"skr-e2e","value_list":[]}]}}}`,
 	)
 	measureRuleUID := monitoringSuiteIDText(t, measureRule, "uid")
+
+	// ルールを取得した直後に削除と不在確認を defer で登録する
+	defer func() {
+		h.Call(t, "後片付け: ログ計測ルール "+measureRuleUID+" を削除する",
+			"monitoring-suite-api", "delete-alert-project-log-measure-rule", projectID, measureRuleUID)
+		monitoringSuiteWaitGone(t, h, "後片付け: ログ計測ルール "+measureRuleUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-alert-project-log-measure-rule", projectID, measureRuleUID)
+	}()
 
 	measureRuleRead := callMonitoringSuite(t, h, "ログ計測ルール "+measureRuleUID+" を参照する",
 		"monitoring-suite-api", "read-alert-project-log-measure-rule", projectID, measureRuleUID)
@@ -509,11 +576,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		break
 	}
 
-	h.Call(t, "ログ計測ルール "+measureRuleUID+" を削除する",
-		"monitoring-suite-api", "delete-alert-project-log-measure-rule", projectID, measureRuleUID)
-	monitoringSuiteWaitGone(t, h, "ログ計測ルール "+measureRuleUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-alert-project-log-measure-rule", projectID, measureRuleUID)
-
 	// --- ログルーティングとメトリクスルーティング ---
 	logRouting := callMonitoringSuite(t, h, "ログルーティングを作成する (publisher="+publisherCode+" log_storage="+logStorageID+")",
 		"monitoring-suite-api", "create-log-routing",
@@ -522,6 +584,13 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"--log-storage-id", logStorageID,
 	)
 	logRoutingUID := monitoringSuiteIDText(t, logRouting, "uid")
+
+	// ルーティングを取得した直後に削除と不在確認を defer で登録する
+	defer func() {
+		h.Call(t, "後片付け: ログルーティング "+logRoutingUID+" を削除する", "monitoring-suite-api", "delete-log-routing", logRoutingUID)
+		monitoringSuiteWaitGone(t, h, "後片付け: ログルーティング "+logRoutingUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-log-routing", logRoutingUID)
+	}()
 
 	logRoutingRead := callMonitoringSuite(t, h, "ログルーティング "+logRoutingUID+" を参照する",
 		"monitoring-suite-api", "read-log-routing", logRoutingUID)
@@ -539,10 +608,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"--log-storage-id", logStorageID)
 	require.Equal(t, logRoutingUID, monitoringSuiteIDText(t, logRoutingPatched, "uid"), "patch-log-routing output: %v", logRoutingPatched)
 
-	h.Call(t, "後片付け: ログルーティング "+logRoutingUID+" を削除する", "monitoring-suite-api", "delete-log-routing", logRoutingUID)
-	monitoringSuiteWaitGone(t, h, "後片付け: ログルーティング "+logRoutingUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-log-routing", logRoutingUID)
-
 	metricRouting := callMonitoringSuite(t, h, "メトリクスルーティングを作成する (publisher="+publisherCode+" metrics_storage="+metricStorageID+")",
 		"monitoring-suite-api", "create-metric-routing",
 		"--publisher-code", publisherCode,
@@ -550,6 +615,13 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"--metrics-storage-id", metricStorageID,
 	)
 	metricRoutingUID := monitoringSuiteIDText(t, metricRouting, "uid")
+
+	// ルーティングを取得した直後に削除と不在確認を defer で登録する
+	defer func() {
+		h.Call(t, "後片付け: メトリクスルーティング "+metricRoutingUID+" を削除する", "monitoring-suite-api", "delete-metric-routing", metricRoutingUID)
+		monitoringSuiteWaitGone(t, h, "後片付け: メトリクスルーティング "+metricRoutingUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-metric-routing", metricRoutingUID)
+	}()
 
 	metricRoutingRead := callMonitoringSuite(t, h, "メトリクスルーティング "+metricRoutingUID+" を参照する",
 		"monitoring-suite-api", "read-metric-routing", metricRoutingUID)
@@ -566,10 +638,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"monitoring-suite-api", "patch-metric-routing", metricRoutingUID,
 		"--metrics-storage-id", metricStorageID)
 	require.Equal(t, metricRoutingUID, monitoringSuiteIDText(t, metricRoutingPatched, "uid"), "patch-metric-routing output: %v", metricRoutingPatched)
-
-	h.Call(t, "後片付け: メトリクスルーティング "+metricRoutingUID+" を削除する", "monitoring-suite-api", "delete-metric-routing", metricRoutingUID)
-	monitoringSuiteWaitGone(t, h, "後片付け: メトリクスルーティング "+metricRoutingUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-metric-routing", metricRoutingUID)
 
 	// --- トレースストレージ ---
 	traceStorage := callMonitoringSuite(t, h, "トレースストレージ "+traceStorageName+" を作成する",
@@ -623,6 +691,15 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 		"monitoring-suite-api", "create-trace-storage-key", traceStorageID, "--description", "skr e2e key")
 	traceKeyUID := monitoringSuiteIDText(t, traceKey, "uid")
 
+	// キーを取得した直後に削除と不在確認を defer で登録する。
+	// 読み取り応答にキーの値が含まれるため、不在確認も応答本文を記録に残さない
+	defer func() {
+		h.Call(t, "後片付け: トレースストレージのアクセキー "+traceKeyUID+" を削除する",
+			"monitoring-suite-api", "delete-trace-storage-key", traceStorageID, traceKeyUID)
+		monitoringSuiteWaitGoneHidingStdout(t, h, "後片付け: トレースストレージのアクセキー "+traceKeyUID+" の削除後の不在を確認する", 2*time.Minute,
+			"monitoring-suite-api", "read-trace-storage-key", traceStorageID, traceKeyUID)
+	}()
+
 	traceKeyPatched := callMonitoringSuiteSecret(t, h, "トレースストレージのアクセスキー "+traceKeyUID+" の説明を更新する",
 		"monitoring-suite-api", "patch-trace-storage-key", traceStorageID, traceKeyUID, "--description", "skr e2e key patched")
 	require.Equal(t, "skr e2e key patched", traceKeyPatched["description"], "patch-trace-storage-key output: %v", traceKeyPatched)
@@ -634,11 +711,6 @@ func TestScenarioMonitoringSuiteLifecycle(t *testing.T) {
 	traceKeyList := callMonitoringSuiteSecretList(t, h, "トレースストレージのアクセキー一覧を取得する",
 		"monitoring-suite-api", "list-trace-storage-keys", traceStorageID)
 	require.Contains(t, jsonUIDs(traceKeyList), traceKeyUID, "list-trace-storage-keys should contain the created key")
-
-	h.Call(t, "トレースストレージのアクセキー "+traceKeyUID+" を削除する",
-		"monitoring-suite-api", "delete-trace-storage-key", traceStorageID, traceKeyUID)
-	monitoringSuiteWaitGone(t, h, "トレースストレージのアクセキー "+traceKeyUID+" の削除後の不在を確認する", 2*time.Minute,
-		"monitoring-suite-api", "read-trace-storage-key", traceStorageID, traceKeyUID)
 
 	// --- 通知先一覧 ---
 	targetList := h.Call(t, "アラートプロジェクトの通知先一覧を取得する",
