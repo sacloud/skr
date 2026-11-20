@@ -58,6 +58,8 @@ generate-iaas-api:
 generate-wiring:
 	$(GO) run ./cmd/apigen-wiring -mode iaas -out internal/cli/iaas_wiring_generated.go \
 		$(patsubst %,api/commands/%,$(filter iaas-%,$(notdir $(wildcard api/commands/*.json))))
+	$(GO) run ./cmd/apigen-wiring -mode iaas -out internal/cli/nfs_wiring_generated.go \
+		$(patsubst %,api/commands/%,$(filter nfs%,$(notdir $(wildcard api/commands/*.json))))
 	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/eventbus_wiring_generated.go \
 		$(patsubst %,api/commands/%,$(filter eventbus%,$(notdir $(wildcard api/commands/*.json))))
 	$(GO) run ./cmd/apigen-wiring -mode ogen -out internal/cli/iam_wiring_generated.go \

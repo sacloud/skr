@@ -35,6 +35,7 @@ iam-api.md deferred 23 sakumock にサーバーがあるが harness 未接続
 kms-api.md deferred 11 sakumock にサーバーがあるが harness 未接続
 local-router-api.md deferred 14 sakumock にサーバーがなく fake で代替
 networking-suite-api.md deferred 26 手動置換プレースホルダーの撤去が必要
+nfs-api.md deferred 15 sakumockiaas が NFS 未対応
 object-storage-api.md deferred 14 sakumock にサーバーがあるが harness 未接続
 proxylb-api.md deferred 18 手動置換プレースホルダーの撤去と sakumockiaas の拡充が必要
 secretmanager-api.md deferred 13 sakumock にサーバーがあるが harness 未接続

@@ -13,6 +13,7 @@
 - [IaaS Icon API: 画像ファイルからユーザー作成アイコンを管理する](tutorials/iaas-api/icon.md)
 - [IaaS LicenseInfo API: ライセンス情報を検索する](tutorials/iaas-api/license-info.md)
 - [IaaS LocalRouter API: スイッチ接続とスタティックルートを設定する](tutorials/local-router-api.md)
+- [NFS API: スイッチ配下に NFS を作ってライフサイクルを確認する](tutorials/nfs-api.md)
 - [IaaS PacketFilter API: ルールを設定・管理する](tutorials/iaas-api/packetfilter.md)
 - [IaaS Region API: リージョン情報を検索・参照する](tutorials/iaas-api/region.md)
 - [IaaS ServiceClass API: ゾーン内のサービスクラスを検索する](tutorials/iaas-api/serviceclass.md)

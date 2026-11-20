@@ -18,7 +18,7 @@
 
 ## 対応範囲と制限
 
-zone、icon、packetfilter、switch、database (appliance の一部操作: 参照・削除・電源・リセット・モニター、パラメータ一覧) のみ実装している。それ以外のリソースの URL は `unsupported IaaS request URL` エラーになる。
+zone、icon、packetfilter、switch、database (appliance の一部操作: 参照・削除・電源・リセット・モニター、パラメータ一覧) のみ実装している。NFS (appliance) も未対応で、これらのリソースの URL は `unsupported IaaS request URL` エラーになる。
 
 icon の検索は、SDK が `Names`/`Tags`/`Scope` を Filter (`Name`、`Tags.Name`、`Scope`) に変換した形式を受け付ける。検索条件は `Count`/`From`/`Sort`/`Filter` の一部キーのみを解釈し、FindCondition の `Include`/`Exclude` などそれ以外は無視する。ソートキーはリソースごとに限定的である (icon は ID/Name/Scope)。
 
@@ -34,6 +34,7 @@ database は create と update (POST/PUT の本体) に未対応で、テスト�
 | `proxylb-api.md` | 拡充が必要 | sakumock に ProxyLB モックサーバーが無い (Ogen 系)、手動置換プレースホルダーの撤去 |
 | `iaas-api/archive.md` | archive 未対応 | なし |
 | `iaas-api/database.md` | create / update 未対応 | なし |
+| `nfs-api.md` | NFS (appliance) 未対応 | なし |
 | `iaas-api/disk.md` | disk 未対応 | 手動置換プレースホルダーの撤去 |
 | `iaas-api/disk-plan.md` | product disk 未対応 | なし |
 | `iaas-api/icon.md` | なし | 手動置換プレースホルダーの撤去 |
