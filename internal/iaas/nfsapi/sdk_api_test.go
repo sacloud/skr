@@ -19,6 +19,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,7 +33,10 @@ import (
 
 // fakeNFSOp は iaas.NFSAPI を満たすテスト用実装です。
 // 操作の引数とワークフローの操作順序を検証します。
+// SDK の待ち処理は別 goroutine で polling するため、状態の読み書きは mu で保護し、
+// Read はコピーを返します。
 type fakeNFSOp struct {
+	mu          sync.Mutex
 	nfs         *iaas.NFS
 	readErr     error
 	readCount   int
@@ -67,7 +71,31 @@ type fakeNFSOp struct {
 }
 
 func (f *fakeNFSOp) record(operation string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.operations = append(f.operations, operation)
+}
+
+// setStatus はテストから NFS の状態を変更します。待ち処理の polling と競合しないよう
+// ロックします。Boot 後の起動待ちのテストで、polling 中に状態が変わる様子を再現します。
+func (f *fakeNFSOp) setStatus(status types.EServerInstanceStatus) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.nfs != nil {
+		f.nfs.InstanceStatus = status
+	}
+}
+
+// currentNFS はロック内で NFS のコピーを返します。SDK の待ち処理は返却値を
+// 別 goroutine で読むため、ポインタの共有を避けます。
+func (f *fakeNFSOp) currentNFS() *iaas.NFS {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.nfs == nil {
+		return nil
+	}
+	copied := *f.nfs
+	return &copied
 }
 
 func (f *fakeNFSOp) Find(_ context.Context, zone string, conditions *iaas.FindCondition) (*iaas.NFSFindResult, error) {
@@ -96,7 +124,7 @@ func (f *fakeNFSOp) Read(context.Context, string, types.ID) (*iaas.NFS, error) {
 	if f.readErr != nil {
 		return nil, f.readErr
 	}
-	return f.nfs, nil
+	return f.currentNFS(), nil
 }
 
 func (f *fakeNFSOp) Update(_ context.Context, zone string, id types.ID, param *iaas.NFSUpdateRequest) (*iaas.NFS, error) {
@@ -115,6 +143,8 @@ func (f *fakeNFSOp) Delete(_ context.Context, _ string, _ types.ID) error {
 	if f.deleteErr != nil {
 		return f.deleteErr
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.nfs = nil
 	return nil
 }
@@ -133,6 +163,8 @@ func (f *fakeNFSOp) Shutdown(_ context.Context, _ string, _ types.ID, _ *iaas.Sh
 		return f.shutdownErr
 	}
 	// 強制終了を受け付けた状態を模擬する
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.nfs != nil {
 		f.nfs.InstanceStatus = types.ServerInstanceStatuses.Down
 	}
@@ -475,20 +507,21 @@ func TestDeleteWorkflowFailsOnMissingNFSOnDeleteWithFailIfNotFound(t *testing.T)
 
 func TestBootWithContextWaitsByDefault(t *testing.T) {
 	defer speedUpWaiters()()
-	// 起動後の状態を段階的に変化させ、起動完了待ちが行われることを確認します
+	// 起動後の状態を段階的に変化させ、起動完了待ちが行われることを確認します。
+	// 待ち処理の polling とテストからの状態変更は fakeNFSOp のロックで保護します
 	op := &fakeNFSOp{
 		nfs: &iaas.NFS{ID: 123, Availability: types.Availabilities.Available, InstanceStatus: types.ServerInstanceStatuses.Down},
 	}
 	api := &nfsAPI{op: op}
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		op.nfs.InstanceStatus = types.ServerInstanceStatuses.Up
+		op.setStatus(types.ServerInstanceStatuses.Up)
 	}()
 
 	err := api.BootWithContext(context.Background(), &BootRequest{Zone: "is1b", ID: 123})
 	require.NoError(t, err)
 	require.Contains(t, op.operations, "boot")
-	require.Equal(t, types.ServerInstanceStatuses.Up, op.nfs.InstanceStatus)
+	require.Equal(t, types.ServerInstanceStatuses.Up, op.currentNFS().InstanceStatus)
 }
 
 func TestBootWithContextNoWait(t *testing.T) {
@@ -516,7 +549,7 @@ func TestShutdownWithContextWaitsByDefault(t *testing.T) {
 	err := api.ShutdownWithContext(context.Background(), &ShutdownRequest{Zone: "is1b", ID: 123})
 	require.NoError(t, err)
 	require.Contains(t, op.operations, "shutdown")
-	require.Equal(t, types.ServerInstanceStatuses.Down, op.nfs.InstanceStatus)
+	require.Equal(t, types.ServerInstanceStatuses.Down, op.currentNFS().InstanceStatus)
 }
 
 func TestShutdownWithContextNoWaitWithForce(t *testing.T) {
