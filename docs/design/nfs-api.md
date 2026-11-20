@@ -25,7 +25,7 @@
 - create は SDK の作成リクエスト型にゾーンフィールドがなく、CLI がゾーンを別途管理するため、手書きの `CreateRequest` (Zone を含む) から `iaas.NFSCreateRequest` へ変換します。変換時に Class (`nfs`) を補完します。
 - update は SDK の更新リクエストが未指定項目を空の値として送る挙動のため、個別フラグはポインタ型で未指定を区別します。
 
-`delete` は生成コマンドですが、`TransformDeleteRequest` で手書きのワークフロー (電源状態を考慮した停止と削除) を呼び出します。
+`delete` は手書きの `DeleteWithContext` で実装し、電源状態を考慮したワークフロー (起動中なら `--force` で強制停止してから削除) を行います。生成コードからはこの `DeleteWithContext` が呼び出されます。
 
 生成コードを直接編集せず、設定を変更して再生成します。手書き処理と SDK 呼び出しは `internal/iaas/nfsapi/commands_test.go` と `sdk_api_test.go` で確認します。CLI 登録とヘルプは `internal/cli/nfs_test.go` で確認します (高レベル `skr nfs` の service 層の検証は `internal/nfs/` のテストで行います)。
 

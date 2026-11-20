@@ -177,16 +177,15 @@ func TestScenarioNFS(t *testing.T) {
 		require.Equal(t, createdSwitch.ID, current.ID, "cleanup target switch ID mismatch")
 		require.Equal(t, switchName, current.Name, "cleanup target switch name mismatch")
 		require.Equal(t, nfsDescription, current.Description, "cleanup target switch description mismatch")
-		// スイッチに接続する NFS が残っていないことを確認する。
-		// 接続が残る場合や照合に失敗した場合はスイッチを削除しない (背景は ADR 0064)
-		remaining := lookupNFS(t, client, name)
+		// 接続先スイッチの ID で NFS を検索し、名前に関係なくスイッチに接続する NFS が
+		// 残っていないことを確認する。接続が残る場合や照合に失敗した場合はスイッチを削除しない (背景は ADR 0064)
+		remaining := lookupNFSBySwitch(t, client, createdSwitch.ID)
 		for _, item := range remaining {
 			if item.ID == created.ID {
 				t.Errorf("NFS %s still exists; refusing to delete the switch %s", created.ID, createdSwitch.ID)
 				return
 			}
-			require.NotEqual(t, createdSwitch.ID, item.SwitchID,
-				"NFS %s still connects to the switch %s; refusing to delete it", item.ID, createdSwitch.ID)
+			t.Errorf("NFS %s still connects to the switch %s; refusing to delete it", item.ID, createdSwitch.ID)
 		}
 		_ = h.Call(t, "テスト用スイッチを削除する",
 			"iaas-api", "switch", "delete", "--zone", nfsZone, "--id", createdSwitch.ID.String(), "--fail-if-not-found")
@@ -415,6 +414,33 @@ func waitForNFSReady(t *testing.T, client *iaas.Client, id types.ID) {
 		}
 		return nfs != nil && nfs.InstanceStatus == types.ServerInstanceStatuses.Up
 	}, nfsCreateTimeout, 15*time.Second, "NFS %s should become up", id)
+}
+
+// lookupNFSBySwitch は SDK で接続先スイッチの ID で NFS を検索します。
+// スイッチ削除前の接続確認に使い、名前に関係なく接続中の NFS を検出します。
+func lookupNFSBySwitch(t *testing.T, client *iaas.Client, switchID types.ID) []nfsItem {
+	t.Helper()
+
+	op := iaas.NewNFSOp(client)
+	result, err := op.Find(t.Context(), nfsZone, &iaas.FindCondition{
+		Count:  nfsFindPageSize,
+		Filter: search.Filter{search.Key("Switch.ID"): search.AndEqual(switchID.String())},
+	})
+	require.NoError(t, err, "find NFS by switch %s", switchID)
+	items := make([]nfsItem, 0, len(result.NFS))
+	for _, nfs := range result.NFS {
+		if nfs == nil {
+			continue
+		}
+		items = append(items, nfsItem{
+			ID:       nfs.ID,
+			Name:     nfs.Name,
+			SwitchID: nfs.SwitchID,
+		})
+	}
+	// 1ページで取りきれない結果では接続中の判定ができない
+	require.Less(t, len(items), nfsFindPageSize, "NFS find result page is full; cannot conclude connections to %q", switchID)
+	return items
 }
 
 // lookupNFS は SDK で名前で NFS を検索します。

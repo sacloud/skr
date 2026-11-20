@@ -92,14 +92,14 @@ $ echo "$PLAN_ID"
 
 ```console
 $ NFS_NAME="skr-tutorial-nfs"
-$ skr nfs-api create --zone "$ZONE" --name "$NFS_NAME" \
+$ NFS_ID=$(skr nfs-api create --zone "$ZONE" --name "$NFS_NAME" \
     --description "Temporary NFS for tutorial" \
     --tags "tutorial,managed" \
     --plan-id "$PLAN_ID" \
     --switch-id "$SWITCH_ID" \
     --ip-address 192.168.0.11 \
     --network-mask-len 24 \
-    --query-raw '.ID'
+    --query-raw '.ID')
 $ skr nfs-api read --zone "$ZONE" --id "$NFS_ID" --query '{ID,Name,PlanID,SwitchID,IPAddresses,NetworkMaskLen}'
 {
   "ID": 112800500001,
