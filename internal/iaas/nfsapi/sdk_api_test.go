@@ -604,6 +604,45 @@ func TestMonitorConditionRejectsInvalidPeriod(t *testing.T) {
 	require.Contains(t, err.Error(), "is invalid")
 }
 
+func TestFreeDiskSizeConditionDefaultsToDayBoundaries(t *testing.T) {
+	// この API は正時でない時刻を指定するとエラー (400) になるため、
+	// 未指定の既定値は UTC の正時にします
+	condition, err := freeDiskSizeCondition(time.Time{}, time.Time{})
+	require.NoError(t, err)
+	// 終了の既定は当日の UTC 正時 (時分秒が 0) です
+	require.Equal(t, condition.End.UTC().Truncate(24*time.Hour), condition.End, "end should be a UTC day boundary, got %s", condition.End)
+	// 開始の既定は終了の前日の正時です
+	require.Equal(t, condition.End.Add(-24*time.Hour), condition.Start)
+
+	// 終了のみ指定した場合は開始が前日の正時に補完されます
+	end := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	condition, err = freeDiskSizeCondition(time.Time{}, end)
+	require.NoError(t, err)
+	require.Equal(t, end.Add(-24*time.Hour), condition.Start)
+	require.Equal(t, end, condition.End)
+}
+
+func TestFreeDiskSizeConditionRejectsInvalidPeriod(t *testing.T) {
+	start := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	_, err := freeDiskSizeCondition(start, end)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "is invalid")
+}
+
+func TestMonitorFreeDiskSizeWithContextUsesDayBoundaries(t *testing.T) {
+	op := &fakeNFSOp{diskValues: &iaas.FreeDiskSizeActivity{Values: []*iaas.MonitorFreeDiskSizeValue{{FreeDiskSize: 100}}}}
+	api := &nfsAPI{op: op}
+
+	// 期間を省略しても正時の既定値が送られるため、API エラーになりません
+	_, err := api.MonitorFreeDiskSizeWithContext(context.Background(), &MonitorFreeDiskSizeRequest{Zone: "is1b", ID: 123})
+	require.NoError(t, err)
+	require.NotNil(t, op.monitorCondition)
+	require.Equal(t, op.monitorCondition.End.UTC().Truncate(24*time.Hour), op.monitorCondition.End)
+	require.Equal(t, op.monitorCondition.End.Add(-24*time.Hour), op.monitorCondition.Start)
+}
+
 func TestMonitorCPUWithContextReturnsValues(t *testing.T) {
 	end := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
 	start := end.Add(-1 * time.Hour)

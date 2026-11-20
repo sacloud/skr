@@ -45,19 +45,18 @@ NFS はスイッチへの接続が必須です。テスト用のスイッチを�
 
 ```console
 $ SWITCH_NAME="skr-tutorial-nfs-switch"
-$ skr iaas-api switch create --zone "$ZONE" --name "$SWITCH_NAME" \
+$ SWITCH_ID=$(skr iaas-api switch create --zone "$ZONE" --name "$SWITCH_NAME" \
     --description "Temporary switch for NFS tutorial" \
-    --query '{ID,Name,Description}'
+    --query-raw '.ID')
+$ skr iaas-api switch read --zone "$ZONE" --id "$SWITCH_ID" --query '{ID,Name,Description}'
 {
   "ID": 112900500001,
   "Name": "skr-tutorial-nfs-switch",
   "Description": "Temporary switch for NFS tutorial"
 }
-$ SWITCH_ID=$(skr iaas-api switch find --zone "$ZONE" --name "$SWITCH_NAME" --query-raw 'map(select(.Name == "'"$SWITCH_NAME"'")) | sort_by(-.ID) | .[0].ID')
-$ echo "$SWITCH_ID"
 ```
 
-出力例は ID と名前を置き換えています。`SWITCH_ID` は検索結果から取り込むため、手動での置き換えは不要です。
+`SWITCH_ID` は作成応答の ID で、手動での置き換えは不要です。続ける前に read の応答で ID と名前を照合します。
 
 ## Step 3: プラン ID を確認する
 
@@ -100,7 +99,8 @@ $ skr nfs-api create --zone "$ZONE" --name "$NFS_NAME" \
     --switch-id "$SWITCH_ID" \
     --ip-address 192.168.0.11 \
     --network-mask-len 24 \
-    --query '{ID,Name,PlanID,SwitchID,IPAddresses,NetworkMaskLen}'
+    --query-raw '.ID'
+$ skr nfs-api read --zone "$ZONE" --id "$NFS_ID" --query '{ID,Name,PlanID,SwitchID,IPAddresses,NetworkMaskLen}'
 {
   "ID": 112800500001,
   "Name": "skr-tutorial-nfs",
@@ -109,11 +109,9 @@ $ skr nfs-api create --zone "$ZONE" --name "$NFS_NAME" \
   "IPAddresses": ["192.168.0.11"],
   "NetworkMaskLen": 24
 }
-$ NFS_ID=$(skr nfs-api find --zone "$ZONE" --name "$NFS_NAME" --query-raw 'map(select(.Name == "'"$NFS_NAME"'")) | sort_by(-.ID) | .[0].ID')
-$ echo "$NFS_ID"
 ```
 
-出力例は ID を置き換えています。`NFS_ID` は検索結果から取り込むため、手動での置き換えは不要です。作成リクエストは起動の完了を待たずに応答を返します。2 台目の IP アドレスが必要な場合は `--ip-address` を繰り返して指定します。
+`NFS_ID` は作成応答の ID で、手動での置き換えは不要です。read の応答で ID と名前を照合してから次に進みます。作成リクエストは起動の完了を待たずに応答を返します。2 台目の IP アドレスが必要な場合は `--ip-address` を繰り返して指定します。
 
 ## Step 5: 起動の完了を待つ
 

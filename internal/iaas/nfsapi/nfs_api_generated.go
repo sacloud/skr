@@ -24,7 +24,7 @@ type Commands struct {
 	Shutdown            ShutdownCommand            "cmd:\"\" help:\"NFS アプライアンスをシャットダウンします。成功時は出力しません。例: skr nfs-api shutdown --zone ZONE --id 123456789012\""
 	Reset               ResetCommand               "cmd:\"\" help:\"NFS アプライアンスを再起動します。成功時は出力しません。例: skr nfs-api reset --zone ZONE --id 123456789012\""
 	MonitorCPU          MonitorCPUCommand          "cmd:\"\" help:\"CPU 使用率のモニタリング値を指定した期間で取得して出力します。例: skr nfs-api monitor-cpu --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00\""
-	MonitorFreeDiskSize MonitorFreeDiskSizeCommand "cmd:\"\" help:\"空きディスク容量のモニタリング値を指定した期間で取得して出力します。モニタリングデータは日単位で記録されるため、--start / --end は 00:00:00 の正時で指定してください。未指定の場合は直近1時間が指定され、正時でない時刻は API エラーになります。例: skr nfs-api monitor-free-disk-size --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00\""
+	MonitorFreeDiskSize MonitorFreeDiskSizeCommand "cmd:\"\" help:\"空きディスク容量のモニタリング値を指定した期間で取得して出力します。モニタリングデータは日単位で記録されるため、--start / --end は 00:00:00 の正時で指定してください。両方を省略すると、UTC の前日 0 時から当日 0 時までの期間で取得します。例: skr nfs-api monitor-free-disk-size --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00\""
 	MonitorInterface    MonitorInterfaceCommand    "cmd:\"\" help:\"ネットワークインタフェースのモニタリング値を指定した期間で取得して出力します。例: skr nfs-api monitor-interface --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00\""
 }
 

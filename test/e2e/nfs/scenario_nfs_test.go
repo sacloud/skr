@@ -88,7 +88,7 @@ func TestScenarioNFS(t *testing.T) {
 	suffix := helper.RandomSuffix(t)
 	name := nfsNamePrefix + suffix
 	updatedDescription := nfsDescription + " (updated)"
-	// created は後片てつきの中で ID 照合に使うため、作成前に宣言する
+	// created は後片付けの中で ID 照合に使うため、作成前に宣言する
 	var created nfsItem
 
 	// 作成前の同名確認を実施する

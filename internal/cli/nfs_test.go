@@ -44,6 +44,30 @@ func TestRunNFSCommandHelp(t *testing.T) {
 				"--plan-id",
 			},
 		},
+		{
+			args: []string{"nfs-api", "--help"},
+			want: []string{
+				"find", "read", "create", "update", "delete",
+				"boot", "shutdown", "reset",
+				"monitor-cpu", "monitor-free-disk-size", "monitor-interface",
+			},
+		},
+		{
+			args: []string{"nfs-api", "create", "--help"},
+			want: []string{
+				"--zone", "--name", "--plan-id", "--switch-id",
+				"--ip-address", "--network-mask-len", "--default-route",
+				"--description", "--tags", "--icon-id", "--request",
+			},
+		},
+		{
+			args: []string{"nfs-api", "shutdown", "--help"},
+			want: []string{"--zone", "--id", "--no-wait", "--force"},
+		},
+		{
+			args: []string{"nfs-api", "monitor-free-disk-size", "--help"},
+			want: []string{"--zone", "--id", "--start", "--end", "00:00:00"},
+		},
 	} {
 		t.Run(strings.Join(test.args, "_"), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer

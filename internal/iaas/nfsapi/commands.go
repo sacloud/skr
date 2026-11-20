@@ -198,8 +198,9 @@ func (a *nfsAPI) MonitorCPUWithContext(ctx context.Context, req *MonitorCPUReque
 }
 
 // MonitorFreeDiskSizeWithContext は api 層の NFSOp.MonitorFreeDiskSize を直接呼び出します。
+// この API は日単位の集計で正時でない時刻を受け付けないため、期間の既定値は正時です。
 func (a *nfsAPI) MonitorFreeDiskSizeWithContext(ctx context.Context, req *MonitorFreeDiskSizeRequest) ([]*iaas.MonitorFreeDiskSizeValue, error) {
-	condition, err := monitorCondition(req.Start, req.End)
+	condition, err := freeDiskSizeCondition(req.Start, req.End)
 	if err != nil {
 		return nil, err
 	}
@@ -233,6 +234,24 @@ func monitorCondition(start, end time.Time) (*iaas.MonitorCondition, error) {
 	s := start
 	if s.IsZero() {
 		s = e.Add(-1 * time.Hour)
+	}
+	if !(s.Unix() <= e.Unix()) {
+		return nil, fmt.Errorf("start(%s) or end(%s) is invalid", start.String(), end.String())
+	}
+	return &iaas.MonitorCondition{Start: s, End: e}, nil
+}
+
+// freeDiskSizeCondition は日単位のモニタリング API に対する取得期間を組み立てます。
+// この API は正時でない時刻を指定するとエラー (400) になるため、--end の省略は
+// 当日の UTC 正時、--start の省略は --end の前日の UTC 正時を既定にします。
+func freeDiskSizeCondition(start, end time.Time) (*iaas.MonitorCondition, error) {
+	e := end
+	if e.IsZero() {
+		e = time.Now().UTC().Truncate(24 * time.Hour)
+	}
+	s := start
+	if s.IsZero() {
+		s = e.Add(-24 * time.Hour)
 	}
 	if !(s.Unix() <= e.Unix()) {
 		return nil, fmt.Errorf("start(%s) or end(%s) is invalid", start.String(), end.String())

@@ -72,12 +72,13 @@
 ### boot / shutdown / reset
 
 - `boot` は `--no-wait` に対応します。省略時は起動の完了を待ちます。
-- `shutdown` は `--no-wait` と `--force-shutdown` に対応します。省略時は停止の完了を待ちます。
+- `shutdown` は `--no-wait` と `--force` に対応します。省略時は停止の完了を待ちます。
 - `reset` はリクエストのパラメータを持ちません。
 
 ### monitor-*
 
-- `--zone` と `--id` が必須です。`--start` と `--end` は取得期間で、`--end` を省略すると現在時刻、`--start` を省略すると `--end` の 1 時間前になります。
+- `--zone` と `--id` が必須です。`--start` と `--end` は取得期間で、`--end` を省略すると現在時刻、`--start` を省略すると `--end` の 1 時間前になります。`monitor-cpu` と `monitor-interface` は 1 分単位の route を使います。
+- `monitor-free-disk-size` は日単位の route で正時でない時刻を受け付けないため、期間の既定値を `freeDiskSizeCondition` で正時にします。両方省略時は当日の UTC 正時から前日の UTC 正時、`--end` のみ指定時はその前日です。省略時の呼び出しが常にエラーにならないよう、共通の `monitorCondition` は使いません。
 
 ## 高レベルコマンド (`skr nfs plans`)
 

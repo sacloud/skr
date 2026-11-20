@@ -390,7 +390,7 @@
     },
     {
       "name": "MonitorFreeDiskSize",
-      "help": "空きディスク容量のモニタリング値を指定した期間で取得して出力します。モニタリングデータは日単位で記録されるため、--start / --end は 00:00:00 の正時で指定してください。未指定の場合は直近1時間が指定され、正時でない時刻は API エラーになります。例: skr nfs-api monitor-free-disk-size --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00",
+      "help": "空きディスク容量のモニタリング値を指定した期間で取得して出力します。モニタリングデータは日単位で記録されるため、--start / --end は 00:00:00 の正時で指定してください。両方を省略すると、UTC の前日 0 時から当日 0 時までの期間で取得します。例: skr nfs-api monitor-free-disk-size --zone ZONE --id 123456789012 --start 2025-01-01T00:00:00+09:00 --end 2025-01-02T00:00:00+09:00",
       "method": "MonitorFreeDiskSizeWithContext",
       "request_type": "MonitorFreeDiskSizeRequest",
       "response_type": "[]*iaas.MonitorFreeDiskSizeValue",
