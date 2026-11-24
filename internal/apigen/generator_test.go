@@ -288,6 +288,9 @@ func TestGenerateZoneValidation(t *testing.T) {
 	require.Less(t, transform, zoneValidation, "transform must precede zone validation")
 	require.Less(t, zoneValidation, validator, "zone validation must precede domain validation")
 	require.Less(t, validator, factory, "domain validation must precede API setup")
+	// ゾーン必須の操作では、入力なしの実行に対してゾーンの指定を促すメッセージを生成する
+	require.Contains(t, text, "--zone が必要です", "zone-required operation should prompt for --zone")
+	require.NotContains(t, text, "--request または個別フラグが必要です", "zone-required operation should not use the generic input message")
 	second, err := Generate(config, ModeIaaS)
 	require.NoError(t, err)
 	require.Equal(t, text, string(second), "second Generate() is not deterministic")
@@ -296,6 +299,8 @@ func TestGenerateZoneValidation(t *testing.T) {
 	source, err = Generate(config, ModeIaaS)
 	require.NoError(t, err)
 	require.NotContains(t, string(source), "zones", "disabled zone validation added an import or validation call")
+	// ゾーン必須でない操作は、従来の入力経路を促すメッセージを生成する
+	require.Contains(t, string(source), "--request または個別フラグが必要です", "non-zone operation should keep the generic input message")
 }
 
 func TestValidateZoneSetting(t *testing.T) {
