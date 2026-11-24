@@ -62,7 +62,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
