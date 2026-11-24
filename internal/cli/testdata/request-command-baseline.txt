@@ -75,6 +75,17 @@ iaas-api server delete
 iaas-api service-class find
 iaas-api zone find
 iaas-api zone read
+nfs-api find
+nfs-api read
+nfs-api create
+nfs-api update
+nfs-api delete
+nfs-api boot
+nfs-api shutdown
+nfs-api reset
+nfs-api monitor-cpu
+nfs-api monitor-free-disk-size
+nfs-api monitor-interface
 gslb-api find
 gslb-api read
 gslb-api create
