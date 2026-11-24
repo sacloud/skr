@@ -18,6 +18,10 @@ updates:
       time: "00:00"
     commit-message:
       prefix: "go:"
+    ignore:
+      # API 定義 (ogen 定義) の変更を skr 側へ追従させる必要があるため、
+      # dependabot の自動更新対象から外し、手順に従って手動で更新します (ADR 0097)
+      - dependency-name: github.com/sacloud/sacloud-sdk-go
 
   - package-ecosystem: docker
     directory: /
