@@ -16,19 +16,19 @@ SimpleMQ のキュー／メッセージ API コマンドは [`api/commands/simpl
 
 ## IaaS リソース候補
 
-SDK のサービスパッケージごとに対応状況を管理します。実装済みコマンドの操作範囲は「実装済み IaaS コマンドの対応範囲」に記載し、ここには未実装の候補を記載します。
+SDK のサービスパッケージごとに対応状況を管理します。実装済みコマンドの操作範囲は「実装済み IaaS コマンドの対応範囲」に記載し、ここには未実装の候補を記載します。説明は `sacloud-sdk-go v0.7.1` の API 定義 (`api/iaas`) で確認した内容です。
 
-- [ ] `bridge`
-- [ ] `cdrom`
-- [ ] `coupon`
-- [ ] `iface`
-- [ ] `license`
-- [ ] `loadbalancer`
-- [ ] `mobilegateway`
-- [ ] `note`
-- [ ] `privatehost`
-- [ ] `subnet`
-- [ ] `vpcrouter`
+- [ ] `bridge` — API `/bridge` の Find / Create / Read / Update / Delete。Region と、接続されているスイッチの情報 (BridgeInfo)、SwitchInZone を持つリソースです。
+- [ ] `cdrom` — API `/cdrom` の Find / Read / Update / Delete と、イメージの受け渡しに使う OpenFTP / CloseFTP。ISO イメージ (CDROM) を扱います。
+- [ ] `coupon` — API `/coupon` (請求情報向けエンドポイント、グローバル) の Find のみ。アカウント ID をパスに含め、クーポン残高と適用開始日、有効期限を照会します。
+- [ ] `iface` — API `/interface` の Find / Create / Read / Update / Delete / Monitor と、スイッチ・パケットフィルタへの接続と切断の操作。サーバーの NIC を扱います。
+- [ ] `license` — API `/license` の Find / Create / Read / Update / Delete。実装済みの `licenseinfo` (商品カタログの Find) とは別リソースで、ライセンス契約の個体を扱います。作成時の種別指定には `LicenseInfoID` を使います。
+- [ ] `loadbalancer` — アプライアンス API (`/appliance`、クラスで判別) の操作一式。実装済みの database、nfs と同じ appliance 系で、起動・停止・リセットなどのインスタンス操作を含みます。
+- [ ] `mobilegateway` — アプライアンス API の操作一式。SIM グループ (SIMGroup) の設定を伴います。対応は後回しとします。
+- [ ] `note` — API `/note` (グローバル) の Find / Create / Read / Update / Delete。スタートアップスクリプトを Class、Content、Scope とともに扱います。`skr nfs plans` が参照する共有 Note も同じ API です。
+- [ ] `privatehost` — API `/privatehost` の Find / Create / CreateWithDedicatedStorage / Read / Update / Delete。専有ホストで、プラン (PrivateHostPlan) と割当済み CPU・メモリのフィールドを持ちます。サーバーを作成するときは Server の PrivateHostID で専有ホストを指定します。
+- [ ] `subnet` — API `/subnet` の Find / Read のみ (読み取り専用)。ルータ＋スイッチ (Internet) に追加される追加サブネットを参照します。
+- [ ] `vpcrouter` — アプライアンス API の操作一式。実装済みの database、nfs と同じ appliance 系です。
 
 ## 実装済み IaaS コマンドの対応範囲
 
