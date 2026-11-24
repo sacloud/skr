@@ -25,7 +25,7 @@ v0.7.1 (PR #293) では ogen 定義が無変更で、手書きラッパーへの
 ## Consequences
 
 - SDK の更新は dependabot PR ではなく、このスキルに従った手動の PR になります。影響判断を書いた PR 説明が残ります。
-- dependabot の自動更新がなくなるため、セキュリティ修正を含む SDK の更新も自動では届きません。スキルの手順に従い、定期的に SDK のリリースを確認して更新します。
+- dependabot の自動更新がなくなっても、セキュリティ修正の適用漏れは前提にしません。`sacloud-sdk-go` は自社でメンテナンスする依存で、セキュリティ修正を含む SDK 側の開発も自社で管理されます。SDK 側に機能追加や API 定義の変更を行った場合、skr 側の追従をその都度、スキルの手順で進めます。
 - 除外の対象は `sacloud-sdk-go` だけです。`sakumock` など他の sacloud 関連依存は引き続き dependabot が提案します。`sakumock` で SDK の型が変わる変更が提案された場合は、このスキルの観点で評価します。
 
 ## Alternatives considered

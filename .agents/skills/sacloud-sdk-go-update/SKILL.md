@@ -25,10 +25,11 @@ description: sacloud-sdk-go を新しいバージョンへ更新するとき、A
 
 4. ogen 定義の差分では、スキーマの追加・削除、型の変化、required の変化、nullable の変化を区別して読みます。これが、生成コードの再生成とユーザー向け出力の判断の根拠になります。
 
-新旧バージョンの openapi.yaml の比較は、たとえば次のとおりです。
+新旧バージョンの openapi.yaml の比較は、たとえば次のとおりです。`go mod download` は go.mod を変更せずにモジュールキャッシュへ取得するため、旧・新の両バージョンを明示的に取得してから比較します。クリーンなモジュールキャッシュでは旧バージョンが存在しないため、新バージョンだけ取得して比較すると diff が失敗します。
 
 ```console
-go get github.com/sacloud/sacloud-sdk-go@vX.Y.Z
+go mod download github.com/sacloud/sacloud-sdk-go@vX.Y.Z
+go mod download github.com/sacloud/sacloud-sdk-go@vX.Y.Z+1
 diff "$(go env GOMODCACHE)/github.com/sacloud/sacloud-sdk-go@vX.Y.Z/api/<domain>/openapi/openapi.yaml" "$(go env GOMODCACHE)/github.com/sacloud/sacloud-sdk-go@vX.Y.Z+1/api/<domain>/openapi/openapi.yaml"
 ```
 
@@ -50,12 +51,13 @@ diff "$(go env GOMODCACHE)/github.com/sacloud/sacloud-sdk-go@vX.Y.Z/api/<domain>
 ### 3. 更新と検証
 
 1. `go get github.com/sacloud/sacloud-sdk-go@vX.Y.Z && go mod tidy` を実行します。
-2. 手順 2 で必要と判断した場合、生成コードを再生成します。
-3. `go build ./...` でビルドを確認します。
-4. `go test ./...` を実行します。変更のあったドメインは重点的に、必要なら `-race` も実行します。
-5. `make lint-go` を実行します。Markdown を変更した場合は `make lint-text` も実行します。
-6. ユーザー向け挙動が変わる場合は、実際のコマンド出力とヘルプ・チュートリアルを照合し、該当コマンドのライブ E2E の要否をユーザーと確認します。実行する場合は [`generate-skr-api-command`](../generate-skr-api-command/SKILL.md) と [`apigen-iaas`](../apigen-iaas/SKILL.md) の E2E 要件に従います。
-7. 生成コードを再生成した場合は、baseline テストの更新漏れを確認します。
+2. `service/` 配下の独立モジュール (`service/apprun-dedicated-service-go`、`service/eventbus-service-go`) も SDK を直接参照します。[ADR 0097](../../../docs/adr/0097-exclude-sacloud-sdk-go-from-dependabot.md) と同じ理由でこれらも dependabot の対象からは外れていないため、ルートの更新だけでは追従しません。`includes/go/common.mk` の `SUBMODULES` に列挙された各モジュールでも、SDK の更新と `go mod tidy` を行います。
+3. 手順 2 で必要と判断した場合、生成コードを再生成します。
+4. `go build ./...` でビルドを確認します。
+5. `go test ./...` を実行します。変更のあったドメインは重点的に、必要なら `-race` も実行します。サブモジュールを含めた全体の検証は `make test` で行えます。
+6. `make lint-go` を実行します。`make test` と `make lint-go` は `SUBMODULES` の各モジュールにも実行されるため、ルートモジュール単独の実行より広い範囲を検証できます。Markdown を変更した場合は `make lint-text` も実行します。
+7. ユーザー向け挙動が変わる場合は、実際のコマンド出力とヘルプ・チュートリアルを照合し、該当コマンドのライブ E2E の要否をユーザーと確認します。実行する場合は [`generate-skr-api-command`](../generate-skr-api-command/SKILL.md) と [`apigen-iaas`](../apigen-iaas/SKILL.md) の E2E 要件に従います。
+8. 生成コードを再生成した場合は、baseline テストの更新漏れを確認します。
 
 ### 4. 記録と PR
 
@@ -69,4 +71,4 @@ diff "$(go env GOMODCACHE)/github.com/sacloud/sacloud-sdk-go@vX.Y.Z/api/<domain>
 
 ## 更新の確認タイミング
 
-dependabot が提案しなくなるため、SDK のリリースを定期的に確認します。セキュリティ修正や、skr が未対応のドメインの API 追加・変更が含まれる場合は、この手順で更新します。更新しない判断 (現行バージョンで十分、追従コストが高い) も、PR や Issue に理由を残します。
+dependabot が提案しなくなるため、SDK の更新は SDK 側の開発に合わせて進めます。`sacloud-sdk-go` は自社がメンテナンスする依存です。SDK 側に機能追加や API 定義の変更を加えた場合、skr 側の追従をこの手順で行います。更新しない判断 (現行バージョンで十分、追従コストが高い) も、PR や Issue に理由を残します。
