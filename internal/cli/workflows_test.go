@@ -190,9 +190,26 @@ func TestRunWorkflowsAPILifecycle(t *testing.T) {
 	require.NoError(t, json.Unmarshal(runCommand("workflows-api", "list-workflows", "--name", "mock-wf", "--name-match-type", "prefix"), &listed))
 	require.Len(t, listed.Workflows, 2, "prefix filter should match both mock-wf and mock-wf-private")
 
-	// list-suggestions: --name は必須。sakumock の候補応答は SDK が必須とする Count を
-	// 含まないため、正常系は TestRunWorkflowsAPIListSuggestions で仕様に沿った応答を使って検証する
+	// list-suggestions: --name は必須。
 	require.NotEqual(t, 0, run([]string{"workflows-api", "list-suggestions"}, &stdoutHolder{}, &stderrBuf))
+
+	// list-suggestions: sakumock は要素を {Name, Count} で返します (v0.15.0 以降)。
+	// 作成済みの mock-wf と mock-wf-private が部分一致でヒットすることを確認します。
+	var suggestions struct {
+		IsOk     bool `json:"is_ok"`
+		Suggests []struct {
+			Name  string `json:"Name"`
+			Count int    `json:"Count"`
+		} `json:"Suggests"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("workflows-api", "list-suggestions", "--name", "mock-wf"), &suggestions))
+	require.True(t, suggestions.IsOk)
+	counts := map[string]int{}
+	for _, item := range suggestions.Suggests {
+		counts[item.Name] = item.Count
+	}
+	require.Equal(t, map[string]int{"mock-wf": 1, "mock-wf-private": 1}, counts,
+		"suggestions should report each workflow name with its count")
 
 	// read-workflow
 	var read struct {
@@ -421,37 +438,6 @@ steps:
 	require.NoError(t, json.Unmarshal(runCommand("workflows-api", "cancel-execution", created.Id, execution.ExecutionId), &canceled))
 	require.Equal(t, execution.ExecutionId, canceled.ExecutionId)
 	require.Equal(t, "Canceled", canceled.Status)
-}
-
-// TestRunWorkflowsAPIListSuggestions は sakumock の候補応答が SDK の必須フィールド (Count) を
-// 含まないため、仕様に沿った応答を返すテストサーバーで list-suggestions を検証します。
-func TestRunWorkflowsAPIListSuggestions(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "private", r.URL.Query().Get("Name"))
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"is_ok":true,"Total":1,"From":0,"Count":1,"Suggests":[{"Id":"wf-1","Name":"mock-wf-private","Count":3}]}`))
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
-	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
-	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
-	t.Setenv("SAKURA_ENDPOINTS_WORKFLOWS", server.URL)
-
-	var stdout, stderr bytes.Buffer
-	require.Equal(t, 0, run([]string{"workflows-api", "list-suggestions", "--name", "private"}, &stdout, &stderr), "stderr: %s", stderr.String())
-	var result struct {
-		IsOk     bool `json:"is_ok"`
-		Suggests []struct {
-			Id    string `json:"Id"`
-			Name  string `json:"Name"`
-			Count int    `json:"Count"`
-		} `json:"Suggests"`
-	}
-	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result), "output = %s", stdout.String())
-	require.True(t, result.IsOk)
-	require.Len(t, result.Suggests, 1)
-	require.Equal(t, "mock-wf-private", result.Suggests[0].Name)
-	require.Equal(t, 3, result.Suggests[0].Count)
 }
 
 // TestRunWorkflowsAPIPatchWorkflowWireBody は patch-workflow の送信内容を検証します。

@@ -336,7 +336,7 @@ init は既存ファイルの保護を `O_EXCL` 付きの作成で行います�
 
 ### CLI 全体と SDK 通信のテスト
 
-- `internal/cli` の sakumock テストで、14 個の末端コマンドの正常系を実際の CLI パスと SDK を通して検証します。sakumock の `apprundedicated` サーバー (v0.14.0) を使います。既存の低レベル層のテスト (`internal/cli/apprundedicated_test.go`) と同じサーバーを共有します。sakumock は待受ポートなしの `create-cluster` を 400 で拒否するため ([sacloud/sakumock#267](https://github.com/sacloud/sakumock/issues/267)、[sakumock の既知の差分と未整備](sakumock-gaps.md))、sakumock でのクラスタ作成は待受ポートを 1 つ以上指定します。待受ポート省略 (空配列送信) は service 層の fake テストとライブ E2E で検証します。
+- `internal/cli` の sakumock テストで、14 個の末端コマンドの正常系を実際の CLI パスと SDK を通して検証します。sakumock の `apprundedicated` サーバー (v0.15.0) を使います。既存の低レベル層のテスト (`internal/cli/apprundedicated_test.go`) と同じサーバーを共有します。待受ポートを省略した `create-cluster` (空配列送信) も sakumock 上で検証します (v0.15.0 から)。実 API の挙動と差分の経緯は [sakumock の既知の差分と未整備](sakumock-gaps.md) を参照してください。
 - sakumock で待機条件 (コンテナの `running` 遷移) が再現できない場合は、SDK が読むステータスと応答型を再現する HTTP テストサーバーで補います (`SAKURA_ENDPOINTS_*` によるエンドポイント差し替え)。[EventBus 高レベルコマンドの設計](eventbus.md) のテスト方針と同じ方式です。
 - service 層の通信テストは service/apprun-dedicated-service-go に置き、sakumock へ実際の SDK を接続して wire 形式と操作の流れを検証します。
 - 秘密情報: 定義ファイル・標準入力・fake リクエストのいずれの経路でも、stdout・stderr・ログ・エラーに `registryPassword` が現れないことを確認します。

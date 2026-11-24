@@ -79,6 +79,6 @@ skr workflows-api delete-subscription
 
 ## テスト
 
-- 単体テストは sakumock v0.14.0 の `workflows` モックサーバーに対して行います。ワークフローとリビジョンの作成から実行、解約までの一連の流れを確認します。
-- `list-suggestions` は sakumock が API 応答スキーマ上必須の `Count` を返さないためデコードが失敗します。詳細と現状の扱いは [sakumock の既知の差分と未整備](sakumock-gaps.md) を参照してください。
+- 単体テストは sakumock v0.15.0 の `workflows` モックサーバーに対して行います。ワークフローとリビジョンの作成から実行、解約までの一連の流れを確認します。
+- `list-suggestions` は、候補名と各名前のワークフロー数 (`Count`) を返す応答を sakumock 上で検証します。詳細は [sakumock の既知の差分と未整備](sakumock-gaps.md) を参照してください。
 - ライブ E2E はプラン契約 (課金) を伴うため、シナリオと費用の範囲を提示して合意した上で実施します。

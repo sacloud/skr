@@ -36,7 +36,7 @@ SDK v0.7.0 時点での合計は 21 操作である。operationId はすべて A
 - `create-execution` の `--revision-id` と `--revision-alias` は相互排他とする。両指定時の API の挙動が仕様に明記されていないため、CLI で拒否する。どちらも未指定のときは最新リビジョンで実行される。`Args` は `--args` (インライン JSON 文字列、または `@path.json` と `-` によるファイル読み込み) で受け取り、CLI が JSON として妥当か検証する。`@path` 形式は AGENTS.md の入力経路の規約に揃えている。
 - `create-subscription` は `--plan-id` と `--request` を相互排他で受け取り、どちらかの指定を必須にする。`delete-subscription` は契約の解約であることをヘルプに明記する。
 - 待機系のオプションは設けない ([ADR 0082](0082-high-level-command-wait-options.md)。本コマンド群は低レベルの `<service>-api` である)。
-- 単体テストは sakumock v0.14.0 の `workflows` モックサーバー (`sakumock/workflows`) に対して行う。ライブ E2E はプラン契約 (課金) を伴うため、シナリオと費用の範囲を提示して合意した上で実施する。
+- 単体テストは sakumock の `workflows` モックサーバー (`sakumock/workflows`) に対して行う。ライブ E2E はプラン契約 (課金) を伴うため、シナリオと費用の範囲を提示して合意した上で実施する。
 
 ## Consequences
 

@@ -16,7 +16,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -128,21 +127,16 @@ func TestScenarioWorkflowsLifecycle(t *testing.T) {
 
 	// 名前の候補検索に作成したワークフローが含まれることを確認する。
 	// 実 API の Suggests 要素は Name と Count で、作成直後のワークフローも即座に反映される (2026-11-19 ライブ検証済み)。
-	// sakumock は Suggests 要素の必須フィールド Count を返さないため、その応答デコード
-	// エラーだけは環境の制限として許容する。詳細は docs/design/sakumock-gaps.md を参照。
-	if suggested, err := tryListWorkflowsSuggestions(t, h, "名前の候補検索で作成したワークフローを確認する", mainName); err != nil {
-		require.Contains(t, err.Error(), "Count (field required)", "unexpected list-suggestions error: %v", err)
-		t.Logf("list-suggestions は sakumock が Count を返さないため検証をスキップします (ライブ環境で検証します)")
-	} else {
-		found := false
-		for _, item := range suggested {
-			if item.Name == mainName {
-				require.Positive(t, item.Count, "suggestion %q should report its workflow count", item.Name)
-				found = true
-			}
+	// 候補検索で作成したワークフローの名前と件数を確認する
+	suggested := listWorkflowsSuggestions(t, h, "名前の候補検索で作成したワークフローを確認する", mainName)
+	found := false
+	for _, item := range suggested {
+		if item.Name == mainName {
+			require.Positive(t, item.Count, "suggestion %q should report its workflow count", item.Name)
+			found = true
 		}
-		require.True(t, found, "suggestions should contain the workflow created by this run")
 	}
+	require.True(t, found, "suggestions should contain the workflow created by this run")
 
 	// リビジョン一覧で初回リビジョンを確認する
 	revisions := listWorkflowsRevisions(t, h, "初回リビジョンを一覧で確認する", mainID)
@@ -265,21 +259,17 @@ func readWorkflowsWorkflow(t *testing.T, h *helper.Helper, description, workflow
 	return result
 }
 
-// tryListWorkflowsSuggestions は list-suggestions を実行します。失敗した場合は
-// エラーと nil を返します。
-func tryListWorkflowsSuggestions(t *testing.T, h *helper.Helper, description, name string) ([]workflowsSuggestionItem, error) {
+// listWorkflowsSuggestions は list-suggestions を実行して候補を返します。
+func listWorkflowsSuggestions(t *testing.T, h *helper.Helper, description, name string) []workflowsSuggestionItem {
 	t.Helper()
-	data, stderr, err := h.CallAllowingFailure(t, description, "workflows-api", "list-suggestions", "--name", name)
-	if err != nil {
-		return nil, fmt.Errorf("list-suggestions: %w (stderr: %s)", err, stderr)
-	}
+	data := h.Call(t, description, "workflows-api", "list-suggestions", "--name", name)
 	var result struct {
 		workflowsListResponse
 		Suggests []workflowsSuggestionItem `json:"Suggests"`
 	}
 	require.NoError(t, json.Unmarshal(data, &result), "list-suggestions output: %s", data)
 	require.True(t, result.IsOk, "list-suggestions should report is_ok: %s", data)
-	return result.Suggests, nil
+	return result.Suggests
 }
 
 // listWorkflowsRevisions は list-revisions を実行して応答を返します。
