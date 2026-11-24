@@ -520,6 +520,52 @@ func TestRunAppRunDedicatedInfrastructureCommandsWithSakumock(t *testing.T) {
 	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)
 }
 
+// TestRunAppRunDedicatedCreateClusterWithoutPorts は待受ポートを省略した高レベル
+// create-cluster が空配列を送信して作成に成功することを、sakumock 上で検証します。
+// 実 API は待受ポートなしのクラスタ作成を受け付けます (2026-11-13 ライブ検証)。
+// sakumock v0.15.0 から空配列を受け付けるようになったため、ここで検証します。
+func TestRunAppRunDedicatedCreateClusterWithoutPorts(t *testing.T) {
+	t.Setenv("SAKURA_PROFILE_DIR", t.TempDir())
+	t.Setenv("SAKURA_ACCESS_TOKEN", "dummy-token")
+	t.Setenv("SAKURA_ACCESS_TOKEN_SECRET", "dummy-secret")
+	server := apprunmock.NewTestServer(apprunmock.Config{})
+	t.Cleanup(server.Close)
+	t.Setenv("SAKURA_ENDPOINTS_APPRUN_DEDICATED", server.TestURL())
+
+	runCommand := func(args ...string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		require.Equal(t, 0, run(args, &stdout, &stderr), "stderr: %s", stderr.String())
+		return stdout.Bytes()
+	}
+
+	// 高レベルコマンドで待受ポートと Let's Encrypt を省略して作成します。
+	var createdCluster struct {
+		Name                string `json:"name"`
+		ClusterID           string `json:"clusterID"`
+		HasLetsEncryptEmail bool   `json:"hasLetsEncryptEmail"`
+		Ports               []struct {
+			Port     uint16 `json:"port"`
+			Protocol string `json:"protocol"`
+		} `json:"ports"`
+	}
+	require.NoError(t, json.Unmarshal(runCommand("apprun-dedicated", "create-cluster", "no-ports-cluster",
+		"--service-principal-id", "sp-000000000"), &createdCluster))
+	require.Equal(t, "no-ports-cluster", createdCluster.Name)
+	require.NotEmpty(t, createdCluster.ClusterID)
+	require.False(t, createdCluster.HasLetsEncryptEmail)
+	require.Empty(t, createdCluster.Ports, "omitted load balancer ports should not be set")
+
+	// 後片付けとして削除します。
+	var stdoutDelete, stderrDelete bytes.Buffer
+	require.Equal(t, 0, run([]string{"apprun-dedicated", "delete-cluster", "no-ports-cluster", "--force", "--no-wait"},
+		&stdoutDelete, &stderrDelete), "stderr: %s", stderrDelete.String())
+	require.Empty(t, stdoutDelete.String(), "delete-cluster output should be empty")
+
+	violations := server.SpecViolations()
+	require.Len(t, violations, 0, "sakumock recorded OpenAPI response violations: %+v", violations)
+}
+
 // TestRunAppRunDedicatedWaitFlagForms は negatable な単一フラグの --wait、
 // --no-wait、--no-wait=false の各形式が同じ待機オプションとして機能することを
 // 確認します。sakumock の削除は即座に完了するため待機の有無を実行結果からは

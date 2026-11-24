@@ -7,6 +7,7 @@
 
 - 新たな差分や未整備を確認したら、対応する節に「現象」と「影響と現状の扱い」を追記する。
 - upstream (sacloud/sakumock) に issue を起票した項目は、issue へのリンクを残して解消を追跡する。
+- sakumock をバージョン更新するときは、リリースノートと新旧の差分から解消した差分を特定し、この文書の該当箇所とテストのワークアラウンドを見直す。手順は [sakumock の更新評価](../../.agents/skills/sakumock-update/SKILL.md) を参照する。
 - sakumock の更新や実装追加で解消したら、確認した日付と内容を残して該当箇所を更新する。
 - サービスごとの設計文書は「sakumock による検証の状況」だけを書き、差分の詳細はこの文書を参照する。
 - チュートリアルの実行可否の現状は `test/tutorials/baseline.txt` の status と理由、対応表はこの文書の「チュートリアル harness と sakumock の接続状況」に置く。
@@ -31,13 +32,13 @@ IaaS API のモック (sakumockiaas、`internal/sakumock/iaas` のリポジト�
 | 自前モック | sakumock に操作やサーバーが無い場合に、`httptest` または SDK interface の test double で補う |
 | 未整備 | チュートリアル baseline を `deferred` にして、console ブロックの抽出と baseline 照合のみを行う |
 
-## Ogen 系 API (sakumock v0.14.0)
+## Ogen 系 API (sakumock v0.15.0)
 
 ### Workflows
 
 | 操作 | 差分 | 影響と現状の扱い |
 | --- | --- | --- |
-| `list-suggestions` | sakumock は `Suggests` 要素を `{Id, Name}` で返すが、API 応答スキーマ上は要素に `Count` (1 以上の整数) が必須である。SDK (`ListSuggestionsOKSuggestsItem`) も `Name` と `Count` を必須としてデコードするため、応答のデコードが `Count (field required)` で失敗する。sakumock 自身の応答スキーマ検証 (`validate_gen.go`) も `Count` を必須としており、モック内部の不整合。実 API の要素は `{Name, Count}` で、`Id` は含まない (2026-11-19 ライブ検証)。詳細は [sacloud/sakumock#265](https://github.com/sacloud/sakumock/issues/265) を参照 | 許容。ライフサイクル E2E (`test/e2e/workflows/scenario_lifecycle_test.go` の `tryListWorkflowsSuggestions`) は、デコードエラーのメッセージが一致する場合だけ制約として通し、それ以外のエラーは失敗扱いにする。正常系はライブ E2E で検証済み (2026-11-19、作成直後のワークフローが候補に即時反映されることも確認)。チュートリアル (`docs/manual/tutorials/workflows-api.md`) は候補検索を対象外にしている |
+| `list-suggestions` | ~~sakumock は `Suggests` 要素を `{Id, Name}` で返すが、API 応答スキーマ上は要素に `Count` (1 以上の整数) が必須である。SDK (`ListSuggestionsOKSuggestsItem`) も `Name` と `Count` を必須としてデコードするため、応答のデコードが `Count (field required)` で失敗する。sakumock 自身の応答スキーマ検証 (`validate_gen.go`) も `Count` を必須としており、モック内部の不整合。実 API の要素は `{Name, Count}` で、`Id` は含まない (2026-11-19 ライブ検証)。詳細は [sacloud/sakumock#265](https://github.com/sacloud/sakumock/issues/265) を参照~~ | 解消 (2026-11-24、sakumock v0.15.0 で確認)。sakumock v0.15.0 は要素を `{Name, Count}` で返す ([sacloud/sakumock#266](https://github.com/sacloud/sakumock/issues/266))。CLI 操作テスト (`internal/cli/workflows_test.go`) は sakumock 上で正常系の応答照合を行うように変え、エラー許容と自前テストサーバー (`TestRunWorkflowsAPIListSuggestions`) を撤去した。ライフサイクル E2E (`test/e2e/workflows/scenario_lifecycle_test.go` の `listWorkflowsSuggestions`) も候補の正常系を検証する |
 
 ### Workflows の動作メモ (差分ではないがテスト設計に関わる事項)
 
@@ -49,7 +50,7 @@ IaaS API のモック (sakumockiaas、`internal/sakumock/iaas` のリポジト�
 
 | 操作 | 差分 | 影響と現状の扱い |
 | --- | --- | --- |
-| `create-cluster` | sakumock は `ports` が空配列 (または要素なし) の作成リクエストを 400 (`at least one port is required`) で拒否する (`apprundedicated/validate.go` の `validateClusterPorts`)。実 API は空配列を受け付け、2026-11-13 のライブ実行で待受ポートなしのクラスタ作成を確認済み。詳細は [sacloud/sakumock#267](https://github.com/sacloud/sakumock/issues/267) を参照 | 許容。sakumock での検証では待受ポートを 1 つ以上指定する (`internal/cli` の CLI 操作テストとチュートリアル harness が該当)。高レベル `create-cluster` での待受ポート省略 (空配列送信) は、service 層の fake テストとライブ E2E で検証する |
+| `create-cluster` | ~~sakumock は `ports` が空配列 (または要素なし) の作成リクエストを 400 (`at least one port is required`) で拒否する (`apprundedicated/validate.go` の `validateClusterPorts`)。実 API は空配列を受け付け、2026-11-13 のライブ実行で待受ポートなしのクラスタ作成を確認済み。詳細は [sacloud/sakumock#267](https://github.com/sacloud/sakumock/issues/267) を参照~~ | 解消 (2026-11-24、sakumock v0.15.0 で確認)。sakumock v0.15.0 は空配列を受け付ける ([sacloud/sakumock#269](https://github.com/sacloud/sakumock/issues/269))。CLI 操作テスト (`internal/cli/apprundedicated_commands_test.go` の `TestRunAppRunDedicatedCreateClusterWithoutPorts`) に待受ポート省略の作成と削除の検証を追加した。待受ポート省略 (空配列送信) は、service 層の fake テストとライブ E2E に加えて、sakumock の CLI 操作テストでも検証する |
 
 ### Monitoring Suite
 
