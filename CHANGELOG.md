@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.4.0](https://github.com/sacloud/skr/compare/v0.3.0...v0.4.0) - 2026-11-24
+
+### 🚀 Changes
+- skr dns-api で DNS ゾーンとレコードを操作できるようにする by @tokuhirom in https://github.com/sacloud/skr/pull/289
+- monitoring-suite-api のコマンド群を追加する by @tokuhirom in https://github.com/sacloud/skr/pull/291
+- nfs-api コマンドを追加する by @tokuhirom in https://github.com/sacloud/skr/pull/292
+- sacloud-sdk-go を dependabot の対象から外し、更新手順をスキルとして整理する by @tokuhirom in https://github.com/sacloud/skr/pull/295
+- sakumock v0.15.0 で解消した差分に対応するワークアラウンドを撤去する by @tokuhirom in https://github.com/sacloud/skr/pull/298
+- PLAN.md の IaaS リソース候補に SDK 定義から確認した説明を追記する by @tokuhirom in https://github.com/sacloud/skr/pull/297
+- PLAN.md に vpcrouter を次の対応対象として明記し、nosql を見送りとして記載する by @tokuhirom in https://github.com/sacloud/skr/pull/299
+- ゾーン必須の IaaS 操作で入力なし実行に --zone の指定を促すメッセージを返す by @tokuhirom in https://github.com/sacloud/skr/pull/300
+### 📦 Dependency Updates
+- go: bump github.com/sacloud/sacloud-sdk-go from 0.7.0 to 0.7.1 by @dependabot[bot] in https://github.com/sacloud/skr/pull/293
+- go: bump github.com/sacloud/sakumock from 0.14.0 to 0.15.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/294
+- ci: bump actions/setup-go from 7.0.0 to 7.1.0 by @dependabot[bot] in https://github.com/sacloud/skr/pull/296
+
 ## [v0.3.0](https://github.com/sacloud/skr/compare/v0.2.2...v0.3.0) - 2026-11-19
 
 ### 🚀 Changes
