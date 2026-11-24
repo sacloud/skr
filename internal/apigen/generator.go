@@ -368,7 +368,11 @@ func (c *{{.CommandType}}) Run(ctx *kong.Context) error {
 {{- if or .Flags .RepeatedFlags }}
 		if !flagsSet {
 {{- if not .RequestOptional }}
+{{- if .ValidateZone }}
+			return fmt.Errorf("--zone が必要です")
+{{- else }}
 			return fmt.Errorf("--request または個別フラグが必要です")
+{{- end }}
 {{- end }}
 		}
 {{- else }}

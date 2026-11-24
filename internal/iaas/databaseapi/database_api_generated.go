@@ -116,7 +116,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -189,7 +189,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -260,7 +260,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -322,7 +322,7 @@ func (c *BootCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -383,7 +383,7 @@ func (c *ShutdownCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -443,7 +443,7 @@ func (c *ResetCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -501,7 +501,7 @@ func (c *MonitorCPUCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -578,7 +578,7 @@ func (c *MonitorDiskCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -655,7 +655,7 @@ func (c *MonitorInterfaceCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -732,7 +732,7 @@ func (c *MonitorDatabaseCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -808,7 +808,7 @@ func (c *ListParameterCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")

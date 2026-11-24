@@ -116,7 +116,7 @@ func (c *FindCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Names != nil {
 			request.Names = []string{*c.Names}
@@ -189,7 +189,7 @@ func (c *ReadCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -266,7 +266,7 @@ func (c *CreateCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -363,7 +363,7 @@ func (c *UpdateCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -448,7 +448,7 @@ func (c *DeleteCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Force != nil {
 			request.Force = *c.Force
@@ -508,7 +508,7 @@ func (c *ListSubnetCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -579,7 +579,7 @@ func (c *AddSubnetCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -662,7 +662,7 @@ func (c *UpdateSubnetCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -744,7 +744,7 @@ func (c *DeleteSubnetCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -805,7 +805,7 @@ func (c *ReadIpv6Command) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -872,7 +872,7 @@ func (c *EnableIpv6Command) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -939,7 +939,7 @@ func (c *DisableIpv6Command) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")
@@ -997,7 +997,7 @@ func (c *MonitorRouterCommand) Run(ctx *kong.Context) error {
 		}
 	} else {
 		if !flagsSet {
-			return fmt.Errorf("--request または個別フラグが必要です")
+			return fmt.Errorf("--zone が必要です")
 		}
 		if c.Zone == nil {
 			return fmt.Errorf("--zone が必要です")

@@ -185,7 +185,7 @@ func TestCreateCommandRequestTransformLifecycle(t *testing.T) {
 		{name: "explicit empty disk", args: []string{"--request", "{}", "--disk", ""}, mode: "normal", want: "併用できません"},
 		{name: "explicit empty nic", args: []string{"--request", "{}", "--nic", ""}, mode: "normal", want: "併用できません"},
 		{name: "missing name", args: []string{"--zone", "is1b", "--cpu", "1", "--memory-gb", "1", "--disk", "plan-id=4,size-gb=20"}, mode: "normal", want: "--name が必要です"},
-		{name: "no input", mode: "normal", want: "--request または個別フラグが必要です"},
+		{name: "no input", mode: "normal", want: "--zone が必要です"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			command := CreateCommand{}
